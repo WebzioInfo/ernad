@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ernad_postgres
+    environment:
+      POSTGRES_USER: ernad_admin
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: ernad_prod
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - ernad_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ernad_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ernad_network
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ernad_backend
+    environment:
+      DATABASE_URL: postgresql://ernad_admin:secretpassword@db:5432/ernad_prod?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: supersecretjwtkeyxyz
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - ernad_network
+
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    container_name: ernad_frontend_admin
+    ports:
+      - "8080:80"
+    networks:
+      - ernad_network
+
+  frontend-operator:
+    build:
+      context: ./frontend-operator
+      dockerfile: Dockerfile
+    container_name: ernad_frontend_operator
+    ports:
+      - "8081:80"
+    networks:
+      - ernad_network
+
+volumes:
+  pgdata:
+
+networks:
+  ernad_network:
+    driver: bridge
+
+# To run:
+# docker-compose up -d
