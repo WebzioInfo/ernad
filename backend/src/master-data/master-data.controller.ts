@@ -7,7 +7,7 @@ import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Master Data')
 @ApiBearerAuth()
-@Controller('api/master-data')
+@Controller('master-data')
 export class MasterDataController {
   constructor(private readonly masterDataService: MasterDataService) {}
 

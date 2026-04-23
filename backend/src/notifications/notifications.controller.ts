@@ -10,7 +10,7 @@ class RegisterTokenDto {
   platform: 'web' | 'android' | 'ios';
 }
 
-@Controller('api/notifications')
+@Controller('notifications')
 @UseGuards(AuthGuard, RolesGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}

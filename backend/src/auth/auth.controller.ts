@@ -16,7 +16,7 @@ import { AuthGuard } from './auth.guard';
 import { LoginDto, StartSessionDto, ResetCredentialDto } from './dto/auth.dto';
 
 @ApiTags('Auth')
-@Controller('api/auth')
+@Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 

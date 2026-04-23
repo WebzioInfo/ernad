@@ -11,7 +11,7 @@ import { CreateLogDto } from './dto/create-log.dto';
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @UseInterceptors(AuditInterceptor)
-@Controller('api/logs')
+@Controller('logs')
 export class OperatorLogsController {
   constructor(private readonly logsService: OperatorLogsService) {}
   

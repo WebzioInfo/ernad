@@ -8,7 +8,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @ApiTags('Changeover')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
-@Controller('api/changeover')
+@Controller('changeover')
 
 
 export class ChangeoverController {

@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm';
 import * as os from 'os';
 
 @ApiTags('Health Check')
-@Controller('api/health')
+@Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 

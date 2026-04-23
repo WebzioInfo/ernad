@@ -10,7 +10,7 @@ import { AuthGuard } from '../auth/auth.guard';
 @ApiTags('Production Batch')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
-@Controller('api/production-batch')
+@Controller('production-batch')
 
 export class ProductionBatchController {
   constructor(private readonly batchService: ProductionBatchService) {}

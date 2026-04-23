@@ -20,6 +20,8 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.setGlobalPrefix('api', { exclude: ['/'] });
+
   // Swagger Configuration
   const { SwaggerModule, DocumentBuilder } = await import('@nestjs/swagger');
   const config = new DocumentBuilder()
@@ -31,12 +33,12 @@ async function bootstrap() {
   
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
-    customCssUrl:
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css',
+    customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css',
     customJs: [
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-standalone-preset.js',
+      'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js',
+      'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-standalone-preset.js',
     ],
+    customfavIcon: 'https://ernad-mes.vercel.app/favicon-32x32.png',
   });
 
   const port = process.env.PORT || 4000;

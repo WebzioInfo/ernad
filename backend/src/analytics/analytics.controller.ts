@@ -8,7 +8,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 @ApiTags('Analytics')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
-@Controller('api/analytics')
+@Controller('analytics')
 
 
 
