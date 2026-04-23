@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, ForbiddenException, NotFoundExceptio
 import { JwtService } from '@nestjs/jwt';
 import { db } from '../db/db';
 import { users, operatorSessions } from '../db/schema';
-import { eq, ilike, and, isNull, sql } from 'drizzle-orm';
+import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -13,7 +13,10 @@ export class AuthService {
 
   async login(identity: string, credential: string, type?: 'PASSWORD' | 'PIN') {
     const userResult = await db.select().from(users).where(
-      sql`${users.username} = ${identity} OR ${users.email} = ${identity}`
+      or(
+        ilike(users.username, identity),
+        ilike(users.email, identity)
+      )
     );
     const user = userResult[0];
 

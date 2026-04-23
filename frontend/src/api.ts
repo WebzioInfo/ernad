@@ -19,8 +19,11 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      toast.error('Session expired. Please log in again.');
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      if (!isLoginRequest) {
+        useAuthStore.getState().logout();
+        toast.error('Session expired. Please log in again.');
+      }
     }
     return Promise.reject(error);
   }
