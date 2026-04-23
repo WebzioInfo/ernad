@@ -20,7 +20,15 @@ export default function Login() {
     setLoading(true);
     try {
       // Intelligent Auto-Detection Flow (No "Type" toggle needed)
-      const res = await api.post('/auth/login', { identity, credential });
+      // Added trimming and type hint to match Swagger behavior
+      const trimmedIdentity = identity.trim();
+      const detectedType = credential.length <= 6 && /^\d+$/.test(credential) ? 'PIN' : 'PASSWORD';
+      
+      const res = await api.post('/auth/login', { 
+        identity: trimmedIdentity, 
+        credential,
+        type: detectedType
+      });
       setAuth(res.data.access_token, res.data.user);
       toast.success(`Welcome back, ${res.data.user.name.split(' ')[0]}`);
 

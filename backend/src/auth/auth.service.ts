@@ -12,10 +12,11 @@ export class AuthService {
   constructor(private jwtService: JwtService) {}
 
   async login(identity: string, credential: string, type?: 'PASSWORD' | 'PIN') {
+    const trimmedIdentity = identity.trim();
     const userResult = await db.select().from(users).where(
       or(
-        ilike(users.username, identity),
-        ilike(users.email, identity)
+        ilike(users.username, trimmedIdentity),
+        ilike(users.email, trimmedIdentity)
       )
     );
     const user = userResult[0];
