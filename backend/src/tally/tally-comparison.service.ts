@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { db } from '../db/drizzle.provider'; // Assume Drizzle DB provider exists
-import { materialFlows } from '../db/drizzle-schema'; 
+import { db } from '../db/db';
+import { materialFlows } from '../db/schema';
 // (assuming system_inventory is added to schema, or raw query used)
 import { sql } from 'drizzle-orm';
 
@@ -30,7 +30,7 @@ export class TallyComparisonService {
         SELECT material_name, current_stock FROM system_inventory
       `);
 
-      const systemStockMap = systemStockDocs.rows.reduce((acc, row) => {
+      const systemStockMap = (systemStockDocs as any[]).reduce((acc, row) => {
           acc[row.material_name as string] = row.current_stock;
           return acc;
       }, {} as Record<string, number>);

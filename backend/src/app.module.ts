@@ -8,20 +8,29 @@ import { ChangeoverService } from './changeover/changeover.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { MasterDataModule } from './master-data/master-data.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { HealthModule } from './health/health.module';
+import { MailModule } from './mail/mail.module';
+import { MediaModule } from './media/media.module';
+import { EventsModule } from './events/events.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { OneSignalModule } from './firebase/onesignal.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, UsersModule, MasterDataModule, AnalyticsModule, HealthModule, MailModule, MediaModule, EventsModule, NotificationsModule, OneSignalModule],
   controllers: [
-    ProductionBatchController, 
+    ProductionBatchController,
     OperatorLogsController,
     ChangeoverController,
-    ReportsController
+    ReportsController,
   ],
   providers: [
     ProductionBatchService,
     OperatorLogsService,
     ChangeoverService,
-    ReportsService
+    ReportsService,
   ],
 })
 export class AppModule {}

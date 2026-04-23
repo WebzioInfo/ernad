@@ -1,8 +1,10 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { db } from './db';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/ernad-db',
-});
+// Re-export the optimized db instance for backward compatibility and NestJS providers
+export { db };
+export const DRIZZLE_PROVIDER = 'DRIZZLE_PROVIDER';
 
-export const db = drizzle(pool);
+export const drizzleProvider = {
+  provide: DRIZZLE_PROVIDER,
+  useValue: db,
+};

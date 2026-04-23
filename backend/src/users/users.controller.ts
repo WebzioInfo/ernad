@@ -1,0 +1,134 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UsersService, CreateOperatorDto, UpdateOperatorDto } from './users.service';
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+
+@ApiTags('Users')
+@ApiBearerAuth()
+@Controller('api/users')
+@UseGuards(AuthGuard, RolesGuard)
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * GET /api/users
+   * Admin/Manager — List all operators (no passwords)
+   */
+  @Get()
+  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get all operators (Admin/Manager)' })
+  getAllOperators() {
+    return this.usersService.getAllOperators();
+  }
+
+  /**
+   * GET /api/users/:id
+   * Admin/Manager — Get a single operator
+   */
+  @Get(':id')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get operator by ID (Admin/Manager)' })
+  getOperatorById(@Param('id') id: string) {
+    return this.usersService.getOperatorById(id);
+  }
+
+  /**
+   * POST /api/users
+   * Admin only — Create a new operator with bcrypt PIN
+   */
+  @Post()
+  @Roles('SUPER_ADMIN')
+
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new operator (Admin only)' })
+  createOperator(@Body() dto: CreateOperatorDto) {
+    return this.usersService.createOperator(dto);
+  }
+
+  /**
+   * PATCH /api/users/:id
+   * Admin only — Update operator details
+   */
+  @Patch(':id')
+  @Roles('SUPER_ADMIN')
+
+  @ApiOperation({ summary: 'Update operator details (Admin only)' })
+  updateOperator(@Param('id') id: string, @Body() dto: UpdateOperatorDto) {
+    return this.usersService.updateOperator(id, dto);
+  }
+
+  /**
+   * PATCH /api/users/:id/toggle-active
+   * Admin only — Toggle active/inactive status
+   */
+  @Patch(':id/toggle-active')
+  @Roles('SUPER_ADMIN')
+
+  @ApiOperation({ summary: 'Toggle operator active status (Admin only)' })
+  toggleActive(@Param('id') id: string) {
+    return this.usersService.toggleActive(id);
+  }
+
+  /**
+   * PATCH /api/users/:id/reset-pin
+   * Admin only — Reset a user's PIN
+   * Body: { newPin: string }
+   */
+  @Patch(':id/reset-pin')
+  @Roles('SUPER_ADMIN')
+
+  @ApiOperation({ summary: 'Reset operator PIN (Admin only)' })
+  resetPin(@Param('id') id: string, @Body() body: { newPin: string }) {
+    return this.usersService.resetPin(id, body.newPin);
+  }
+
+  /**
+   * POST /api/users/:id/avatar
+   * Admin/Manager — Upload/Update personnel avatar
+   */
+  @Post(':id/avatar')
+  @Roles('SUPER_ADMIN')
+
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload personnel avatar (Admin/Manager)' })
+  uploadAvatar(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+    return this.usersService.updateAvatar(id, file);
+  }
+
+  /**
+   * DELETE /api/users/:id
+   * Super Admin only — Permanently delete an operator
+   */
+  @Delete(':id')
+  @Roles('SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete operator (Super Admin only)' })
+  deleteOperator(@Param('id') id: string) {
+    return this.usersService.deleteOperator(id);
+  }
+}

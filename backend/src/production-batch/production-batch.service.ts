@@ -1,33 +1,59 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { db } from '../db/drizzle.provider';
-import { productionBatches, changeoverLogs, materialFlows } from '../db/drizzle-schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { db } from '../db/db';
+import { productionBatches, changeoverLogs, materialFlows, productionLines, users, batchSnapshots, batchTotals } from '../db/schema';
+import { eq, and, sql, desc } from 'drizzle-orm';
 
 @Injectable()
 export class ProductionBatchService {
   private readonly logger = new Logger(ProductionBatchService.name);
 
   async startBatch(lineId: string, brandId: string, productId: string, shiftId: string) {
-    // Check if another batch is running on this line
-    const activeBatch = await db.select().from(productionBatches)
+    return await db.transaction(async (tx) => {
+      // Check if another batch is running on this line
+      const activeBatch = await tx.select().from(productionBatches)
+        .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
+        .limit(1);
+
+      if (activeBatch.length > 0) {
+        throw new BadRequestException('A batch is already running on this line.');
+      }
+
+      const newBatch = await tx.insert(productionBatches).values({
+        lineId,
+        brandId,
+        productId,
+        shiftId,
+        startTime: new Date(),
+        status: 'RUNNING',
+      }).returning();
+
+      // Initialize Atomic Totals for MES flow validation
+      await tx.insert(batchTotals).values({
+        batchId: newBatch[0].id,
+        lineId: lineId,
+        blowingTotal: 0,
+        fillingTotal: 0,
+        labelingTotal: 0,
+        packingTotal: 0,
+      });
+
+
+      this.logger.log(`Started new batch ${newBatch[0].id} on line ${lineId}`);
+      
+      // Update Line Status
+      await tx.update(productionLines).set({ status: 'RUNNING' }).where(eq(productionLines.id, lineId));
+      
+      return newBatch[0];
+    });
+  }
+
+
+  async getActiveBatchByLine(lineId: string) {
+    const batch = await db.select().from(productionBatches)
       .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
       .limit(1);
-
-    if (activeBatch.length > 0) {
-      throw new BadRequestException('A batch is already running on this line.');
-    }
-
-    const newBatch = await db.insert(productionBatches).values({
-      lineId,
-      brandId,
-      productId,
-      shiftId,
-      startTime: new Date(),
-      status: 'RUNNING',
-    }).returning();
-
-    this.logger.log(`Started new batch ${newBatch[0].id} on line ${lineId}`);
-    return newBatch[0];
+    
+    return batch[0] || null;
   }
 
   async initiateChangeover(batchId: string, toProductId: string, userId: string) {
@@ -40,27 +66,35 @@ export class ProductionBatchService {
     const batch = (await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)))[0];
 
     // 3. Calculate materials left over (This is an aggregate of material_flows)
-    const materials = await db.execute(sql`
+    const materials = (await db.execute(sql`
       SELECT material_name, (SUM(issued) - SUM(used) - SUM(wasted)) as leftover
       FROM material_flows
       WHERE batch_id = ${batchId}
       GROUP BY material_name
-    `);
+    `)) as any[];
 
-    const leftoverMaterials = materials.rows.reduce((acc, row) => {
+    const leftoverMaterials = materials.reduce((acc, row) => {
         if (Number(row.leftover) > 0) acc[row.material_name as string] = row.leftover;
         return acc;
     }, {});
 
-    // 4. Record changeover
+    // 4. Record Snapshot (The "Memory" of the line)
+    await db.insert(batchSnapshots).values({
+      batchId,
+      snapshotType: 'CHANGEOVER_START',
+      data: leftoverMaterials,
+      recordedAt: new Date()
+    });
+
+    // 5. Record changeover
     const changeover = await db.insert(changeoverLogs).values({
       batchId,
       lineId: batch.lineId,
       fromProductId: batch.productId,
       toProductId,
       startTime: new Date(),
-      leftoverMaterials, // JSON of things like { "Preforms": 500, "Labels": 800 }
-      wastedMaterials: {}, // This would be populated by operator inputs during changeover
+      leftoverMaterials, 
+      wastedMaterials: {}, 
       createdBy: userId
     }).returning();
 

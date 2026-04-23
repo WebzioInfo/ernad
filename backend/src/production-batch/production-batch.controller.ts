@@ -1,22 +1,30 @@
 import { Controller, Post, Body, Param, Put, Get, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductionBatchService } from './production-batch.service';
 
-// Pseudo-code for guard import
-// import { RolesGuard } from '../auth/roles.guard'; 
-// import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard'; 
+import { Roles } from '../auth/roles.decorator';
+import { AuthGuard } from '../auth/auth.guard';
 
+
+@ApiTags('Production Batch')
+@ApiBearerAuth()
+@UseGuards(AuthGuard, RolesGuard)
 @Controller('api/production-batch')
+
 export class ProductionBatchController {
   constructor(private readonly batchService: ProductionBatchService) {}
 
   @Post('start')
-  // @Roles('MANAGER', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'MANAGER')
+
   async startBatch(@Body() dto: { lineId: string; brandId: string; productId: string; shiftId: string }) {
     return await this.batchService.startBatch(dto.lineId, dto.brandId, dto.productId, dto.shiftId);
   }
 
   @Post(':id/changeover')
-  // @Roles('MANAGER')
+  @Roles('SUPER_ADMIN', 'MANAGER')
+
   async initiateChangeover(
     @Param('id') batchId: string, 
     @Body() dto: { toProductId: string; userId: string }
@@ -25,22 +33,16 @@ export class ProductionBatchController {
   }
 
   @Put(':id/close')
-  // @Roles('MANAGER', 'ADMIN')
+  @Roles('SUPER_ADMIN', 'MANAGER')
+
   async closeBatch(@Param('id') batchId: string) {
     await this.batchService.closeBatch(batchId);
     return { success: true, message: 'Batch closed successfully.' };
   }
-}
 
-// Separate controller for high-volume logs
-@Controller('api/logs')
-export class OperatorLogsController {
-  
-  @Post('filling')
-  // @Roles('FILLING_OPERATOR')
-  async logFilling(@Body() dto: { batchId: string; operatorId: string; bottleCount: number; capWastage: number }) {
-    // Calling an assumed OperatorLogsService
-    // Return fast 201 Created responding to the operator touch panel
-    return { success: true, loggedAt: new Date() };
+  @Get('active/:lineId')
+  @ApiOperation({ summary: 'Get the active batch for a production line' })
+  async getActiveBatch(@Param('lineId') lineId: string) {
+    return await this.batchService.getActiveBatchByLine(lineId);
   }
 }

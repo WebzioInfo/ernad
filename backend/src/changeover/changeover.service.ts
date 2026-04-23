@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { db } from '../db/drizzle.provider';
-import { changeoverLogs, productionBatches } from '../db/drizzle-schema';
+import { db } from '../db/db';
+import { changeoverLogs, productionBatches } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 @Injectable()
