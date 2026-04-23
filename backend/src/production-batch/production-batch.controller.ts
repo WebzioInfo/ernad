@@ -45,4 +45,16 @@ export class ProductionBatchController {
   async getActiveBatch(@Param('lineId') lineId: string) {
     return await this.batchService.getActiveBatchByLine(lineId);
   }
+
+  @Post('historical')
+  @Roles('SUPER_ADMIN', 'MANAGER')
+  async createHistoricalBatch(@Body() dto: any) {
+    return await this.batchService.createHistoricalBatch(dto);
+  }
+
+  @Post('log-historical')
+  @Roles('SUPER_ADMIN', 'MANAGER')
+  async addStationLog(@Body() dto: { station: string; payload: any }) {
+    return await this.batchService.addStationLog(dto.station, dto.payload);
+  }
 }

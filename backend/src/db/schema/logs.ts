@@ -58,6 +58,7 @@ export const operatorBlowingLogs = pgTable('operator_blowing_logs', {
   preformCount: integer('preform_count').notNull().default(0),
   bagsUsed: integer('bags_used').notNull().default(0),
   damaged: integer('damaged').notNull().default(0),
+  remarks: varchar('remarks', { length: 500 }),
   loggedAt: timestamp('logged_at').defaultNow().notNull(),
 }, (table) => {
   return [index('idx_blowing_batch').on(table.batchId)];
@@ -70,6 +71,7 @@ export const operatorFillingLogs = pgTable('operator_filling_logs', {
   bottleCount: integer('bottle_count').notNull().default(0),
   capWastage: integer('cap_wastage').notNull().default(0),
   boxesUsed: integer('boxes_used').notNull().default(0),
+  remarks: varchar('remarks', { length: 500 }),
   loggedAt: timestamp('logged_at').defaultNow().notNull(),
 }, (table) => {
   return [index('idx_filling_batch').on(table.batchId)];
@@ -83,6 +85,7 @@ export const operatorLabelingLogs = pgTable('operator_labeling_logs', {
   inkUsedMl: integer('ink_used_ml').notNull().default(0),
   makeupUsedMl: integer('makeup_used_ml').notNull().default(0),
   cleaningSolutionUsedMl: integer('cleaning_solution_used_ml').notNull().default(0),
+  remarks: varchar('remarks', { length: 500 }),
   loggedAt: timestamp('logged_at').defaultNow().notNull(),
 }, (table) => {
   return [index('idx_labeling_batch').on(table.batchId)];
@@ -95,6 +98,7 @@ export const operatorPackingLogs = pgTable('operator_packing_logs', {
   shrinkRollUsedKg: decimal('shrink_roll_used_kg', { precision: 10, scale: 2 }).notNull().default('0'),
   shrinkWastageKg: decimal('shrink_wastage_kg', { precision: 10, scale: 2 }).notNull().default('0'),
   packedCount: integer('packed_count').notNull().default(0),
+  remarks: varchar('remarks', { length: 500 }),
   loggedAt: timestamp('logged_at').defaultNow().notNull(),
 }, (table) => {
   return [index('idx_packing_batch').on(table.batchId)];

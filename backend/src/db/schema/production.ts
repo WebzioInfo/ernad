@@ -6,6 +6,8 @@ export const batchStatusEnum = pgEnum('batch_status', ['RUNNING', 'CHANGEOVER', 
 
 export const productionBatches = pgTable('production_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
+  batchCode: varchar('batch_code', { length: 50 }),
+  productionDate: timestamp('production_date'),
   lineId: uuid('line_id').references(() => productionLines.id).notNull(),
   brandId: uuid('brand_id').references(() => productBrands.id).notNull(),
   productId: uuid('product_id').references(() => products.id).notNull(),
