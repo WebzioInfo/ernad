@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import Watermark from './Watermark';
 import { useWebSocket } from '../hooks/useWebSocket';
 import NotificationBell from './NotificationBell';
+import ProductionLedger from './ProductionLedger';
 
 type ActiveTab = 'dashboard' | 'users' | 'production' | 'analytics' | 'reports' | 'entries';
 
@@ -666,20 +667,20 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <nav className="flex-1 py-4">
-          <ul className="space-y-1 px-3">
+        <nav className="flex-1 py-6">
+          <ul className="space-y-1.5 px-4">
             {navItems.map((item) => (
               <li key={item.name}>
                 <button
                   onClick={() => setActiveTab(item.key!)}
-                  className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all ${
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 ${
                     activeTab === item.key
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-slate-600 hover:bg-slate-50'
+                      ? 'bg-blue-600 text-white font-bold shadow-lg shadow-blue-600/30 scale-[1.02]'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
-                  <item.icon className={`w-4 h-4 ${activeTab === item.key ? 'text-blue-600' : 'text-slate-400'}`} />
-                  <span className="text-sm">{item.name}</span>
+                  <item.icon className={`w-4.5 h-4.5 ${activeTab === item.key ? 'text-white' : 'text-slate-400'}`} />
+                  <span className="text-sm tracking-tight">{item.name}</span>
                 </button>
               </li>
             ))}
@@ -707,41 +708,46 @@ export default function AdminDashboard() {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center space-x-3 px-4 py-2 w-full text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all text-sm font-medium"
+            className="flex items-center space-x-3 px-4 py-2 w-full text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all text-xs font-black uppercase tracking-widest"
           >
             <LogOut className="w-4 h-4" />
-            <span>Log Out</span>
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center z-10 sticky top-0">
-          <div>
-            <h1 className="text-xl font-bold text-slate-800">
-              {activeTab === 'dashboard' && 'Overview'}
-              {activeTab === 'users' && 'User Management'}
-              {activeTab === 'production' && 'Production Control'}
-              {activeTab === 'analytics' && 'AI Analytics'}
-              {activeTab === 'reports' && 'System Reports'}
-              {activeTab === 'entries' && 'Data Entry Terminal'}
-            </h1>
-
-
-            <p className="text-xs text-slate-500">
-              Manage system users and production lines
-            </p>
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 py-5 flex justify-between items-center z-30 sticky top-0">
+          <div className="flex items-center gap-4">
+            <div className="w-1.5 h-8 bg-blue-600 rounded-full" />
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                {activeTab === 'dashboard' && 'System Overview'}
+                {activeTab === 'users' && 'Personnel Directory'}
+                {activeTab === 'production' && 'Line Controls'}
+                {activeTab === 'analytics' && 'Intelligent Insights'}
+                {activeTab === 'reports' && 'Business Intelligence'}
+                {activeTab === 'entries' && 'Terminal Access'}
+              </h1>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
+                {activeTab === 'dashboard' ? 'Real-time performance metrics' : 'Administrative control center'}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2 bg-slate-100 px-4 py-2 rounded-full border border-slate-200">
-            <span className="flex h-2.5 w-2.5 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <span className="text-sm font-semibold text-slate-600   text-xs">{currentUser?.role === 'SUPER_ADMIN' ? 'Full Access' : 'View Only'}</span>
-
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100 shadow-inner">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-tight">
+                {currentUser?.role === 'SUPER_ADMIN' ? 'Elevated Access' : 'Standard View'}
+              </span>
+            </div>
+            <div className="h-8 w-px bg-slate-200" />
+            <NotificationBell />
           </div>
-          <NotificationBell />
         </header>
 
         {activeTab === 'dashboard' && (
@@ -753,38 +759,56 @@ export default function AdminDashboard() {
                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                        <Activity className="w-5 h-5" />
-                     </div>
-                     <h3 className="text-sm font-semibold text-slate-600">Total Efficiency</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+               <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-500 group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform duration-700">
+                     <Activity className="w-24 h-24 text-blue-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">98.4%</div>
-                  <p className="text-xs text-emerald-600 mt-1 font-medium">Optimal performance</p>
+                  <div className="flex items-center gap-4 mb-6">
+                     <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-colors duration-300">
+                        <Activity className="w-6 h-6" />
+                     </div>
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Total Efficiency</h3>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight italic">98.4%</div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                    <span className="text-[11px] text-emerald-600 font-black uppercase">Optimal performance</span>
+                  </div>
                </div>
 
-               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                        <Zap className="w-5 h-5" />
-                     </div>
-                     <h3 className="text-sm font-semibold text-slate-600">Active Batches</h3>
+               <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-amber-500/5 transition-all duration-500 group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform duration-700">
+                     <Zap className="w-24 h-24 text-amber-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">{lines.filter((l: any) => l.status === 'RUNNING').length}</div>
-                  <p className="text-xs text-slate-500 mt-1">Running now</p>
+                  <div className="flex items-center gap-4 mb-6">
+                     <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors duration-300">
+                        <Zap className="w-6 h-6" />
+                     </div>
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Batches</h3>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight italic">{lines.filter((l: any) => l.status === 'RUNNING').length}</div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-400" />
+                    <span className="text-[11px] text-slate-500 font-black uppercase">Running across lines</span>
+                  </div>
                </div>
 
-               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
-                        <Clock className="w-5 h-5" />
-                     </div>
-                     <h3 className="text-sm font-semibold text-slate-600">System Uptime</h3>
+               <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 hover:shadow-2xl hover:shadow-indigo-500/5 transition-all duration-500 group relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-110 transition-transform duration-700">
+                     <Clock className="w-24 h-24 text-indigo-600" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">24/7</div>
-                  <p className="text-xs text-slate-500 mt-1">Always online</p>
+                  <div className="flex items-center gap-4 mb-6">
+                     <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors duration-300">
+                        <Clock className="w-6 h-6" />
+                     </div>
+                     <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">System Uptime</h3>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight italic">24/7</div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                    <span className="text-[11px] text-emerald-600 font-black uppercase">High Availability</span>
+                  </div>
                </div>
             </div>
 
@@ -1081,60 +1105,18 @@ export default function AdminDashboard() {
         {/* Data Entry Tab */}
         {activeTab === 'entries' && (
           <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
-             <div className="bg-white rounded-[2.5rem] p-10 border border-slate-200 shadow-xl max-w-4xl mx-auto">
+             <div className="max-w-4xl mx-auto">
                 <div className="flex items-center gap-4 mb-10">
                    <div className="p-3 bg-blue-600 rounded-2xl">
                       <PackageOpen className="w-6 h-6 text-white" />
                    </div>
                    <div>
-                      <h3 className="text-2xl font-bold text-slate-900">Manual Log Creation</h3>
-                      <p className="text-xs text-slate-500 font-semibold mt-1 uppercase tracking-wider">Super Admin Override</p>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight italic uppercase">System Ledger</h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Manual Production Entry & Historical Sync</p>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-8">
-                   <div className="space-y-4">
-                      <label className="text-xs font-bold text-slate-500 ml-1">Select Station</label>
-                      <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500">
-                         <option>Blowing Station</option>
-                         <option>Filling Station</option>
-                         <option>Labeling Station</option>
-                         <option>Packing Station</option>
-                      </select>
-                   </div>
-                   <div className="space-y-4">
-                      <label className="text-xs font-bold text-slate-500 ml-1">Production Line</label>
-                      <select className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500">
-                         {lines.map((l: any) => (
-                           <option key={l.id}>{l.name}</option>
-                         ))}
-                      </select>
-                   </div>
-                   <div className="space-y-4">
-                      <label className="text-xs font-bold text-slate-500 ml-1">Primary Count</label>
-                      <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                   </div>
-                   <div className="space-y-4">
-                      <label className="text-xs font-bold text-slate-500 ml-1">Wastage Count</label>
-                      <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
-                   </div>
-                </div>
-
-                <div className="mt-12 p-8 bg-blue-50 rounded-[2rem] border border-blue-100">
-                   <div className="flex items-start gap-4">
-                      <ShieldCheck className="w-6 h-6 text-blue-600 mt-1" />
-                      <div>
-                         <h4 className="font-bold text-blue-900 mb-1">Administrative Consent</h4>
-                         <p className="text-xs text-blue-700 leading-relaxed">By submitting this log, you are manually overriding the system sensors. This entry will be flagged as "Admin Manual Entry" in the historical audit trail.</p>
-                      </div>
-                   </div>
-                   <button 
-                     onClick={() => toast.success('Manual log entry submitted to core')}
-                     className="w-full mt-8 py-5 bg-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all"
-                   >
-                      Submit Data Entry
-                   </button>
-                </div>
+                <ProductionLedger />
              </div>
           </div>
         )}

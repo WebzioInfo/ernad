@@ -15,11 +15,20 @@ export function usePushNotifications() {
     const setupOneSignal = async () => {
       try {
         if (!isOneSignalInitialized) {
-          await OneSignal.init({
-            appId: ONESIGNAL_APP_ID,
-            allowLocalhostAsSecureOrigin: true,
-          });
-          isOneSignalInitialized = true;
+          try {
+            await OneSignal.init({
+              appId: ONESIGNAL_APP_ID,
+              allowLocalhostAsSecureOrigin: true,
+            });
+            isOneSignalInitialized = true;
+          } catch (initErr: any) {
+            // If it's already initialized, we can safely proceed
+            if (initErr.message?.includes('already initialized')) {
+              isOneSignalInitialized = true;
+            } else {
+              throw initErr;
+            }
+          }
         }
 
         // Link the current device to the user's DB ID

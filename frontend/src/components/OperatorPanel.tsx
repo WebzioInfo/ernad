@@ -114,37 +114,41 @@ export default function OperatorPanel() {
       <Watermark />
       
       {/* Header */}
-      <header className="flex justify-between items-center px-8 py-3 bg-white border-b border-slate-100 z-20 shadow-sm">
-        <div className="flex items-center gap-5">
-          <div className={`p-2.5 bg-slate-900 rounded-2xl`}>
-            <Icon className={`w-6 h-6 text-white`} />
+      <header className="flex justify-between items-center px-8 py-5 bg-white/80 backdrop-blur-md border-b border-slate-100 z-30 sticky top-0">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+             <div className="w-1.5 h-10 bg-slate-900 rounded-full" />
+             <div className={`p-3 bg-slate-900 rounded-[1.25rem] shadow-xl shadow-slate-900/20`}>
+               <Icon className={`w-6 h-6 text-white`} />
+             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight">Line {lineId}</h1>
-
-              <div className="w-1 h-1 rounded-full bg-slate-300" />
-              <span className="text-slate-500 text-xs font-semibold ">{config.title}</span>
-
-
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">Line {lineId}</h1>
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{config.title}</span>
             </div>
-            <div className="flex items-center gap-3 mt-0.5">
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Clock className="w-3 h-3" />
-                <span className="text-xs font-bold  ">{formatTime(sessionRuntime)}</span>
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="text-[11px] font-black tabular-nums">{formatTime(sessionRuntime)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase">Live Syncing</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-6">
           {user?.role === 'SUPER_ADMIN' && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Switch Station:</span>
+            <div className="flex items-center gap-3 bg-slate-50 px-5 py-2.5 rounded-[1.5rem] border border-slate-200 shadow-inner">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Station:</span>
               <select 
                 value={selectedStation}
                 onChange={(e) => setSelectedStation(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-xs font-black text-slate-900 outline-none cursor-pointer appearance-none pr-4"
               >
                 {stations.map(s => (
                   <option key={s.id} value={s.id}>{s.title}</option>
@@ -153,27 +157,23 @@ export default function OperatorPanel() {
             </div>
           )}
 
-           <div className="flex items-center gap-3 pr-5 border-r border-slate-100">
-
+           <div className="flex items-center gap-4 pl-6 border-l border-slate-100">
               <div className="text-right">
-                <p className="text-slate-900 font-bold text-[11px] tracking-tight">{user?.name}</p>
-
-                <p className="text-blue-600 text-xs font-bold ">{user?.role?.replace('_', ' ')}</p>
-
-
+                <p className="text-slate-900 font-black text-sm tracking-tight">{user?.name}</p>
+                <p className="text-blue-600 text-[10px] font-black uppercase tracking-widest">{user?.role?.replace('_', ' ')}</p>
               </div>
-              <div className="w-9 h-9 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shadow-inner">
+              <div className="w-11 h-11 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden shadow-inner ring-4 ring-white">
                 {(user as any)?.avatarUrl ? (
                   <img src={(user as any).avatarUrl} alt="User" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-slate-300">
-                    <User className="w-5 h-5" />
+                    <User className="w-6 h-6" />
                   </div>
                 )}
               </div>
            </div>
 
-           <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+           <button onClick={handleLogout} className="w-11 h-11 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl border border-transparent hover:border-rose-100 transition-all active:scale-95">
              <LogOut className="w-5 h-5" />
            </button>
         </div>
@@ -199,39 +199,51 @@ export default function OperatorPanel() {
           <>
             {/* Left: Station Controls */}
             <div className="lg:col-span-8 flex flex-col gap-6">
-              <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-xl shadow-slate-200/20">
-                 <div className="flex justify-between items-center mb-6 px-2">
+              <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/40 relative overflow-hidden">
+                 <div className="absolute -top-10 -right-10 p-12 opacity-[0.03]">
+                    <Icon className="w-64 h-64 text-slate-900" />
+                 </div>
+                 
+                 <div className="flex justify-between items-end mb-10 relative z-10">
                     <div>
-                      <span className="text-xs font-bold text-blue-600 ">Operator Controls</span>
-                      <h2 className="text-xl font-bold text-slate-900 tracking-tight">Record Production</h2>
-
-
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Active Recording Session</span>
+                      </div>
+                      <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Production Output</h2>
                     </div>
                     <div className="text-right">
-                      <p className="text-slate-400 text-[10px] font-bold">Active Batch</p>
-
-                      <p className="text-slate-900 font-mono font-bold text-sm">#{activeBatch?.id.slice(0, 8).toUpperCase()}</p>
+                      <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Current Batch</p>
+                      <div className="px-4 py-1.5 bg-slate-900 rounded-xl">
+                        <p className="text-white font-mono font-black text-sm tracking-tighter italic">#{activeBatch?.id.slice(0, 8).toUpperCase()}</p>
+                      </div>
                     </div>
                  </div>
 
-                 <div className="bg-slate-900 rounded-[2rem] p-8 text-center shadow-2xl shadow-slate-900/20 mb-6">
-                    <div className="text-xs font-bold text-blue-400/80   mb-2">{config.primaryLabel}</div>
-                    <div className="text-7xl font-bold text-white tabular-nums tracking-tight">{primaryCount}</div>
+                 <div className="bg-slate-900 rounded-[3rem] p-12 text-center shadow-2xl shadow-slate-900/40 mb-10 relative group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-transparent opacity-50" />
+                    <div className="relative z-10">
+                      <div className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-4 opacity-60">{config.primaryLabel}</div>
+                      <div className="text-8xl font-black text-white tabular-nums tracking-tighter group-hover:scale-105 transition-transform duration-500">{primaryCount}</div>
+                      <div className="mt-6 flex justify-center gap-2">
+                         <div className="w-1 h-1 rounded-full bg-blue-500" />
+                         <div className="w-1 h-1 rounded-full bg-blue-500/50" />
+                         <div className="w-1 h-1 rounded-full bg-blue-500/20" />
+                      </div>
+                    </div>
                  </div>
 
-
-                 <div className="grid grid-cols-4 gap-3">
+                 <div className="grid grid-cols-4 gap-4 relative z-10">
                     {[1, 10, 50, 100].map(val => (
                        <button 
                         key={val}
                         onClick={() => handleIncrement('primary', val)}
-                        className={`py-5 rounded-2xl font-bold text-xl transition-all border-2 ${
+                        className={`py-6 rounded-[2rem] font-black text-2xl transition-all duration-300 border-2 active:scale-95 ${
                           val === 100 
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-600/30 hover:bg-blue-700' 
-                          : 'bg-white text-slate-800 border-slate-100 hover:border-blue-200 hover:bg-blue-50/30'
+                          ? 'bg-blue-600 text-white border-blue-500 shadow-xl shadow-blue-600/40 hover:bg-blue-700 hover:shadow-blue-600/60' 
+                          : 'bg-white text-slate-900 border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 shadow-sm'
                         }`}
                        >
-
                          +{val}
                        </button>
                     ))}
