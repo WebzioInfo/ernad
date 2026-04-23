@@ -18,9 +18,12 @@ import { EventsModule } from './events/events.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OneSignalModule } from './firebase/onesignal.module';
 
+import { AppController } from './app.controller';
+
 @Module({
   imports: [AuthModule, UsersModule, MasterDataModule, AnalyticsModule, HealthModule, MailModule, MediaModule, EventsModule, NotificationsModule, OneSignalModule],
   controllers: [
+    AppController,
     ProductionBatchController,
     OperatorLogsController,
     ChangeoverController,
