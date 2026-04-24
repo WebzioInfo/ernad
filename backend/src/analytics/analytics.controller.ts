@@ -17,8 +17,13 @@ export class AnalyticsController {
 
   @Get('line-performance')
   @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
-  async getLinePerformance(@Query('lineId') lineId: string, @Query('shiftId') shiftId?: string) {
-    return this.analyticsService.getLinePerformance(lineId, shiftId);
+  async getLinePerformance(
+    @Query('lineId') lineId: string, 
+    @Query('shiftId') shiftId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('productId') productId?: string
+  ) {
+    return this.analyticsService.getLinePerformance(lineId, shiftId, brandId, productId);
   }
 
   @Get('filling-anomalies')
@@ -39,4 +44,15 @@ export class AnalyticsController {
     return this.analyticsService.getPredictiveInsights(batchId);
   }
 
+  @Get('brands')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  async getBrandPerformance() {
+    return this.analyticsService.getBrandPerformance();
+  }
+
+  @Get('products')
+  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  async getProductPerformance() {
+    return this.analyticsService.getProductPerformance();
+  }
 }

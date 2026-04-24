@@ -60,4 +60,18 @@ export class MasterDataController {
   async getBrands() {
     return await this.masterDataService.getBrands();
   }
+
+  @Post('brands')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  async createBrand(@Body() dto: { name: string }) {
+    return await this.masterDataService.createBrand(dto);
+  }
+
+  @Post('products')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('SUPER_ADMIN')
+  async createProduct(@Body() dto: { name: string; sku?: string; brandId: string; category?: string }) {
+    return await this.masterDataService.createProduct(dto);
+  }
 }

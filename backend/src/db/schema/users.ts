@@ -35,3 +35,19 @@ export const users = pgTable('users', {
     index('idx_users_role').on(table.role),
   ];
 });
+
+export const attendanceLogs = pgTable('attendance_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  clockIn: timestamp('clock_in').defaultNow().notNull(),
+  clockOut: timestamp('clock_out'),
+  shiftName: varchar('shift_name', { length: 50 }), // e.g., Morning, Night
+  status: varchar('status', { length: 20 }).default('PRESENT').notNull(), // PRESENT, LATE, ON_LEAVE
+  externalSyncId: varchar('external_sync_id', { length: 255 }), // ID from biometric device
+  remarks: varchar('remarks', { length: 255 }),
+}, (table) => {
+  return [
+    index('idx_attendance_user_date').on(table.userId, table.clockIn),
+    index('idx_attendance_sync_id').on(table.externalSyncId),
+  ];
+});

@@ -65,4 +65,14 @@ export class MasterDataService {
     
     return null;
   }
+
+  async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
+    const [product] = await db.insert(products).values(dto).returning();
+    return product;
+  }
+
+  async createBrand(dto: { name: string }) {
+    const [brand] = await db.insert(productBrands).values(dto).returning();
+    return brand;
+  }
 }

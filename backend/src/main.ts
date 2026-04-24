@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
+import cookieParser from 'cookie-parser';
+
 import * as dns from 'dns';
 
 // Fix for Node >= 17 IPv6 DNS resolution issues with Supabase Pooler
@@ -8,6 +12,8 @@ dns.setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use(cookieParser());
 
   const origins = (process.env.FRONTEND_URL || 'http://localhost:5173')
     .split(',')
@@ -21,6 +27,9 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('api', { exclude: ['/'] });
+  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
 
   // Swagger Configuration
   const { SwaggerModule, DocumentBuilder } = await import('@nestjs/swagger');

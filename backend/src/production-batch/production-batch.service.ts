@@ -3,7 +3,7 @@ import { db } from '../db/db';
 import { 
   productionBatches, changeoverLogs, materialFlows, 
   productionLines, users, batchSnapshots, batchTotals,
-  operatorBlowingLogs, operatorFillingLogs, operatorLabelingLogs, operatorPackingLogs
+  factoryLogs, productBrands, products
 } from '../db/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 
@@ -22,7 +22,11 @@ export class ProductionBatchService {
         throw new BadRequestException('A batch is already running on this line.');
       }
 
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const batchCode = `B-${dateStr}-${lineId.slice(0, 4).toUpperCase()}`;
+
       const newBatch = await tx.insert(productionBatches).values({
+        batchCode,
         lineId,
         brandId,
         productId,
@@ -53,11 +57,24 @@ export class ProductionBatchService {
 
 
   async getActiveBatchByLine(lineId: string) {
-    const batch = await db.select().from(productionBatches)
-      .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
-      .limit(1);
+    const results = await db.select({
+      batch: productionBatches,
+      brand: productBrands,
+      product: products,
+    })
+    .from(productionBatches)
+    .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+    .innerJoin(products, eq(productionBatches.productId, products.id))
+    .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
+    .limit(1);
     
-    return batch[0] || null;
+    if (!results.length) return null;
+    
+    return {
+      ...results[0].batch,
+      brand: results[0].brand,
+      product: results[0].product
+    };
   }
 
   async initiateChangeover(batchId: string, toProductId: string, userId: string) {
@@ -147,57 +164,5 @@ export class ProductionBatchService {
       return newBatch[0];
     });
   }
-
-  async addStationLog(station: string, payload: any) {
-    const { batchId, userId, loggedAt, ...data } = payload;
-    const timestamp = loggedAt ? new Date(loggedAt) : new Date();
-
-    return await db.transaction(async (tx) => {
-      let result;
-      switch (station.toUpperCase()) {
-        case 'BLOWING':
-          result = await tx.insert(operatorBlowingLogs).values({
-            batchId, userId, 
-            preformCount: data.primaryCount || 0,
-            damaged: data.wastageCount || 0,
-            bagsUsed: data.bagsUsed || 0,
-            remarks: data.remarks,
-            loggedAt: timestamp
-          }).returning();
-          break;
-        case 'FILLING':
-          result = await tx.insert(operatorFillingLogs).values({
-            batchId, userId,
-            bottleCount: data.primaryCount || 0,
-            capWastage: data.wastageCount || 0,
-            boxesUsed: data.boxesUsed || 0,
-            remarks: data.remarks,
-            loggedAt: timestamp
-          }).returning();
-          break;
-        case 'LABELING':
-          result = await tx.insert(operatorLabelingLogs).values({
-            batchId, userId,
-            labelCount: data.primaryCount || 0,
-            makeupUsedMl: data.makeupUsed || 0,
-            remarks: data.remarks,
-            loggedAt: timestamp
-          }).returning();
-          break;
-        case 'PACKING':
-          result = await tx.insert(operatorPackingLogs).values({
-            batchId, userId,
-            packedCount: data.primaryCount || 0,
-            shrinkRollUsedKg: data.shrinkRoll || 0,
-            shrinkWastageKg: data.wastageCount || 0,
-            remarks: data.remarks,
-            loggedAt: timestamp
-          }).returning();
-          break;
-        default:
-          throw new BadRequestException('Invalid station type');
-      }
-      return result[0];
-    });
-  }
 }
+

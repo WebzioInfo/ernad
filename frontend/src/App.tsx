@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import AdminDashboard from './components/AdminDashboard';
-import OperatorPanel from './components/OperatorPanel';
+import AdminDashboard from './features/analytics/components/AdminDashboard';
+import OperatorPanel from './features/production/components/OperatorPanel';
 import Login from './components/Login';
 import RequireAuth from './components/RequireAuth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

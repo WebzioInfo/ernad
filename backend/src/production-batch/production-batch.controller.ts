@@ -52,9 +52,5 @@ export class ProductionBatchController {
     return await this.batchService.createHistoricalBatch(dto);
   }
 
-  @Post('log-historical')
-  @Roles('SUPER_ADMIN', 'MANAGER')
-  async addStationLog(@Body() dto: { station: string; payload: any }) {
-    return await this.batchService.addStationLog(dto.station, dto.payload);
-  }
 }
+

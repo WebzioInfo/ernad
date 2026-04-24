@@ -11,7 +11,7 @@ import { CreateLogDto } from './dto/create-log.dto';
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @UseInterceptors(AuditInterceptor)
-@Controller('logs')
+@Controller('operator-logs')
 export class OperatorLogsController {
   constructor(private readonly logsService: OperatorLogsService) {}
   
@@ -19,31 +19,32 @@ export class OperatorLogsController {
   @Roles('SUPER_ADMIN', 'ADMIN', 'BLOWING_OPERATOR', 'FILLING_OPERATOR', 'LABELING_OPERATOR', 'PACKING_OPERATOR')
   @ApiOperation({ summary: 'Create a unified production log entry' })
   async createLog(@Request() req, @Body() dto: CreateLogDto) {
-    return this.logsService.createLog(req.user.id, dto);
+    return this.logsService.createLog(req.user.sub, dto);
   }
 
   // Legacy individual endpoints (delegated to unified logic)
   @Post('blowing')
   @Roles('SUPER_ADMIN', 'BLOWING_OPERATOR')
   async logBlowing(@Request() req, @Body() dto: any) {
-    return this.logsService.createLog(req.user.id, { ...dto, station: 'BLOWING' });
+    return this.logsService.createLog(req.user.sub, { ...dto, station: 'BLOWING' });
   }
 
   @Post('filling')
   @Roles('SUPER_ADMIN', 'FILLING_OPERATOR')
   async logFilling(@Request() req, @Body() dto: any) {
-    return this.logsService.createLog(req.user.id, { ...dto, station: 'FILLING' });
+    return this.logsService.createLog(req.user.sub, { ...dto, station: 'FILLING' });
   }
 
   @Post('labeling')
   @Roles('SUPER_ADMIN', 'LABELING_OPERATOR')
   async logLabeling(@Request() req, @Body() dto: any) {
-    return this.logsService.createLog(req.user.id, { ...dto, station: 'LABELING' });
+    return this.logsService.createLog(req.user.sub, { ...dto, station: 'LABELING' });
   }
 
   @Post('packing')
   @Roles('SUPER_ADMIN', 'PACKING_OPERATOR')
   async logPacking(@Request() req, @Body() dto: any) {
-    return this.logsService.createLog(req.user.id, { ...dto, station: 'PACKING' });
+    return this.logsService.createLog(req.user.sub, { ...dto, station: 'PACKING' });
   }
 }
+

@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ProductionBatchController } from './production-batch/production-batch.controller';
-import { ProductionBatchService } from './production-batch/production-batch.service';
-import { OperatorLogsController } from './operator-logs/operator-logs.controller';
-import { OperatorLogsService } from './operator-logs/operator-logs.service';
+import { OperatorLogsModule } from './operator-logs/operator-logs.module';
+import { ProductionBatchModule } from './production-batch/production-batch.module';
 import { ChangeoverController } from './changeover/changeover.controller';
 import { ChangeoverService } from './changeover/changeover.service';
 import { ReportsController } from './reports/reports.controller';
@@ -17,21 +15,33 @@ import { MediaModule } from './media/media.module';
 import { EventsModule } from './events/events.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OneSignalModule } from './firebase/onesignal.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 import { AppController } from './app.controller';
 
 @Module({
-  imports: [AuthModule, UsersModule, MasterDataModule, AnalyticsModule, HealthModule, MailModule, MediaModule, EventsModule, NotificationsModule, OneSignalModule],
+  imports: [
+    AuthModule, 
+    UsersModule, 
+    MasterDataModule, 
+    AnalyticsModule, 
+    HealthModule, 
+    MailModule, 
+    MediaModule, 
+    EventsModule, 
+    NotificationsModule, 
+    OneSignalModule, 
+    AttendanceModule,
+    OperatorLogsModule,
+    ProductionBatchModule
+  ],
+
   controllers: [
     AppController,
-    ProductionBatchController,
-    OperatorLogsController,
     ChangeoverController,
     ReportsController,
   ],
   providers: [
-    ProductionBatchService,
-    OperatorLogsService,
     ChangeoverService,
     ReportsService,
   ],

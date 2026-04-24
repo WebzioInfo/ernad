@@ -1,10 +1,11 @@
 import { Injectable, Logger, BadRequestException, ConflictException } from '@nestjs/common';
 import { db } from '../db/db';
-import { factoryLogs, batchTotals } from '../db/schema';
+import { factoryLogs, batchTotals, materialsUsage } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { CreateLogDto } from './dto/create-log.dto';
 import { ProductionGateway } from '../events/production.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ShiftService } from '../master-data/shift.service';
 
 @Injectable()
 export class OperatorLogsService {
@@ -13,6 +14,7 @@ export class OperatorLogsService {
   constructor(
     private readonly eventsGateway: ProductionGateway,
     private readonly notificationsService: NotificationsService,
+    private readonly shiftService: ShiftService,
   ) {}
 
   async createLog(userId: string, dto: CreateLogDto) {
@@ -27,80 +29,110 @@ export class OperatorLogsService {
         return existing[0];
       }
 
-      // 2. Fetch Totals for Validation (Lock for update)
+      // 2. Fetch Totals for Validation
       const totalsList = await tx.select().from(batchTotals)
         .where(eq(batchTotals.batchId, dto.batchId))
         .for('update');
-
       
       if (totalsList.length === 0) {
-        throw new BadRequestException('Batch tracking not initialized for this ID.');
+        throw new BadRequestException('Batch tracking not initialized.');
       }
       
       const current = totalsList[0];
 
-      // 3. Flow Validation (Blowing -> Filling -> Labeling -> Packing)
-      await this.validateProductionFlow(dto.station, dto.primaryCount, current, dto.batchId);
+      // 3. Shift Validation
+      const isValidShift = await this.shiftService.validateShiftEntry(dto.shiftId, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
+      if (!isValidShift) {
+        throw new BadRequestException('Inactive or expired shift.');
+      }
 
-      // 4. Insert Log
+      // 4. Data Processing (Phase 4): Handle Split Values
+      let finalPrimaryCount = dto.primaryCount;
+      if (dto.splitValues && dto.splitValues.length > 0) {
+        finalPrimaryCount = dto.splitValues.reduce((sum, val) => sum + val, 0);
+      }
+
+      // 5. Flow Validation (Phase 1)
+      // FIX: Skip flow validation for REWORK entries (Phase 6 Fix)
+      if (!dto.isRework) {
+        await this.validateProductionFlow(dto.station, finalPrimaryCount, current, dto.batchId);
+      }
+
+      // 6. Insert Main Log
       const [log] = await tx.insert(factoryLogs).values({
         requestId: dto.requestId,
         batchId: dto.batchId,
         lineId: dto.lineId,
         shiftId: dto.shiftId,
+        brandId: dto.brandId,
+        productId: dto.productId,
         userId: userId,
         station: dto.station,
-        primaryCount: dto.primaryCount,
+        primaryCount: finalPrimaryCount,
+        splitValues: dto.splitValues || [],
         wastageCount: dto.wastageCount,
+        isRework: dto.isRework || false,
+        eventType: dto.eventType || 'NORMAL_PRODUCTION',
+        remarks: dto.remarks,
         loggedAt: dto.loggedAt ? new Date(dto.loggedAt) : new Date(),
       }).returning();
 
-
-      // 5. Atomic Totals Update
-      const updateField = this.getFieldName(dto.station);
-      await tx.update(batchTotals)
-        .set({ 
-          [updateField]: sql`${batchTotals[updateField]} + ${dto.primaryCount}`,
-          updatedAt: new Date()
-        })
-        .where(eq(batchTotals.batchId, dto.batchId));
-
-      this.logger.log(`Log created: ${dto.station} (+${dto.primaryCount}) for batch ${dto.batchId}`);
-      
-      // Emit real-time event
-      this.eventsGateway.emitProductionUpdated(dto.batchId);
-
-      // Milestone trigger (every 5000 units packed)
-      if (dto.station === 'PACKING') {
-        const oldPacked = current.packingTotal;
-        const newPacked = oldPacked + dto.primaryCount;
-        const oldMilestone = Math.floor(oldPacked / 5000);
-        const newMilestone = Math.floor(newPacked / 5000);
-
-        if (newMilestone > oldMilestone && newMilestone > 0) {
-          const milestoneAmount = newMilestone * 5000;
-          this.notificationsService.triggerBatchMilestone(dto.batchId, milestoneAmount, 'Production Line').catch(e => 
-            this.logger.error('Failed to trigger milestone alert: ' + e.message)
-          );
+      // 7. Material Tracking Module (Phase 2)
+      if (dto.materials && dto.materials.length > 0) {
+        for (const mat of dto.materials) {
+          await tx.insert(materialsUsage).values({
+            logId: log.id,
+            batchId: dto.batchId,
+            materialName: mat.materialName,
+            quantity: String(mat.quantity),
+            unit: mat.unit,
+            waste: mat.waste ? String(mat.waste) : '0',
+            loggedAt: log.loggedAt
+          });
         }
       }
+
+      // 8. Atomic Totals Update
+      // FIX: Only increment totals if NOT rework (rework is counted separately in analytics)
+      if (!dto.isRework) {
+        const updateField = this.getFieldName(dto.station);
+        await tx.update(batchTotals)
+          .set({ 
+            [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount}`,
+            updatedAt: new Date()
+          })
+          .where(eq(batchTotals.batchId, dto.batchId));
+      }
+
+      // 9. Notifications (Phase 7)
+      if (dto.eventType && dto.eventType !== 'NORMAL_PRODUCTION') {
+        await this.notificationsService.createNotification(
+          'MACHINE_ISSUE', 
+          `Issue on Station: ${dto.station}`, 
+          `${dto.eventType}: ${dto.remarks || 'No remarks provided'}`, 
+          'CRITICAL'
+        );
+      }
+
+      // 10. Real-time Gateway (Phase 7)
+      this.eventsGateway.emitNewLog(log);
+      this.eventsGateway.emitProductionUpdated(dto.batchId, dto.lineId);
       
       return log;
     });
   }
 
   private async validateProductionFlow(station: string, count: number, totals: any, batchId: string) {
-    if (station === 'FILLING' && (totals.fillingTotal + count) > totals.blowingTotal) {
-      await this.notificationsService.triggerFlowViolation(`Cannot fill ${count} units. Blowing output is only ${totals.blowingTotal}.`, batchId);
-      throw new BadRequestException(`Flow Violation: Cannot fill ${count} units. Blowing output is only ${totals.blowingTotal}.`);
+    const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
+    
+    if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
+      throw new BadRequestException(`Flow Violation: Filling (${nextTotal}) > Blowing (${totals.blowingTotal}).`);
     }
-    if (station === 'LABELING' && (totals.labelingTotal + count) > totals.fillingTotal) {
-      await this.notificationsService.triggerFlowViolation(`Cannot label ${count} units. Filling output is only ${totals.fillingTotal}.`, batchId);
-      throw new BadRequestException(`Flow Violation: Cannot label ${count} units. Filling output is only ${totals.fillingTotal}.`);
+    if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
+      throw new BadRequestException(`Flow Violation: Labeling (${nextTotal}) > Filling (${totals.fillingTotal}).`);
     }
-    if (station === 'PACKING' && (totals.packingTotal + count) > totals.labelingTotal) {
-      await this.notificationsService.triggerFlowViolation(`Cannot pack ${count} units. Labeling output is only ${totals.labelingTotal}.`, batchId);
-      throw new BadRequestException(`Flow Violation: Cannot pack ${count} units. Labeling output is only ${totals.labelingTotal}.`);
+    if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
+      throw new BadRequestException(`Flow Violation: Packing (${nextTotal}) > Labeling (${totals.labelingTotal}).`);
     }
   }
 
@@ -113,10 +145,4 @@ export class OperatorLogsService {
     };
     return map[station];
   }
-
-  // Legacy support for older UI if needed (Internal)
-  async logBlowing(dto: any) { return this.createLog(dto.userId, { ...dto, station: 'BLOWING' }); }
-  async logFilling(dto: any) { return this.createLog(dto.userId, { ...dto, station: 'FILLING' }); }
-  async logLabeling(dto: any) { return this.createLog(dto.userId, { ...dto, station: 'LABELING' }); }
-  async logPacking(dto: any) { return this.createLog(dto.userId, { ...dto, station: 'PACKING' }); }
 }
