@@ -16,9 +16,11 @@ export function usePushNotifications() {
       try {
         if (!isOneSignalInitialized) {
           try {
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            
             await OneSignal.init({
               appId: ONESIGNAL_APP_ID,
-              allowLocalhostAsSecureOrigin: true,
+              allowLocalhostAsSecureOrigin: isLocalhost,
             });
             isOneSignalInitialized = true;
           } catch (initErr: any) {
@@ -26,7 +28,9 @@ export function usePushNotifications() {
             if (initErr.message?.includes('already initialized')) {
               isOneSignalInitialized = true;
             } else {
-              throw initErr;
+              console.warn('[OneSignal] Initialization warning (check dashboard Site URL):', initErr.message);
+              // We don't re-throw here to prevent crashing the hook, but we mark as not initialized
+              return; 
             }
           }
         }
