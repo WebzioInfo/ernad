@@ -43,7 +43,7 @@ export const syncOfflineLogs = async () => {
 
   for (const log of unsynced) {
     try {
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const baseURL = import.meta.env.VITE_API_URL || 'https://ernad-backend.vercel.app/api';
       await axios.post(`${baseURL}/operator-logs`, log, {
         withCredentials: true,
       });

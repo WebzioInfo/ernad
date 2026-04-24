@@ -15,7 +15,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const origins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  const origins = (process.env.FRONTEND_URL || 'https://ernad.vercel.app')
     .split(',')
     .map((url) => url.trim());
 

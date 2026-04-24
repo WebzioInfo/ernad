@@ -6,7 +6,7 @@ const envSchema = z.object({
   DIRECT_URL: z.string().url(),
   JWT_SECRET: z.string().min(16),
   PORT: z.string().default('4000'),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().default('https://ernad.vercel.app'),
 });
 
 const _env = envSchema.safeParse(process.env);

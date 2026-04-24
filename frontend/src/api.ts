@@ -3,7 +3,7 @@ import useAuthStore from './store/useAuthStore';
 import toast from 'react-hot-toast';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:4000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://ernad-backend.vercel.app/api',
   timeout: 8000,
   withCredentials: true, // Required for HttpOnly Cookies
 });
