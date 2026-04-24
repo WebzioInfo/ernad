@@ -22,7 +22,8 @@ export class AuthService {
     const user = userResult[0];
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      this.logger.warn(`Login attempt failed: User not found for identity [${trimmedIdentity}]`);
+      throw new UnauthorizedException('Identity signature not recognized.');
     }
 
     let isMatch = false;
@@ -31,10 +32,10 @@ export class AuthService {
     if (type) {
       // User specified which mode to use
       if (type === 'PASSWORD') {
-        if (!user.passwordHash) throw new UnauthorizedException('No password set for this account. Try PIN.');
+        if (!user.passwordHash) throw new UnauthorizedException('This account requires a PIN access.');
         isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
       } else {
-        if (!user.pinCode) throw new UnauthorizedException('No PIN set for this account. Try Password.');
+        if (!user.pinCode) throw new UnauthorizedException('This account requires a Password access.');
         isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
       }
     } else {
@@ -49,7 +50,8 @@ export class AuthService {
     }
 
     if (!isMatch) {
-      throw new UnauthorizedException('Invalid credentials');
+      this.logger.warn(`Login attempt failed: Credential mismatch for user [${user.username}]`);
+      throw new UnauthorizedException('Access credential rejected.');
     }
 
     if (!user.isActive) {
