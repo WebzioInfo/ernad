@@ -7,7 +7,7 @@ import {
 import { db } from '../db/db';
 import { users } from '../db/schema';
 import { eq, ilike, asc, sql } from 'drizzle-orm';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { MailService } from '../mail/mail.service';
 import { MediaService } from '../media/media.service';
 

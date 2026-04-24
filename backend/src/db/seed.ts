@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Client } from 'pg';
 import { users, productionLines, shifts } from './schema';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
