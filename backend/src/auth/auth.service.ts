@@ -50,7 +50,7 @@ export class AuthService {
     }
 
     if (!isMatch) {
-      this.logger.warn(`Login attempt failed: Credential mismatch for user [${user.username}]`);
+      this.logger.warn(`Login attempt failed: Credential mismatch for user [${user.username}]. Provided: ${credential.length} chars. Hash exists: ${!!user.passwordHash}, Pin exists: ${!!user.pinCode}`);
       throw new UnauthorizedException('Access credential rejected.');
     }
 

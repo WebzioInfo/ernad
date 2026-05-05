@@ -29,7 +29,7 @@ export default function NotificationBell() {
   });
 
   useEffect(() => {
-    const socket = io(`${SOCKET_URL}/production`, { transports: ['websocket'] });
+    const socket = io(`${SOCKET_URL}/production`);
     
     socket.on('NEW_NOTIFICATION', () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });

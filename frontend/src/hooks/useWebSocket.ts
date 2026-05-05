@@ -12,9 +12,7 @@ export const useWebSocket = () => {
 
   useEffect(() => {
     if (!socket) {
-      socket = io(`${SOCKET_URL}/production`, {
-        transports: ['websocket'],
-      });
+      socket = io(`${SOCKET_URL}/production`);
 
       socket.on('connect', () => {
         console.log('Connected to Production WebSocket');
