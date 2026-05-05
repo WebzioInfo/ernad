@@ -100,8 +100,7 @@ export class ProductionManagementController {
     @Body() body: { remarks?: string },
     @Query('factoryId') factoryId?: string
   ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    await this.productionService.closeBatch(targetFactoryId, batchId, req.user.sub, body.remarks);
+    await this.productionService.closeBatch(factoryId, batchId, req.user.sub, body.remarks);
     return { success: true, message: 'Batch moved to QC_PENDING.' };
   }
 
@@ -112,8 +111,7 @@ export class ProductionManagementController {
     @Req() req: any,
     @Query('factoryId') factoryId?: string
   ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    return await this.productionService.completeChangeover(targetFactoryId, batchId, req.user.sub);
+    return await this.productionService.completeChangeover(factoryId, batchId, req.user.sub);
   }
 
   @Post('line/:id/toggle-maintenance')
@@ -123,8 +121,7 @@ export class ProductionManagementController {
     @Req() req: any,
     @Query('factoryId') factoryId?: string
   ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    return await this.productionService.toggleMaintenance(targetFactoryId, lineId, req.user.sub);
+    return await this.productionService.toggleMaintenance(factoryId, lineId, req.user.sub);
   }
 
   @Get('active/:lineId')
@@ -141,8 +138,7 @@ export class ProductionManagementController {
     @Req() req: any,
     @Query('factoryId') factoryId?: string
   ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    return await this.productionService.getBatches(targetFactoryId);
+    return await this.productionService.getBatches(factoryId);
   }
 
   @Get('logs/:type')
@@ -153,7 +149,6 @@ export class ProductionManagementController {
     @Param('type') type: 'qc' | 'packaging' | 'dispatch',
     @Query('factoryId') factoryId?: string
   ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    return await this.productionService.getLifecycleLogs(targetFactoryId, type);
+    return await this.productionService.getLifecycleLogs(factoryId, type);
   }
 }

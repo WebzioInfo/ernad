@@ -1,11 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../db/db';
-import { rawMaterials, stockTransactions } from '../db/schema';
+import { rawMaterials, stockTransactions, factories } from '../db/schema';
 import { eq, sql, desc } from 'drizzle-orm';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
+
+  private async getFactoryContext(factoryId?: string): Promise<string> {
+    if (factoryId) return factoryId;
+    const results = await db.select().from(factories).limit(1);
+    if (!results.length) return 'default-factory-id';
+    return results[0].id;
+  }
+
+  constructor() {}
 
   async getInventory() {
     // Return all materials with their current stock levels
@@ -21,13 +30,14 @@ export class InventoryService {
       .limit(50);
   }
 
-  async updateStock(factoryId: string, dto: { 
+  async updateStock(factoryIdArg: string | undefined, dto: { 
     materialId: string; 
     quantity: number; 
     type: 'IN' | 'OUT' | 'ADJUSTMENT'; 
     remarks?: string; 
     referenceId?: string;
   }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     return await db.transaction(async (tx) => {
       // 1. Record in Ledger
       await tx.insert(stockTransactions).values({
@@ -60,7 +70,8 @@ export class InventoryService {
     });
   }
 
-  async createMaterial(factoryId: string, dto: { name: string; unit: string; category?: string; minimumStock?: string }) {
+  async createMaterial(factoryIdArg: string | undefined, dto: { name: string; unit: string; category?: string; minimumStock?: string }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     const [material] = await db.insert(rawMaterials).values({
       ...dto,
       factoryId,

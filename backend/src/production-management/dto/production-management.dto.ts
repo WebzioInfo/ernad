@@ -4,8 +4,8 @@ import { ApiProperty } from '@nestjs/swagger';
 export class StartBatchDto {
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  factoryId: string;
+  @IsOptional()
+  factoryId?: string;
 
   @ApiProperty()
   @IsString()
@@ -58,8 +58,8 @@ export class ChangeoverDto {
 export class QualityCheckDto {
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  factoryId: string;
+  @IsOptional()
+  factoryId?: string;
 
   @ApiProperty()
   @IsString()
@@ -88,8 +88,8 @@ export class QualityCheckDto {
 export class PackagingLogDto {
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  factoryId: string;
+  @IsOptional()
+  factoryId?: string;
 
   @ApiProperty()
   @IsString()
@@ -123,8 +123,8 @@ export class PackagingLogDto {
 export class DispatchLogDto {
   @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  factoryId: string;
+  @IsOptional()
+  factoryId?: string;
 
   @ApiProperty()
   @IsString()

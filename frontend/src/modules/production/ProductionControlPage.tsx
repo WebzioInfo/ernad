@@ -66,6 +66,9 @@ export default function ProductionControlPage() {
             key={line.id}
             line={line}
             onFocus={() => setFilters({ lineId: line.id })}
+            brands={brands}
+            products={products}
+            shifts={shifts}
           />
         ))}
       </div>
@@ -263,68 +266,19 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
   if (line.status === 'IDLE') {
     return (
-      <div className="space-y-4">
-        <div className="space-y-1">
-           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
-           <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-             <option value="">Select Shift</option>
-             {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
-           </select>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-           <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand</label>
-              <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-                <option value="">Select Brand</option>
-                {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-           </div>
-           <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Product</label>
-              <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-                <option value="">Select Product</option>
-                {products?.filter((p:any)=>p.brandId === selectedBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-           </div>
-        </div>
-
-        <div className="space-y-1">
-           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Auto-gen if empty)</label>
-           <input 
-              type="text" 
-              placeholder="e.g. NB-20260505-001" 
-              value={batchCode}
-              onChange={(e) => setBatchCode(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
-           />
-        </div>
-
-        <div className="space-y-1">
-           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>
-           <input 
-              type="datetime-local" 
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
-           />
-        </div>
-
-        <textarea 
-          value={remarks} 
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="Shift remarks (optional)..."
-          className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-20 resize-none"
-        />
-        <button 
-           onClick={() => startMutation.mutate()} 
-           disabled={!selectedProduct || !selectedShift || startMutation.isPending} 
-           className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-           {startMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
-           Commit Production Start
-        </button>
-      </div>
+      <StartProductionForm 
+        shifts={shifts} 
+        brands={brands} 
+        products={products} 
+        selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+        selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+        selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+        batchCode={batchCode} setBatchCode={setBatchCode}
+        startTime={startTime} setStartTime={setStartTime}
+        remarks={remarks} setRemarks={setRemarks}
+        onSubmit={() => startMutation.mutate()}
+        isPending={startMutation.isPending}
+      />
     );
   }
 
@@ -379,12 +333,117 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   );
 }
 
-function LineControlCard({ line, onFocus }: any) {
+function StartProductionForm({ 
+  shifts, brands, products, 
+  selectedShift, setSelectedShift, 
+  selectedBrand, setSelectedBrand, 
+  selectedProduct, setSelectedProduct,
+  batchCode, setBatchCode,
+  startTime, setStartTime,
+  remarks, setRemarks,
+  onSubmit, isPending
+}: any) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
+         <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+           <option value="">Select Shift</option>
+           {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
+         </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+         <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand</label>
+            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+              <option value="">Select Brand</option>
+              {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+         </div>
+         <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Product</label>
+            <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+              <option value="">Select Product</option>
+              {products?.filter((p:any)=>p.brandId === selectedBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+         </div>
+      </div>
+
+      <div className="space-y-1">
+         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Auto-gen if empty)</label>
+         <input 
+            type="text" 
+            placeholder="e.g. NB-20260505-001" 
+            value={batchCode}
+            onChange={(e) => setBatchCode(e.target.value)}
+            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
+         />
+      </div>
+
+      <div className="space-y-1">
+         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>
+         <input 
+            type="datetime-local" 
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
+         />
+      </div>
+
+      <textarea 
+        value={remarks} 
+        onChange={(e) => setRemarks(e.target.value)}
+        placeholder="Shift remarks (optional)..."
+        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-20 resize-none"
+      />
+      <button 
+         onClick={onSubmit} 
+         disabled={!selectedProduct || !selectedShift || isPending} 
+         className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
+      >
+         {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
+         Commit Production Start
+      </button>
+    </div>
+  );
+}
+
+function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
+  const queryClient = useQueryClient();
+  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
+  
+  // Form State
+  const [selectedShift, setSelectedShift] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [batchCode, setBatchCode] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
+
   const { data: activeBatch } = useQuery({
     queryKey: ['active-batch', line.id],
     queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
     enabled: line.status === 'RUNNING' || line.status === 'CHANGEOVER',
     refetchInterval: 30000,
+  });
+
+  const startMutation = useMutation({
+    mutationFn: () => api.post(`/production/start`, {
+      factoryId: line.factoryId,
+      lineId: line.id,
+      shiftId: selectedShift,
+      brandId: selectedBrand,
+      productId: selectedProduct,
+      batchCode: batchCode || undefined,
+      remarks,
+      startTime: new Date(startTime).toISOString()
+    }),
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+      setIsStartModalOpen(false);
+      toast.success('Production started successfully'); 
+    }
   });
 
   return (
@@ -422,9 +481,38 @@ function LineControlCard({ line, onFocus }: any) {
          </div>
       </div>
 
-      <button onClick={onFocus} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center justify-center gap-2">
-         Commander Interface <MoreVertical className="w-3 h-3" />
-      </button>
+      <div className="flex gap-3">
+        <button onClick={onFocus} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2">
+           Commander Interface <MoreVertical className="w-3 h-3" />
+        </button>
+        {line.status === 'IDLE' && (
+          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100">
+             <Play className="w-3 h-3 fill-white" /> Start
+          </button>
+        )}
+      </div>
+
+      {isStartModalOpen && (
+        <Modal onClose={() => setIsStartModalOpen(false)}>
+           <div className="mb-8">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Quick Start: {line.name}</h3>
+              <p className="text-slate-500 font-medium mt-1">Configure and launch a new production batch.</p>
+           </div>
+           <StartProductionForm 
+             shifts={shifts} 
+             brands={brands} 
+             products={products} 
+             selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+             selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+             selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+             batchCode={batchCode} setBatchCode={setBatchCode}
+             startTime={startTime} setStartTime={setStartTime}
+             remarks={remarks} setRemarks={setRemarks}
+             onSubmit={() => startMutation.mutate()}
+             isPending={startMutation.isPending}
+           />
+        </Modal>
+      )}
     </div>
   );
 }

@@ -6,6 +6,13 @@ import { productionLines, shifts, products, productBrands, rawMaterials, stockTr
 
 @Injectable()
 export class FactoryConfigService {
+  private async getFactoryContext(factoryId?: string): Promise<string> {
+    if (factoryId) return factoryId;
+    const [factory] = await db.select().from(factories).limit(1);
+    if (!factory) throw new BadRequestException('No factory configured in system.');
+    return factory.id;
+  }
+
   async getFactories() {
     return await db.select().from(factories);
   }
@@ -19,11 +26,9 @@ export class FactoryConfigService {
     }
   }
 
-  async createLine(factoryId: string, dto: { name: string; description?: string }) {
+  async createLine(factoryIdArg: string, dto: { name: string; description?: string }) {
     try {
-      if (!factoryId) {
-        throw new BadRequestException('Operation requires an assigned factory context.');
-      }
+      const factoryId = await this.getFactoryContext(factoryIdArg);
       const existingLines = await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
       if (existingLines.length >= 2) {
         throw new BadRequestException('Factory is limited to exactly 2 production lines (Line 1 & Line 2).');
@@ -100,8 +105,8 @@ export class FactoryConfigService {
     return null;
   }
 
-  async createProduct(factoryId: string, dto: { name: string; sku?: string; brandId: string; category?: string }) {
-    if (!factoryId) throw new BadRequestException('Operation requires an assigned factory.');
+  async createProduct(factoryIdArg: string, dto: { name: string; sku?: string; brandId: string; category?: string }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     const [product] = await db.insert(products).values({ ...dto, factoryId }).returning();
     return product;
   }
@@ -111,8 +116,8 @@ export class FactoryConfigService {
     return brand;
   }
 
-  async createRawMaterial(factoryId: string, dto: { name: string; unit: string; category?: string; currentStock?: string; minimumStock?: string }) {
-    if (!factoryId) throw new BadRequestException('Operation requires an assigned factory.');
+  async createRawMaterial(factoryIdArg: string, dto: { name: string; unit: string; category?: string; currentStock?: string; minimumStock?: string }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     const [material] = await db.insert(rawMaterials).values({
       ...dto,
       factoryId,
@@ -122,7 +127,8 @@ export class FactoryConfigService {
     return material;
   }
 
-  async updateStock(factoryId: string, dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
+  async updateStock(factoryIdArg: string, dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     return await db.transaction(async (tx) => {
       // 1. Record transaction
       await tx.insert(stockTransactions).values({
@@ -193,8 +199,8 @@ export class FactoryConfigService {
     return { success: true };
   }
 
-  async createShift(factoryId: string, dto: { name: string; startTime: string; endTime: string }) {
-    if (!factoryId) throw new BadRequestException('Operation requires an assigned factory.');
+  async createShift(factoryIdArg: string, dto: { name: string; startTime: string; endTime: string }) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     const [shift] = await db.insert(shifts).values({ ...dto, factoryId }).returning();
     return shift;
   }

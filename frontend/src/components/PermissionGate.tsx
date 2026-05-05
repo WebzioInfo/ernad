@@ -18,8 +18,9 @@ export default function PermissionGate({
 
   if (!user) return <>{fallback}</>;
   
-  // Super Admin bypass
-  if (user.role === 'SUPER_ADMIN') return <>{children}</>;
+  // Super Admin God Mode bypass
+  const isSuperAdmin = user.role === 'SUPER_ADMIN' || user.roles?.includes('SUPER_ADMIN');
+  if (isSuperAdmin) return <>{children}</>;
 
   // Check Permissions (Primary)
   if (permissions && permissions.length > 0) {

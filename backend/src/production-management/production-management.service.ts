@@ -9,12 +9,23 @@ import {
 } from '../db/schema';
 import { eq, and, sql, desc, isNull, inArray } from 'drizzle-orm';
 
+import { ProductionEventsService } from '../events/production.gateway';
+
 @Injectable()
 export class ProductionManagementService {
   private readonly logger = new Logger(ProductionManagementService.name);
 
+  constructor(private eventsService: ProductionEventsService) {}
+
+  private async getFactoryContext(factoryId?: string): Promise<string> {
+    if (factoryId) return factoryId;
+    const [factory] = await db.select().from(factories).limit(1);
+    if (!factory) throw new BadRequestException('No factory configured in system.');
+    return factory.id;
+  }
+
   async startBatch(
-    factoryId: string, 
+    factoryIdArg: string | undefined, 
     lineId: string, 
     brandId: string, 
     productId: string, 
@@ -24,30 +35,32 @@ export class ProductionManagementService {
     remarks?: string, 
     startTime?: string
   ) {
-    return await db.transaction(async (tx) => {
-      // 1. Validate Factory
-      const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
-      if (!factory) throw new BadRequestException('Factory context not found.');
-
-      // 2. Validate Line Status
-      const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+    const factoryId = await this.getFactoryContext(factoryIdArg);
+    
+    const result = await db.transaction(async (tx) => {
+      // 1. Lock line for update to prevent concurrent starts
+      const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).for('update');
       if (!line) throw new BadRequestException('Line not found.');
       if (line.status !== 'IDLE') {
-        throw new BadRequestException(`Cannot start production. Line is currently ${line.status}.`);
+        throw new BadRequestException(`Line is ${line.status}. Must be IDLE to start.`);
       }
 
-      // 3. Generate or Validate Batch Code
+      // 2. Validate Factory
+      const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
+      
+      // 3. Robust Batch Code Generation (Atomic Sequence)
       let finalBatchCode = batchCode;
       if (!finalBatchCode) {
         const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        // Sequence fetch (Simple count for now, can be improved with a sequence table)
-        const existingCount = await tx.select({ count: sql`count(*)` })
+        // Atomic count with lock
+        const [{ count }] = await tx.select({ count: sql<number>`count(*)` })
           .from(productionBatches)
-          .where(and(eq(productionBatches.factoryId, factoryId), eq(productionBatches.productionDate, sql`CURRENT_DATE`)));
-        const seq = (Number(existingCount[0]?.count || 0) + 1).toString().padStart(3, '0');
-        finalBatchCode = `${factory.code}-${dateStr}-${seq}`;
+          .where(and(eq(productionBatches.factoryId, factoryId), eq(productionBatches.productionDate, sql`CURRENT_DATE`)))
+          .for('share'); // Prevent others from starting same day batches until we insert
+        
+        const seq = (Number(count) + 1).toString().padStart(3, '0');
+        finalBatchCode = `${factory?.code || 'BATCH'}-${dateStr}-${seq}`;
       } else {
-        // Enforce uniqueness manually if DB doesn't (though we added unique index)
         const [existing] = await tx.select().from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
         if (existing) throw new BadRequestException(`Batch code ${finalBatchCode} already exists.`);
       }
@@ -83,35 +96,46 @@ export class ProductionManagementService {
       this.logger.log(`[Factory: ${factoryId}] Started batch ${finalBatchCode} on line ${lineId}`);
       return newBatch;
     });
+
+    // 7. Emit Events after successful commit
+    await this.eventsService.emitLineStatus(lineId, 'RUNNING');
+    await this.eventsService.emitProductionUpdated(result.id, lineId);
+    
+    return result;
   }
 
-  async closeBatch(factoryId: string, batchId: string, reqUserId: string, remarks?: string) {
-    return await db.transaction(async (tx) => {
-      // 1. Get Batch and validate state
+  async closeBatch(factoryIdArg: string | undefined, batchId: string, reqUserId: string, remarks?: string) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
+
+    const result = await db.transaction(async (tx) => {
+      // 1. Get Batch and validate state (LOCK for update to prevent concurrent closes)
       const [batch] = await tx.select().from(productionBatches)
         .where(and(eq(productionBatches.id, batchId), eq(productionBatches.factoryId, factoryId)))
-        .limit(1);
+        .for('update');
       
       if (!batch) throw new BadRequestException('Batch not found.');
-      if (batch.status !== 'RUNNING' && batch.status !== 'CHANGEOVER') {
-        throw new BadRequestException(`Cannot close batch. Current status is ${batch.status}.`);
+      if (!['RUNNING', 'CHANGEOVER'].includes(batch.status)) {
+        throw new BadRequestException(`Invalid transition from ${batch.status} to QC_PENDING.`);
       }
 
       // 2. AUTOMATIC INVENTORY DEDUCTION (ERP Integration)
-      // Fetch material flows recorded for this batch
       const flows = await tx.select().from(materialFlows).where(eq(materialFlows.batchId, batchId));
       
       for (const flow of flows) {
         if (flow.used > 0 || flow.wasted > 0) {
           const totalDeduction = flow.used + flow.wasted;
           
-          // Find matching raw material (by name for now, in production use materialId)
           const [material] = await tx.select().from(rawMaterials)
             .where(and(eq(rawMaterials.name, flow.materialName), eq(rawMaterials.factoryId, factoryId)))
-            .limit(1);
+            .for('update');
           
           if (material) {
-            // Log Stock Transaction
+            // Enterprise Hardening: Block negative stock
+            const current = Number(material.currentStock);
+            if (current < totalDeduction) {
+              throw new BadRequestException(`Insufficient inventory for ${material.name}. Available: ${current}, Required: ${totalDeduction}`);
+            }
+
             await tx.insert(stockTransactions).values({
               materialId: material.id,
               factoryId,
@@ -122,7 +146,6 @@ export class ProductionManagementService {
               createdAt: new Date(),
             });
 
-            // Update Current Stock
             await tx.update(rawMaterials)
               .set({ currentStock: sql`${rawMaterials.currentStock} - ${totalDeduction}` })
               .where(eq(rawMaterials.id, material.id));
@@ -146,13 +169,26 @@ export class ProductionManagementService {
         .set({ status: 'IDLE' })
         .where(eq(productionLines.id, batch.lineId));
       
-      this.logger.log(`[Factory: ${factoryId}] Batch ${batch.batchCode} closed. Inventory updated.`);
       return updatedBatch;
     });
+
+    // 5. Emit Events
+    await this.eventsService.emitLineStatus(result.lineId, 'IDLE');
+    await this.eventsService.emitProductionUpdated(result.id, result.lineId);
+    
+    return result;
   }
 
-  async submitQualityCheck(factoryId: string, batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
+  async submitQualityCheck(factoryIdArg: string | undefined, batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
     return await db.transaction(async (tx) => {
+      // 1. State Machine Enforcement
+      const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
+      if (!batch) throw new BadRequestException('Batch not found.');
+      if (batch.status !== 'QC_PENDING') {
+        throw new BadRequestException(`Invalid state for QC: ${batch.status}. Batch must be QC_PENDING.`);
+      }
+
       const check = await tx.insert(qualityChecks).values({
         batchId,
         factoryId,
@@ -171,11 +207,24 @@ export class ProductionManagementService {
           .where(and(eq(productionBatches.id, batchId), eq(productionBatches.status, 'QC_PENDING')));
       }
 
-      return check[0];
+      const res = check[0];
+      return res;
     });
+
+    await this.eventsService.emitProductionUpdated(batchId, '');
+    return result;
   }
 
-  async logPackaging(factoryId: string, batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
+  async logPackaging(factoryIdArg: string | undefined, batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
+    
+    // 1. State Machine Enforcement
+    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+    if (!batch) throw new BadRequestException('Batch not found.');
+    if (!['RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED'].includes(batch.status)) {
+       throw new BadRequestException(`Cannot log packaging for batch in ${batch.status} state.`);
+    }
+
     return await db.insert(packagingLogs).values({
       batchId,
       factoryId,
@@ -188,7 +237,16 @@ export class ProductionManagementService {
     }).returning();
   }
 
-  async logDispatch(factoryId: string, batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
+  async logDispatch(factoryIdArg: string | undefined, batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
+    
+    // 1. State Machine Enforcement
+    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+    if (!batch) throw new BadRequestException('Batch not found.');
+    if (batch.status !== 'COMPLETED' && batch.status !== 'QC_PENDING') {
+       throw new BadRequestException('Batch must be at least QC_PENDING or COMPLETED to dispatch.');
+    }
+
     return await db.insert(dispatchLogs).values({
       batchId,
       factoryId,
@@ -227,7 +285,7 @@ export class ProductionManagementService {
   }
 
   async initiateChangeover(batchId: string, toProductId: string, userId: string) {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
       if (!batch) throw new BadRequestException('Batch not found');
       if (batch.status !== 'RUNNING') throw new BadRequestException('Can only initiate changeover from RUNNING state.');
@@ -236,7 +294,7 @@ export class ProductionManagementService {
       
       await tx.update(productionLines).set({ status: 'CHANGEOVER' }).where(eq(productionLines.id, batch.lineId));
 
-      return await tx.insert(changeoverLogs).values({
+      const res = await tx.insert(changeoverLogs).values({
         batchId,
         lineId: batch.lineId,
         fromProductId: batch.productId,
@@ -246,11 +304,17 @@ export class ProductionManagementService {
         wastedMaterials: {},
         createdBy: userId
       }).returning();
+      return res[0];
     });
+
+    await this.eventsService.emitLineStatus(result.lineId, 'CHANGEOVER');
+    await this.eventsService.emitProductionUpdated(result.batchId, result.lineId);
+    return result;
   }
 
-  async completeChangeover(factoryId: string, batchId: string, userId: string) {
-    return await db.transaction(async (tx) => {
+  async completeChangeover(factoryIdArg: string | undefined, batchId: string, userId: string) {
+    const factoryId = await this.getFactoryContext(factoryIdArg);
+    const result = await db.transaction(async (tx) => {
       const [log] = await tx.select().from(changeoverLogs)
         .where(and(eq(changeoverLogs.batchId, batchId), isNull(changeoverLogs.endTime)))
         .limit(1);
@@ -296,9 +360,14 @@ export class ProductionManagementService {
 
       return newBatch;
     });
+
+    await this.eventsService.emitLineStatus(result.lineId, 'RUNNING');
+    await this.eventsService.emitProductionUpdated(result.id, result.lineId);
+    return result;
   }
 
-  async toggleMaintenance(factoryId: string, lineId: string, userId: string) {
+  async toggleMaintenance(factoryIdArg: string | undefined, lineId: string, userId: string) {
+     const factoryId = await this.getFactoryContext(factoryIdArg);
      const [line] = await db.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
      if (!line) throw new BadRequestException('Line not found');
 
@@ -307,13 +376,17 @@ export class ProductionManagementService {
         throw new BadRequestException('Stop production before maintenance.');
      }
 
-     return await db.update(productionLines)
+     const [updated] = await db.update(productionLines)
        .set({ status: newStatus, updatedAt: new Date() })
        .where(and(eq(productionLines.id, lineId), eq(productionLines.factoryId, factoryId)))
        .returning();
+     
+     await this.eventsService.emitLineStatus(lineId, newStatus);
+     return updated;
   }
 
-  async getBatches(factoryId?: string, limit = 50) {
+  async getBatches(factoryIdArg?: string, limit = 50) {
+    const factoryId = factoryIdArg ? await this.getFactoryContext(factoryIdArg) : null;
     const conditions = [];
     if (factoryId) {
       conditions.push(eq(productionBatches.factoryId, factoryId));
@@ -334,7 +407,8 @@ export class ProductionManagementService {
     .limit(limit);
   }
 
-  async getLifecycleLogs(factoryId?: string, type?: 'qc' | 'packaging' | 'dispatch') {
+  async getLifecycleLogs(factoryIdArg?: string, type?: 'qc' | 'packaging' | 'dispatch') {
+    const factoryId = factoryIdArg ? await this.getFactoryContext(factoryIdArg) : null;
     if (type === 'qc') {
       const q = db.select().from(qualityChecks);
       if (factoryId) q.where(eq(qualityChecks.factoryId, factoryId));
