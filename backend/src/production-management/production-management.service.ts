@@ -156,6 +156,16 @@ export class ProductionManagementService {
   }
 
   async getActiveBatchByLine(factoryId: string, lineId: string) {
+    const conditions = [
+      eq(productionBatches.lineId, lineId),
+      sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
+    ];
+
+    // Only filter by factoryId if it's provided (Super Admins might have null factoryId)
+    if (factoryId) {
+      conditions.push(eq(productionBatches.factoryId, factoryId));
+    }
+
     const results = await db.select({
       batch: productionBatches,
       brand: productBrands,
@@ -164,11 +174,7 @@ export class ProductionManagementService {
     .from(productionBatches)
     .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
     .leftJoin(products, eq(productionBatches.productId, products.id))
-    .where(and(
-      eq(productionBatches.lineId, lineId), 
-      eq(productionBatches.factoryId, factoryId),
-      sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
-    ))
+    .where(and(...conditions))
     .limit(1);
     
     if (!results.length) return null;
@@ -296,7 +302,12 @@ export class ProductionManagementService {
     }).returning();
   }
 
-  async getBatches(factoryId: string, limit = 50) {
+  async getBatches(factoryId?: string, limit = 50) {
+    const conditions = [];
+    if (factoryId) {
+      conditions.push(eq(productionBatches.factoryId, factoryId));
+    }
+
     return await db.select({
       batch: productionBatches,
       line: productionLines,
@@ -307,18 +318,29 @@ export class ProductionManagementService {
     .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
     .innerJoin(products, eq(productionBatches.productId, products.id))
     .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
-    .where(eq(productionBatches.factoryId, factoryId))
+    .where(and(...conditions))
     .orderBy(desc(productionBatches.startTime))
     .limit(limit);
   }
 
-  async getLifecycleLogs(factoryId: string, type: 'qc' | 'packaging' | 'dispatch') {
+  async getLifecycleLogs(factoryId?: string, type?: 'qc' | 'packaging' | 'dispatch') {
+    const conditions = [];
+    if (factoryId) {
+      conditions.push(eq(sql`factory_id`, factoryId)); // Generic column match for simplicity or specific per table
+    }
+
     if (type === 'qc') {
-      return await db.select().from(qualityChecks).where(eq(qualityChecks.factoryId, factoryId)).orderBy(desc(qualityChecks.checkedAt)).limit(50);
+      const q = db.select().from(qualityChecks);
+      if (factoryId) q.where(eq(qualityChecks.factoryId, factoryId));
+      return await q.orderBy(desc(qualityChecks.checkedAt)).limit(50);
     } else if (type === 'packaging') {
-      return await db.select().from(packagingLogs).where(eq(packagingLogs.factoryId, factoryId)).orderBy(desc(packagingLogs.createdAt)).limit(50);
+      const q = db.select().from(packagingLogs);
+      if (factoryId) q.where(eq(packagingLogs.factoryId, factoryId));
+      return await q.orderBy(desc(packagingLogs.createdAt)).limit(50);
     } else {
-      return await db.select().from(dispatchLogs).where(eq(dispatchLogs.factoryId, factoryId)).orderBy(desc(dispatchLogs.dispatchedAt)).limit(50);
+      const q = db.select().from(dispatchLogs);
+      if (factoryId) q.where(eq(dispatchLogs.factoryId, factoryId));
+      return await q.orderBy(desc(dispatchLogs.dispatchedAt)).limit(50);
     }
   }
 }

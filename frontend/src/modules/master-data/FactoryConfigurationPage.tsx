@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+import useAuthStore from '../../store/useAuthStore';
 
 export default function FactoryConfigurationPage() {
   const [activeSubTab, setActiveSubTab] = useState<'brands' | 'products' | 'raw-materials' | 'shifts' | 'lines'>('brands');
@@ -42,6 +43,11 @@ export default function FactoryConfigurationPage() {
   const { data: lines } = useQuery({
     queryKey: ['production-lines'],
     queryFn: async () => (await api.get('/master-data/lines')).data
+  });
+
+  const { data: factories } = useQuery({
+    queryKey: ['factories'],
+    queryFn: async () => (await api.get('/master-data/factories')).data
   });
 
   const createBrandMutation = useMutation({
@@ -297,6 +303,7 @@ export default function FactoryConfigurationPage() {
         <MasterDataModal 
           type={activeSubTab} 
           brands={brands}
+          factories={factories}
           initialData={editingItem}
           onClose={() => {
             setIsModalOpen(false);
@@ -456,7 +463,8 @@ function LineCard({ line, onEdit, onDelete }: any) {
   );
 }
 
-function MasterDataModal({ type, brands, initialData, onClose, onSubmit }: any) {
+function MasterDataModal({ type, brands, factories, initialData, onClose, onSubmit }: any) {
+  const { user } = useAuthStore();
   const [name, setName] = useState(initialData?.name || '');
   const [sku, setSku] = useState(initialData?.sku || '');
   const [brandId, setBrandId] = useState(initialData?.brandId || brands?.[0]?.id || '');
@@ -466,6 +474,7 @@ function MasterDataModal({ type, brands, initialData, onClose, onSubmit }: any) 
   const [startTime, setStartTime] = useState(initialData?.startTime || '08:00');
   const [endTime, setEndTime] = useState(initialData?.endTime || '16:00');
   const [description, setDescription] = useState(initialData?.description || '');
+  const [factoryId, setFactoryId] = useState(initialData?.factoryId || user?.factoryId || (factories?.[0]?.id || ''));
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -481,6 +490,19 @@ function MasterDataModal({ type, brands, initialData, onClose, onSubmit }: any) 
           </div>
           
           <div className="space-y-6">
+            {user?.role === 'SUPER_ADMIN' && !initialData && (
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 ml-1">Assign to Factory</label>
+                <select 
+                  className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 text-sm font-semibold focus:ring-2 focus:ring-indigo-100 transition-all appearance-none"
+                  value={factoryId}
+                  onChange={(e) => setFactoryId(e.target.value)}
+                >
+                  <option value="">Select a factory</option>
+                  {factories?.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">Name</label>
               <input 
@@ -615,7 +637,7 @@ function MasterDataModal({ type, brands, initialData, onClose, onSubmit }: any) 
               <button 
                 onClick={() => {
                   if (!name) return;
-                  const data: any = { name };
+                  const data: any = { name, factoryId };
                   if (type === 'products') {
                     if (!brandId && brands?.length > 0) {
                       toast.error('Please select a brand');

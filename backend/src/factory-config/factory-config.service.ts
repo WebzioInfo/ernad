@@ -2,13 +2,17 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '../db/db';
-import { productionLines, shifts, products, productBrands, rawMaterials, stockTransactions } from '../db/schema';
+import { productionLines, shifts, products, productBrands, rawMaterials, stockTransactions, factories } from '../db/schema';
 
 @Injectable()
 export class FactoryConfigService {
-  async getLines() {
+  async getFactories() {
+    return await db.select().from(factories);
+  }
+  async getLines(factoryId?: string) {
     try {
-      return await db.select().from(productionLines);
+      if (!factoryId) return await db.select().from(productionLines);
+      return await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
     } catch (error) {
       console.error('[FactoryConfigService] getLines Error:', error);
       throw error;
@@ -55,20 +59,24 @@ export class FactoryConfigService {
     return { success: true };
   }
 
-  async getShifts() {
-    return await db.select().from(shifts);
+  async getShifts(factoryId?: string) {
+    if (!factoryId) return await db.select().from(shifts);
+    return await db.select().from(shifts).where(eq(shifts.factoryId, factoryId));
   }
 
-  async getProducts() {
-    return await db.select().from(products);
+  async getProducts(factoryId?: string) {
+    if (!factoryId) return await db.select().from(products);
+    return await db.select().from(products).where(eq(products.factoryId, factoryId));
   }
 
   async getBrands() {
+    // Brands are global in this schema (no factoryId)
     return await db.select().from(productBrands);
   }
 
-  async getRawMaterials() {
-    return await db.select().from(rawMaterials);
+  async getRawMaterials(factoryId?: string) {
+    if (!factoryId) return await db.select().from(rawMaterials);
+    return await db.select().from(rawMaterials).where(eq(rawMaterials.factoryId, factoryId));
   }
 
   async getCurrentShift() {

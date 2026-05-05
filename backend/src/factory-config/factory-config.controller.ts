@@ -21,8 +21,8 @@ export class FactoryConfigController {
   @Get('lines')
   @UseGuards(RolesGuard)
   @Permissions('settings:view')
-  async getLines() {
-    return await this.factoryConfigService.getLines();
+  async getLines(@Req() req: any) {
+    return await this.factoryConfigService.getLines(req.user.factoryId);
   }
 
   @Post('lines')
@@ -30,7 +30,8 @@ export class FactoryConfigController {
   @Permissions('settings:manage')
   @ApiOperation({ summary: 'Create a new production line' })
   async createLine(@Req() req: any, @Body() dto: CreateLineDto) {
-    return await this.factoryConfigService.createLine(req.user.factoryId, dto);
+    const factoryId = req.user.factoryId || (dto as any).factoryId;
+    return await this.factoryConfigService.createLine(factoryId, dto);
   }
 
   @Patch('lines/:id')
@@ -53,15 +54,15 @@ export class FactoryConfigController {
   @Get('shifts')
   @UseGuards(RolesGuard)
   @Permissions('settings:view')
-  async getShifts() {
-    return await this.factoryConfigService.getShifts();
+  async getShifts(@Req() req: any) {
+    return await this.factoryConfigService.getShifts(req.user.factoryId);
   }
 
   @Get('products')
   @UseGuards(RolesGuard)
   @Permissions('settings:view')
-  async getProducts() {
-    return await this.factoryConfigService.getProducts();
+  async getProducts(@Req() req: any) {
+    return await this.factoryConfigService.getProducts(req.user.factoryId);
   }
 
   @Get('current-shift')
@@ -81,22 +82,24 @@ export class FactoryConfigController {
   @Get('raw-materials')
   @UseGuards(RolesGuard)
   @Permissions('settings:view')
-  async getRawMaterials() {
-    return await this.factoryConfigService.getRawMaterials();
+  async getRawMaterials(@Req() req: any) {
+    return await this.factoryConfigService.getRawMaterials(req.user.factoryId);
   }
 
   @Post('raw-materials')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
   async createRawMaterial(@Req() req: any, @Body() dto: CreateRawMaterialDto) {
-    return await this.factoryConfigService.createRawMaterial(req.user.factoryId, dto);
+    const factoryId = req.user.factoryId || (dto as any).factoryId;
+    return await this.factoryConfigService.createRawMaterial(factoryId, dto);
   }
 
   @Post('raw-materials/stock')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('inventory:update')
   async updateStock(@Req() req: any, @Body() dto: UpdateStockDto) {
-    return await this.factoryConfigService.updateStock(req.user.factoryId, dto);
+    const factoryId = req.user.factoryId || (dto as any).factoryId;
+    return await this.factoryConfigService.updateStock(factoryId, dto);
   }
 
   @Post('brands')
@@ -110,7 +113,8 @@ export class FactoryConfigController {
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
   async createProduct(@Req() req: any, @Body() dto: CreateProductDto) {
-    return await this.factoryConfigService.createProduct(req.user.factoryId, dto);
+    const factoryId = req.user.factoryId || (dto as any).factoryId;
+    return await this.factoryConfigService.createProduct(factoryId, dto);
   }
 
   @Delete('shifts/:id')
@@ -124,6 +128,7 @@ export class FactoryConfigController {
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
   async createShift(@Req() req: any, @Body() dto: { name: string; startTime: string; endTime: string }) {
-    return await this.factoryConfigService.createShift(req.user.factoryId, dto);
+    const factoryId = req.user.factoryId || (dto as any).factoryId;
+    return await this.factoryConfigService.createShift(factoryId, dto);
   }
 }

@@ -14,14 +14,18 @@ import useAuthStore from '../../../store/useAuthStore';
 
 
 export function BatchTrackingView() {
-  const factoryId = useAuthStore((state) => state.user?.factoryId);
+  const user = useAuthStore((state) => state.user);
+  const factoryId = user?.factoryId;
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const { data: batches, isLoading } = useQuery({
     queryKey: ['production-batches', factoryId],
     queryFn: async () => {
-      const res = await api.get(`/production/batches?factoryId=${factoryId}`);
+      const url = isSuperAdmin ? '/production/batches' : `/production/batches?factoryId=${factoryId}`;
+      const res = await api.get(url);
       return res.data;
     },
-    enabled: !!factoryId,
+    enabled: !!factoryId || isSuperAdmin,
   });
 
   if (isLoading) return <div className="p-10 text-center text-slate-400">Loading batches...</div>;
@@ -80,14 +84,18 @@ export function BatchTrackingView() {
 }
 
 export function QualityCheckView() {
-  const factoryId = useAuthStore((state) => state.user?.factoryId);
+  const user = useAuthStore((state) => state.user);
+  const factoryId = user?.factoryId;
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const { data: logs, isLoading } = useQuery({
     queryKey: ['qc-logs', factoryId],
     queryFn: async () => {
-      const res = await api.get(`/production/logs/qc?factoryId=${factoryId}`);
+      const url = isSuperAdmin ? '/production/logs/qc' : `/production/logs/qc?factoryId=${factoryId}`;
+      const res = await api.get(url);
       return res.data;
     },
-    enabled: !!factoryId,
+    enabled: !!factoryId || isSuperAdmin,
   });
 
   if (isLoading) return <div className="p-10 text-center text-slate-400">Loading QC data...</div>;
@@ -115,14 +123,18 @@ export function QualityCheckView() {
 }
 
 export function PackagingView() {
-  const factoryId = useAuthStore((state) => state.user?.factoryId);
+  const user = useAuthStore((state) => state.user);
+  const factoryId = user?.factoryId;
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const { data: logs, isLoading } = useQuery({
     queryKey: ['packaging-logs', factoryId],
     queryFn: async () => {
-      const res = await api.get(`/production/logs/packaging?factoryId=${factoryId}`);
+      const url = isSuperAdmin ? '/production/logs/packaging' : `/production/logs/packaging?factoryId=${factoryId}`;
+      const res = await api.get(url);
       return res.data;
     },
-    enabled: !!factoryId,
+    enabled: !!factoryId || isSuperAdmin,
   });
 
   if (isLoading) return <div className="p-10 text-center text-slate-400">Loading packaging data...</div>;
@@ -149,14 +161,18 @@ export function PackagingView() {
 }
 
 export function DispatchView() {
-  const factoryId = useAuthStore((state) => state.user?.factoryId);
+  const user = useAuthStore((state) => state.user);
+  const factoryId = user?.factoryId;
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const { data: logs, isLoading } = useQuery({
     queryKey: ['dispatch-logs', factoryId],
     queryFn: async () => {
-      const res = await api.get(`/production/logs/dispatch?factoryId=${factoryId}`);
+      const url = isSuperAdmin ? '/production/logs/dispatch' : `/production/logs/dispatch?factoryId=${factoryId}`;
+      const res = await api.get(url);
       return res.data;
     },
-    enabled: !!factoryId,
+    enabled: !!factoryId || isSuperAdmin,
   });
 
   if (isLoading) return <div className="p-10 text-center text-slate-400">Loading dispatch data...</div>;

@@ -3,8 +3,11 @@ import { Bell, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { io } from 'socket.io-client';
+import Pusher from 'pusher-js';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
+const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
@@ -29,14 +32,25 @@ export default function NotificationBell() {
   });
 
   useEffect(() => {
-    const socket = io(`${SOCKET_URL}/production`);
-    
-    socket.on('NEW_NOTIFICATION', () => {
+    let socket: any = null;
+    let pusher: Pusher | null = null;
+
+    const handleNewNotification = () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    });
+    };
+
+    if (PUSHER_KEY) {
+      pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER || 'ap2' });
+      const channel = pusher.subscribe('managers');
+      channel.bind('NEW_NOTIFICATION', handleNewNotification);
+    } else {
+      socket = io(`${SOCKET_URL}/production`);
+      socket.on('NEW_NOTIFICATION', handleNewNotification);
+    }
 
     return () => {
-      socket.disconnect();
+      if (pusher) pusher.unsubscribe('managers');
+      if (socket) socket.disconnect();
     };
   }, [queryClient]);
 

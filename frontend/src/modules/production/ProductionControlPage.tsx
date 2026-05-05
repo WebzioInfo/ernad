@@ -315,7 +315,7 @@ function LineControlButtons({ line, activeBatch: propActiveBatch, brands, produc
          startTime = new Date(`${manualDate}T${manualTime}:00`).toISOString();
       }
       return api.post(`/production/start`, {
-        factoryId: user?.factoryId,
+        factoryId: line.factoryId,
         lineId: line.id,
         shiftId: selectedShift,
         brandId: selectedBrand,
@@ -505,7 +505,7 @@ function LineControlCard({ line, brands, products, shifts, canManage, isFocused,
       if (!selectedBrand || !selectedProduct || !selectedShift)
         throw new Error('Please select brand, product, and shift');
       const res = await api.post('/production/start', {
-        factoryId: user?.factoryId,
+        factoryId: line.factoryId,
         lineId: line.id,
         brandId: selectedBrand,
         productId: selectedProduct,
@@ -737,18 +737,28 @@ function LineControlCard({ line, brands, products, shifts, canManage, isFocused,
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              <div className={`${line.status === 'CHANGEOVER' ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'} rounded-3xl p-5 border transition-colors`}>
+              <div className={`${line.status === 'CHANGEOVER' ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'} rounded-3xl p-5 border transition-colors relative`}>
                 <p className={`text-[10px] font-black ${line.status === 'CHANGEOVER' ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-widest mb-1`}>
                   {line.status === 'CHANGEOVER' ? 'In Changeover' : 'Current Batch'}
                 </p>
-                <p className="text-sm font-black text-slate-900 truncate">{activeBatch?.batchCode || '—'}</p>
+                <p className="text-sm font-black text-slate-900 truncate">
+                  {activeBatch?.batchCode || (
+                    <span className="flex items-center gap-1 text-rose-500">
+                      <AlertTriangle className="w-3 h-3" /> State Error
+                    </span>
+                  )}
+                </p>
               </div>
               <div className={`${line.status === 'CHANGEOVER' ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'} rounded-3xl p-5 border transition-colors`}>
                 <p className={`text-[10px] font-black ${line.status === 'CHANGEOVER' ? 'text-amber-500' : 'text-slate-400'} uppercase tracking-widest mb-1`}>Brand / Product</p>
-                <p className="text-sm font-black text-slate-900 truncate">
-                  {activeBatch?.brand?.name || '—'}
-                </p>
-                <p className="text-xs text-slate-500 truncate">{activeBatch?.product?.name || ''}</p>
+                {activeBatch ? (
+                  <>
+                    <p className="text-sm font-black text-slate-900 truncate">{activeBatch.brand?.name || '—'}</p>
+                    <p className="text-xs text-slate-500 truncate">{activeBatch.product?.name || ''}</p>
+                  </>
+                ) : (
+                  <p className="text-xs font-bold text-slate-400 italic">No batch data</p>
+                )}
               </div>
             </div>
           )}

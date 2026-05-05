@@ -29,6 +29,11 @@ export class MasterDataAliasController {
     console.log('MasterDataAliasController initialized');
   }
 
+  @Get('factories')
+  async getFactories() {
+    return await this.factoryConfigService.getFactories();
+  }
+
   @Get('lines')
   async getLines() {
     return await this.factoryConfigService.getLines();
@@ -83,8 +88,9 @@ export class MasterDataAliasController {
   @Post('products')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
-  async createProduct(@Req() req: any, @Body() dto: CreateProductDto) {
-    return await this.factoryConfigService.createProduct(req.user.factoryId, dto);
+  async createProduct(@Req() req: any, @Body() dto: CreateProductDto & { factoryId?: string }) {
+    const factoryId = req.user.factoryId || dto.factoryId;
+    return await this.factoryConfigService.createProduct(factoryId, dto);
   }
 
   @Patch('products/:id')
@@ -104,8 +110,9 @@ export class MasterDataAliasController {
   @Post('raw-materials')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
-  async createRawMaterial(@Req() req: any, @Body() dto: CreateRawMaterialDto) {
-    return await this.factoryConfigService.createRawMaterial(req.user.factoryId, dto);
+  async createRawMaterial(@Req() req: any, @Body() dto: CreateRawMaterialDto & { factoryId?: string }) {
+    const factoryId = req.user.factoryId || dto.factoryId;
+    return await this.factoryConfigService.createRawMaterial(factoryId, dto);
   }
 
   @Patch('raw-materials/:id')
@@ -125,15 +132,17 @@ export class MasterDataAliasController {
   @Post('raw-materials/stock')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('inventory:update')
-  async updateStock(@Req() req: any, @Body() dto: UpdateStockDto) {
-    return await this.factoryConfigService.updateStock(req.user.factoryId, dto);
+  async updateStock(@Req() req: any, @Body() dto: UpdateStockDto & { factoryId?: string }) {
+    const factoryId = req.user.factoryId || dto.factoryId;
+    return await this.factoryConfigService.updateStock(factoryId, dto);
   }
 
   @Post('lines')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
-  async createLine(@Req() req: any, @Body() dto: CreateLineDto) {
-    return await this.factoryConfigService.createLine(req.user.factoryId, dto);
+  async createLine(@Req() req: any, @Body() dto: CreateLineDto & { factoryId?: string }) {
+    const factoryId = req.user.factoryId || dto.factoryId;
+    return await this.factoryConfigService.createLine(factoryId, dto);
   }
 
   @Patch('lines/:id')
@@ -153,8 +162,9 @@ export class MasterDataAliasController {
   @Post('shifts')
   @UseGuards(AuthGuard, RolesGuard)
   @Permissions('settings:manage')
-  async createShift(@Req() req: any, @Body() dto: CreateShiftDto) {
-    return await this.factoryConfigService.createShift(req.user.factoryId, dto);
+  async createShift(@Req() req: any, @Body() dto: CreateShiftDto & { factoryId?: string }) {
+    const factoryId = req.user.factoryId || dto.factoryId;
+    return await this.factoryConfigService.createShift(factoryId, dto);
   }
 
   @Patch('shifts/:id')
