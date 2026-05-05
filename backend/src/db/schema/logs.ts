@@ -1,5 +1,5 @@
 import { pgTable, uuid, timestamp, integer, decimal, bigserial, index, pgEnum, varchar, jsonb, boolean } from 'drizzle-orm/pg-core';
-import { productionBatches } from './production';
+import { productionBatches, operatorSessions } from './production';
 import { users } from './users';
 import { factories, productionLines, shifts, productBrands, products } from './master-data';
 
@@ -16,6 +16,7 @@ export const productionLogs = pgTable('production_logs', {
   brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   userId: uuid('user_id').references(() => users.id).notNull(),
+  sessionId: uuid('session_id').references(() => operatorSessions.id),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   station: stationTypeEnum('station').notNull(),
   
@@ -39,6 +40,7 @@ export const productionLogs = pgTable('production_logs', {
     index('idx_production_logs_station').on(table.station),
     index('idx_production_logs_request').on(table.requestId),
     index('idx_production_logs_date').on(table.loggedAt),
+    index('idx_production_logs_session').on(table.sessionId),
   ];
 });
 

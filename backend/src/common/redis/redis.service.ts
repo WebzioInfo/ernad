@@ -11,6 +11,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   onModuleInit() {
+    const isConfigured = !!(process.env.REDIS_HOST || process.env.REDIS_URL);
+    if (!isConfigured) {
+      // console.log('🕒 Redis not configured. Using Memory Fallback.');
+      this.isAvailable = false;
+      return;
+    }
+
     this.client = new Redis({
       host: this.configService.get('REDIS_HOST') || '127.0.0.1',
       port: this.configService.get('REDIS_PORT') || 6379,
@@ -19,11 +26,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       retryStrategy: null, // Don't retry on connection failure
       showFriendlyErrorStack: true
     });
-
-    // this.client.on('connect', () => {
-    //   this.isAvailable = true;
-    //   console.log('✅ Redis speed-layer connected');
-    // });
 
     this.client.on('error', (err) => {
       this.isAvailable = false;
@@ -42,7 +44,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.isAvailable = true;
       })
       .catch((err) => {
-        // console.warn('🕒 Redis connection timed out or failed. Using Memory Fallback.');
         this.isAvailable = false;
       });
   }
@@ -55,6 +56,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     if (this.client) {
       this.client.quit();
     }
+  }
+
+  getClient() {
+    return this.client;
   }
 
   async incrementCounter(batchId: string, station: string, amount: number) {

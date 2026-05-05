@@ -51,6 +51,7 @@ export const products = pgTable('products', {
   brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'restrict' }),
   category: varchar('category', { length: 50 }), // e.g., 'Water', 'Soda', 'Juice'
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }),
+  targetBPM: integer('target_bpm').default(120).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

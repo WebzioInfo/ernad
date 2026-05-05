@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FactoryConfigService } from './factory-config.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -17,6 +17,7 @@ import {
 @UseGuards(AuthGuard, RolesGuard)
 @Controller(['factory-config', 'master-data'])
 export class FactoryConfigController {
+  private readonly logger = new Logger(FactoryConfigController.name);
   constructor(private readonly factoryConfigService: FactoryConfigService) {}
 
   @Get('lines')
@@ -55,7 +56,12 @@ export class FactoryConfigController {
   @Get('products')
   @Permissions('settings:view')
   async getProducts() {
-    return await this.factoryConfigService.getProducts();
+    try {
+      return await this.factoryConfigService.getProducts();
+    } catch (err) {
+      this.logger.error(`Failed to fetch products: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 
   @Get('current-shift')

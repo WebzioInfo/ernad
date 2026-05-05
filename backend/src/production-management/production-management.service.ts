@@ -5,17 +5,21 @@ import {
   productionLines, users, batchSnapshots, batchTotals,
   productionLogs, productBrands, products,
   qualityChecks, packagingLogs, dispatchLogs, factories,
-  rawMaterials, stockTransactions
+  rawMaterials, stockTransactions, operatorSessions
 } from '../db/schema';
 import { eq, and, sql, desc, isNull, inArray } from 'drizzle-orm';
 
 import { ProductionEventsService } from '../events/production.gateway';
+import { OperatorSessionService } from '../operator-session/operator-session.service';
 
 @Injectable()
 export class ProductionManagementService {
   private readonly logger = new Logger(ProductionManagementService.name);
 
-  constructor(private eventsService: ProductionEventsService) {}
+  constructor(
+    private eventsService: ProductionEventsService,
+    private sessionService: OperatorSessionService
+  ) {}
 
   private async getFactoryContext(factoryId?: string): Promise<string> {
     if (factoryId) return factoryId;
@@ -48,18 +52,8 @@ export class ProductionManagementService {
       const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
       
       // 3. Robust Batch Code Generation (Atomic Sequence)
-      let finalBatchCode = batchCode;
-      if (!finalBatchCode) {
-        const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-        // Atomic count with lock
-        const [{ count }] = await tx.select({ count: sql<number>`count(*)` })
-          .from(productionBatches)
-          .where(and(eq(productionBatches.factoryId, factoryId), eq(productionBatches.productionDate, sql`CURRENT_DATE`)))
-          .for('share'); // Prevent others from starting same day batches until we insert
-        
-        const seq = (Number(count) + 1).toString().padStart(3, '0');
-        finalBatchCode = `${factory?.code || 'BATCH'}-${dateStr}-${seq}`;
-      } else {
+      const finalBatchCode = batchCode || await this.generateBatchCode(tx);
+      if (batchCode) {
         const [existing] = await tx.select().from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
         if (existing) throw new BadRequestException(`Batch code ${finalBatchCode} already exists.`);
       }
@@ -103,7 +97,7 @@ export class ProductionManagementService {
     return result;
   }
 
-  async closeBatch(batchId: string, reqUserId: string, remarks?: string) {
+  async closeBatch(batchId: string, reqUserId: string, remarks?: string, endTime?: string, materialReturn?: any) {
     const factoryId = await this.getFactoryContext();
 
     const result = await db.transaction(async (tx) => {
@@ -156,18 +150,24 @@ export class ProductionManagementService {
       const [updatedBatch] = await tx.update(productionBatches)
         .set({ 
           status: 'QC_PENDING', 
-          endTime: new Date(), 
+          endTime: endTime ? new Date(endTime) : new Date(), 
           updatedBy: reqUserId,
-          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[CLOSE]: ' || ${remarks}` : productionBatches.remarks
+          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[CLOSE]: ' || ${remarks}` : productionBatches.remarks,
+          materialReturn: materialReturn || null
         })
         .where(eq(productionBatches.id, batchId))
         .returning();
       
-      // 4. Update Line Status
       await tx.update(productionLines)
         .set({ status: 'IDLE' })
         .where(eq(productionLines.id, batch.lineId));
       
+      // 5. End all sessions bound to this batch
+      const boundSessions = await tx.select().from(operatorSessions).where(and(eq(operatorSessions.batchId, batchId), eq(operatorSessions.isActive, true)));
+      for (const session of boundSessions) {
+        await this.sessionService.endSession(session.userId, reqUserId, 'batch_closed');
+      }
+
       return updatedBatch;
     });
 
@@ -327,10 +327,7 @@ export class ProductionManagementService {
 
       // Start NEW batch
       const [oldBatch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
-      const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
-
-      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      const batchCode = `${factory.code}-${dateStr}-CO-${log.lineId.slice(0, 4).toUpperCase()}`;
+      const batchCode = await this.generateBatchCode(tx);
 
       const [newBatch] = await tx.insert(productionBatches).values({
         batchCode,
@@ -387,7 +384,7 @@ export class ProductionManagementService {
   async getBatches(limit = 50) {
     const factoryId = await this.getFactoryContext();
 
-    return await db.select({
+    const results = await db.select({
       batch: productionBatches,
       line: productionLines,
       product: products,
@@ -395,11 +392,20 @@ export class ProductionManagementService {
     })
     .from(productionBatches)
     .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
-    .innerJoin(products, eq(productionBatches.productId, products.id))
-    .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+    .leftJoin(products, eq(productionBatches.productId, products.id))
+    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
     .where(eq(productionBatches.factoryId, factoryId))
     .orderBy(desc(productionBatches.startTime))
     .limit(limit);
+
+    console.log("BATCHES QUERY RESULT COUNT:", results.length);
+    
+    return results.map(row => ({
+      ...row.batch,
+      line: row.line,
+      product: row.product || { name: 'Unknown Product', id: null, targetBPM: 120 },
+      brand: row.brand || { name: 'Unknown Brand', id: null }
+    }));
   }
 
   async getLifecycleLogs(type?: 'qc' | 'packaging' | 'dispatch') {
@@ -426,15 +432,46 @@ export class ProductionManagementService {
       product: products
     })
     .from(productionBatches)
-    .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
-    .innerJoin(products, eq(productionBatches.productId, products.id))
+    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+    .leftJoin(products, eq(productionBatches.productId, products.id))
     .where(and(
       eq(productionBatches.lineId, lineId),
       inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
     ))
     .orderBy(desc(productionBatches.startTime))
     .limit(1);
+    
+    console.log("ACTIVE QUERY EXECUTED", { lineId });
+    console.log("QUERY RESULT:", JSON.stringify(results[0], null, 2));
 
-    return results[0] || null;
+    if (!results[0]) {
+      console.log("NO ACTIVE BATCH FOUND FOR LINE:", lineId);
+      return null;
+    }
+
+    const { batch, brand, product } = results[0];
+    
+    return { 
+      ...batch, 
+      brand: brand ? brand : { name: 'Unknown Brand', id: null }, 
+      product: product ? product : { name: 'Unknown Product', id: null, targetBPM: 120 } 
+    };
+  }
+
+  private async generateBatchCode(tx: any): Promise<string> {
+    const now = new Date();
+    const yearStr = now.getFullYear().toString().slice(-2);
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((Number(now) - Number(startOfYear)) / (1000 * 60 * 60 * 24));
+    const dayStr = dayOfYear.toString().padStart(3, '0');
+    
+    const baseCode = `EB${yearStr}${dayStr}`;
+    
+    const [{ count }] = await tx.select({ count: sql<number>`count(*)` })
+      .from(productionBatches)
+      .where(sql`${productionBatches.batchCode} LIKE ${baseCode + '%'}`);
+    
+    const suffix = Number(count) === 0 ? '' : String.fromCharCode(64 + Number(count));
+    return `${baseCode}${suffix}`;
   }
 }

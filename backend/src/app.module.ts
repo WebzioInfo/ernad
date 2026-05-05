@@ -21,6 +21,8 @@ import { ConfigModule } from '@nestjs/config';
 import { QueueModule } from './common/queue/queue.module';
 import { RedisModule } from './common/redis/redis.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { OperatorSessionModule } from './operator-session/operator-session.module';
+import { DataLifecycleModule } from './data-lifecycle/data-lifecycle.module';
 
 import { AppController } from './app.controller';
 
@@ -42,7 +44,9 @@ import { AppController } from './app.controller';
     AttendanceModule,
     ProductionTelemetryModule,
     ProductionManagementModule,
-    InventoryModule
+    InventoryModule,
+    OperatorSessionModule,
+    DataLifecycleModule,
   ],
 
   controllers: [

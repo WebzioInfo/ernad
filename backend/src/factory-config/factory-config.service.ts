@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../db/db';
-import { productionLines, shifts, products, productBrands, rawMaterials, stockTransactions, factories } from '../db/schema';
+import { productionLines, shifts, products, productBrands, rawMaterials, stockTransactions, factories, productionBatches } from '../db/schema';
 
 @Injectable()
 export class FactoryConfigService {
@@ -14,7 +14,25 @@ export class FactoryConfigService {
 
   async getLines() {
     const factoryId = await this.getFactoryContext();
-    return await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
+    const results = await db.select({
+      line: productionLines,
+      batch: {
+        id: productionBatches.id,
+        batchCode: productionBatches.batchCode,
+        status: productionBatches.status,
+      }
+    })
+    .from(productionLines)
+    .leftJoin(productionBatches, and(
+      eq(productionLines.id, productionBatches.lineId),
+      inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
+    ))
+    .where(eq(productionLines.factoryId, factoryId));
+
+    return results.map(r => ({
+      ...r.line,
+      batch: r.batch.id ? r.batch : null
+    }));
   }
 
   async createLine(dto: { name: string; description?: string }) {

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req } from '@nestjs/common';
+import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductionManagementService } from './production-management.service';
 
@@ -18,6 +18,7 @@ import {
 @UseGuards(AuthGuard, RolesGuard)
 @Controller(['production', 'production-batch'])
 export class ProductionManagementController {
+  private readonly logger = new Logger(ProductionManagementController.name);
   constructor(private readonly productionService: ProductionManagementService) {}
 
   @Post('start')
@@ -93,9 +94,9 @@ export class ProductionManagementController {
   async closeBatch(
     @Param('id') batchId: string,
     @Req() req: any,
-    @Body() body: { remarks?: string }
+    @Body() body: { remarks?: string; endTime?: string; materialReturn?: any }
   ) {
-    await this.productionService.closeBatch(batchId, req.user.sub, body.remarks);
+    await this.productionService.closeBatch(batchId, req.user.sub, body.remarks, body.endTime, body.materialReturn);
     return { success: true, message: 'Batch moved to QC_PENDING.' };
   }
 
@@ -121,7 +122,12 @@ export class ProductionManagementController {
   @Permissions('production:start')
   @ApiOperation({ summary: 'Get active batch for a specific line' })
   async getActiveBatch(@Param('lineId') lineId: string) {
-    return await this.productionService.getActiveBatch(lineId);
+    try {
+      return await this.productionService.getActiveBatch(lineId);
+    } catch (err) {
+      this.logger.error(`Failed to get active batch for line ${lineId}: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 
   @Get('batches')

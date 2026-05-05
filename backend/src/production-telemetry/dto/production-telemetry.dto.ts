@@ -21,6 +21,10 @@ export class ProductionTelemetryDto {
   requestId: string;
 
   @IsUUID()
+  @IsNotEmpty()
+  sessionId: string;
+
+  @IsUUID()
   batchId: string;
 
   @IsUUID()

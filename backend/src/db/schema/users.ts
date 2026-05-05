@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
-import { factories, productionLines } from './master-data';
+import { factories, productionLines, shifts } from './master-data';
 
 // ── RBAC SYSTEM (Phase 3 Redesign) ──
 
@@ -38,7 +38,7 @@ export const users = pgTable('users', {
   jobTitle: varchar('job_title', { length: 100 }),
   passwordHash: varchar('password_hash', { length: 255 }),
   pinCode: varchar('pin_code', { length: 255 }),
-  operatorType: varchar('operator_type', { length: 50 }),
+  operatorType: varchar('operator_type', { length: 50 }), // @deprecated - Use operator_sessions.station
   isActive: boolean('is_active').default(true).notNull(),
   avatarUrl: varchar('avatar_url', { length: 255 }),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'set null' }),
@@ -75,7 +75,8 @@ export const attendanceLogs = pgTable('attendance_logs', {
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
   clockIn: timestamp('clock_in').defaultNow().notNull(),
   clockOut: timestamp('clock_out'),
-  shiftName: varchar('shift_name', { length: 50 }), // e.g., Morning, Night
+  shiftId: uuid('shift_id').references(() => shifts.id), // New: Link to master shift data
+  shiftName: varchar('shift_name', { length: 50 }), // @deprecated - Use shiftId
   status: varchar('status', { length: 20 }).default('PRESENT').notNull(), // PRESENT, LATE, ON_LEAVE
   externalSyncId: varchar('external_sync_id', { length: 255 }), // ID from biometric device
   remarks: varchar('remarks', { length: 255 }),

@@ -222,8 +222,11 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   const [stopRemarks, setStopRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
   const [stopConfirmOpen, setStopConfirmOpen] = useState(false);
+  const [stopEndTime, setStopEndTime] = useState(new Date().toISOString().slice(0, 16));
   const [changeoverModalOpen, setChangeoverModalOpen] = useState(false);
+  const [changeoverBrand, setChangeoverBrand] = useState('');
   const [changeoverProduct, setChangeoverProduct] = useState('');
+  const [materialReturns, setMaterialReturns] = useState<any>({ preforms: 0, caps: 0, labels: 0 });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['production-lines'] });
@@ -247,7 +250,17 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   });
 
   const stopMutation = useMutation({
-    mutationFn: () => api.put(`/production/${activeBatch.id}/close`, { remarks: stopRemarks }),
+    mutationFn: () => {
+      if (!activeBatch?.id) {
+        toast.error('No active batch found to close');
+        throw new Error('No active batch ID');
+      }
+      return api.put(`/production/${activeBatch.id}/close`, { 
+        remarks: stopRemarks,
+        endTime: new Date(stopEndTime).toISOString(),
+        materialReturn: materialReturns
+      });
+    },
     onSuccess: () => { 
       invalidate(); 
       setStopConfirmOpen(false); 
@@ -283,9 +296,15 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      <button onClick={() => setStopConfirmOpen(true)} className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group">
-         <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />
-         <span className="text-[10px] font-black uppercase tracking-widest">End Batch</span>
+      <button 
+        onClick={() => setStopConfirmOpen(true)} 
+        disabled={!activeBatch || stopMutation.isPending}
+        className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group disabled:opacity-50"
+      >
+         {stopMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
+         <span className="text-[10px] font-black uppercase tracking-widest">
+           {stopMutation.isPending ? 'Closing...' : 'End Batch'}
+         </span>
       </button>
       <button onClick={() => setChangeoverModalOpen(true)} className="flex flex-col items-center gap-3 p-8 bg-amber-500 text-white rounded-[2.5rem] hover:bg-amber-600 transition-all group">
          <RefreshCcw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
@@ -301,12 +320,40 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">Finalize Production?</h3>
               <p className="text-slate-500 font-medium mt-2">Closing batch will trigger inventory deduction and move state to QC Pending.</p>
            </div>
+
+           <div className="mb-4">
+             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-1">Ending Time</label>
+             <input 
+               type="datetime-local" 
+               value={stopEndTime} 
+               onChange={(e) => setStopEndTime(e.target.value)}
+               className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-rose-500"
+             />
+           </div>
+
            <textarea 
              value={stopRemarks} 
              onChange={(e) => setStopRemarks(e.target.value)}
              placeholder="End of shift remarks (optional)..."
-             className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-24 resize-none mb-8"
+             className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-24 resize-none mb-6"
            />
+
+           <div className="bg-slate-50 p-6 rounded-[2rem] mb-8">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Material Returns</h4>
+              <div className="grid grid-cols-3 gap-4">
+                 {Object.keys(materialReturns).map(key => (
+                   <div key={key}>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 capitalize">{key}</label>
+                      <input 
+                         type="number" 
+                         value={materialReturns[key]} 
+                         onChange={(e) => setMaterialReturns({...materialReturns, [key]: Number(e.target.value)})}
+                         className="w-full bg-white border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                   </div>
+                 ))}
+              </div>
+           </div>
            <div className="flex gap-4">
               <button onClick={() => setStopConfirmOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
               <button onClick={() => stopMutation.mutate()} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-200">Confirm Close</button>
@@ -317,11 +364,24 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
       {changeoverModalOpen && (
         <Modal onClose={() => setChangeoverModalOpen(false)}>
            <h3 className="text-xl font-black mb-4">Product Changeover</h3>
-           <p className="text-slate-500 mb-6">Select the next product to be produced on this line.</p>
-           <select value={changeoverProduct} onChange={(e) => setChangeoverProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 mb-8">
-              <option value="">Select New Product</option>
-              {products?.map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-           </select>
+           <p className="text-slate-500 mb-6">Select the next brand and product to be produced on this line.</p>
+           
+           <div className="space-y-4 mb-8">
+             <select value={changeoverBrand} onChange={(e) => { setChangeoverBrand(e.target.value); setChangeoverProduct(''); }} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4">
+                <option value="">Select Brand</option>
+                {brands?.map((b:any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+             </select>
+             
+             <select 
+               value={changeoverProduct} 
+               onChange={(e) => setChangeoverProduct(e.target.value)} 
+               className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 disabled:opacity-50"
+               disabled={!changeoverBrand}
+             >
+                <option value="">Select New Product</option>
+                {products?.filter((p:any) => p.brandId === changeoverBrand).map((p:any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+             </select>
+           </div>
            <div className="flex gap-4">
               <button onClick={() => setChangeoverModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
               <button onClick={() => changeoverMutation.mutate()} className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-100">Initiate</button>
@@ -420,12 +480,16 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
   const [remarks, setRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
 
+  // activeBatch is still useful for additional details if needed, 
+  // but for the basic batchCode we can use line.batch
+  /*
   const { data: activeBatch } = useQuery({
     queryKey: ['active-batch', line.id],
     queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
     enabled: line.status === 'RUNNING' || line.status === 'CHANGEOVER',
     refetchInterval: 30000,
   });
+  */
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
@@ -439,6 +503,7 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
     }),
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+      queryClient.invalidateQueries({ queryKey: ['active-batch', line.id] });
       setIsStartModalOpen(false);
       toast.success('Production started successfully'); 
     }
@@ -473,10 +538,10 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
             <p className="text-sm font-black text-slate-900 capitalize">{line.status.toLowerCase()}</p>
          </div>
-         <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
+          <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
-            <p className="text-sm font-black text-slate-900 truncate">{activeBatch?.batchCode || '—'}</p>
-         </div>
+            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batchCode || '—'}</p>
+          </div>
       </div>
 
       <div className="flex gap-3">

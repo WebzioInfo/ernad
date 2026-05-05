@@ -11,9 +11,12 @@ import { api } from '../../api';
 import { db } from '../../utils/sync-service';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function OperatorPanel() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { id: lineId } = useParams();
 
   const [activeBatch, setActiveBatch] = useState<any>(null);
@@ -27,6 +30,29 @@ export default function OperatorPanel() {
   const [isRework, setIsRework] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
 
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { data: session, isLoading: isLoadingSession } = useQuery({
+    queryKey: ['current-operator-session'],
+    queryFn: async () => (await api.get('/operator/session/current')).data,
+  });
+
+  const endSessionMutation = useMutation({
+    mutationFn: () => api.post('/operator/session/end'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
+      navigate('/line/select');
+    }
+  });
+
+  // Redirect if no session and not loading
+  useEffect(() => {
+    if (!isLoadingSession && !session) {
+      navigate('/line/select');
+    }
+  }, [session, isLoadingSession, navigate]);
+
 
   const stations = [
     { id: 'BLOWING', title: 'Blowing Station', icon: Wind, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', materials: ['Preform Bags', 'Scrap Bottles'] },
@@ -35,14 +61,7 @@ export default function OperatorPanel() {
     { id: 'PACKING', title: 'Packing Station', icon: Box, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', materials: ['Shrink Rolls', 'Master Cartons'] },
   ];
 
-  const availableStations = stations.filter(s =>
-    user?.roles?.some(role => role === `OPERATOR_${s.id}`) ||
-    user?.role === 'SUPER_ADMIN' ||
-    user?.role === 'ADMIN' ||
-    user?.role === 'MANAGER'
-  );
-
-  const [currentStationId, setCurrentStationId] = useState(availableStations[0]?.id || 'FILLING');
+  const currentStationId = session?.station || 'FILLING';
   const currentStation = stations.find(s => s.id === currentStationId) || stations[1];
 
   useEffect(() => {
@@ -77,10 +96,11 @@ export default function OperatorPanel() {
     const logEntry = {
       requestId: uuidv4(),
       batchId: activeBatch?.id,
+      sessionId: session.id,
       lineId: lineId!,
       brandId: activeBatch?.brandId,
       productId: activeBatch?.productId,
-      shiftId: activeBatch?.shiftId || 'SHIFT_A',
+      shiftId: session.shiftId || activeBatch?.shiftId || 'SHIFT_A',
       station: currentStation.id,
       primaryCount,
       splitValues,
@@ -119,39 +139,26 @@ export default function OperatorPanel() {
           <div className="flex items-center gap-4">
             <currentStation.icon className={`w-8 h-8 ${currentStation.color}`} />
             <div>
-              <h1 className="text-xl font-bold tracking-tight">LINE {lineId}</h1>
-              <p className="text-[10px] uppercase tracking-widest text-slate-400">{currentStation.title}</p>
+              <h1 className="text-xl font-bold tracking-tight">LINE {line?.name || lineId}</h1>
+              <p className="text-[10px] uppercase tracking-widest text-slate-400">
+                {currentStation.title} • Active for {session?.startTime ? formatDistanceToNow(new Date(session.startTime)) : '...'}
+              </p>
             </div>
           </div>
 
-          {/* Station Switcher */}
-          {availableStations.length > 1 && (
-            <div className="flex gap-2 p-1 bg-white/5 rounded-xl ml-4">
-              {availableStations.map(s => (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    setCurrentStationId(s.id);
-                    setMaterials([]);
-                    setPrimaryCount(0);
-                    setSplitValues([]);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${currentStationId === s.id ? 'bg-white/10 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'
-                    }`}
-                >
-                  {s.id}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right mr-4">
             <p className="text-sm font-bold">{user?.name}</p>
-            <p className="text-[10px] text-blue-400 uppercase tracking-widest">Shift: Morning</p>
+            <p className="text-[10px] text-blue-400 uppercase tracking-widest">Operator Session</p>
           </div>
-          <button onClick={() => logout()} className="p-3 bg-white/5 rounded-xl hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-all">
-            <LogOut className="w-5 h-5" />
+          <button 
+            onClick={() => endSessionMutation.mutate()} 
+            disabled={endSessionMutation.isPending}
+            className="p-3 bg-rose-500/10 rounded-xl hover:bg-rose-500 hover:text-white text-rose-400 transition-all flex items-center gap-2 px-4"
+          >
+            {endSessionMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            <span className="text-[10px] font-black uppercase tracking-widest">End Session</span>
           </button>
         </div>
       </header>

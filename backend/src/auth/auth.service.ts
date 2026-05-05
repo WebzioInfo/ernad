@@ -124,11 +124,11 @@ export class AuthService {
 
     // Close existing open sessions for the SAME USER and SAME LINE
     await db.update(operatorSessions)
-      .set({ logoutTime: new Date() })
+      .set({ endTime: new Date(), isActive: false, endReason: 'superseded' })
       .where(and(
         eq(operatorSessions.userId, userId), 
         eq(operatorSessions.lineId, lineId),
-        isNull(operatorSessions.logoutTime)
+        eq(operatorSessions.isActive, true)
       ));
 
     const result = await db.insert(operatorSessions).values({
@@ -136,7 +136,9 @@ export class AuthService {
       lineId,
       shiftId,
       factoryId: user.factoryId,
-      loginTime: new Date(),
+      station: 'UNKNOWN', // Legacy session
+      startTime: new Date(),
+      isActive: true,
     }).returning();
 
     return result[0];
@@ -144,8 +146,8 @@ export class AuthService {
 
   async logoutOperatorSession(userId: string) {
     await db.update(operatorSessions)
-      .set({ logoutTime: new Date() })
-      .where(and(eq(operatorSessions.userId, userId), isNull(operatorSessions.logoutTime)));
+      .set({ endTime: new Date(), isActive: false, endReason: 'manual' })
+      .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)));
     
     return { success: true };
   }

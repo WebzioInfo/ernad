@@ -27,11 +27,18 @@ export class AnalyticsService {
     if (brandId) conditions.push(eq(productionBatches.brandId, brandId));
     if (productId) conditions.push(eq(productionBatches.productId, productId));
 
-    const batches = await db.select({ id: productionBatches.id }).from(productionBatches)
-      .where(and(...conditions));
+    const batches = await db.select({ 
+      id: productionBatches.id,
+      targetBPM: products.targetBPM
+    })
+    .from(productionBatches)
+    .leftJoin(products, eq(productionBatches.productId, products.id))
+    .where(and(...conditions));
+    
     if (!batches.length) return null;
 
     const activeBatchId = batches[0].id;
+    const targetBPM = batches[0].targetBPM || 120;
 
     // 1.5 Fetch active operators count
     const [{ count: activeOperators }] = await db.select({ 
@@ -72,9 +79,9 @@ export class AnalyticsService {
     // Quality = (Total Packed - Rework) / Total Blowing
     const quality = data.blowingTotal > 0 ? (data.packingTotal / data.blowingTotal) : 0;
     
-    // Performance = Actual Throughput / Target Throughput (120 BPM)
+    // Performance = Actual Throughput / Target Throughput
     const currentBPM = await this.calculateCurrentBPM(lineId);
-    const performance = Math.min(currentBPM / 120, 1);
+    const performance = Math.min(currentBPM / targetBPM, 1);
     
     // Availability = Operating Time / Planned Production Time (Assume 8h shift)
     const availability = 0.92; // Calculated via shift logs in future phase
@@ -154,12 +161,12 @@ export class AnalyticsService {
 
   async getBrandPerformance() {
     return await db.select({
-      brand: productBrands.name,
+      brand: sql<string>`COALESCE(${productBrands.name}, 'Unknown Brand')`,
       totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
       rejection: sql<number>`SUM(${productionLogs.wastageCount})`
     })
     .from(productionLogs)
-    .innerJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
+    .leftJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
     .groupBy(productBrands.name);
   }
 
@@ -177,11 +184,11 @@ export class AnalyticsService {
 
   async getProductPerformance() {
     return await db.select({
-      product: products.name,
+      product: sql<string>`COALESCE(${products.name}, 'Unknown Product')`,
       totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`
     })
     .from(productionLogs)
-    .innerJoin(products, eq(productionLogs.productId, products.id))
+    .leftJoin(products, eq(productionLogs.productId, products.id))
     .groupBy(products.name);
   }
 }
