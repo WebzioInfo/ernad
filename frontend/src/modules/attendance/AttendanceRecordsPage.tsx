@@ -1,11 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../api';
 import { 
-  Calendar, Clock, UserCheck, UserX, 
-  Search, Filter, Download, ArrowLeft,
-  ChevronRight, BadgeCheck, Timer
+  Clock
 } from 'lucide-react';
-// import { format } from 'date-fns'; // Removed due to missing dependency
 
 interface AttendanceRecord {
   id: string;
@@ -18,7 +14,7 @@ interface AttendanceRecord {
 }
 
 export default function AttendanceRecordsPage() {
-  const { data: attendance, isLoading } = useQuery<AttendanceRecord[]>({
+  const { isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ['attendance'],
     queryFn: async () => {
       // For now, returning dummy data as the backend only has minimal stubs
@@ -50,25 +46,6 @@ export default function AttendanceRecordsPage() {
           Phase 4: Hardware Bridge
         </div>
       </div>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value, icon: Icon, color }: any) {
-  return (
-    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-      <div className="flex items-center gap-4 mb-3">
-        <div className={`p-3 rounded-2xl ${
-          color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-          color === 'amber' ? 'bg-amber-50 text-amber-600' :
-          color === 'rose' ? 'bg-rose-50 text-rose-600' :
-          'bg-blue-50 text-blue-600'
-        }`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-      </div>
-      <h4 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h4>
     </div>
   );
 }

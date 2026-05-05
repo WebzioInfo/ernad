@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   BarChart3, Settings, Users, Activity,
   Package, LayoutDashboard, Bell, Search,
-  Menu, X, LogOut, Clock, Globe, Command,
-  UserCog, Fingerprint, Sparkles, ClipboardList, ShieldCheck
+  Menu, X, LogOut, Globe, Command,
+  UserCog, Sparkles, ClipboardList, ShieldCheck
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import { useNavigate, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom';

@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import { 
-  ClipboardList, Search, User, Clock, 
-  Database, Info, Calendar, Filter
+  ClipboardList, User, Clock, 
+  Database, Info, Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 

@@ -4,10 +4,10 @@ import { api } from '../../api';
 import {
   Users, UserPlus, Search,
   Trash2, Edit2, UserCheck,
-  UserMinus, Mail, Fingerprint,
+  Mail, Fingerprint,
   Lock, Unlock, BadgeCheck,
   ShieldCheck, ShieldAlert, UserCog,
-  Filter, ListFilter, XCircle
+  Filter, XCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';

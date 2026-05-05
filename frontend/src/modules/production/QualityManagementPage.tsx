@@ -1,24 +1,15 @@
-import { useState } from 'react';
-import { 
-  ClipboardCheck, 
-  PackageCheck, 
-  Truck, 
-  AlertCircle, 
-  CheckCircle2, 
-  Search,
-  Filter,
-  ChevronRight,
-  MoreVertical
+import {
+  ClipboardCheck,
+  PackageCheck,
+  Truck,
+  AlertCircle,
+  Search
 } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../../api';
 
-import { 
-  BatchTrackingView, 
-  QualityCheckView, 
-  PackagingView, 
-  DispatchView 
+import {
+  BatchTrackingView
 } from './components/BatchLifecycleViews';
+import { useState } from 'react';
 
 export default function QualityManagementPage() {
   const [activeTab, setActiveTab] = useState<'batches' | 'qc' | 'packaging' | 'dispatch'>('batches');
@@ -32,7 +23,7 @@ export default function QualityManagementPage() {
 
   const renderContent = () => {
     if (activeTab === 'batches') return <BatchTrackingView />;
-    
+
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
         <div className="w-24 h-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6 border border-slate-100">
@@ -76,8 +67,8 @@ export default function QualityManagementPage() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`
                 flex items-center gap-3 px-8 py-4 rounded-[1.5rem] font-black text-sm transition-all
-                ${isActive 
-                  ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/50' 
+                ${isActive
+                  ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200/50'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}
               `}
             >

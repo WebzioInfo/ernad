@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bell, Shield, X, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Shield, X } from 'lucide-react';
 import OneSignal from 'react-onesignal';
 
 export default function NotificationPermissionModal() {

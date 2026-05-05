@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import DashboardLayout from './layouts/DashboardLayout';
@@ -9,10 +9,10 @@ const EfficiencyDashboardPage = lazy(() => import('./modules/analytics/Efficienc
 const ProductionControlPage = lazy(() => import('./modules/production/ProductionControlPage'));
 const UserManagementPage = lazy(() => import('./modules/personnel/UserManagementPage'));
 const AuditLogsPage = lazy(() => import('./modules/personnel/AuditLogsPage'));
-const AttendanceRecordsPage = lazy(() => import('./modules/attendance/AttendanceRecordsPage'));
+// const AttendanceRecordsPage = lazy(() => import('./modules/attendance/AttendanceRecordsPage'));
 const FactoryConfigurationPage = lazy(() => import('./modules/master-data/FactoryConfigurationPage'));
 const InventoryPage = lazy(() => import('./modules/inventory/InventoryPage'));
-const QualityManagementPage = lazy(() => import('./modules/production/QualityManagementPage'));
+// const QualityManagementPage = lazy(() => import('./modules/production/QualityManagementPage'));
 const OperatorPanel = lazy(() => import('./modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('./modules/production/LineSelectionPage'));
 

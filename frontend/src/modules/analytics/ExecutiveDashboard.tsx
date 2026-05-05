@@ -1,9 +1,9 @@
-import React, { memo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import useAuthStore from '../../store/useAuthStore';
 import { 
-  Zap, Package, CheckCircle2, AlertTriangle, 
+  Package, CheckCircle2, AlertTriangle, 
   Users, Activity, Box, Clock, TrendingUp,
   ArrowUpRight, ArrowDownRight, MoreVertical,
   ShieldCheck, Database, HardDrive, Cpu,
@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, BarChart, Bar, 
-  PieChart, Pie, Cell 
+  Tooltip, ResponsiveContainer, BarChart, Bar 
 } from 'recharts';
 
 const MOCK_CHART_DATA = [

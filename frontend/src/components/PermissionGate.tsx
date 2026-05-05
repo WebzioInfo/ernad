@@ -1,8 +1,6 @@
 import React from 'react';
 import useAuthStore from '../store/useAuthStore';
 
-type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'OPERATOR_BLOWING' | 'OPERATOR_FILLING' | 'OPERATOR_LABELING' | 'OPERATOR_PACKING' | 'OPERATOR';
-
 interface PermissionGateProps {
   children: React.ReactNode;
   allowedRoles?: string[];

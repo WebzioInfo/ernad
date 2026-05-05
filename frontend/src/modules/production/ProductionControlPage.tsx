@@ -6,7 +6,7 @@ import { api } from '../../api';
 import { 
   Activity, Play, Square, RefreshCcw, MoreVertical, 
   Gauge, Loader2, Pencil, Trash2, X, Check, AlertTriangle,
-  History, Users, Layout, Settings2, BarChart2, TrendingUp,
+  History, Users, BarChart2, TrendingUp,
   Clock, Shield, ArrowLeft, Wrench, Construction, ShieldAlert, ZapOff
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -84,8 +84,8 @@ export default function ProductionControlPage() {
   );
 }
 
-function ProductionCommander({ line, onBack, brands, products, shifts, canManage }: any) {
-  const queryClient = useQueryClient();
+function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
+
   
   const { data: activeBatch } = useQuery({
     queryKey: ['active-batch', line.id],
@@ -451,7 +451,7 @@ function LineControlButtons({ line, activeBatch: propActiveBatch, brands, produc
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LineControlCard({ line, brands, products, shifts, canManage, userId, isFocused, onFocus }: any) {
+function LineControlCard({ line, brands, products, shifts, canManage, isFocused, onFocus }: any) {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const menuRef = useRef<HTMLDivElement>(null);

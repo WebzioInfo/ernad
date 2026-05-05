@@ -1,8 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../api';
 import { 
-  ClipboardCheck, 
-  PackageCheck, 
   Truck, 
   Clock, 
   CheckCircle2, 
@@ -13,7 +11,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import useAuthStore from '../../../store/useAuthStore';
-import { toast } from 'sonner';
+
 
 export function BatchTrackingView() {
   const factoryId = useAuthStore((state) => state.user?.factoryId);

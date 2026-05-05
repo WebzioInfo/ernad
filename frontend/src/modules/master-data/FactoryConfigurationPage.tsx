@@ -3,8 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 import { 
   Plus, Package, Tag, Edit2, Trash2, 
-  Search, Filter, ChevronRight, Layers,
-  Box, Droplet, Hash, HardDrive, X, Clock
+  Layers, Box, HardDrive, X, Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -20,27 +19,27 @@ export default function FactoryConfigurationPage() {
   });
   const queryClient = useQueryClient();
 
-  const { data: brands, isLoading: brandsLoading } = useQuery({
+  const { data: brands } = useQuery({
     queryKey: ['brands'],
     queryFn: async () => (await api.get('/master-data/brands')).data
   });
 
-  const { data: products, isLoading: productsLoading } = useQuery({
+  const { data: products } = useQuery({
     queryKey: ['products'],
     queryFn: async () => (await api.get('/master-data/products')).data
   });
 
-  const { data: rawMaterials, isLoading: materialsLoading } = useQuery({
+  const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials'],
     queryFn: async () => (await api.get('/master-data/raw-materials')).data
   });
 
-  const { data: shifts, isLoading: shiftsLoading } = useQuery({
+  const { data: shifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => (await api.get('/master-data/shifts')).data
   });
   
-  const { data: lines, isLoading: linesLoading } = useQuery({
+  const { data: lines } = useQuery({
     queryKey: ['production-lines'],
     queryFn: async () => (await api.get('/master-data/lines')).data
   });
@@ -324,20 +323,6 @@ export default function FactoryConfigurationPage() {
         />
       )}
     </div>
-  );
-}
-
-function TabButton({ active, onClick, icon: Icon, label }: any) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black transition-all ${
-        active ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-900'
-      }`}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
   );
 }
 
