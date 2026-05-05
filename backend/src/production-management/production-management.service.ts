@@ -438,13 +438,13 @@ export class ProductionManagementService {
       status: lineData?.status || batch.status,
       batch: {
         id: batch.id,
-        batch_code: batch.batchCode,
+        batchCode: batch.batchCode,
         status: batch.status,
         startTime: batch.startTime,
         productId: batch.productId,
         brandId: batch.brandId,
-        product_name: product?.name || 'Unknown Product',
-        brand_name: brand?.name || 'Unknown Brand'
+        productName: product?.name || 'Unknown Product',
+        brandName: brand?.name || 'Unknown Brand'
       }
     };
   }

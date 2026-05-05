@@ -20,6 +20,10 @@ export class FactoryConfigService {
         id: productionBatches.id,
         batchCode: productionBatches.batchCode,
         status: productionBatches.status,
+        productId: productionBatches.productId,
+        brandId: productionBatches.brandId,
+        productName: products.name,
+        brandName: productBrands.name
       }
     })
     .from(productionLines)
@@ -27,14 +31,13 @@ export class FactoryConfigService {
       eq(productionLines.id, productionBatches.lineId),
       inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
     ))
+    .leftJoin(products, eq(productionBatches.productId, products.id))
+    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
     .where(eq(productionLines.factoryId, factoryId));
 
     return results.map(r => ({
       ...r.line,
-      batch: r.batch.id ? {
-        ...r.batch,
-        batch_code: r.batch.batchCode
-      } : null
+      batch: r.batch.id ? r.batch : null
     }));
   }
 

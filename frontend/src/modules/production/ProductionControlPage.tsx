@@ -77,15 +77,8 @@ export default function ProductionControlPage() {
 }
 
 function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
-   const { data: activeBatch } = useQuery({
-     queryKey: ['production-active', line.id],
-     queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
-     enabled: !!line.id,
-     refetchInterval: 10000
-   });
-
    console.log("LINE DATA (COMMANDER):", line);
-   console.log("ACTIVE BATCH DATA:", activeBatch);
+   console.log("BATCH DATA:", line.batch);
 
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
@@ -119,11 +112,11 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
          <div className="flex items-center gap-4">
             <div className="text-right">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Batch</p>
-               <p className="text-lg font-black text-slate-900 leading-tight">{activeBatch?.batch?.batch_code || 'NO BATCH'}</p>
-               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{activeBatch?.batch?.product_name || 'No Active Product'}</p>
+               <p className="text-lg font-black text-slate-900 leading-tight">{line.batch?.batchCode || 'NO BATCH'}</p>
+               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{line.batch?.productName || 'No Active Product'}</p>
             </div>
             <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
-               {activeBatch?.batch?.batch_code?.charAt(0) || '?'}
+               {line.batch?.batchCode?.charAt(0) || '?'}
             </div>
          </div>
       </header>
@@ -174,7 +167,7 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
             <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
                <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Station Control</h3>
                 <div className="space-y-4">
-                   <LineControlButtons line={line} activeBatch={activeBatch} brands={brands} products={products} shifts={shifts} />
+                   <LineControlButtons line={line} brands={brands} products={products} shifts={shifts} />
                 </div>
             </div>
             
@@ -216,7 +209,7 @@ function TelemetryCard({ label, value, icon: Icon, color, sub }: any) {
   );
 }
 
-function LineControlButtons({ line, activeBatch, brands, products, shifts }: any) {
+function LineControlButtons({ line, brands, products, shifts }: any) {
   const queryClient = useQueryClient();
   const [selectedShift, setSelectedShift] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -234,7 +227,6 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
    const invalidate = () => {
      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
-     queryClient.invalidateQueries({ queryKey: ['production-active', line.id] });
    };
 
   const startMutation = useMutation({
@@ -255,11 +247,11 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
   const stopMutation = useMutation({
     mutationFn: () => {
-      if (!activeBatch?.batch?.id) {
+      if (!line.batch?.id) {
         toast.error('No active batch found to close');
         throw new Error('No active batch ID');
       }
-      return api.put(`/production/${activeBatch.batch.id}/close`, { 
+      return api.put(`/production/${line.batch.id}/close`, { 
         remarks: stopRemarks,
         endTime: new Date(stopEndTime).toISOString(),
         materialReturn: materialReturns
@@ -275,7 +267,7 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   const changeoverMutation = useMutation({
     mutationFn: () => api.post(`/production/line/${line.id}/changeover`, { 
       productId: changeoverProduct,
-      batchId: activeBatch?.batch?.id
+      batchId: line.batch?.id
     }),
     onSuccess: () => { invalidate(); setChangeoverModalOpen(false); toast.success('Changeover initiated'); }
   });
@@ -302,7 +294,7 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
     <div className="grid grid-cols-2 gap-4">
       <button 
         onClick={() => setStopConfirmOpen(true)} 
-        disabled={!activeBatch?.batch || stopMutation.isPending}
+        disabled={!line.batch || stopMutation.isPending}
         className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group disabled:opacity-50"
       >
          {stopMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
@@ -484,16 +476,7 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
   const [remarks, setRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
 
-  // activeBatch is still useful for additional details if needed, 
-  // but for the basic batchCode we can use line.batch
-  /*
-  const { data: activeBatch } = useQuery({
-    queryKey: ['active-batch', line.id],
-    queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
-    enabled: line.status === 'RUNNING' || line.status === 'CHANGEOVER',
-    refetchInterval: 30000,
-  });
-  */
+
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
@@ -507,7 +490,6 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
     }),
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['production-lines'] });
-      queryClient.invalidateQueries({ queryKey: ['active-batch', line.id] });
       setIsStartModalOpen(false);
       toast.success('Production started successfully'); 
     }
@@ -545,7 +527,7 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
          </div>
           <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
-            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batch_code || 'NO BATCH'}</p>
+            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batchCode || 'NO BATCH'}</p>
           </div>
       </div>
 
