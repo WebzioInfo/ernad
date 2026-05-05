@@ -1,19 +1,30 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import {
   ShieldCheck, User, Loader2, ArrowRight, KeyRound
 } from 'lucide-react';
 import { api } from '../api';
 import useAuthStore from '../store/useAuthStore';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import Watermark from './Watermark';
 
 export default function Login() {
+  const { isAuthenticated, user, setAuth } = useAuthStore();
   const [identity, setIdentity] = useState('');
   const [credential, setCredential] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const setAuth = useAuthStore((state) => state.setAuth);
+
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    const userRoles = user?.roles || (user?.role ? [user.role] : []);
+    const isOperator = userRoles.some(r => r.includes('OPERATOR'));
+    const isManager = userRoles.includes('MANAGER');
+    
+    if (isOperator) return <Navigate to="/line/select" replace />;
+    if (isManager) return <Navigate to="/manager/overview" replace />;
+    return <Navigate to="/admin/overview" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +44,9 @@ export default function Login() {
       toast.success(`Welcome back, ${res.data.user.name.split(' ')[0]}`);
 
       const role = res.data.user.role;
-      if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'MANAGER') navigate('/admin');
-      else navigate(`/line/1/operator`); // Default line for now
+      if (role === 'SUPER_ADMIN' || role === 'ADMIN') navigate('/admin');
+      else if (role === 'MANAGER') navigate('/manager');
+      else navigate(`/line/select`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Access Denied: Invalid Identity or Credential');
     } finally {

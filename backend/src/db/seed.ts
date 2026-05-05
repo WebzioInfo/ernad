@@ -1,143 +1,210 @@
 import 'dotenv/config';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Client } from 'pg';
-import { users, productionLines, shifts } from './schema';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { 
+  users, userRoles, productionLines, shifts, productBrands, products, 
+  rawMaterials, factories, roles, permissions, rolePermissions 
+} from './schema';
+import { eq, and, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const connectionString = process.env.DATABASE_URL!;
+const client = postgres(connectionString);
+const db = drizzle(client);
 
 async function seed() {
-  console.log('🏗️ Starting Personnel System "Big Makeover" Seed...');
+    console.log('🏗️ Starting MES Infrastructure Seed (Multi-Station Support)...');
 
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 30000,
-  });
-
-  try {
-    await client.connect();
-    const db = drizzle(client);
-    console.log('✅ Synchronized with Factory DB.');
-
-    const passwordHash = await bcrypt.hash('password123', 10);
-    const pinHash = await bcrypt.hash('1234', 10);
-
-    const realisticStaff = [
-      {
-        name: 'Sarah Chen',
-        username: 'sarah.chen',
-        email: 'sarah.chen@ernad.com',
-        phoneNumber: '+44 7700 900123',
-        department: 'Plant Operations',
-        jobTitle: 'Plant Manager',
-        passwordHash,
-        role: 'SUPER_ADMIN' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400',
-      },
-      {
-        name: 'Marcus Rodriguez',
-        username: 'marcus.admin',
-        email: 'm.rodriguez@ernad.com',
-        phoneNumber: '+44 7700 900456',
-        department: 'IT & Infrastructure',
-        jobTitle: 'System Architect',
-        passwordHash,
-        role: 'ADMIN' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-      },
-      {
-        name: 'Aisha Patel',
-        username: 'aisha.patel',
-        email: 'aisha.patel@ernad.com',
-        phoneNumber: '+44 7700 900789',
-        department: 'Production',
-        jobTitle: 'Shift Supervisor',
-        passwordHash,
-        role: 'MANAGER' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400',
-      },
-      {
-        name: 'David Kim',
-        username: 'david.kim',
-        email: 'david.kim@ernad.com',
-        phoneNumber: '+44 7700 900111',
-        department: 'Blowing',
-        jobTitle: 'Senior Technician',
-        pinCode: pinHash,
-        role: 'BLOWING_OPERATOR' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-      },
-      {
-        name: 'Elena Rossi',
-        username: 'elena.rossi',
-        email: 'elena.r@ernad.com',
-        phoneNumber: '+44 7700 900222',
-        department: 'Labeling',
-        jobTitle: 'Lead Operator',
-        pinCode: pinHash,
-        role: 'LABELING_OPERATOR' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
-      },
-      {
-        name: 'Michael Obina',
-        username: 'michael.o',
-        email: 'm.obina@ernad.com',
-        department: 'Packing',
-        jobTitle: 'Automation Specialist',
-        pinCode: pinHash,
-        role: 'PACKING_OPERATOR' as const,
-        isActive: true,
-        avatarUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400',
-      }
-    ];
-
-    console.log('🚀 Seeding comprehensive identity records...');
-    for (const u of realisticStaff) {
-      try {
-        await db.insert(users).values(u).onConflictDoNothing();
-        console.log(`   - Identity Created: ${u.name} (${u.jobTitle})`);
-      } catch (e: any) {
-        console.warn(`   ! Conflict for ${u.username}: ${e.message}`);
-      }
+    // 1. Seed Factory
+    console.log('🏭 Establishing Factory Context...');
+    let factoryId: string;
+    const existingFactories = await db.select().from(factories).where(eq(factories.name, 'Nairobi Main Plant')).limit(1);
+    
+    if (existingFactories.length > 0) {
+        factoryId = existingFactories[0].id;
+    } else {
+        const [newFactory] = await db.insert(factories).values({
+            name: 'Nairobi Main Plant',
+            location: 'Industrial Area, Nairobi',
+            contactInfo: '+254 20 1234567'
+        }).returning();
+        factoryId = newFactory.id;
     }
 
-    // Seed Lines
+    // 2. Seed Roles (Granular Operator Roles)
+    console.log('🔐 Seeding Granular RBAC Matrix...');
+    const rolesToSeed = [
+        { slug: 'SUPER_ADMIN', name: 'Super Administrator' },
+        { slug: 'ADMIN', name: 'System Administrator' },
+        { slug: 'MANAGER', name: 'Production Manager' },
+        { slug: 'OPERATOR_BLOWING', name: 'Blowing Operator' },
+        { slug: 'OPERATOR_FILLING', name: 'Filling Operator' },
+        { slug: 'OPERATOR_LABELING', name: 'Labeling/Batching Operator' },
+        { slug: 'OPERATOR_PACKING', name: 'Packing Operator' },
+        { slug: 'OPERATOR', name: 'Generic Operator' },
+    ];
+
+    for (const r of rolesToSeed) {
+        await db.insert(roles).values(r).onConflictDoUpdate({
+            target: roles.slug,
+            set: { name: r.name }
+        });
+    }
+
+    // 3. Seed Permissions
+    console.log('🔑 Seeding Permissions Matrix...');
+    const perms = [
+        { slug: 'users:view', name: 'View Personnel', category: 'Personnel' },
+        { slug: 'users:manage', name: 'Manage Personnel', category: 'Personnel' },
+        { slug: 'production:start', name: 'Start/Manage Batches', category: 'Production' },
+        { slug: 'production:close', name: 'Close/Complete Batches', category: 'Production' },
+        { slug: 'telemetry:log', name: 'Log Telemetry Data', category: 'Production' },
+        { slug: 'inventory:view', name: 'View Inventory', category: 'Inventory' },
+        { slug: 'inventory:update', name: 'Update Inventory', category: 'Inventory' },
+        { slug: 'settings:manage', name: 'Manage Factory Config', category: 'Master Data' },
+        { slug: 'reports:view', name: 'View Reports', category: 'Analytics' },
+        { slug: 'notifications:view', name: 'View Notifications', category: 'Communication' },
+    ];
+
+    for (const p of perms) {
+        await db.insert(permissions).values(p).onConflictDoUpdate({
+            target: permissions.slug,
+            set: { name: p.name, category: p.category }
+        });
+    }
+
+    // 4. Map Permissions to Roles
+    console.log('🔗 Mapping Permissions to Roles...');
+    const roleMapping: Record<string, string[]> = {
+        'SUPER_ADMIN': perms.map(p => p.slug),
+        'ADMIN': perms.map(p => p.slug),
+        'MANAGER': [
+            'users:view', 'users:manage', 
+            'production:start', 'production:close', 
+            'telemetry:log', 'inventory:view', 'inventory:update',
+            'reports:view', 'notifications:view'
+        ],
+        'OPERATOR_BLOWING': ['production:start', 'telemetry:log', 'notifications:view'],
+        'OPERATOR_FILLING': ['production:start', 'telemetry:log', 'notifications:view'],
+        'OPERATOR_LABELING': ['production:start', 'telemetry:log', 'notifications:view'],
+        'OPERATOR_PACKING': ['production:start', 'telemetry:log', 'notifications:view'],
+        'OPERATOR': ['production:start', 'telemetry:log', 'notifications:view'],
+    };
+
+    for (const [roleSlug, permSlugs] of Object.entries(roleMapping)) {
+        const [roleObj] = await db.select().from(roles).where(eq(roles.slug, roleSlug)).limit(1);
+        if (!roleObj) continue;
+
+        // Clear old mapping
+        await db.delete(rolePermissions).where(eq(rolePermissions.roleId, roleObj.id));
+
+        for (const pSlug of permSlugs) {
+            const [pObj] = await db.select().from(permissions).where(eq(permissions.slug, pSlug)).limit(1);
+            if (pObj) {
+                await db.insert(rolePermissions).values({
+                    roleId: roleObj.id,
+                    permissionId: pObj.id
+                }).onConflictDoNothing();
+            }
+        }
+    }
+
+    // 5. Seed Users with multi-station assignments
+    console.log('👥 Seeding Specialized Personnel...');
+    const hashedPass = await bcrypt.hash('password123', 10);
+    const hashedPin = await bcrypt.hash('1234', 10);
+
+    const personnel = [
+        {
+            username: 'sarah.chen',
+            name: 'Sarah Chen',
+            email: 's.chen@ernad.com',
+            passwordHash: hashedPass,
+            roles: ['SUPER_ADMIN'],
+            factoryId: null
+        },
+        {
+            username: 'marcus.admin',
+            name: 'Marcus Rodriguez',
+            email: 'm.rodriguez@ernad.com',
+            passwordHash: hashedPass,
+            roles: ['ADMIN'],
+            factoryId
+        },
+        {
+            username: 'david.blowing',
+            name: 'David Kim',
+            email: 'd.blowing@ernad.com',
+            pinCode: hashedPin,
+            roles: ['OPERATOR_BLOWING'],
+            factoryId
+        },
+        {
+            username: 'elena.multi',
+            name: 'Elena Rossi',
+            email: 'e.multi@ernad.com',
+            pinCode: hashedPin,
+            roles: ['OPERATOR_FILLING', 'OPERATOR_LABELING'], // Multi-station operator
+            factoryId
+        },
+        {
+            username: 'john.packing',
+            name: 'John Doe',
+            email: 'j.packing@ernad.com',
+            pinCode: hashedPin,
+            roles: ['OPERATOR_PACKING'],
+            factoryId
+        },
+        {
+            username: 'musa.manager',
+            name: 'Musa Mwaniki',
+            email: 'musa.manager@ernad.com',
+            passwordHash: hashedPass,
+            roles: ['MANAGER'],
+            factoryId
+        }
+    ];
+
+    for (const p of personnel) {
+        const { roles: userRoleSlugs, ...userData } = p;
+        const [userRecord] = await db.insert(users).values(userData).onConflictDoUpdate({
+            target: users.username,
+            set: userData
+        }).returning();
+
+        // Clear old roles for re-seed
+        await db.delete(userRoles).where(eq(userRoles.userId, userRecord.id));
+
+        for (const slug of userRoleSlugs) {
+            const [roleRecord] = await db.select().from(roles).where(eq(roles.slug, slug)).limit(1);
+            if (roleRecord) {
+                await db.insert(userRoles).values({
+                    userId: userRecord.id,
+                    roleId: roleRecord.id
+                }).onConflictDoNothing();
+            }
+        }
+    }
+
+    // 4. Seed Production Lines
+    console.log('🏭 Seeding Production Lines...');
     const lines = [
-      { name: 'Line A (2L PET)', description: 'High-speed Carbonation Line', status: 'IDLE' },
-      { name: 'Line B (500ml)', description: 'Still Water Line', status: 'IDLE' },
-      { name: 'Line C (Can)', description: 'Canning Production', status: 'IDLE' },
+        { name: 'Line 1', description: 'Primary High-Speed Line', status: 'IDLE', factoryId },
+        { name: 'Line 2', description: 'Secondary Utility Line', status: 'IDLE', factoryId },
     ];
 
     for (const l of lines) {
-      await db.insert(productionLines).values(l).onConflictDoNothing();
+        await db.insert(productionLines).values(l).onConflictDoUpdate({
+            target: [productionLines.name, productionLines.factoryId],
+            set: { description: l.description, status: l.status }
+        });
     }
-    console.log('✅ Production Lines Ready.');
 
-    // Seed Shifts
-    const shiftData = [
-      { name: 'Alpha (Morning)', startTime: '06:00', endTime: '14:00' },
-      { name: 'Beta (Afternoon)', startTime: '14:00', endTime: '22:00' },
-      { name: 'Gamma (Night)', startTime: '22:00', endTime: '06:00' },
-    ];
-
-    for (const s of shiftData) {
-      await db.insert(shifts).values(s).onConflictDoNothing();
-    }
-    console.log('✅ Shift Cycles Synchronized.');
-
-    console.log('\n✨ Makeover Complete. Identity and Resources have been modernized.');
-  } catch (err: any) {
-    console.error('❌ Personnel Makeover failed:', err.message);
-  } finally {
-    await client.end();
+    console.log('✅ Multi-Station Seed Complete!');
     process.exit(0);
-  }
 }
 
-seed();
+seed().catch(err => {
+    console.error('❌ Seed Failed:', err);
+    process.exit(1);
+});

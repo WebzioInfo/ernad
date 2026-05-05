@@ -1,13 +1,14 @@
-import { Module } from '@nestjs/common';
-import { OperatorLogsModule } from './operator-logs/operator-logs.module';
-import { ProductionBatchModule } from './production-batch/production-batch.module';
-import { ChangeoverController } from './changeover/changeover.controller';
-import { ChangeoverService } from './changeover/changeover.service';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { AuthGuard } from './auth/auth.guard';
+import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { ProductionTelemetryModule } from './production-telemetry/production-telemetry.module';
+import { ProductionManagementModule } from './production-management/production-management.module';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
-import { MasterDataModule } from './master-data/master-data.module';
+import { FactoryConfigModule } from './factory-config/factory-config.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 import { MailModule } from './mail/mail.module';
@@ -16,14 +17,21 @@ import { EventsModule } from './events/events.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OneSignalModule } from './firebase/onesignal.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { ConfigModule } from '@nestjs/config';
+import { QueueModule } from './common/queue/queue.module';
+import { RedisModule } from './common/redis/redis.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 import { AppController } from './app.controller';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
+    QueueModule,
     AuthModule, 
     UsersModule, 
-    MasterDataModule, 
+    FactoryConfigModule, 
     AnalyticsModule, 
     HealthModule, 
     MailModule, 
@@ -32,18 +40,27 @@ import { AppController } from './app.controller';
     NotificationsModule, 
     OneSignalModule, 
     AttendanceModule,
-    OperatorLogsModule,
-    ProductionBatchModule
+    ProductionTelemetryModule,
+    ProductionManagementModule,
+    InventoryModule
   ],
 
   controllers: [
     AppController,
-    ChangeoverController,
     ReportsController,
   ],
-  providers: [
-    ChangeoverService,
+   providers: [
     ReportsService,
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard,
+    },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(LoggerMiddleware)
+      .forRoutes('*');
+  }
+}

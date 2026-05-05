@@ -16,6 +16,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { LoginDto, StartSessionDto, ResetCredentialDto } from './dto/auth.dto';
+import { Public } from './public.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -26,6 +27,7 @@ export class AuthController {
    * POST /api/auth/login
    * Public — no guard. Returns JWT + user info.
    */
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate personnel and set HttpOnly session cookie' })
@@ -45,10 +47,12 @@ export class AuthController {
 
     return { 
       user: result.user,
+      access_token: result.access_token,
       message: 'Login successful'
     };
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Clear session cookie' })
@@ -109,6 +113,6 @@ export class AuthController {
     @Request() req,
     @Body() body: { userId: string; newCredential: string; type: 'PASSWORD' | 'PIN' },
   ) {
-    return this.authService.resetCredentialById(req.user.role, body.userId, body.newCredential, body.type);
+    return this.authService.resetCredentialById(req.user.roles, body.userId, body.newCredential, body.type);
   }
 }

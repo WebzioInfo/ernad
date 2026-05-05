@@ -3,9 +3,9 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 
-@ApiTags('Attendance')
+@ApiTags('Staff Attendance')
 @ApiBearerAuth()
 @Controller('attendance')
 export class AttendanceController {
@@ -13,14 +13,14 @@ export class AttendanceController {
 
   @Post('sync')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'MANAGER')
+  @Permissions('attendance:manage')
   async syncBiometricData() {
     return await this.attendanceService.syncBiometricData();
   }
 
   @Get('operator/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'MANAGER', 'ADMIN')
+  @Permissions('attendance:view')
   async getOperatorAttendance(@Param('id') id: string) {
     return await this.attendanceService.getOperatorAttendance(id);
   }

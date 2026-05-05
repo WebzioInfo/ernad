@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { users, productionLines, shifts, productionBatches, factoryLogs, products } from '../src/db/schema';
+import { users, productionLines, shifts, productionBatches, productionLogs, products } from '../src/db/schema';
 import { eq } from 'drizzle-orm';
 
 async function simulate() {
@@ -35,6 +35,7 @@ async function simulate() {
         console.log('📦 Starting new simulation batch...');
         const newBatchResults = await db.insert(productionBatches).values({
             lineId: line.id,
+            factoryId: line.factoryId,
             brandId: product.brandId,
             productId: product.id,
             shiftId: shift.id,
@@ -46,7 +47,7 @@ async function simulate() {
     console.log(`✅ Using Batch ID: ${batch.id}`);
 
     // 3. Clear existing logs for this batch
-    await db.delete(factoryLogs).where(eq(factoryLogs.batchId, batch.id));
+    await db.delete(productionLogs).where(eq(productionLogs.batchId, batch.id));
 
     // 4. Insert 10 "Baseline" logs (Wastage 1-3)
     console.log('📉 Inserting baseline logs (Stable Production)...');
@@ -57,23 +58,25 @@ async function simulate() {
         shiftId: shift.id,
         brandId: product.brandId!,
         productId: product.id,
+        factoryId: line.factoryId,
         userId: user.id,
         station: 'FILLING' as const,
         primaryCount: 500,
         wastageCount: Math.floor(Math.random() * 3) + 1,
         loggedAt: new Date(Date.now() - (10 - i) * 60000)
     }));
-    await db.insert(factoryLogs).values(logs);
+    await db.insert(productionLogs).values(logs);
 
     // 5. Insert 1 "Anomaly" log (Wastage = 45)
     console.log('🚨 Inserting ANOMALY log (Wastage = 45)...');
-    await db.insert(factoryLogs).values({
+    await db.insert(productionLogs).values({
         requestId: crypto.randomUUID(),
         batchId: batch.id,
         lineId: line.id,
         shiftId: shift.id,
         brandId: product.brandId!,
         productId: product.id,
+        factoryId: line.factoryId,
         userId: user.id,
         station: 'FILLING' as const,
         primaryCount: 500,

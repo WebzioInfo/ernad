@@ -1,7 +1,7 @@
 import { AnalyticsService } from './analytics.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
@@ -16,7 +16,7 @@ export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('line-performance')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getLinePerformance(
     @Query('lineId') lineId: string, 
     @Query('shiftId') shiftId?: string,
@@ -27,31 +27,31 @@ export class AnalyticsController {
   }
 
   @Get('filling-anomalies')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getFillingAnomalies(@Query('batchId') batchId: string) {
     return this.analyticsService.getFillingAnomalies(batchId);
   }
 
   @Get('global-efficiency')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getGlobalEfficiency() {
     return this.analyticsService.getGlobalEfficiency();
   }
 
   @Get('predictive-insights')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getPredictiveInsights(@Query('batchId') batchId: string) {
     return this.analyticsService.getPredictiveInsights(batchId);
   }
 
   @Get('brands')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getBrandPerformance() {
     return this.analyticsService.getBrandPerformance();
   }
 
   @Get('products')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('analytics:view')
   async getProductPerformance() {
     return this.analyticsService.getProductPerformance();
   }

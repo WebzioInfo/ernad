@@ -14,7 +14,9 @@
     "db:seed": "npx tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.1.19",
+    "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.19",
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/platform-express": "^11.1.19",
@@ -22,7 +24,6 @@
     "@nestjs/swagger": "^11.3.0",
     "@nestjs/websockets": "^11.1.19",
     "@onesignal/node-onesignal": "^5.5.0",
-    "@prisma/client": "^5.0.0",
     "@types/multer": "^2.1.0",
     "@types/nodemailer": "^8.0.0",
     "@types/streamifier": "^0.1.2",
@@ -33,6 +34,7 @@
     "cloudinary": "^2.9.0",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
+    "ioredis": "^5.10.1",
     "nodemailer": "^8.0.5",
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
@@ -50,7 +52,6 @@
     "@types/node": "^25.6.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
-    "prisma": "^5.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.1.3"
   }

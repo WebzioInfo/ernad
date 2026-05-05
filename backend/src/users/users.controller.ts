@@ -14,10 +14,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UsersService, CreateOperatorDto, UpdateOperatorDto } from './users.service';
+import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -33,10 +35,21 @@ export class UsersController {
    * Admin/Manager — List all operators (no passwords)
    */
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('users:view')
   @ApiOperation({ summary: 'Get all operators (Admin/Manager)' })
   getAllOperators() {
     return this.usersService.getAllOperators();
+  }
+
+  /**
+   * GET /api/users/audit-logs
+   * Admin only — Get system audit logs
+   */
+  @Get('audit-logs')
+  @Permissions('users:manage')
+  @ApiOperation({ summary: 'Get system audit logs (Admin only)' })
+  getAuditLogs() {
+    return this.usersService.getAuditLogs();
   }
 
   /**
@@ -44,7 +57,7 @@ export class UsersController {
    * Admin/Manager — Get a single operator
    */
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @Permissions('users:view')
   @ApiOperation({ summary: 'Get operator by ID (Admin/Manager)' })
   getOperatorById(@Param('id') id: string) {
     return this.usersService.getOperatorById(id);
@@ -55,11 +68,10 @@ export class UsersController {
    * Admin only — Create a new operator with bcrypt PIN
    */
   @Post()
-  @Roles('SUPER_ADMIN')
-
+  @Permissions('users:manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new operator (Admin only)' })
-  createOperator(@Body() dto: CreateOperatorDto) {
+  createOperator(@Body() dto: CreateUserDto) {
     return this.usersService.createOperator(dto);
   }
 
@@ -68,10 +80,10 @@ export class UsersController {
    * Admin only — Update operator details
    */
   @Patch(':id')
-  @Roles('SUPER_ADMIN')
-
+  @Permissions('users:manage')
   @ApiOperation({ summary: 'Update operator details (Admin only)' })
-  updateOperator(@Param('id') id: string, @Body() dto: UpdateOperatorDto) {
+  updateOperator(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    console.log(`[UsersController] PATCH user ${id} with DTO:`, dto);
     return this.usersService.updateOperator(id, dto);
   }
 
@@ -80,7 +92,7 @@ export class UsersController {
    * Admin only — Toggle active/inactive status
    */
   @Patch(':id/toggle-active')
-  @Roles('SUPER_ADMIN')
+  @Permissions('users:manage')
 
   @ApiOperation({ summary: 'Toggle operator active status (Admin only)' })
   toggleActive(@Param('id') id: string) {
@@ -93,7 +105,7 @@ export class UsersController {
    * Body: { newPin: string }
    */
   @Patch(':id/reset-pin')
-  @Roles('SUPER_ADMIN')
+  @Permissions('users:manage')
 
   @ApiOperation({ summary: 'Reset operator PIN (Admin only)' })
   resetPin(@Param('id') id: string, @Body() body: { newPin: string }) {
@@ -105,7 +117,7 @@ export class UsersController {
    * Admin/Manager — Upload/Update personnel avatar
    */
   @Post(':id/avatar')
-  @Roles('SUPER_ADMIN')
+  @Permissions('users:manage')
 
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('file'))
@@ -120,12 +132,13 @@ export class UsersController {
     return this.usersService.updateAvatar(id, file);
   }
 
+
   /**
    * DELETE /api/users/:id
    * Super Admin only — Permanently delete an operator
    */
   @Delete(':id')
-  @Roles('SUPER_ADMIN')
+  @Permissions('users:manage')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete operator (Super Admin only)' })
   deleteOperator(@Param('id') id: string) {

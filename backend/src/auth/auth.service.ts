@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { db } from '../db/db';
-import { users, operatorSessions } from '../db/schema';
+import { users, operatorSessions, roles, permissions, rolePermissions, userRoles } from '../db/schema';
 import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 
@@ -58,11 +58,40 @@ export class AuthService {
       throw new UnauthorizedException('Account deactivated.');
     }
 
+    // ── Fetch Roles and Permissions (Phase 3 Redesign - Multi-Role Support) ──
+    const userRolesResult = await db.select({
+      id: roles.id,
+      slug: roles.slug,
+      name: roles.name,
+    })
+    .from(roles)
+    .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, user.id));
+
+    const roleSlugs = userRolesResult.map(r => r.slug);
+    
+    let permissionsSlugs: string[] = [];
+    if (userRolesResult.length > 0) {
+      const perms = await db.select({
+        slug: permissions.slug,
+      })
+      .from(permissions)
+      .innerJoin(rolePermissions, eq(rolePermissions.permissionId, permissions.id))
+      .where(or(...userRolesResult.map(r => eq(rolePermissions.roleId, r.id))));
+      
+      permissionsSlugs = Array.from(new Set(perms.map(p => p.slug)));
+    }
+
+    this.logger.debug(`[AuthService] User ${user.username} logged in with roles: ${roleSlugs} and permissions: ${permissionsSlugs}`);
+
     const payload = {
       sub: user.id,
       username: user.username,
-      role: user.role,
+      role: roleSlugs[0],
+      roles: roleSlugs,
+      permissions: permissionsSlugs,
       name: user.name,
+      factoryId: user.factoryId,
     };
 
     return {
@@ -72,10 +101,13 @@ export class AuthService {
         name: user.name,
         username: user.username,
         email: user.email,
-        role: user.role,
+        role: roleSlugs[0],
+        roles: roleSlugs,
+        permissions: permissionsSlugs,
         jobTitle: user.jobTitle,
         department: user.department,
         avatarUrl: user.avatarUrl,
+        factoryId: user.factoryId,
       },
     };
   }
@@ -83,15 +115,27 @@ export class AuthService {
   async startOperatorSession(userId: string, lineId: string, shiftId: string) {
     this.logger.log(`Starting session for user ${userId} on line ${lineId}`);
     
-    // Close existing open sessions
+    // Fetch user to get factoryId
+    const [user] = await db.select({ factoryId: users.factoryId }).from(users).where(eq(users.id, userId)).limit(1);
+    
+    if (!user || !user.factoryId) {
+      throw new BadRequestException('User does not have an assigned factory.');
+    }
+
+    // Close existing open sessions for the SAME USER and SAME LINE
     await db.update(operatorSessions)
       .set({ logoutTime: new Date() })
-      .where(and(eq(operatorSessions.userId, userId), isNull(operatorSessions.logoutTime)));
+      .where(and(
+        eq(operatorSessions.userId, userId), 
+        eq(operatorSessions.lineId, lineId),
+        isNull(operatorSessions.logoutTime)
+      ));
 
     const result = await db.insert(operatorSessions).values({
       userId,
       lineId,
       shiftId,
+      factoryId: user.factoryId,
       loginTime: new Date(),
     }).returning();
 
@@ -106,9 +150,11 @@ export class AuthService {
     return { success: true };
   }
 
-  async resetCredentialById(adminRole: string, userId: string, newCredential: string, type: 'PASSWORD' | 'PIN') {
+  async resetCredentialById(adminRoles: string[], userId: string, newCredential: string, type: 'PASSWORD' | 'PIN') {
     const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'];
-    if (!allowedRoles.includes(adminRole)) {
+    const hasAccess = adminRoles?.some(r => allowedRoles.includes(r));
+    
+    if (!hasAccess) {
       throw new ForbiddenException('Unauthorized to reset credentials');
     }
 

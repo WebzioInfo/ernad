@@ -1,15 +1,43 @@
 import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
+import { factories, productionLines } from './master-data';
 
 export const userRoleEnum = pgEnum('user_role', [
   'SUPER_ADMIN', 
   'ADMIN', 
   'MANAGER', 
-  'FILLING_OPERATOR', 
-  'BLOWING_OPERATOR', 
-  'LABELING_OPERATOR', 
-  'PACKING_OPERATOR', 
+  'OPERATOR_BLOWING', 
+  'OPERATOR_FILLING', 
+  'OPERATOR_LABELING', 
+  'OPERATOR_PACKING',
   'OPERATOR'
 ]);
+
+// ── RBAC SYSTEM (Phase 3 Redesign) ──
+
+export const roles = pgTable('roles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 50 }).notNull().unique(), // e.g. "Plant Manager"
+  slug: varchar('slug', { length: 50 }).notNull().unique(), // e.g. "SUPER_ADMIN"
+  description: varchar('description', { length: 255 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const permissions = pgTable('permissions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 100 }).notNull(), // e.g. "Edit Users"
+  slug: varchar('slug', { length: 100 }).notNull().unique(), // e.g. "user:edit"
+  category: varchar('category', { length: 50 }), // e.g. "Personnel", "Production"
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const rolePermissions = pgTable('role_permissions', {
+  roleId: uuid('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
+  permissionId: uuid('permission_id').references(() => permissions.id, { onDelete: 'cascade' }).notNull(),
+}, (table) => {
+  return [
+    index('idx_role_permissions').on(table.roleId, table.permissionId),
+  ];
+});
 
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -19,12 +47,13 @@ export const users = pgTable('users', {
   phoneNumber: varchar('phone_number', { length: 20 }),
   department: varchar('department', { length: 100 }),
   jobTitle: varchar('job_title', { length: 100 }),
-  passwordHash: varchar('password_hash', { length: 255 }), // Nullable for purely PIN-based operators if needed
-  pinCode: varchar('pin_code', { length: 255 }),          // Nullable for non-operators
-  role: userRoleEnum('role').default('OPERATOR').notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }),
+  pinCode: varchar('pin_code', { length: 255 }),
   operatorType: varchar('operator_type', { length: 50 }),
   isActive: boolean('is_active').default(true).notNull(),
   avatarUrl: varchar('avatar_url', { length: 255 }),
+  role: userRoleEnum('role').default('OPERATOR').notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
@@ -32,7 +61,24 @@ export const users = pgTable('users', {
   return [
     index('idx_users_username').on(table.username),
     index('idx_users_email').on(table.email),
-    index('idx_users_role').on(table.role),
+  ];
+});
+
+export const userRoles = pgTable('user_roles', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  roleId: uuid('role_id').references(() => roles.id, { onDelete: 'cascade' }).notNull(),
+}, (table) => {
+  return [
+    index('idx_user_roles').on(table.userId, table.roleId),
+  ];
+});
+
+export const userLines = pgTable('user_lines', {
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
+}, (table) => {
+  return [
+    index('idx_user_lines').on(table.userId, table.lineId),
   ];
 });
 

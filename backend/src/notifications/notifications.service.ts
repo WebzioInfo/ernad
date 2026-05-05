@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../db/db';
-import { notifications, deviceTokens, users } from '../db/schema';
+import { notifications, deviceTokens, users, roles, userRoles } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { ProductionGateway } from '../events/production.gateway';
 import { OneSignalService } from '../firebase/onesignal.service';
@@ -62,9 +62,11 @@ export class NotificationsService {
   private async broadcastOneSignalPush(title: string, body: string, data: Record<string, string>) {
     const targetUsers = await db.select({ id: users.id })
       .from(users)
-      .where(inArray(users.role, ['SUPER_ADMIN', 'ADMIN', 'MANAGER']));
+      .innerJoin(userRoles, eq(users.id, userRoles.userId))
+      .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(inArray(roles.slug, ['SUPER_ADMIN', 'ADMIN', 'MANAGER']));
 
-    const userIds = targetUsers.map((u) => u.id);
+    const userIds = Array.from(new Set(targetUsers.map((u) => u.id)));
     if (userIds.length === 0) return;
 
     await this.oneSignalService.sendToUsers(userIds, title, body, data);

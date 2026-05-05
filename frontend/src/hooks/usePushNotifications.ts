@@ -6,43 +6,54 @@ import { api } from '../api';
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 let isOneSignalInitialized = false;
 
+/** 
+ * OneSignal requires HTTPS + ServiceWorkers to function.
+ * It will always fail on localhost — skip it entirely in development.
+ */
+const isSecureContext = (): boolean => {
+  return window.location.protocol === 'https:';
+};
+
 export function usePushNotifications() {
   const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     if (!ONESIGNAL_APP_ID || !currentUser) return;
+    // Skip on HTTP (localhost dev) — OneSignal requires HTTPS
+    if (!isSecureContext()) {
+      console.log('[OneSignal] Skipping initialization: HTTPS is required for Push Notifications.');
+      return;
+    }
 
     const setupOneSignal = async () => {
-      try {
-        if (!isOneSignalInitialized) {
-          try {
-            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            
-            await OneSignal.init({
-              appId: ONESIGNAL_APP_ID,
-              allowLocalhostAsSecureOrigin: isLocalhost,
-            });
+      // ── Step 1: Initialize SDK ──
+      if (!isOneSignalInitialized) {
+        try {
+          await OneSignal.init({ appId: ONESIGNAL_APP_ID });
+          isOneSignalInitialized = true;
+        } catch (initErr: any) {
+          if (initErr?.message?.includes('already initialized')) {
             isOneSignalInitialized = true;
-          } catch (initErr: any) {
-            // If it's already initialized, we can safely proceed
-            if (initErr.message?.includes('already initialized')) {
-              isOneSignalInitialized = true;
-            } else {
-              console.warn('[OneSignal] Initialization warning (check dashboard Site URL):', initErr.message);
-              // We don't re-throw here to prevent crashing the hook, but we mark as not initialized
-              return; 
-            }
+          } else {
+            console.warn('[OneSignal] Init failed:', initErr?.message);
+            return;
           }
         }
+      }
 
-        // Link the current device to the user's DB ID
-        // This sets their "external_id" in OneSignal, allowing the backend to target them directly
-        await OneSignal.login(currentUser.id);
+      // ── Step 2: Link user identity ──
+      try {
+        if (isOneSignalInitialized && OneSignal.User) {
+          await OneSignal.login(currentUser.id);
+        }
+      } catch (loginErr: any) {
+        console.warn('[OneSignal] Login failed (non-critical):', loginErr?.message);
+        return;
+      }
 
-        console.info('[OneSignal] Logged in user:', currentUser.id);
-
-        // Optionally store the subscription ID in our own DB for analytics/tracking
-        const subId = OneSignal.User.PushSubscription.id;
+      // ── Step 3: Register push subscription token in our DB ──
+      try {
+        const subId = OneSignal?.User?.PushSubscription?.id;
         if (subId) {
           await api.post('/notifications/tokens', {
             userId: currentUser.id,
@@ -50,18 +61,11 @@ export function usePushNotifications() {
             platform: 'web',
           });
         }
-
-      } catch (err) {
-        console.error('[OneSignal] Setup failed:', err);
+      } catch (tokenErr: any) {
+        console.warn('[OneSignal] Token registration failed (non-critical):', tokenErr?.message);
       }
     };
 
     setupOneSignal();
-
-    // Cleanup logic: If the user logs out, we should logout from OneSignal
-    return () => {
-      // We don't logout immediately on unmount because the user is still active
-      // Logout from OneSignal is handled in the actual authentication logout flow
-    };
   }, [currentUser]);
 }

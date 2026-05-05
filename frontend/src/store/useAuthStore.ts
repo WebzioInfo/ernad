@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'FILLING_OPERATOR' | 'BLOWING_OPERATOR' | 'LABELING_OPERATOR' | 'PACKING_OPERATOR' | 'OPERATOR';
+type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'OPERATOR_BLOWING' | 'OPERATOR_FILLING' | 'OPERATOR_LABELING' | 'OPERATOR_PACKING' | 'OPERATOR' | string;
 
 interface User {
   id: string;
   name: string;
   role: UserRole;
+  roles: string[];
+  permissions: string[];
   avatarUrl?: string;
+  factoryId: string;
 }
 
 interface AuthState {

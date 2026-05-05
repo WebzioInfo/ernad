@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "idx_lines_name_factory" ON "production_lines" USING btree ("name","factory_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_shifts_name_factory" ON "shifts" USING btree ("name","factory_id");

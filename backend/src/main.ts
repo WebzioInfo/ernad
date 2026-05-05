@@ -10,6 +10,10 @@ import * as dns from 'dns';
 // Fix for Node >= 17 IPv6 DNS resolution issues with Supabase Pooler
 dns.setDefaultResultOrder('ipv4first');
 
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
+  // Do not exit, just log it. This prevents Redis connection failures from killing the app.
+});
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -29,6 +33,11 @@ async function bootstrap() {
   app.setGlobalPrefix('api', { exclude: ['/'] });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  
+  // AuthGuard will be registered as a global guard in app.module.ts for better DI support
+
+  const { AuditInterceptor } = await import('./common/interceptors/audit.interceptor');
+  app.useGlobalInterceptors(new AuditInterceptor());
 
 
   // Swagger Configuration
@@ -56,3 +65,4 @@ async function bootstrap() {
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
 bootstrap();
+// Reload trigger

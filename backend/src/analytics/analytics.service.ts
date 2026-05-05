@@ -1,13 +1,23 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { db } from '../db/db';
-import { factoryLogs, batchTotals, productionBatches, materialsUsage, productBrands, products } from '../db/schema';
-import { eq, and, sql, desc, gte } from 'drizzle-orm';
+import { 
+  productionLogs, batchTotals, productionBatches, 
+  materialsUsage, productBrands, products, userLines 
+} from '../db/schema';
+import { eq, and, sql, gte } from 'drizzle-orm';
+import { RedisService } from '../common/redis/redis.service';
 
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
 
+  constructor(private readonly redisService: RedisService) {}
+
   async getLinePerformance(lineId: string, shiftId?: string, brandId?: string, productId?: string) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(lineId)) {
+      throw new NotFoundException('Invalid production line identifier.');
+    }
     // 1. Find the relevant batch(es)
     const conditions = [
       eq(productionBatches.lineId, lineId),
@@ -19,16 +29,44 @@ export class AnalyticsService {
 
     const batches = await db.select({ id: productionBatches.id }).from(productionBatches)
       .where(and(...conditions));
-    if (!batches.length) throw new NotFoundException('No active batch found for these criteria.');
+    if (!batches.length) return null;
 
     const activeBatchId = batches[0].id;
 
-    // 2. Fetch Aggregated Totals for this batch
-    const totals = await db.select().from(batchTotals)
-      .where(eq(batchTotals.batchId, activeBatchId));
-    
-    if (!totals.length) throw new NotFoundException('No active tracking data for this line.');
-    const data = totals[0];
+    // 1.5 Fetch active operators count
+    const [{ count: activeOperators }] = await db.select({ 
+      count: sql<number>`count(*)` 
+    })
+    .from(userLines)
+    .where(eq(userLines.lineId, lineId));
+
+    // 2. Try Speed Layer (Redis) First
+    const redisTotals = await this.redisService.getBatchTotals(activeBatchId);
+    let data: any;
+
+    if (redisTotals && Object.keys(redisTotals).length > 0) {
+      data = {
+        blowingTotal: parseInt(String(redisTotals.blowing || '0')),
+        fillingTotal: parseInt(String(redisTotals.filling || '0')),
+        labelingTotal: parseInt(String(redisTotals.labeling || '0')),
+        packingTotal: parseInt(String(redisTotals.packing || '0')),
+      };
+    } else {
+      // Fallback to PostgreSQL (Primary Source of Truth)
+      const totals = await db.select().from(batchTotals)
+        .where(eq(batchTotals.batchId, activeBatchId));
+      
+      if (!totals.length) return null;
+      data = totals[0];
+
+      // Re-populate Speed Layer if missing
+      await this.redisService.setBatchTotals(activeBatchId, {
+        blowing: data.blowingTotal,
+        filling: data.fillingTotal,
+        labeling: data.labelingTotal,
+        packing: data.packingTotal,
+      });
+    }
 
     // 2. Real OEE Calculation (Phase 5)
     // Quality = (Total Packed - Rework) / Total Blowing
@@ -56,7 +94,13 @@ export class AnalyticsService {
         { station: 'LABELING', total: data.labelingTotal },
         { station: 'PACKING', total: data.packingTotal }
       ],
-      generatedAt: new Date()
+      generatedAt: new Date(),
+      activeOperators: Number(activeOperators || 0),
+      yesterday: {
+        oee: 84, // Placeholder for historical data
+        totalOutput: 42000,
+        downtimeMins: 45
+      }
     };
   }
 
@@ -64,15 +108,15 @@ export class AnalyticsService {
     // Look at last 10 minutes of packing logs
     const tenMinsAgo = new Date(Date.now() - 10 * 60000);
     const recentLogs = await db.select({
-      count: sql<number>`SUM(${factoryLogs.primaryCount})`,
-      minTime: sql<Date>`MIN(${factoryLogs.loggedAt})`,
-      maxTime: sql<Date>`MAX(${factoryLogs.loggedAt})`
+      count: sql<number>`SUM(${productionLogs.primaryCount})`,
+      minTime: sql<Date>`MIN(${productionLogs.loggedAt})`,
+      maxTime: sql<Date>`MAX(${productionLogs.loggedAt})`
     })
-    .from(factoryLogs)
+    .from(productionLogs)
     .where(and(
-      eq(factoryLogs.lineId, lineId),
-      eq(factoryLogs.station, 'PACKING'),
-      gte(factoryLogs.loggedAt, tenMinsAgo)
+      eq(productionLogs.lineId, lineId),
+      eq(productionLogs.station, 'PACKING'),
+      gte(productionLogs.loggedAt, tenMinsAgo)
     ));
 
     const result = recentLogs[0];
@@ -95,15 +139,15 @@ export class AnalyticsService {
 
   async getReworkStats(batchId: string) {
     const rework = await db.select({
-      station: factoryLogs.station,
-      totalRework: sql<number>`SUM(${factoryLogs.primaryCount})`
+      station: productionLogs.station,
+      totalRework: sql<number>`SUM(${productionLogs.primaryCount})`
     })
-    .from(factoryLogs)
+    .from(productionLogs)
     .where(and(
-      eq(factoryLogs.batchId, batchId),
-      eq(factoryLogs.isRework, true)
+      eq(productionLogs.batchId, batchId),
+      eq(productionLogs.isRework, true)
     ))
-    .groupBy(factoryLogs.station);
+    .groupBy(productionLogs.station);
 
     return rework;
   }
@@ -111,11 +155,11 @@ export class AnalyticsService {
   async getBrandPerformance() {
     return await db.select({
       brand: productBrands.name,
-      totalProduction: sql<number>`SUM(${factoryLogs.primaryCount})`,
-      rejection: sql<number>`SUM(${factoryLogs.wastageCount})`
+      totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
+      rejection: sql<number>`SUM(${productionLogs.wastageCount})`
     })
-    .from(factoryLogs)
-    .innerJoin(productBrands, eq(factoryLogs.brandId, productBrands.id))
+    .from(productionLogs)
+    .innerJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
     .groupBy(productBrands.name);
   }
 
@@ -134,10 +178,10 @@ export class AnalyticsService {
   async getProductPerformance() {
     return await db.select({
       product: products.name,
-      totalProduction: sql<number>`SUM(${factoryLogs.primaryCount})`
+      totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`
     })
-    .from(factoryLogs)
-    .innerJoin(products, eq(factoryLogs.productId, products.id))
+    .from(productionLogs)
+    .innerJoin(products, eq(productionLogs.productId, products.id))
     .groupBy(products.name);
   }
 }
