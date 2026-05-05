@@ -25,7 +25,6 @@ export class ProductionManagementController {
   @ApiOperation({ summary: 'Start a new production batch (Safe)' })
   async startBatch(@Req() req: any, @Body() dto: StartBatchDto) {
     return await this.productionService.startBatch(
-      dto.factoryId, 
       dto.lineId, 
       dto.brandId, 
       dto.productId, 
@@ -42,7 +41,6 @@ export class ProductionManagementController {
   @ApiOperation({ summary: 'Submit a quality check for a batch' })
   async submitQC(@Body() dto: QualityCheckDto) {
     return await this.productionService.submitQualityCheck(
-      dto.factoryId,
       dto.batchId,
       dto.inspectorId,
       dto.result,
@@ -56,7 +54,6 @@ export class ProductionManagementController {
   @ApiOperation({ summary: 'Log packaged units' })
   async logPackaging(@Body() dto: PackagingLogDto) {
     return await this.productionService.logPackaging(
-      dto.factoryId,
       dto.batchId,
       dto.operatorId,
       dto.packType,
@@ -71,7 +68,6 @@ export class ProductionManagementController {
   @ApiOperation({ summary: 'Log dispatch event' })
   async logDispatch(@Body() dto: DispatchLogDto) {
     return await this.productionService.logDispatch(
-      dto.factoryId,
       dto.batchId,
       dto.managerId,
       dto.destination,
@@ -97,10 +93,9 @@ export class ProductionManagementController {
   async closeBatch(
     @Param('id') batchId: string,
     @Req() req: any,
-    @Body() body: { remarks?: string },
-    @Query('factoryId') factoryId?: string
+    @Body() body: { remarks?: string }
   ) {
-    await this.productionService.closeBatch(factoryId, batchId, req.user.sub, body.remarks);
+    await this.productionService.closeBatch(batchId, req.user.sub, body.remarks);
     return { success: true, message: 'Batch moved to QC_PENDING.' };
   }
 
@@ -108,20 +103,18 @@ export class ProductionManagementController {
   @Permissions('production:close')
   async completeChangeover(
     @Param('id') batchId: string,
-    @Req() req: any,
-    @Query('factoryId') factoryId?: string
+    @Req() req: any
   ) {
-    return await this.productionService.completeChangeover(factoryId, batchId, req.user.sub);
+    return await this.productionService.completeChangeover(batchId, req.user.sub);
   }
 
   @Post('line/:id/toggle-maintenance')
   @Permissions('production:close')
   async toggleMaintenance(
     @Param('id') lineId: string,
-    @Req() req: any,
-    @Query('factoryId') factoryId?: string
+    @Req() req: any
   ) {
-    return await this.productionService.toggleMaintenance(factoryId, lineId, req.user.sub);
+    return await this.productionService.toggleMaintenance(lineId, req.user.sub);
   }
 
   @Get('active/:lineId')
@@ -135,10 +128,9 @@ export class ProductionManagementController {
   @Permissions('production:start')
   @ApiOperation({ summary: 'List recent production batches' })
   async getBatches(
-    @Req() req: any,
-    @Query('factoryId') factoryId?: string
+    @Req() req: any
   ) {
-    return await this.productionService.getBatches(factoryId);
+    return await this.productionService.getBatches();
   }
 
   @Get('logs/:type')
@@ -146,9 +138,8 @@ export class ProductionManagementController {
   @ApiOperation({ summary: 'Get lifecycle logs (qc, packaging, dispatch)' })
   async getLifecycleLogs(
     @Req() req: any,
-    @Param('type') type: 'qc' | 'packaging' | 'dispatch',
-    @Query('factoryId') factoryId?: string
+    @Param('type') type: 'qc' | 'packaging' | 'dispatch'
   ) {
-    return await this.productionService.getLifecycleLogs(factoryId, type);
+    return await this.productionService.getLifecycleLogs(type);
   }
 }

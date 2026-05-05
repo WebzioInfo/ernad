@@ -232,7 +232,6 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
-      factoryId: line.factoryId,
       lineId: line.id,
       shiftId: selectedShift,
       brandId: selectedBrand,
@@ -430,7 +429,6 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
-      factoryId: line.factoryId,
       lineId: line.id,
       shiftId: selectedShift,
       brandId: selectedBrand,

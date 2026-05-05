@@ -29,14 +29,14 @@ export class InventoryController {
   @Post('stock')
   @Permissions('inventory:update')
   @ApiOperation({ summary: 'Update stock levels (IN/OUT/ADJUSTMENT)' })
-  async updateStock(@Req() req: any, @Body() dto: any) {
-    return await this.inventoryService.updateStock(req.user.factoryId, dto);
+  async updateStock(@Body() dto: any) {
+    return await this.inventoryService.updateStock(dto);
   }
 
   @Post('materials')
   @Permissions('settings:manage')
   @ApiOperation({ summary: 'Define a new raw material' })
-  async createMaterial(@Req() req: any, @Body() dto: any) {
-    return await this.inventoryService.createMaterial(req.user.factoryId, dto);
+  async createMaterial(@Body() dto: any) {
+    return await this.inventoryService.createMaterial(dto);
   }
 }

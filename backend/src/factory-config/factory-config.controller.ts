@@ -19,25 +19,17 @@ import {
 export class FactoryConfigController {
   constructor(private readonly factoryConfigService: FactoryConfigService) {}
 
-  @Get('factories')
-  @Permissions('settings:view')
-  async getFactories() {
-    return await this.factoryConfigService.getFactories();
-  }
-
   @Get('lines')
   @Permissions('settings:view')
-  async getLines(@Req() req: any) {
-    const factoryId = req.user.factoryId;
-    return await this.factoryConfigService.getLines(factoryId);
+  async getLines() {
+    return await this.factoryConfigService.getLines();
   }
 
   @Post('lines')
   @Permissions('settings:manage')
   @ApiOperation({ summary: 'Create a new production line' })
-  async createLine(@Req() req: any, @Body() dto: CreateLineDto) {
-    const factoryId = req.user.factoryId || (dto as any).factoryId;
-    return await this.factoryConfigService.createLine(factoryId, dto);
+  async createLine(@Body() dto: CreateLineDto) {
+    return await this.factoryConfigService.createLine(dto);
   }
 
   @Patch('lines/:id')
@@ -56,14 +48,14 @@ export class FactoryConfigController {
 
   @Get('shifts')
   @Permissions('settings:view')
-  async getShifts(@Req() req: any) {
-    return await this.factoryConfigService.getShifts(req.user.factoryId);
+  async getShifts() {
+    return await this.factoryConfigService.getShifts();
   }
 
   @Get('products')
   @Permissions('settings:view')
-  async getProducts(@Req() req: any) {
-    return await this.factoryConfigService.getProducts(req.user.factoryId);
+  async getProducts() {
+    return await this.factoryConfigService.getProducts();
   }
 
   @Get('current-shift')
@@ -80,22 +72,20 @@ export class FactoryConfigController {
 
   @Get('raw-materials')
   @Permissions('settings:view')
-  async getRawMaterials(@Req() req: any) {
-    return await this.factoryConfigService.getRawMaterials(req.user.factoryId);
+  async getRawMaterials() {
+    return await this.factoryConfigService.getRawMaterials();
   }
 
   @Post('raw-materials')
   @Permissions('settings:manage')
-  async createRawMaterial(@Req() req: any, @Body() dto: CreateRawMaterialDto) {
-    const factoryId = req.user.factoryId || (dto as any).factoryId;
-    return await this.factoryConfigService.createRawMaterial(factoryId, dto);
+  async createRawMaterial(@Body() dto: CreateRawMaterialDto) {
+    return await this.factoryConfigService.createRawMaterial(dto);
   }
 
   @Post('raw-materials/stock')
   @Permissions('inventory:update')
-  async updateStock(@Req() req: any, @Body() dto: UpdateStockDto) {
-    const factoryId = req.user.factoryId || (dto as any).factoryId;
-    return await this.factoryConfigService.updateStock(factoryId, dto);
+  async updateStock(@Body() dto: UpdateStockDto) {
+    return await this.factoryConfigService.updateStock(dto);
   }
 
   @Post('brands')
@@ -106,9 +96,8 @@ export class FactoryConfigController {
 
   @Post('products')
   @Permissions('settings:manage')
-  async createProduct(@Req() req: any, @Body() dto: CreateProductDto) {
-    const factoryId = req.user.factoryId || (dto as any).factoryId;
-    return await this.factoryConfigService.createProduct(factoryId, dto);
+  async createProduct(@Body() dto: CreateProductDto) {
+    return await this.factoryConfigService.createProduct(dto);
   }
 
   @Delete('shifts/:id')
@@ -119,8 +108,7 @@ export class FactoryConfigController {
 
   @Post('shifts')
   @Permissions('settings:manage')
-  async createShift(@Req() req: any, @Body() dto: { name: string; startTime: string; endTime: string }) {
-    const factoryId = req.user.factoryId || (dto as any).factoryId;
-    return await this.factoryConfigService.createShift(factoryId, dto);
+  async createShift(@Body() dto: { name: string; startTime: string; endTime: string }) {
+    return await this.factoryConfigService.createShift(dto);
   }
 }

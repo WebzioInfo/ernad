@@ -10,7 +10,6 @@ interface User {
   roles: string[];
   permissions: string[];
   avatarUrl?: string;
-  factoryId: string;
 }
 
 interface AuthState {

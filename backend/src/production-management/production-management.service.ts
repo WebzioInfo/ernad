@@ -25,7 +25,6 @@ export class ProductionManagementService {
   }
 
   async startBatch(
-    factoryIdArg: string | undefined, 
     lineId: string, 
     brandId: string, 
     productId: string, 
@@ -35,7 +34,7 @@ export class ProductionManagementService {
     remarks?: string, 
     startTime?: string
   ) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+    const factoryId = await this.getFactoryContext();
     
     const result = await db.transaction(async (tx) => {
       // 1. Lock line for update to prevent concurrent starts
@@ -104,8 +103,8 @@ export class ProductionManagementService {
     return result;
   }
 
-  async closeBatch(factoryIdArg: string | undefined, batchId: string, reqUserId: string, remarks?: string) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async closeBatch(batchId: string, reqUserId: string, remarks?: string) {
+    const factoryId = await this.getFactoryContext();
 
     const result = await db.transaction(async (tx) => {
       // 1. Get Batch and validate state (LOCK for update to prevent concurrent closes)
@@ -179,8 +178,8 @@ export class ProductionManagementService {
     return result;
   }
 
-  async submitQualityCheck(factoryIdArg: string | undefined, batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async submitQualityCheck(batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
+    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       // 1. State Machine Enforcement
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
@@ -215,8 +214,8 @@ export class ProductionManagementService {
     return result;
   }
 
-  async logPackaging(factoryIdArg: string | undefined, batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async logPackaging(batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
+    const factoryId = await this.getFactoryContext();
     
     // 1. State Machine Enforcement
     const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
@@ -237,8 +236,8 @@ export class ProductionManagementService {
     }).returning();
   }
 
-  async logDispatch(factoryIdArg: string | undefined, batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async logDispatch(batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
+    const factoryId = await this.getFactoryContext();
     
     // 1. State Machine Enforcement
     const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
@@ -312,8 +311,8 @@ export class ProductionManagementService {
     return result;
   }
 
-  async completeChangeover(factoryIdArg: string | undefined, batchId: string, userId: string) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async completeChangeover(batchId: string, userId: string) {
+    const factoryId = await this.getFactoryContext();
     const result = await db.transaction(async (tx) => {
       const [log] = await tx.select().from(changeoverLogs)
         .where(and(eq(changeoverLogs.batchId, batchId), isNull(changeoverLogs.endTime)))
@@ -366,8 +365,8 @@ export class ProductionManagementService {
     return result;
   }
 
-  async toggleMaintenance(factoryIdArg: string | undefined, lineId: string, userId: string) {
-     const factoryId = await this.getFactoryContext(factoryIdArg);
+  async toggleMaintenance(lineId: string, userId: string) {
+     const factoryId = await this.getFactoryContext();
      const [line] = await db.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
      if (!line) throw new BadRequestException('Line not found');
 
@@ -385,8 +384,8 @@ export class ProductionManagementService {
      return updated;
   }
 
-  async getBatches(factoryIdArg?: string, limit = 50) {
-    const factoryId = factoryIdArg ? await this.getFactoryContext(factoryIdArg) : null;
+  async getBatches(limit = 50) {
+    const factoryId = await this.getFactoryContext();
     const conditions = [];
     if (factoryId) {
       conditions.push(eq(productionBatches.factoryId, factoryId));
@@ -407,8 +406,8 @@ export class ProductionManagementService {
     .limit(limit);
   }
 
-  async getLifecycleLogs(factoryIdArg?: string, type?: 'qc' | 'packaging' | 'dispatch') {
-    const factoryId = factoryIdArg ? await this.getFactoryContext(factoryIdArg) : null;
+  async getLifecycleLogs(type?: 'qc' | 'packaging' | 'dispatch') {
+    const factoryId = await this.getFactoryContext();
     if (type === 'qc') {
       const q = db.select().from(qualityChecks);
       if (factoryId) q.where(eq(qualityChecks.factoryId, factoryId));

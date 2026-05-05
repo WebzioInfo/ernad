@@ -7,8 +7,7 @@ import { eq, sql, desc } from 'drizzle-orm';
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  private async getFactoryContext(factoryId?: string): Promise<string> {
-    if (factoryId) return factoryId;
+  private async getFactoryContext(): Promise<string> {
     const results = await db.select().from(factories).limit(1);
     if (!results.length) return 'default-factory-id';
     return results[0].id;
@@ -30,14 +29,14 @@ export class InventoryService {
       .limit(50);
   }
 
-  async updateStock(factoryIdArg: string | undefined, dto: { 
+  async updateStock(dto: { 
     materialId: string; 
     quantity: number; 
     type: 'IN' | 'OUT' | 'ADJUSTMENT'; 
     remarks?: string; 
     referenceId?: string;
   }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       // 1. Record in Ledger
       await tx.insert(stockTransactions).values({
@@ -70,8 +69,8 @@ export class InventoryService {
     });
   }
 
-  async createMaterial(factoryIdArg: string | undefined, dto: { name: string; unit: string; category?: string; minimumStock?: string }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async createMaterial(dto: { name: string; unit: string; category?: string; minimumStock?: string }) {
+    const factoryId = await this.getFactoryContext();
     const [material] = await db.insert(rawMaterials).values({
       ...dto,
       factoryId,

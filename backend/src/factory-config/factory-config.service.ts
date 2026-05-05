@@ -6,29 +6,20 @@ import { productionLines, shifts, products, productBrands, rawMaterials, stockTr
 
 @Injectable()
 export class FactoryConfigService {
-  private async getFactoryContext(factoryId?: string): Promise<string> {
-    if (factoryId) return factoryId;
+  private async getFactoryContext(): Promise<string> {
     const [factory] = await db.select().from(factories).limit(1);
     if (!factory) throw new BadRequestException('No factory configured in system.');
     return factory.id;
   }
 
-  async getFactories() {
-    return await db.select().from(factories);
-  }
-  async getLines(factoryId?: string) {
-    try {
-      if (!factoryId) return await db.select().from(productionLines);
-      return await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
-    } catch (error) {
-      console.error('[FactoryConfigService] getLines Error:', error);
-      throw error;
-    }
+  async getLines() {
+    const factoryId = await this.getFactoryContext();
+    return await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
   }
 
-  async createLine(factoryIdArg: string, dto: { name: string; description?: string }) {
+  async createLine(dto: { name: string; description?: string }) {
     try {
-      const factoryId = await this.getFactoryContext(factoryIdArg);
+      const factoryId = await this.getFactoryContext();
       const existingLines = await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
       if (existingLines.length >= 2) {
         throw new BadRequestException('Factory is limited to exactly 2 production lines (Line 1 & Line 2).');
@@ -64,13 +55,13 @@ export class FactoryConfigService {
     return { success: true };
   }
 
-  async getShifts(factoryId?: string) {
-    if (!factoryId) return await db.select().from(shifts);
+  async getShifts() {
+    const factoryId = await this.getFactoryContext();
     return await db.select().from(shifts).where(eq(shifts.factoryId, factoryId));
   }
 
-  async getProducts(factoryId?: string) {
-    if (!factoryId) return await db.select().from(products);
+  async getProducts() {
+    const factoryId = await this.getFactoryContext();
     return await db.select().from(products).where(eq(products.factoryId, factoryId));
   }
 
@@ -79,8 +70,8 @@ export class FactoryConfigService {
     return await db.select().from(productBrands);
   }
 
-  async getRawMaterials(factoryId?: string) {
-    if (!factoryId) return await db.select().from(rawMaterials);
+  async getRawMaterials() {
+    const factoryId = await this.getFactoryContext();
     return await db.select().from(rawMaterials).where(eq(rawMaterials.factoryId, factoryId));
   }
 
@@ -105,8 +96,8 @@ export class FactoryConfigService {
     return null;
   }
 
-  async createProduct(factoryIdArg: string, dto: { name: string; sku?: string; brandId: string; category?: string }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
+    const factoryId = await this.getFactoryContext();
     const [product] = await db.insert(products).values({ ...dto, factoryId }).returning();
     return product;
   }
@@ -116,8 +107,8 @@ export class FactoryConfigService {
     return brand;
   }
 
-  async createRawMaterial(factoryIdArg: string, dto: { name: string; unit: string; category?: string; currentStock?: string; minimumStock?: string }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async createRawMaterial(dto: { name: string; unit: string; category?: string; currentStock?: string; minimumStock?: string }) {
+    const factoryId = await this.getFactoryContext();
     const [material] = await db.insert(rawMaterials).values({
       ...dto,
       factoryId,
@@ -127,8 +118,8 @@ export class FactoryConfigService {
     return material;
   }
 
-  async updateStock(factoryIdArg: string, dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async updateStock(dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
+    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       // 1. Record transaction
       await tx.insert(stockTransactions).values({
@@ -199,8 +190,8 @@ export class FactoryConfigService {
     return { success: true };
   }
 
-  async createShift(factoryIdArg: string, dto: { name: string; startTime: string; endTime: string }) {
-    const factoryId = await this.getFactoryContext(factoryIdArg);
+  async createShift(dto: { name: string; startTime: string; endTime: string }) {
+    const factoryId = await this.getFactoryContext();
     const [shift] = await db.insert(shifts).values({ ...dto, factoryId }).returning();
     return shift;
   }

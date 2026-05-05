@@ -10,7 +10,6 @@ const ProductionControlPage = lazy(() => import('./modules/production/Production
 const UserManagementPage = lazy(() => import('./modules/personnel/UserManagementPage'));
 const AuditLogsPage = lazy(() => import('./modules/personnel/AuditLogsPage'));
 // const AttendanceRecordsPage = lazy(() => import('./modules/attendance/AttendanceRecordsPage'));
-const FactoryConfigurationPage = lazy(() => import('./modules/master-data/FactoryConfigurationPage'));
 const InventoryPage = lazy(() => import('./modules/inventory/InventoryPage'));
 // const QualityManagementPage = lazy(() => import('./modules/production/QualityManagementPage'));
 const OperatorPanel = lazy(() => import('./modules/production/OperatorPanel'));
@@ -77,7 +76,7 @@ function App() {
               <Route path="staffs" element={<ComingSoonPage title="Staff Directory" description="The physical personnel and factory floor staff directory is currently being synchronized with our HR systems." icon={Users} />} />
               <Route path="attendance" element={<ComingSoonPage title="Attendance System" description="Biometric attendance tracking and shift scheduling is undergoing final hardware validation." icon={Fingerprint} />} />
               <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkles} />} />
-              <Route path="settings" element={<FactoryConfigurationPage />} />
+              <Route path="settings" element={<ComingSoonPage title="System Settings" description="General system configuration and factory preferences are being migrated to the unified management console." />} />
               {/* Admin can also access operations */}
               <Route path="production" element={<ProductionControlPage />} />
               <Route path="quality" element={<ComingSoonPage title="Quality Management" description="Advanced QC testing and laboratory integration modules are coming in the next release." />} />
