@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Bell, Shield, X } from 'lucide-react';
-import OneSignal from 'react-onesignal';
 
 export default function NotificationPermissionModal() {
   const [show, setShow] = useState(false);
@@ -23,7 +22,11 @@ export default function NotificationPermissionModal() {
       // OneSignal requires HTTPS to function correctly. 
       // On localhost, we skip the real request to avoid silent failures.
       if (window.location.protocol === 'https:') {
-        await OneSignal.Notifications.requestPermission();
+        // @ts-ignore
+        const OneSignal = window.OneSignal || (window as any).OneSignalDeferred;
+        if (OneSignal?.Notifications) {
+          await OneSignal.Notifications.requestPermission();
+        }
       } else {
         console.info('[OneSignal] Skipping permission request on non-HTTPS environment (localhost).');
       }

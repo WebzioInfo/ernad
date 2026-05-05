@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import OneSignal from 'react-onesignal';
 import useAuthStore from '../store/useAuthStore';
 import { api } from '../api';
 
@@ -26,20 +25,16 @@ export function usePushNotifications() {
     }
 
     const setupOneSignal = async () => {
-      // ── Step 1: Initialize SDK ──
-      if (!isOneSignalInitialized) {
-        try {
-          await OneSignal.init({ appId: ONESIGNAL_APP_ID });
-          isOneSignalInitialized = true;
-        } catch (initErr: any) {
-          if (initErr?.message?.includes('already initialized')) {
-            isOneSignalInitialized = true;
-          } else {
-            console.warn('[OneSignal] Init failed:', initErr?.message);
-            return;
-          }
-        }
+      // @ts-ignore
+      const OneSignal = window.OneSignal || (window as any).OneSignalDeferred;
+      
+      if (!OneSignal) {
+        console.warn('[OneSignal] SDK not loaded yet.');
+        return;
       }
+
+      // We don't need to call init here as it's handled in index.html
+      isOneSignalInitialized = true;
 
       // ── Step 2: Link user identity ──
       try {
