@@ -258,30 +258,7 @@ export class ProductionManagementService {
     }).returning();
   }
 
-  async getActiveBatchByLine(lineId: string, factoryId?: string) {
-    const conditions = [
-      eq(productionBatches.lineId, lineId),
-      sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
-    ];
 
-    if (factoryId) {
-      conditions.push(eq(productionBatches.factoryId, factoryId));
-    }
-
-    const results = await db.select({
-      batch: productionBatches,
-      brand: productBrands,
-      product: products,
-    })
-    .from(productionBatches)
-    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
-    .leftJoin(products, eq(productionBatches.productId, products.id))
-    .where(and(...conditions))
-    .limit(1);
-    
-    if (!results.length) return null;
-    return { ...results[0].batch, brand: results[0].brand, product: results[0].product };
-  }
 
   async initiateChangeover(batchId: string, toProductId: string, userId: string) {
     const result = await db.transaction(async (tx) => {
@@ -424,7 +401,6 @@ export class ProductionManagementService {
         .orderBy(desc(dispatchLogs.dispatchedAt)).limit(50);
     }
   }
-
   async getActiveBatch(lineId: string) {
     const results = await db.select({
       batch: productionBatches,
@@ -440,21 +416,36 @@ export class ProductionManagementService {
     ))
     .orderBy(desc(productionBatches.startTime))
     .limit(1);
-    
+
     console.log("ACTIVE QUERY EXECUTED", { lineId });
     console.log("QUERY RESULT:", JSON.stringify(results[0], null, 2));
 
+    const line = await db.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+    const lineData = line[0];
+
     if (!results[0]) {
-      console.log("NO ACTIVE BATCH FOUND FOR LINE:", lineId);
-      return null;
+      return {
+        lineId,
+        status: lineData?.status || 'IDLE',
+        batch: null
+      };
     }
 
     const { batch, brand, product } = results[0];
     
     return { 
-      ...batch, 
-      brand: brand ? brand : { name: 'Unknown Brand', id: null }, 
-      product: product ? product : { name: 'Unknown Product', id: null, targetBPM: 120 } 
+      lineId,
+      status: lineData?.status || batch.status,
+      batch: {
+        id: batch.id,
+        batch_code: batch.batchCode,
+        status: batch.status,
+        startTime: batch.startTime,
+        productId: batch.productId,
+        brandId: batch.brandId,
+        product_name: product?.name || 'Unknown Product',
+        brand_name: brand?.name || 'Unknown Brand'
+      }
     };
   }
 

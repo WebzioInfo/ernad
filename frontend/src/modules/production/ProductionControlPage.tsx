@@ -77,12 +77,15 @@ export default function ProductionControlPage() {
 }
 
 function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
-  const { data: activeBatch } = useQuery({
-    queryKey: ['active-batch', line.id],
-    queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
-    enabled: !!line.id,
-    refetchInterval: 10000
-  });
+   const { data: activeBatch } = useQuery({
+     queryKey: ['production-active', line.id],
+     queryFn: async () => (await api.get(`/production/active/${line.id}`)).data,
+     enabled: !!line.id,
+     refetchInterval: 10000
+   });
+
+   console.log("LINE DATA (COMMANDER):", line);
+   console.log("ACTIVE BATCH DATA:", activeBatch);
 
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
@@ -113,15 +116,16 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-           <div className="text-right">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Batch</p>
-              <p className="text-lg font-black text-slate-900">{activeBatch?.batchCode || 'NO BATCH'}</p>
-           </div>
-           <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
-              {activeBatch?.product?.name.charAt(0) || '?'}
-           </div>
-        </div>
+         <div className="flex items-center gap-4">
+            <div className="text-right">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Batch</p>
+               <p className="text-lg font-black text-slate-900 leading-tight">{activeBatch?.batch?.batch_code || 'NO BATCH'}</p>
+               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{activeBatch?.batch?.product_name || 'No Active Product'}</p>
+            </div>
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
+               {activeBatch?.batch?.batch_code?.charAt(0) || '?'}
+            </div>
+         </div>
       </header>
 
       {/* ── MAIN GRID ── */}
@@ -228,10 +232,10 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   const [changeoverProduct, setChangeoverProduct] = useState('');
   const [materialReturns, setMaterialReturns] = useState<any>({ preforms: 0, caps: 0, labels: 0 });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['production-lines'] });
-    queryClient.invalidateQueries({ queryKey: ['active-batch', line.id] });
-  };
+   const invalidate = () => {
+     queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+     queryClient.invalidateQueries({ queryKey: ['production-active', line.id] });
+   };
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
@@ -251,11 +255,11 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
 
   const stopMutation = useMutation({
     mutationFn: () => {
-      if (!activeBatch?.id) {
+      if (!activeBatch?.batch?.id) {
         toast.error('No active batch found to close');
         throw new Error('No active batch ID');
       }
-      return api.put(`/production/${activeBatch.id}/close`, { 
+      return api.put(`/production/${activeBatch.batch.id}/close`, { 
         remarks: stopRemarks,
         endTime: new Date(stopEndTime).toISOString(),
         materialReturn: materialReturns
@@ -271,7 +275,7 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
   const changeoverMutation = useMutation({
     mutationFn: () => api.post(`/production/line/${line.id}/changeover`, { 
       productId: changeoverProduct,
-      batchId: activeBatch?.id
+      batchId: activeBatch?.batch?.id
     }),
     onSuccess: () => { invalidate(); setChangeoverModalOpen(false); toast.success('Changeover initiated'); }
   });
@@ -298,7 +302,7 @@ function LineControlButtons({ line, activeBatch, brands, products, shifts }: any
     <div className="grid grid-cols-2 gap-4">
       <button 
         onClick={() => setStopConfirmOpen(true)} 
-        disabled={!activeBatch || stopMutation.isPending}
+        disabled={!activeBatch?.batch || stopMutation.isPending}
         className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group disabled:opacity-50"
       >
          {stopMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
@@ -509,8 +513,9 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
     }
   });
 
-  return (
-    <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+   console.log("LINE DATA (CARD):", line);
+   return (
+     <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
       <div className="flex justify-between items-start mb-8">
           <div onClick={onFocus} className="flex items-center gap-5 cursor-pointer">
             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-[1.25rem] flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
@@ -540,7 +545,7 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
          </div>
           <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
-            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batchCode || '—'}</p>
+            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batch_code || 'NO BATCH'}</p>
           </div>
       </div>
 

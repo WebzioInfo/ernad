@@ -31,7 +31,10 @@ export class FactoryConfigService {
 
     return results.map(r => ({
       ...r.line,
-      batch: r.batch.id ? r.batch : null
+      batch: r.batch.id ? {
+        ...r.batch,
+        batch_code: r.batch.batchCode
+      } : null
     }));
   }
 
