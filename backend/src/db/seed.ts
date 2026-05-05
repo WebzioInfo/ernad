@@ -62,6 +62,7 @@ async function seed() {
         { slug: 'telemetry:log', name: 'Log Telemetry Data', category: 'Production' },
         { slug: 'inventory:view', name: 'View Inventory', category: 'Inventory' },
         { slug: 'inventory:update', name: 'Update Inventory', category: 'Inventory' },
+        { slug: 'settings:view', name: 'View Factory Config', category: 'Master Data' },
         { slug: 'settings:manage', name: 'Manage Factory Config', category: 'Master Data' },
         { slug: 'reports:view', name: 'View Reports', category: 'Analytics' },
         { slug: 'notifications:view', name: 'View Notifications', category: 'Communication' },
@@ -201,7 +202,7 @@ async function seed() {
         });
     }
 
-    console.log('✅ Multi-Station Seed Complete!');
+    console.log('✅ ERNAD MES Seed Complete!');
     process.exit(0);
 }
 

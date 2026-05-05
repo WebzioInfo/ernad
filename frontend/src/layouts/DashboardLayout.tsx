@@ -6,25 +6,17 @@ import {
   UserCog, Sparkles, ClipboardList, ShieldCheck
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
-import { useNavigate, NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../api';
+import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import NotificationBell from '../components/NotificationBell';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
 
-  const { data: lines } = useQuery({ queryKey: ['lines'], queryFn: async () => (await api.get('/master-data/lines')).data });
 
-  const showFilters = [
-    '/admin/overview', '/admin/analytics', '/admin/production',
-    '/manager/overview', '/manager/production'
-  ].includes(location.pathname);
 
   const filters = {
     lineId: searchParams.get('lineId') || '',
@@ -52,10 +44,6 @@ export default function DashboardLayout() {
     }
   }, [searchParams, setSearchParams]);
 
-  useEffect(() => {
-    // Only auto-select line if specifically requested or on pages that require a focus
-    // We removed automatic selection for /admin/production to keep URL clean as requested
-  }, [lines, filters.lineId, showFilters, location.pathname, user?.role]);
 
   const getModulePath = (id: string) => {
     if (id === 'terminal') return '/line/select';

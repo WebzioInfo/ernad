@@ -132,7 +132,7 @@ const SuperAdminDashboard = memo(() => {
 
 // ─── ADMIN: THE OPERATIONAL COMMAND VIEW ───
 const AdminDashboard = memo(() => {
-  const { data: lines } = useQuery({ queryKey: ['lines-status'], queryFn: async () => (await api.get('/factory-config/lines')).data });
+  const { data: lines } = useQuery({ queryKey: ['lines-status'], queryFn: async () => (await api.get('/master-data/lines')).data, staleTime: 10000 });
   const { data: personnel } = useQuery({ queryKey: ['personnel-stats'], queryFn: async () => (await api.get('/users')).data });
 
   return (
@@ -180,7 +180,7 @@ const AdminDashboard = memo(() => {
 // ─── MANAGER: THE TACTICAL FLOOR VIEW ───
 const ManagerDashboard = memo(() => {
   const { data: inventory } = useQuery({ queryKey: ['inventory-alerts'], queryFn: async () => (await api.get('/inventory')).data });
-  const { data: lines } = useQuery({ queryKey: ['lines-status'], queryFn: async () => (await api.get('/factory-config/lines')).data });
+  const { data: lines } = useQuery({ queryKey: ['lines-status'], queryFn: async () => (await api.get('/master-data/lines')).data, staleTime: 10000 });
 
   const activeLinesCount = lines?.filter((l:any) => l.status === 'RUNNING').length || 0;
 

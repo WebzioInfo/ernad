@@ -48,12 +48,13 @@ export default function OperatorPanel() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [batchRes, lineRes] = await Promise.all([
+        const [batchRes, linesRes] = await Promise.all([
           api.get(`/production-batch/active/${lineId}`),
-          api.get(`/master-data/lines/${lineId}`)
+          api.get(`/master-data/lines`)
         ]);
         setActiveBatch(batchRes.data);
-        setLine(lineRes.data);
+        const matchedLine = linesRes.data?.find((l: any) => l.id === lineId) || linesRes.data?.[0] || null;
+        setLine(matchedLine);
       } catch (err) {
         console.error('Data fetch error', err);
       } finally {
