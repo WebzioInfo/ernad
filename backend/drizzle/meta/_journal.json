@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777448667189,
-      "tag": "0000_small_sage",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1777449199259,
-      "tag": "0001_bizarre_echo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1777449674716,
-      "tag": "0002_needy_psynapse",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1777467877357,
-      "tag": "0003_familiar_jimmy_woo",
+      "when": 1777965140008,
+      "tag": "0000_nebulous_major_mapleleaf",
       "breakpoints": true
     }
   ]

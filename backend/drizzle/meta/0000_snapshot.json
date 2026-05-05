@@ -1,5 +1,5 @@
 {
-  "id": "2e333ec3-3029-4dec-bc23-540583b8793e",
+  "id": "f0e9aa3c-e889-45d2-b821-b9074b51f6ff",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -306,6 +306,80 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.user_lines": {
+      "name": "user_lines",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "line_id": {
+          "name": "line_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "idx_user_lines": {
+          "name": "idx_user_lines",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "line_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "user_lines_user_id_users_id_fk": {
+          "name": "user_lines_user_id_users_id_fk",
+          "tableFrom": "user_lines",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "user_lines_line_id_production_lines_id_fk": {
+          "name": "user_lines_line_id_production_lines_id_fk",
+          "tableFrom": "user_lines",
+          "tableTo": "production_lines",
+          "columnsFrom": [
+            "line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.user_roles": {
       "name": "user_roles",
       "schema": "",
@@ -553,6 +627,160 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.batch_materials": {
+      "name": "batch_materials",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "planned_quantity": {
+          "name": "planned_quantity",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_consumed": {
+          "name": "actual_consumed",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "waste_quantity": {
+          "name": "waste_quantity",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'0'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "batch_materials_batch_id_production_batches_id_fk": {
+          "name": "batch_materials_batch_id_production_batches_id_fk",
+          "tableFrom": "batch_materials",
+          "tableTo": "production_batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "batch_materials_material_id_raw_materials_id_fk": {
+          "name": "batch_materials_material_id_raw_materials_id_fk",
+          "tableFrom": "batch_materials",
+          "tableTo": "raw_materials",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.batch_outputs": {
+      "name": "batch_outputs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grade_a": {
+          "name": "grade_a",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "grade_b": {
+          "name": "grade_b",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "scrap": {
+          "name": "scrap",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "batch_outputs_batch_id_production_batches_id_fk": {
+          "name": "batch_outputs_batch_id_production_batches_id_fk",
+          "tableFrom": "batch_outputs",
+          "tableTo": "production_batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.batch_snapshots": {
       "name": "batch_snapshots",
       "schema": "",
@@ -590,7 +818,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_snapshots_batch": {
+          "name": "idx_snapshots_batch",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "batch_snapshots_batch_id_production_batches_id_fk": {
           "name": "batch_snapshots_batch_id_production_batches_id_fk",
@@ -685,7 +929,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_changeover_batch": {
+          "name": "idx_changeover_batch",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_changeover_line": {
+          "name": "idx_changeover_line",
+          "columns": [
+            {
+              "expression": "line_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "changeover_logs_batch_id_production_batches_id_fk": {
           "name": "changeover_logs_batch_id_production_batches_id_fk",
@@ -824,13 +1099,14 @@
           "name": "batch_code",
           "type": "varchar(50)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "production_date": {
           "name": "production_date",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "now()"
         },
         "line_id": {
           "name": "line_id",
@@ -866,7 +1142,8 @@
           "name": "start_time",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": "now()"
         },
         "end_time": {
           "name": "end_time",
@@ -881,6 +1158,24 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'RUNNING'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "remarks": {
+          "name": "remarks",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -933,6 +1228,36 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_batches_code_global": {
+          "name": "idx_batches_code_global",
+          "columns": [
+            {
+              "expression": "batch_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_batches_factory": {
+          "name": "idx_batches_factory",
+          "columns": [
+            {
+              "expression": "factory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -946,7 +1271,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "production_batches_brand_id_product_brands_id_fk": {
@@ -959,7 +1284,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "production_batches_product_id_products_id_fk": {
@@ -972,7 +1297,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "production_batches_shift_id_shifts_id_fk": {
@@ -985,7 +1310,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         },
         "production_batches_factory_id_factories_id_fk": {
@@ -998,7 +1323,33 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "production_batches_created_by_users_id_fk": {
+          "name": "production_batches_created_by_users_id_fk",
+          "tableFrom": "production_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "production_batches_updated_by_users_id_fk": {
+          "name": "production_batches_updated_by_users_id_fk",
+          "tableFrom": "production_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "updated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -1305,6 +1656,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "remarks": {
+          "name": "remarks",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "dispatched_at": {
           "name": "dispatched_at",
           "type": "timestamp",
@@ -1313,7 +1670,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_dispatch_batch": {
+          "name": "idx_dispatch_batch",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_dispatch_factory": {
+          "name": "idx_dispatch_factory",
+          "columns": [
+            {
+              "expression": "factory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "dispatch_logs_batch_id_production_batches_id_fk": {
           "name": "dispatch_logs_batch_id_production_batches_id_fk",
@@ -1533,8 +1921,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "operatorId": {
-          "name": "operatorId",
+        "operator_id": {
+          "name": "operator_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -1557,6 +1945,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "remarks": {
+          "name": "remarks",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1565,7 +1959,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_packaging_batch": {
+          "name": "idx_packaging_batch",
+          "columns": [
+            {
+              "expression": "batch_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_packaging_factory": {
+          "name": "idx_packaging_factory",
+          "columns": [
+            {
+              "expression": "factory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "packaging_logs_batch_id_production_batches_id_fk": {
           "name": "packaging_logs_batch_id_production_batches_id_fk",
@@ -1593,12 +2018,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "packaging_logs_operatorId_users_id_fk": {
-          "name": "packaging_logs_operatorId_users_id_fk",
+        "packaging_logs_operator_id_users_id_fk": {
+          "name": "packaging_logs_operator_id_users_id_fk",
           "tableFrom": "packaging_logs",
           "tableTo": "users",
           "columnsFrom": [
-            "operatorId"
+            "operator_id"
           ],
           "columnsTo": [
             "id"
@@ -2089,6 +2514,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "code": {
+          "name": "code",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
         "location": {
           "name": "location",
           "type": "varchar(255)",
@@ -2119,7 +2550,15 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "factories_code_unique": {
+          "name": "factories_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2223,7 +2662,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_lines_name_factory": {
+          "name": "idx_lines_name_factory",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "factory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "production_lines_factory_id_factories_id_fk": {
           "name": "production_lines_factory_id_factories_id_fk",
@@ -2235,7 +2696,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2280,6 +2741,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "factory_id": {
+          "name": "factory_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -2300,7 +2767,20 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "products_factory_id_factories_id_fk": {
+          "name": "products_factory_id_factories_id_fk",
+          "tableFrom": "products",
+          "tableTo": "factories",
+          "columnsFrom": [
+            "factory_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2387,7 +2867,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2448,7 +2928,29 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_shifts_name_factory": {
+          "name": "idx_shifts_name_factory",
+          "columns": [
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "factory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "shifts_factory_id_factories_id_fk": {
           "name": "shifts_factory_id_factories_id_fk",
@@ -2460,7 +2962,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2550,7 +3052,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -2716,20 +3218,6 @@
     }
   },
   "enums": {
-    "public.user_role": {
-      "name": "user_role",
-      "schema": "public",
-      "values": [
-        "SUPER_ADMIN",
-        "ADMIN",
-        "MANAGER",
-        "OPERATOR_BLOWING",
-        "OPERATOR_FILLING",
-        "OPERATOR_LABELING",
-        "OPERATOR_PACKING",
-        "OPERATOR"
-      ]
-    },
     "public.batch_status": {
       "name": "batch_status",
       "schema": "public",

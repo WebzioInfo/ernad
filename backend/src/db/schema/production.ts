@@ -1,19 +1,19 @@
 import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { factories, productionLines, productBrands, products, shifts } from './master-data';
+import { factories, productionLines, productBrands, products, shifts, rawMaterials } from './master-data';
 
 export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED', 'CLOSED']);
 
 export const productionBatches = pgTable('production_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
-  batchCode: varchar('batch_code', { length: 50 }),
-  productionDate: timestamp('production_date'),
-  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
-  brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'cascade' }).notNull(),
-  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
-  shiftId: uuid('shift_id').references(() => shifts.id, { onDelete: 'cascade' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
-  startTime: timestamp('start_time').notNull(),
+  batchCode: varchar('batch_code', { length: 50 }).notNull(),
+  productionDate: timestamp('production_date').defaultNow(),
+  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'restrict' }).notNull(),
+  brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'restrict' }).notNull(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
+  shiftId: uuid('shift_id').references(() => shifts.id, { onDelete: 'restrict' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
+  startTime: timestamp('start_time').defaultNow().notNull(),
   endTime: timestamp('end_time'),
   status: batchStatusEnum('status').default('RUNNING').notNull(),
   createdBy: uuid('created_by').references(() => users.id),
@@ -25,8 +25,28 @@ export const productionBatches = pgTable('production_batches', {
   return [
     index('idx_batches_line_status').on(table.lineId, table.status),
     index('idx_batches_product').on(table.productId),
-    uniqueIndex('idx_batches_code_line').on(table.batchCode, table.lineId),
+    uniqueIndex('idx_batches_code_global').on(table.batchCode),
+    index('idx_batches_factory').on(table.factoryId),
   ];
+});
+
+export const batchMaterials = pgTable('batch_materials', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
+  materialId: uuid('material_id').references(() => rawMaterials.id, { onDelete: 'restrict' }).notNull(),
+  plannedQuantity: decimal('planned_quantity', { precision: 12, scale: 2 }),
+  actualConsumed: decimal('actual_consumed', { precision: 12, scale: 2 }).default('0'),
+  wasteQuantity: decimal('waste_quantity', { precision: 12, scale: 2 }).default('0'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const batchOutputs = pgTable('batch_outputs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
+  gradeA: integer('grade_a').default(0).notNull(), // Main usable product
+  gradeB: integer('grade_b').default(0).notNull(), // Secondary/Discounted
+  scrap: integer('scrap').default(0).notNull(), // Waste
+  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
 });
 
 export const changeoverLogs = pgTable('changeover_logs', {

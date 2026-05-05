@@ -30,11 +30,10 @@ export class StartBatchDto {
   @ApiProperty()
   @IsString()
   @IsOptional()
-  createdBy?: string;
+  batchCode?: string;
 
   @ApiProperty()
   @IsString()
-  @IsOptional()
   @IsOptional()
   remarks?: string;
 
@@ -78,7 +77,7 @@ export class QualityCheckDto {
 
   @ApiProperty()
   @IsOptional()
-  parameters?: any;
+  parameters?: Record<string, any>;
 
   @ApiProperty()
   @IsString()

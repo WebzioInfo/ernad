@@ -3,6 +3,7 @@ import { pgTable, uuid, varchar, timestamp, integer, decimal, uniqueIndex } from
 export const factories = pgTable('factories', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
+  code: varchar('code', { length: 10 }).notNull().unique(), // e.g. 'F1', 'KLA'
   location: varchar('location', { length: 255 }),
   contactInfo: varchar('contact_info', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -11,7 +12,7 @@ export const factories = pgTable('factories', {
 
 export const productionLines = pgTable('production_lines', {
   id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   description: varchar('description', { length: 255 }),
   status: varchar('status', { length: 50 }).default('IDLE').notNull(), // IDLE, RUNNING, CHANGEOVER, MAINTENANCE
@@ -26,7 +27,7 @@ export const productionLines = pgTable('production_lines', {
 
 export const shifts = pgTable('shifts', {
   id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   name: varchar('name', { length: 50 }).notNull(), // e.g., 'Morning', 'Afternoon', 'Night'
   startTime: varchar('start_time', { length: 5 }).notNull(), // 'HH:mm'
   endTime: varchar('end_time', { length: 5 }).notNull(), // 'HH:mm'
@@ -47,9 +48,9 @@ export const products = pgTable('products', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
   sku: varchar('sku', { length: 50 }).unique(),
-  brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'cascade' }),
+  brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'restrict' }),
   category: varchar('category', { length: 50 }), // e.g., 'Water', 'Soda', 'Juice'
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -60,7 +61,7 @@ export const rawMaterials = pgTable('raw_materials', {
   category: varchar('category', { length: 50 }), // Packaging, Closure, Consumable
   currentStock: decimal('current_stock', { precision: 12, scale: 2 }).default('0').notNull(),
   minimumStock: decimal('minimum_stock', { precision: 12, scale: 2 }).default('0').notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -71,6 +72,6 @@ export const stockTransactions = pgTable('stock_transactions', {
   quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
   referenceId: varchar('reference_id', { length: 100 }), // e.g. Batch ID or PO number
   remarks: varchar('remarks', { length: 255 }),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

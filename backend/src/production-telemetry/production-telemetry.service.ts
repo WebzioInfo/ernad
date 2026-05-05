@@ -5,7 +5,7 @@ import { db } from '../db/db';
 import { users, productionLogs, batchTotals, materialsUsage, rawMaterials, stockTransactions } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { ProductionTelemetryDto } from './dto/production-telemetry.dto';
-import { ProductionGateway } from '../events/production.gateway';
+import { ProductionEventsService } from '../events/production.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShiftService } from '../factory-config/shift.service';
 import { RedisService } from '../common/redis/redis.service';
@@ -16,7 +16,7 @@ export class ProductionTelemetryService {
 
   constructor(
     @InjectQueue('telemetry') private readonly telemetryQueue: Queue,
-    private readonly eventsGateway: ProductionGateway,
+    private readonly eventsService: ProductionEventsService,
     private readonly notificationsService: NotificationsService,
     private readonly shiftService: ShiftService,
     private readonly redisService: RedisService,
@@ -175,8 +175,8 @@ export class ProductionTelemetryService {
         );
       }
 
-      this.eventsGateway.emitNewLog(log);
-      this.eventsGateway.emitProductionUpdated(dto.batchId, dto.lineId);
+      this.eventsService.emitNewLog(log);
+      this.eventsService.emitProductionUpdated(dto.batchId, dto.lineId);
       
       return log;
     });

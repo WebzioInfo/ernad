@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../db/db';
 import { notifications, deviceTokens, users, roles, userRoles } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { ProductionGateway } from '../events/production.gateway';
+import { ProductionEventsService } from '../events/production.gateway';
 import { OneSignalService } from '../firebase/onesignal.service';
 
 // In-memory rate limiter: key → last fire timestamp
@@ -14,7 +14,7 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    private readonly eventsGateway: ProductionGateway,
+    private readonly eventsService: ProductionEventsService,
     private readonly oneSignalService: OneSignalService,
   ) {}
 
@@ -45,8 +45,8 @@ export class NotificationsService {
 
     this.logger.log(`[${severity}] ${title}`);
 
-    // ── Real-time in-app (WebSocket) ──
-    this.eventsGateway.server.emit('NEW_NOTIFICATION', notif);
+    // ── Real-time in-app (Pusher) ──
+    await this.eventsService.emitNotification(notif);
 
     // ── OneSignal Push to all Admins & Managers ──
     this.broadcastOneSignalPush(title, message, { type, severity }).catch((e) =>

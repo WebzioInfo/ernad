@@ -28,11 +28,10 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    // Support both single role (enum) and multi-role (join table)
-    const userRoles = (Array.isArray(user.roles) ? user.roles : (user.role ? [user.role] : []))
-      .map((r: any) => String(r).toUpperCase());
+    const userRoles = (user.roles || []).map((r: any) => String(r).toUpperCase());
+    const userPermissions = user.permissions || [];
     
-    this.logger.debug(`[RolesGuard] Path: ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)}`);
+    this.logger.debug(`[RolesGuard] Path: ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)}`);
 
     // SUPER_ADMIN bypasses all role/permission checks
     if (userRoles.includes('SUPER_ADMIN')) {
@@ -48,7 +47,7 @@ export class RolesGuard implements CanActivate {
     // ── Permission Check ──
     let permissionPassed = true;
     if (requiredPermissions && requiredPermissions.length > 0) {
-      permissionPassed = requiredPermissions.every(p => user.permissions?.includes(p));
+      permissionPassed = requiredPermissions.every(p => userPermissions.includes(p));
     }
 
     if (!rolePassed || !permissionPassed) {

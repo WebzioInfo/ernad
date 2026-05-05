@@ -1,59 +1,45 @@
 import { useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
 import { useQueryClient } from '@tanstack/react-query';
 import Pusher from 'pusher-js';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY;
-const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER;
+const PUSHER_KEY = import.meta.env.VITE_PUSHER_KEY || 'c9cd65cc0ed26c24ff13';
+const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER || 'ap2';
 
-let socket: Socket | null = null;
 let pusher: Pusher | null = null;
 
 export const useWebSocket = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // ── Mode 1: Pusher (Production/Vercel) ──
-    if (PUSHER_KEY && !pusher) {
+    // ── Pusher-Only Realtime (Enterprise Standard) ──
+    if (!pusher) {
       pusher = new Pusher(PUSHER_KEY, {
-        cluster: PUSHER_CLUSTER || 'ap2',
+        cluster: PUSHER_CLUSTER,
       });
-      console.log('[Realtime] Pusher Initialized');
-    }
-
-    // ── Mode 2: Socket.io (Local Fallback) ──
-    if (!PUSHER_KEY && !socket) {
-      socket = io(`${SOCKET_URL}/production`);
-      socket.on('connect', () => console.log('[Realtime] Socket.io Connected'));
+      console.log('[Realtime] Pusher Engine Active');
     }
 
     const handleUpdate = (data: any) => {
-      console.log('[Realtime] Update received:', data);
-      queryClient.invalidateQueries({ queryKey: ['aiStats'] });
-      queryClient.invalidateQueries({ queryKey: ['lines'] });
-      queryClient.invalidateQueries({ queryKey: ['batch'] });
+      console.log('[Realtime] Global Signal:', data);
+      
+      // Atomic Invalidations
+      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+      queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['line-performance-detail'] });
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
     };
 
-    // Bind listeners
-    if (pusher) {
-      const channel = pusher.subscribe('managers');
-      channel.bind('PRODUCTION_UPDATED', handleUpdate);
-      channel.bind('global_log_update', handleUpdate);
-    }
-
-    if (socket) {
-      socket.on('PRODUCTION_UPDATED', handleUpdate);
-      socket.on('global_log_update', handleUpdate);
-    }
+    const channel = pusher.subscribe('managers');
+    channel.bind('PRODUCTION_UPDATED', handleUpdate);
+    channel.bind('global_log_update', handleUpdate);
+    channel.bind('NEW_NOTIFICATION', (notif: any) => {
+       console.log('[Realtime] New Notification:', notif);
+       queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    });
 
     return () => {
       if (pusher) {
         pusher.unsubscribe('managers');
-      }
-      if (socket) {
-        socket.off('PRODUCTION_UPDATED', handleUpdate);
-        socket.off('global_log_update', handleUpdate);
       }
     };
   }, [queryClient]);

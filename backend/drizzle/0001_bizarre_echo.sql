@@ -1,1 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "role" "user_role" DEFAULT 'OPERATOR' NOT NULL;

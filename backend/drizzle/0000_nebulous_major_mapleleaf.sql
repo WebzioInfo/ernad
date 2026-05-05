@@ -1,4 +1,3 @@
-CREATE TYPE "public"."user_role" AS ENUM('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING', 'OPERATOR');--> statement-breakpoint
 CREATE TYPE "public"."batch_status" AS ENUM('PLANNING', 'RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED', 'CLOSED');--> statement-breakpoint
 CREATE TYPE "public"."event_type" AS ENUM('POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END');--> statement-breakpoint
 CREATE TYPE "public"."station_type" AS ENUM('BLOWING', 'FILLING', 'LABELING', 'PACKING');--> statement-breakpoint
@@ -37,6 +36,11 @@ CREATE TABLE "roles" (
 	CONSTRAINT "roles_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
+CREATE TABLE "user_lines" (
+	"user_id" uuid NOT NULL,
+	"line_id" uuid NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "user_roles" (
 	"user_id" uuid NOT NULL,
 	"role_id" uuid NOT NULL
@@ -61,6 +65,25 @@ CREATE TABLE "users" (
 	"deleted_at" timestamp,
 	CONSTRAINT "users_username_unique" UNIQUE("username"),
 	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
+CREATE TABLE "batch_materials" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"batch_id" uuid NOT NULL,
+	"material_id" uuid NOT NULL,
+	"planned_quantity" numeric(12, 2),
+	"actual_consumed" numeric(12, 2) DEFAULT '0',
+	"waste_quantity" numeric(12, 2) DEFAULT '0',
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "batch_outputs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"batch_id" uuid NOT NULL,
+	"grade_a" integer DEFAULT 0 NOT NULL,
+	"grade_b" integer DEFAULT 0 NOT NULL,
+	"scrap" integer DEFAULT 0 NOT NULL,
+	"recorded_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "batch_snapshots" (
@@ -97,16 +120,19 @@ CREATE TABLE "material_flows" (
 --> statement-breakpoint
 CREATE TABLE "production_batches" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"batch_code" varchar(50),
-	"production_date" timestamp,
+	"batch_code" varchar(50) NOT NULL,
+	"production_date" timestamp DEFAULT now(),
 	"line_id" uuid NOT NULL,
 	"brand_id" uuid NOT NULL,
 	"product_id" uuid NOT NULL,
 	"shift_id" uuid NOT NULL,
 	"factory_id" uuid NOT NULL,
-	"start_time" timestamp NOT NULL,
+	"start_time" timestamp DEFAULT now() NOT NULL,
 	"end_time" timestamp,
 	"status" "batch_status" DEFAULT 'RUNNING' NOT NULL,
+	"created_by" uuid,
+	"updated_by" uuid,
+	"remarks" varchar(500),
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -150,6 +176,7 @@ CREATE TABLE "dispatch_logs" (
 	"destination" varchar(255) NOT NULL,
 	"quantity" integer NOT NULL,
 	"vehicle_number" varchar(50),
+	"remarks" varchar(500),
 	"dispatched_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -178,10 +205,11 @@ CREATE TABLE "packaging_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"batch_id" uuid NOT NULL,
 	"factory_id" uuid NOT NULL,
-	"operatorId" uuid NOT NULL,
+	"operator_id" uuid NOT NULL,
 	"pack_type" varchar(50) NOT NULL,
 	"quantity" integer NOT NULL,
 	"units_per_pack" integer NOT NULL,
+	"remarks" varchar(500),
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -223,10 +251,12 @@ CREATE TABLE "quality_checks" (
 CREATE TABLE "factories" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" varchar(100) NOT NULL,
+	"code" varchar(10) NOT NULL,
 	"location" varchar(255),
 	"contact_info" varchar(255),
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "factories_code_unique" UNIQUE("code")
 );
 --> statement-breakpoint
 CREATE TABLE "product_brands" (
@@ -253,6 +283,7 @@ CREATE TABLE "products" (
 	"sku" varchar(50),
 	"brand_id" uuid,
 	"category" varchar(50),
+	"factory_id" uuid,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "products_sku_unique" UNIQUE("sku")
 );
@@ -303,18 +334,25 @@ CREATE TABLE "operator_sessions" (
 ALTER TABLE "attendance_logs" ADD CONSTRAINT "attendance_logs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_permissions_id_fk" FOREIGN KEY ("permission_id") REFERENCES "public"."permissions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_lines" ADD CONSTRAINT "user_lines_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_lines" ADD CONSTRAINT "user_lines_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "users" ADD CONSTRAINT "users_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "batch_materials" ADD CONSTRAINT "batch_materials_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "batch_materials" ADD CONSTRAINT "batch_materials_material_id_raw_materials_id_fk" FOREIGN KEY ("material_id") REFERENCES "public"."raw_materials"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "batch_outputs" ADD CONSTRAINT "batch_outputs_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "batch_snapshots" ADD CONSTRAINT "batch_snapshots_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "changeover_logs" ADD CONSTRAINT "changeover_logs_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "changeover_logs" ADD CONSTRAINT "changeover_logs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "material_flows" ADD CONSTRAINT "material_flows_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_brand_id_product_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."product_brands"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_shift_id_shifts_id_fk" FOREIGN KEY ("shift_id") REFERENCES "public"."shifts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_brand_id_product_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."product_brands"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_product_id_products_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."products"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_shift_id_shifts_id_fk" FOREIGN KEY ("shift_id") REFERENCES "public"."shifts"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_batches" ADD CONSTRAINT "production_batches_updated_by_users_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_actor_id_users_id_fk" FOREIGN KEY ("actor_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "batch_totals" ADD CONSTRAINT "batch_totals_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "batch_totals" ADD CONSTRAINT "batch_totals_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -327,7 +365,7 @@ ALTER TABLE "materials_usage" ADD CONSTRAINT "materials_usage_log_id_production_
 ALTER TABLE "materials_usage" ADD CONSTRAINT "materials_usage_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "packaging_logs" ADD CONSTRAINT "packaging_logs_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "packaging_logs" ADD CONSTRAINT "packaging_logs_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "packaging_logs" ADD CONSTRAINT "packaging_logs_operatorId_users_id_fk" FOREIGN KEY ("operatorId") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "packaging_logs" ADD CONSTRAINT "packaging_logs_operator_id_users_id_fk" FOREIGN KEY ("operator_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "production_logs" ADD CONSTRAINT "production_logs_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "production_logs" ADD CONSTRAINT "production_logs_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "production_logs" ADD CONSTRAINT "production_logs_shift_id_shifts_id_fk" FOREIGN KEY ("shift_id") REFERENCES "public"."shifts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -338,12 +376,13 @@ ALTER TABLE "production_logs" ADD CONSTRAINT "production_logs_factory_id_factori
 ALTER TABLE "quality_checks" ADD CONSTRAINT "quality_checks_batch_id_production_batches_id_fk" FOREIGN KEY ("batch_id") REFERENCES "public"."production_batches"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quality_checks" ADD CONSTRAINT "quality_checks_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quality_checks" ADD CONSTRAINT "quality_checks_inspector_id_users_id_fk" FOREIGN KEY ("inspector_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "production_lines" ADD CONSTRAINT "production_lines_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "products" ADD CONSTRAINT "products_brand_id_product_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."product_brands"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "raw_materials" ADD CONSTRAINT "raw_materials_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "shifts" ADD CONSTRAINT "shifts_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "production_lines" ADD CONSTRAINT "production_lines_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_brand_id_product_brands_id_fk" FOREIGN KEY ("brand_id") REFERENCES "public"."product_brands"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "raw_materials" ADD CONSTRAINT "raw_materials_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "shifts" ADD CONSTRAINT "shifts_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "stock_transactions" ADD CONSTRAINT "stock_transactions_material_id_raw_materials_id_fk" FOREIGN KEY ("material_id") REFERENCES "public"."raw_materials"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "stock_transactions" ADD CONSTRAINT "stock_transactions_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "stock_transactions" ADD CONSTRAINT "stock_transactions_factory_id_factories_id_fk" FOREIGN KEY ("factory_id") REFERENCES "public"."factories"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "operator_sessions" ADD CONSTRAINT "operator_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "operator_sessions" ADD CONSTRAINT "operator_sessions_line_id_production_lines_id_fk" FOREIGN KEY ("line_id") REFERENCES "public"."production_lines"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "operator_sessions" ADD CONSTRAINT "operator_sessions_shift_id_shifts_id_fk" FOREIGN KEY ("shift_id") REFERENCES "public"."shifts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -351,17 +390,29 @@ ALTER TABLE "operator_sessions" ADD CONSTRAINT "operator_sessions_factory_id_fac
 CREATE INDEX "idx_attendance_user_date" ON "attendance_logs" USING btree ("user_id","clock_in");--> statement-breakpoint
 CREATE INDEX "idx_attendance_sync_id" ON "attendance_logs" USING btree ("external_sync_id");--> statement-breakpoint
 CREATE INDEX "idx_role_permissions" ON "role_permissions" USING btree ("role_id","permission_id");--> statement-breakpoint
+CREATE INDEX "idx_user_lines" ON "user_lines" USING btree ("user_id","line_id");--> statement-breakpoint
 CREATE INDEX "idx_user_roles" ON "user_roles" USING btree ("user_id","role_id");--> statement-breakpoint
 CREATE INDEX "idx_users_username" ON "users" USING btree ("username");--> statement-breakpoint
 CREATE INDEX "idx_users_email" ON "users" USING btree ("email");--> statement-breakpoint
+CREATE INDEX "idx_snapshots_batch" ON "batch_snapshots" USING btree ("batch_id");--> statement-breakpoint
+CREATE INDEX "idx_changeover_batch" ON "changeover_logs" USING btree ("batch_id");--> statement-breakpoint
+CREATE INDEX "idx_changeover_line" ON "changeover_logs" USING btree ("line_id");--> statement-breakpoint
 CREATE INDEX "idx_material_flows_batch" ON "material_flows" USING btree ("batch_id");--> statement-breakpoint
 CREATE INDEX "idx_batches_line_status" ON "production_batches" USING btree ("line_id","status");--> statement-breakpoint
 CREATE INDEX "idx_batches_product" ON "production_batches" USING btree ("product_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_batches_code_global" ON "production_batches" USING btree ("batch_code");--> statement-breakpoint
+CREATE INDEX "idx_batches_factory" ON "production_batches" USING btree ("factory_id");--> statement-breakpoint
+CREATE INDEX "idx_dispatch_batch" ON "dispatch_logs" USING btree ("batch_id");--> statement-breakpoint
+CREATE INDEX "idx_dispatch_factory" ON "dispatch_logs" USING btree ("factory_id");--> statement-breakpoint
+CREATE INDEX "idx_packaging_batch" ON "packaging_logs" USING btree ("batch_id");--> statement-breakpoint
+CREATE INDEX "idx_packaging_factory" ON "packaging_logs" USING btree ("factory_id");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_batch" ON "production_logs" USING btree ("batch_id");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_brand_product" ON "production_logs" USING btree ("brand_id","product_id");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_line_shift" ON "production_logs" USING btree ("line_id","shift_id","brand_id","product_id");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_station" ON "production_logs" USING btree ("station");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_request" ON "production_logs" USING btree ("request_id");--> statement-breakpoint
 CREATE INDEX "idx_production_logs_date" ON "production_logs" USING btree ("logged_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_lines_name_factory" ON "production_lines" USING btree ("name","factory_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_shifts_name_factory" ON "shifts" USING btree ("name","factory_id");--> statement-breakpoint
 CREATE INDEX "idx_sessions_user" ON "operator_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_sessions_active" ON "operator_sessions" USING btree ("user_id","logout_time");

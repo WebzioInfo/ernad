@@ -13,7 +13,6 @@ import {
   DispatchLogDto 
 } from './dto/production-management.dto';
 
-
 @ApiTags('Production Management')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
@@ -31,14 +30,15 @@ export class ProductionManagementController {
       dto.brandId, 
       dto.productId, 
       dto.shiftId,
-      dto.createdBy || req.user.sub,
+      req.user.sub,
+      dto.batchCode,
       dto.remarks,
       dto.startTime
     );
   }
 
   @Post('qc')
-  @Permissions('production:start') // Managers can perform QC
+  @Permissions('production:start')
   @ApiOperation({ summary: 'Submit a quality check for a batch' })
   async submitQC(@Body() dto: QualityCheckDto) {
     return await this.productionService.submitQualityCheck(
@@ -46,7 +46,7 @@ export class ProductionManagementController {
       dto.batchId,
       dto.inspectorId,
       dto.result,
-      dto.parameters,
+      dto.parameters || {},
       dto.remarks
     );
   }
@@ -76,7 +76,7 @@ export class ProductionManagementController {
       dto.managerId,
       dto.destination,
       dto.quantity,
-      dto.vehicleNumber,
+      dto.vehicleNumber || '',
       dto.remarks
     );
   }
@@ -105,36 +105,6 @@ export class ProductionManagementController {
     return { success: true, message: 'Batch moved to QC_PENDING.' };
   }
 
-  @Get('active/:lineId')
-  @Permissions('production:start')
-  @ApiOperation({ summary: 'Get the active batch for a production line' })
-  async getActiveBatch(
-    @Param('lineId') lineId: string,
-    @Req() req: any,
-    @Query('factoryId') factoryId?: string
-  ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    return await this.productionService.getActiveBatchByLine(targetFactoryId, lineId);
-  }
-
-  @Post('historical')
-  @Permissions('production:start')
-  async createHistoricalBatch(@Body() dto: any) {
-    return await this.productionService.createHistoricalBatch(dto);
-  }
-
-  @Put('line/:lineId/reset')
-  @Permissions('production:close')
-  async forceResetLine(
-    @Param('lineId') lineId: string,
-    @Req() req: any,
-    @Query('factoryId') factoryId?: string
-  ) {
-    const targetFactoryId = factoryId || req.user.factoryId;
-    await this.productionService.forceResetLine(targetFactoryId, lineId);
-    return { success: true, message: 'Line forced to IDLE' };
-  }
-
   @Post('batch/:id/complete-changeover')
   @Permissions('production:close')
   async completeChangeover(
@@ -155,6 +125,13 @@ export class ProductionManagementController {
   ) {
     const targetFactoryId = factoryId || req.user.factoryId;
     return await this.productionService.toggleMaintenance(targetFactoryId, lineId, req.user.sub);
+  }
+
+  @Get('active/:lineId')
+  @Permissions('production:start')
+  @ApiOperation({ summary: 'Get active batch for a specific line' })
+  async getActiveBatch(@Param('lineId') lineId: string) {
+    return await this.productionService.getActiveBatch(lineId);
   }
 
   @Get('batches')

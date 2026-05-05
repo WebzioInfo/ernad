@@ -1,17 +1,6 @@
 import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
 import { factories, productionLines } from './master-data';
 
-export const userRoleEnum = pgEnum('user_role', [
-  'SUPER_ADMIN', 
-  'ADMIN', 
-  'MANAGER', 
-  'OPERATOR_BLOWING', 
-  'OPERATOR_FILLING', 
-  'OPERATOR_LABELING', 
-  'OPERATOR_PACKING',
-  'OPERATOR'
-]);
-
 // ── RBAC SYSTEM (Phase 3 Redesign) ──
 
 export const roles = pgTable('roles', {
@@ -52,7 +41,6 @@ export const users = pgTable('users', {
   operatorType: varchar('operator_type', { length: 50 }),
   isActive: boolean('is_active').default(true).notNull(),
   avatarUrl: varchar('avatar_url', { length: 255 }),
-  role: userRoleEnum('role').default('OPERATOR').notNull(),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

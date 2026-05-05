@@ -25,6 +25,7 @@ async function seed() {
     } else {
         const [newFactory] = await db.insert(factories).values({
             name: 'Nairobi Main Plant',
+            code: 'NB',
             location: 'Industrial Area, Nairobi',
             contactInfo: '+254 20 1234567'
         }).returning();

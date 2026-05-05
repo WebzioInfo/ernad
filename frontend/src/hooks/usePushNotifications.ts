@@ -24,12 +24,16 @@ export function usePushNotifications() {
       return;
     }
 
+    if (isOneSignalInitialized) return;
+
     const setupOneSignal = () => {
       // @ts-ignore
       window.OneSignalDeferred = window.OneSignalDeferred || [];
       // @ts-ignore
       window.OneSignalDeferred.push(async (OneSignal: any) => {
         console.log('[OneSignal] SDK Ready. Linking user:', currentUser.id);
+        
+        isOneSignalInitialized = true;
         
         // ── Step 1: Link user identity ──
         try {

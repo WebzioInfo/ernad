@@ -4,55 +4,57 @@ import {
   productionBatches, changeoverLogs, materialFlows, 
   productionLines, users, batchSnapshots, batchTotals,
   productionLogs, productBrands, products,
-  qualityChecks, packagingLogs, dispatchLogs
+  qualityChecks, packagingLogs, dispatchLogs, factories,
+  rawMaterials, stockTransactions
 } from '../db/schema';
-import { eq, and, sql, desc, isNull } from 'drizzle-orm';
+import { eq, and, sql, desc, isNull, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class ProductionManagementService {
   private readonly logger = new Logger(ProductionManagementService.name);
 
-  // Phase 4: Simple Role Helpers
-  private async getUser(userId: string) {
-    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-    return user;
-  }
-
-  async canPerformQC(userId: string) {
-    const user = await this.getUser(userId);
-    return user && ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(user.role);
-  }
-
-  async canStartBatch(userId: string) {
-    const user = await this.getUser(userId);
-    return user && ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(user.role);
-  }
-
-  async startBatch(factoryId: string, lineId: string, brandId: string, productId: string, shiftId: string, createdBy?: string, remarks?: string, startTime?: string) {
+  async startBatch(
+    factoryId: string, 
+    lineId: string, 
+    brandId: string, 
+    productId: string, 
+    shiftId: string, 
+    createdBy: string, 
+    batchCode?: string,
+    remarks?: string, 
+    startTime?: string
+  ) {
     return await db.transaction(async (tx) => {
-      // End any open changeover for this line
-      await tx.update(changeoverLogs)
-        .set({ endTime: new Date() })
-        .where(and(eq(changeoverLogs.lineId, lineId), isNull(changeoverLogs.endTime)));
+      // 1. Validate Factory
+      const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
+      if (!factory) throw new BadRequestException('Factory context not found.');
 
-      // Check if another batch is running on this line
-      const activeBatch = await tx.select().from(productionBatches)
-        .where(and(
-          eq(productionBatches.lineId, lineId), 
-          eq(productionBatches.factoryId, factoryId),
-          eq(productionBatches.status, 'RUNNING')
-        ))
-        .limit(1);
-
-      if (activeBatch.length > 0) {
-        throw new BadRequestException('A batch is already running on this line.');
+      // 2. Validate Line Status
+      const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+      if (!line) throw new BadRequestException('Line not found.');
+      if (line.status !== 'IDLE') {
+        throw new BadRequestException(`Cannot start production. Line is currently ${line.status}.`);
       }
 
-      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      const batchCode = `B-${dateStr}-${lineId.slice(0, 4).toUpperCase()}`;
+      // 3. Generate or Validate Batch Code
+      let finalBatchCode = batchCode;
+      if (!finalBatchCode) {
+        const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        // Sequence fetch (Simple count for now, can be improved with a sequence table)
+        const existingCount = await tx.select({ count: sql`count(*)` })
+          .from(productionBatches)
+          .where(and(eq(productionBatches.factoryId, factoryId), eq(productionBatches.productionDate, sql`CURRENT_DATE`)));
+        const seq = (Number(existingCount[0]?.count || 0) + 1).toString().padStart(3, '0');
+        finalBatchCode = `${factory.code}-${dateStr}-${seq}`;
+      } else {
+        // Enforce uniqueness manually if DB doesn't (though we added unique index)
+        const [existing] = await tx.select().from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
+        if (existing) throw new BadRequestException(`Batch code ${finalBatchCode} already exists.`);
+      }
 
-      const newBatch = await tx.insert(productionBatches).values({
-        batchCode,
+      // 4. Create Batch
+      const [newBatch] = await tx.insert(productionBatches).values({
+        batchCode: finalBatchCode,
         factoryId,
         lineId,
         brandId,
@@ -60,29 +62,96 @@ export class ProductionManagementService {
         shiftId,
         startTime: startTime ? new Date(startTime) : new Date(),
         status: 'RUNNING',
-        createdBy: createdBy,
-        remarks: remarks,
+        createdBy,
+        remarks,
       }).returning();
 
-      // Initialize Atomic Totals
+      // 5. Initialize Atomic Totals
       await tx.insert(batchTotals).values({
-        batchId: newBatch[0].id,
+        batchId: newBatch.id,
         factoryId,
-        lineId: lineId,
+        lineId,
         blowingTotal: 0,
         fillingTotal: 0,
         labelingTotal: 0,
         packingTotal: 0,
       });
 
-      this.logger.log(`[Factory: ${factoryId}] Started batch ${newBatch[0].id} on line ${lineId}`);
+      // 6. Update Line Status
       await tx.update(productionLines).set({ status: 'RUNNING' }).where(eq(productionLines.id, lineId));
-      
-      return newBatch[0];
+
+      this.logger.log(`[Factory: ${factoryId}] Started batch ${finalBatchCode} on line ${lineId}`);
+      return newBatch;
     });
   }
 
-  async submitQualityCheck(factoryId: string, batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: any, remarks?: string) {
+  async closeBatch(factoryId: string, batchId: string, reqUserId: string, remarks?: string) {
+    return await db.transaction(async (tx) => {
+      // 1. Get Batch and validate state
+      const [batch] = await tx.select().from(productionBatches)
+        .where(and(eq(productionBatches.id, batchId), eq(productionBatches.factoryId, factoryId)))
+        .limit(1);
+      
+      if (!batch) throw new BadRequestException('Batch not found.');
+      if (batch.status !== 'RUNNING' && batch.status !== 'CHANGEOVER') {
+        throw new BadRequestException(`Cannot close batch. Current status is ${batch.status}.`);
+      }
+
+      // 2. AUTOMATIC INVENTORY DEDUCTION (ERP Integration)
+      // Fetch material flows recorded for this batch
+      const flows = await tx.select().from(materialFlows).where(eq(materialFlows.batchId, batchId));
+      
+      for (const flow of flows) {
+        if (flow.used > 0 || flow.wasted > 0) {
+          const totalDeduction = flow.used + flow.wasted;
+          
+          // Find matching raw material (by name for now, in production use materialId)
+          const [material] = await tx.select().from(rawMaterials)
+            .where(and(eq(rawMaterials.name, flow.materialName), eq(rawMaterials.factoryId, factoryId)))
+            .limit(1);
+          
+          if (material) {
+            // Log Stock Transaction
+            await tx.insert(stockTransactions).values({
+              materialId: material.id,
+              factoryId,
+              type: 'OUT',
+              quantity: totalDeduction.toString(),
+              referenceId: batchId,
+              remarks: `Consumption for Batch ${batch.batchCode}`,
+              createdAt: new Date(),
+            });
+
+            // Update Current Stock
+            await tx.update(rawMaterials)
+              .set({ currentStock: sql`${rawMaterials.currentStock} - ${totalDeduction}` })
+              .where(eq(rawMaterials.id, material.id));
+          }
+        }
+      }
+
+      // 3. Update Batch Status
+      const [updatedBatch] = await tx.update(productionBatches)
+        .set({ 
+          status: 'QC_PENDING', 
+          endTime: new Date(), 
+          updatedBy: reqUserId,
+          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[CLOSE]: ' || ${remarks}` : productionBatches.remarks
+        })
+        .where(eq(productionBatches.id, batchId))
+        .returning();
+      
+      // 4. Update Line Status
+      await tx.update(productionLines)
+        .set({ status: 'IDLE' })
+        .where(eq(productionLines.id, batch.lineId));
+      
+      this.logger.log(`[Factory: ${factoryId}] Batch ${batch.batchCode} closed. Inventory updated.`);
+      return updatedBatch;
+    });
+  }
+
+  async submitQualityCheck(factoryId: string, batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
     return await db.transaction(async (tx) => {
       const check = await tx.insert(qualityChecks).values({
         batchId,
@@ -95,7 +164,7 @@ export class ProductionManagementService {
         checkedAt: new Date(),
       }).returning();
 
-      // If QC passed, we might move the batch to COMPLETED if it was closed
+      // If QC passed, we might move the batch to COMPLETED
       if (result === 'PASS') {
         await tx.update(productionBatches)
           .set({ status: 'COMPLETED' })
@@ -132,36 +201,12 @@ export class ProductionManagementService {
     }).returning();
   }
 
-  async closeBatch(factoryId: string, batchId: string, reqUserId?: string, remarks?: string) {
-    return await db.transaction(async (tx) => {
-      const [batch] = await tx.update(productionBatches)
-        .set({ 
-          status: 'QC_PENDING', 
-          endTime: new Date(), 
-          updatedBy: reqUserId,
-          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[CLOSE]: ' || ${remarks}` : productionBatches.remarks
-        })
-        .where(and(eq(productionBatches.id, batchId), eq(productionBatches.factoryId, factoryId)))
-        .returning();
-      
-      if (batch) {
-        await tx.update(productionLines)
-          .set({ status: 'IDLE' })
-          .where(eq(productionLines.id, batch.lineId));
-      }
-      
-      this.logger.log(`[Factory: ${factoryId}] Batch ${batchId} moved to QC_PENDING.`);
-      return batch;
-    });
-  }
-
-  async getActiveBatchByLine(factoryId: string, lineId: string) {
+  async getActiveBatchByLine(lineId: string, factoryId?: string) {
     const conditions = [
       eq(productionBatches.lineId, lineId),
       sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
     ];
 
-    // Only filter by factoryId if it's provided (Super Admins might have null factoryId)
     if (factoryId) {
       conditions.push(eq(productionBatches.factoryId, factoryId));
     }
@@ -185,10 +230,10 @@ export class ProductionManagementService {
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
       if (!batch) throw new BadRequestException('Batch not found');
+      if (batch.status !== 'RUNNING') throw new BadRequestException('Can only initiate changeover from RUNNING state.');
 
-      await tx.update(productionBatches).set({ status: 'CHANGEOVER', endTime: new Date() }).where(eq(productionBatches.id, batchId));
+      await tx.update(productionBatches).set({ status: 'CHANGEOVER' }).where(eq(productionBatches.id, batchId));
       
-      // Sync line status
       await tx.update(productionLines).set({ status: 'CHANGEOVER' }).where(eq(productionLines.id, batch.lineId));
 
       return await tx.insert(changeoverLogs).values({
@@ -206,28 +251,27 @@ export class ProductionManagementService {
 
   async completeChangeover(factoryId: string, batchId: string, userId: string) {
     return await db.transaction(async (tx) => {
-      // 1. Get the changeover log
       const [log] = await tx.select().from(changeoverLogs)
         .where(and(eq(changeoverLogs.batchId, batchId), isNull(changeoverLogs.endTime)))
         .limit(1);
       
-      if (!log) throw new BadRequestException('No active changeover found for this batch');
+      if (!log) throw new BadRequestException('No active changeover found.');
 
-      // 2. Mark changeover as complete
       await tx.update(changeoverLogs).set({ endTime: new Date() }).where(eq(changeoverLogs.id, log.id));
 
-      // 3. Mark old batch as CLOSED
-      await tx.update(productionBatches).set({ status: 'CLOSED' }).where(eq(productionBatches.id, batchId));
+      // Close the old batch completely (Skip QC_PENDING for intermediate changeover batches if needed, but here we move to CLOSED)
+      await tx.update(productionBatches).set({ status: 'CLOSED', endTime: new Date() }).where(eq(productionBatches.id, batchId));
 
-      // 4. Start NEW batch for the new product
-      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
-      const batchCode = `B-${dateStr}-${log.lineId.slice(0, 4).toUpperCase()}-CO`;
-
+      // Start NEW batch
       const [oldBatch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+      const [factory] = await tx.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
+
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const batchCode = `${factory.code}-${dateStr}-CO-${log.lineId.slice(0, 4).toUpperCase()}`;
 
       const [newBatch] = await tx.insert(productionBatches).values({
         batchCode,
-        factoryId: oldBatch.factoryId,
+        factoryId,
         lineId: log.lineId,
         brandId: oldBatch.brandId,
         productId: log.toProductId,
@@ -238,10 +282,9 @@ export class ProductionManagementService {
         remarks: `Auto-started after changeover from batch ${batchId}`,
       }).returning();
 
-      // 5. Initialize Totals
       await tx.insert(batchTotals).values({
         batchId: newBatch.id,
-        factoryId: oldBatch.factoryId,
+        factoryId,
         lineId: log.lineId,
         blowingTotal: 0,
         fillingTotal: 0,
@@ -249,7 +292,6 @@ export class ProductionManagementService {
         packingTotal: 0,
       });
 
-      // 6. Update Line Status back to RUNNING
       await tx.update(productionLines).set({ status: 'RUNNING' }).where(eq(productionLines.id, log.lineId));
 
       return newBatch;
@@ -261,45 +303,14 @@ export class ProductionManagementService {
      if (!line) throw new BadRequestException('Line not found');
 
      const newStatus = line.status === 'MAINTENANCE' ? 'IDLE' : 'MAINTENANCE';
-     
      if (newStatus === 'MAINTENANCE' && line.status === 'RUNNING') {
-        throw new BadRequestException('Cannot put a running line into maintenance. Stop production first.');
+        throw new BadRequestException('Stop production before maintenance.');
      }
 
      return await db.update(productionLines)
        .set({ status: newStatus, updatedAt: new Date() })
        .where(and(eq(productionLines.id, lineId), eq(productionLines.factoryId, factoryId)))
        .returning();
-  }
-
-  async forceResetLine(factoryId: string, lineId: string) {
-    await db.transaction(async (tx) => {
-      await tx.update(productionLines)
-        .set({ status: 'IDLE' })
-        .where(and(eq(productionLines.id, lineId), eq(productionLines.factoryId, factoryId)));
-      
-      await tx.update(productionBatches)
-        .set({ status: 'CLOSED', endTime: new Date() })
-        .where(and(
-          eq(productionBatches.lineId, lineId), 
-          eq(productionBatches.factoryId, factoryId),
-          sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
-        ));
-      
-      await tx.update(changeoverLogs)
-        .set({ endTime: new Date() })
-        .where(and(eq(changeoverLogs.lineId, lineId), isNull(changeoverLogs.endTime)));
-    });
-  }
-
-  async createHistoricalBatch(dto: any) {
-    // Simple implementation for backward compatibility
-    return await db.insert(productionBatches).values({
-      ...dto,
-      startTime: new Date(dto.startTime || Date.now()),
-      endTime: new Date(dto.endTime || Date.now()),
-      status: 'COMPLETED'
-    }).returning();
   }
 
   async getBatches(factoryId?: string, limit = 50) {
@@ -324,11 +335,6 @@ export class ProductionManagementService {
   }
 
   async getLifecycleLogs(factoryId?: string, type?: 'qc' | 'packaging' | 'dispatch') {
-    const conditions = [];
-    if (factoryId) {
-      conditions.push(eq(sql`factory_id`, factoryId)); // Generic column match for simplicity or specific per table
-    }
-
     if (type === 'qc') {
       const q = db.select().from(qualityChecks);
       if (factoryId) q.where(eq(qualityChecks.factoryId, factoryId));
@@ -343,5 +349,23 @@ export class ProductionManagementService {
       return await q.orderBy(desc(dispatchLogs.dispatchedAt)).limit(50);
     }
   }
-}
 
+  async getActiveBatch(lineId: string) {
+    const results = await db.select({
+      batch: productionBatches,
+      brand: productBrands,
+      product: products
+    })
+    .from(productionBatches)
+    .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+    .innerJoin(products, eq(productionBatches.productId, products.id))
+    .where(and(
+      eq(productionBatches.lineId, lineId),
+      inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
+    ))
+    .orderBy(desc(productionBatches.startTime))
+    .limit(1);
+
+    return results[0] || null;
+  }
+}
