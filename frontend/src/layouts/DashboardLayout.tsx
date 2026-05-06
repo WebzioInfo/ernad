@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   BarChart3, Settings, Users, Activity,
-  Package, LayoutDashboard, Bell, Search,
+  Package, Bell, Search,
   Menu, X, LogOut, Globe, Command,
-  UserCog, Sparkles, ClipboardList, ShieldCheck,
+  UserCog, Sparkles, ShieldCheck,
   History, LayoutDashboard, ClipboardCheck
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
