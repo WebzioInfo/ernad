@@ -21,6 +21,9 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
+      // 1. If no origin (e.g. mobile apps, curl), allow it
+      if (!origin) return callback(null, true);
+
       const allowedOrigins = [
         'https://ernad.vercel.app',
         'https://ernad-mes.vercel.app',
@@ -33,20 +36,19 @@ async function bootstrap() {
         frontendUrl.split(',').forEach(url => allowedOrigins.push(url.trim()));
       }
 
-      // Allow Vercel preview deployments and localhost
-      const isVercel = origin && origin.endsWith('.vercel.app');
-      const isLocal = !origin || allowedOrigins.includes(origin);
+      const isVercel = origin.endsWith('.vercel.app');
+      const isAllowed = allowedOrigins.includes(origin);
 
-      if (isVercel || isLocal) {
+      if (isVercel || isAllowed) {
         callback(null, true);
       } else {
-        console.warn(`[CORS] Blocked request from origin: ${origin}`);
+        console.warn(`[CORS] Blocked origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With, X-HTTP-Method-Override',
+    allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With, X-HTTP-Method-Override, x-vercel-protection-skip',
   });
 
   app.setGlobalPrefix('api', { exclude: ['/'] });

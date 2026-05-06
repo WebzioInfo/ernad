@@ -21,6 +21,9 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
+  // Bypass Vercel Deployment Protection if configured
+  config.headers['x-vercel-protection-skip'] = 'true';
+
   // GLOBAL LOGGER (Localhost only)
   if (window.location.hostname === 'localhost') {
     console.log(`%c[OUTGOING] ${config.method?.toUpperCase()} ${config.url}`, 'color: #3b82f6; font-weight: bold;', config.data || '');
