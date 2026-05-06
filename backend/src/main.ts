@@ -19,15 +19,28 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const origins = (process.env.FRONTEND_URL || 'https://ernad.vercel.app')
-    .split(',')
-    .map((url) => url.trim());
-
   app.enableCors({
-    origin: origins,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'https://ernad.vercel.app',
+        'https://ernad-mes.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:5173',
+      ];
+      
+      if (process.env.FRONTEND_URL) {
+        process.env.FRONTEND_URL.split(',').forEach(url => allowedOrigins.push(url.trim()));
+      }
+
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With, X-HTTP-Method-Override',
   });
 
   app.setGlobalPrefix('api', { exclude: ['/'] });
