@@ -46,14 +46,23 @@ export default function AttendanceRecordsPage() {
            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Personnel Attendance</h2>
            <p className="text-slate-500 font-medium">Daily clock-in/out records from biometric systems.</p>
         </div>
-        <button 
-           onClick={() => syncMutation.mutate()}
-           disabled={syncMutation.isPending}
-           className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50"
-        >
-           {syncMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-           Sync Biometrics
-        </button>
+        <div className="flex flex-col md:flex-row items-center gap-4">
+           <div className="flex items-center gap-4 px-6 py-4 bg-slate-50 border border-slate-100 rounded-3xl mr-4">
+              <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse" />
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest leading-none mb-1">eSSL Terminal Active</span>
+                 <span className="text-[9px] font-bold text-slate-400">IP: 192.168.1.201 • Port: 8081</span>
+              </div>
+           </div>
+           <button 
+              onClick={() => syncMutation.mutate()}
+              disabled={syncMutation.isPending}
+              className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 disabled:opacity-50"
+           >
+              {syncMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Sync Biometrics
+           </button>
+        </div>
       </div>
 
       {/* Stats Cards */}

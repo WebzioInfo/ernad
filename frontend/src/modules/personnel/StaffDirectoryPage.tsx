@@ -51,10 +51,13 @@ export default function StaffDirectoryPage() {
             <p className="text-slate-500 font-medium">Manage and view all personnel across factory stations.</p>
           </div>
         </div>
-        <button className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100">
-          <UserPlus className="w-4 h-4" />
-          Register Staff
-        </button>
+        <div className="flex flex-col items-end gap-2 text-right">
+          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 border border-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-[9px]">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            eSSL Biometric Active
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 max-w-[200px]">Registration handled directly via biometric terminal hardware.</p>
+        </div>
       </div>
 
       {/* Filters & Search */}
