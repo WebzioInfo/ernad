@@ -66,7 +66,10 @@ async function bootstrap() {
       'X-Requested-With', 
       'X-HTTP-Method-Override', 
       'x-vercel-protection-skip',
-      'x-mes-client-id'
+      'x-mes-request-id',
+      'x-mes-client-id',
+      'x-request-id',
+      'x-correlation-id'
     ],
     preflightContinue: false,
     optionsSuccessStatus: 204,
