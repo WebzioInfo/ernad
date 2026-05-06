@@ -4,7 +4,7 @@ import { api } from '../../api';
 import {
   Users, UserPlus, Search,
   Trash2, Edit2, UserCheck,
-  Mail, Fingerprint,
+  Mail, 
   Lock, Unlock, BadgeCheck,
   ShieldCheck, ShieldAlert, UserCog,
   Filter, XCircle
