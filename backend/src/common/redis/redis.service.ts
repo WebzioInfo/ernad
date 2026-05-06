@@ -32,18 +32,28 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
+      const isRemote = redisHost && !isLocalhost;
+      const useTls = isRemote || (redisUrl && (redisUrl.startsWith('rediss://') || !redisUrl.includes('localhost')));
+
       const options = redisUrl ? redisUrl : {
         host: redisHost || '127.0.0.1',
         port: Number(this.configService.get('REDIS_PORT')) || 6379,
+        password: this.configService.get('REDIS_PASSWORD'),
+        tls: useTls ? {} : undefined,
       };
 
       this.client = new Redis(options as any, {
         lazyConnect: true,
         maxRetriesPerRequest: 0,
-        connectTimeout: 5000,
+        connectTimeout: 10000, // Increased for remote cloud connection
+        disconnectTimeout: 2000,
+        commandTimeout: 5000,
         retryStrategy: (times) => {
-          if (times > 3) return null; // Stop retrying after 3 attempts
-          return Math.min(times * 100, 2000);
+          if (times > 3) {
+            this.logger.warn(`Redis retry limit reached (${times}). Switching to fallback.`);
+            return null;
+          }
+          return Math.min(times * 200, 2000);
         }
       });
 

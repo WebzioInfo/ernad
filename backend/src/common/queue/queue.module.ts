@@ -17,10 +17,16 @@ const redisIsConfigured = !!(redisHost || redisUrl) && !(isProduction && isLocal
           inject: [ConfigService],
           useFactory: (configService: ConfigService) => {
             const url = configService.get('REDIS_URL');
+            const host = configService.get('REDIS_HOST');
+            const isLocal = host === 'localhost' || host === '127.0.0.1';
+            const useTls = (host && !isLocal) || (url && url.startsWith('rediss://'));
+
             return {
               connection: url ? url : {
-                host: configService.get('REDIS_HOST') || '127.0.0.1',
+                host: host || '127.0.0.1',
                 port: configService.get('REDIS_PORT') || 6379,
+                password: configService.get('REDIS_PASSWORD'),
+                tls: useTls ? {} : undefined,
                 maxRetriesPerRequest: null,
                 enableReadyCheck: false,
                 offlineQueue: true,
