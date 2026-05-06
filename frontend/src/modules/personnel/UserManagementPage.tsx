@@ -369,27 +369,39 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { 
                  </div>
               </div>
 
-              <div className="flex flex-wrap gap-4 w-full">
+              <div className="flex flex-wrap gap-4 w-full mb-8">
                  <button 
                    onClick={onToggleActive}
-                   className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 ${
-                    user.isActive ? 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white shadow-lg shadow-rose-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100'
+                   className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${
+                    user.isActive 
+                      ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600' 
+                      : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
                    }`}
                  >
                    {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                    {user.isActive ? 'Suspend User' : 'Restore User'}
                  </button>
-                 <button onClick={onEdit} className="flex-1 py-5 bg-indigo-50 text-indigo-600 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-600 hover:text-white transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                 <button onClick={onEdit} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
                     <Edit2 className="w-4 h-4" /> Modify Profile
                  </button>
               </div>
 
-              <button 
-                onClick={onDelete}
-                className="mt-8 text-[10px] font-black text-slate-300 hover:text-rose-500 uppercase tracking-widest transition-colors flex items-center gap-2"
-              >
-                 <Trash2 className="w-3 h-3" /> Terminate Account
-              </button>
+              {/* Danger Zone */}
+              <div className="w-full pt-8 border-t border-slate-100">
+                <div className="flex items-center justify-between bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50 group/danger">
+                  <div className="text-left">
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Danger Zone</p>
+                    <p className="text-[11px] font-bold text-slate-500">Permanently remove this user and all associated data.</p>
+                  </div>
+                  <button 
+                    onClick={onDelete}
+                    className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border border-rose-100 flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Account
+                  </button>
+                </div>
+              </div>
            </div>
         </div>
       </div>
