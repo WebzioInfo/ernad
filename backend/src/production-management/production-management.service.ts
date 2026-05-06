@@ -5,7 +5,8 @@ import {
   productionLines, users, batchSnapshots, batchTotals,
   productionLogs, productBrands, products,
   qualityChecks, packagingLogs, dispatchLogs, factories,
-  rawMaterials, stockTransactions, operatorSessions
+  rawMaterials, stockTransactions, operatorSessions,
+  roles, userRoles
 } from '../db/schema';
 import { eq, and, sql, desc, isNull, inArray } from 'drizzle-orm';
 
@@ -115,8 +116,12 @@ export class ProductionManagementService {
       const flows = await tx.select().from(materialFlows).where(eq(materialFlows.batchId, batchId));
       
       // Fetch closer's role for bypass logic
-      const [closer] = await tx.select({ roles: users.roles }).from(users).where(eq(users.id, reqUserId)).limit(1);
-      const isSuperAdmin = closer?.roles?.includes('SUPER_ADMIN');
+      const closerRoles = await tx.select({ slug: roles.slug })
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id))
+        .where(eq(userRoles.userId, reqUserId));
+      
+      const isSuperAdmin = closerRoles.some(r => r.slug === 'SUPER_ADMIN');
 
       for (const flow of flows) {
         if (flow.used > 0 || flow.wasted > 0) {

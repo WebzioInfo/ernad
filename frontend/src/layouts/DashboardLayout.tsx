@@ -56,17 +56,25 @@ export default function DashboardLayout() {
     { id: 'overview', label: 'Overview', icon: Globe, path: '/admin/overview' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
     { id: 'production', label: 'Lines', icon: Activity, path: '/admin/production' },
+    { id: 'quality', label: 'Quality', icon: Bell, path: '/admin/quality' },
+    { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
     { id: 'users', label: 'Users', icon: ShieldCheck, path: '/admin/users' },
-    { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
+    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
+    { id: 'attendance', label: 'Attendance', icon: ClipboardList, path: '/admin/attendance' },
+    { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
     { id: 'audit', label: 'Logs', icon: ClipboardList, path: '/admin/audit' },
+    { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
   const ADMIN_MENU = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/admin/overview' },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
     { id: 'production', label: 'Production', icon: Activity, path: '/admin/production' },
     { id: 'quality', label: 'Quality', icon: Bell, path: '/admin/quality' },
     { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
     { id: 'users', label: 'Users', icon: UserCog, path: '/admin/users' },
+    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
+    { id: 'attendance', label: 'Attendance', icon: ClipboardList, path: '/admin/attendance' },
     { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
@@ -74,8 +82,11 @@ export default function DashboardLayout() {
   const MANAGER_MENU = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/manager/overview' },
     { id: 'production', label: 'Production', icon: Activity, path: '/manager/production' },
+    { id: 'quality', label: 'Quality', icon: Bell, path: '/manager/quality' },
     { id: 'inventory', label: 'Inventory', icon: Package, path: '/manager/inventory' },
     { id: 'users', label: 'Users', icon: Users, path: '/manager/users' },
+    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/manager/staffs' },
+    { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/manager/ai-advices', isComingSoon: true },
   ];
 
   const getMenuItems = () => {
@@ -132,9 +143,12 @@ export default function DashboardLayout() {
                   <>
                     <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
                     {isSidebarOpen && (
-                      <span className="ml-4 font-bold text-sm tracking-tight truncate animate-in fade-in slide-in-from-left-2">{item.label}</span>
+                      <span className="ml-4 font-bold text-sm tracking-tight truncate animate-in fade-in slide-in-from-left-2 flex-1">{item.label}</span>
                     )}
-                    {isActive && isSidebarOpen && (
+                    {item.isComingSoon && isSidebarOpen && (
+                      <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
+                    )}
+                    {isActive && isSidebarOpen && !item.isComingSoon && (
                       <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full flex-shrink-0" />
                     )}
                   </>
