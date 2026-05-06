@@ -23,7 +23,7 @@ import SmartRedirect from './components/SmartRedirect';
 import ComingSoonPage from './components/common/ComingSoonPage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { usePushNotifications } from './hooks/usePushNotifications';
-import { ShieldCheck, UserCircle, Settings, LogOut, ChevronRight, Menu, Bell, Search, Activity, Package, Truck, LayoutDashboard, Clock, Sparkle, Sparkles } from 'lucide-react';
+import { Sparkle, Sparkles } from 'lucide-react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
