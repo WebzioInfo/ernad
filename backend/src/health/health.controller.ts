@@ -4,10 +4,14 @@ import { db } from '../db/db';
 import { sql } from 'drizzle-orm';
 import * as os from 'os';
 
+import { RedisService } from '../common/redis/redis.service';
+
 @ApiTags('Health Check')
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
+
+  constructor(private readonly redisService: RedisService) {}
 
   @Get()
   @ApiOperation({ summary: 'Check system health, database connection, and resource usage' })
@@ -43,8 +47,16 @@ export class HealthController {
       this.logger.error(`Health check failed: ${healthStatus.database.message}`);
     }
 
-    // Checking RMS (assuming Redis / RAM) - RAM is already included. 
-    // If Redis is configured, we could check it here.
+    // Check Redis & Cache Status
+    if (this.redisService) {
+      const isAvailable = this.redisService.getAvailability();
+      (healthStatus as any).cache = {
+        type: isAvailable ? 'REDIS' : 'MEMORY_FALLBACK',
+        status: isAvailable ? 'CONNECTED' : 'DEGRADED',
+        available: true 
+      };
+      if (!isAvailable) healthStatus.status = 'DEGRADED';
+    }
 
     return healthStatus;
   }

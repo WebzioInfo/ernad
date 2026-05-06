@@ -64,7 +64,7 @@ export class OperatorSessionService {
     }).returning();
 
     // 5. Cache in Redis (Fast Validation)
-    await this.redis.getClient()?.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
+    await this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
 
     return session;
   }
@@ -90,14 +90,14 @@ export class OperatorSessionService {
       .returning();
 
     // Invalidate Cache
-    await this.redis.getClient()?.del(`operator_session:${userId}`);
+    await this.redis.del(`operator_session:${userId}`);
 
     return session;
   }
 
   async getCurrentSession(userId: string) {
     // Try cache first
-    const cached = await this.redis.getClient()?.get(`operator_session:${userId}`);
+    const cached = await this.redis.get(`operator_session:${userId}`);
     if (cached) return JSON.parse(cached);
 
     const [session] = await db.select().from(operatorSessions)
@@ -108,7 +108,7 @@ export class OperatorSessionService {
       .limit(1);
 
     if (session) {
-      await this.redis.getClient()?.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
+      await this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
     }
 
     return session || null;
@@ -153,7 +153,7 @@ export class OperatorSessionService {
 
     // Update Cache
     session.lastActivityAt = new Date();
-    await this.redis.getClient()?.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
+    await this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
   }
 
   async cleanupStaleSessions() {
