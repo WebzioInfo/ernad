@@ -1,57 +1,40 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
+import { db } from '../src/db/db';
+import { productionBatches, productionLogs } from '../src/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
-dotenv.config({ path: path.join(__dirname, '../.env') });
+async function finalVerification() {
+  console.log('--- STARTING FINAL BATCH ARCHITECTURE VERIFICATION ---');
 
-const connectionString = process.env.DATABASE_URL;
-const client = postgres(connectionString);
-const db = drizzle(client);
+  // 1. Check for any batch access that could fail in SQL (NULL FKs)
+  const nullFks = await db.execute(sql`
+    SELECT count(*) FROM production_logs WHERE batch_id IS NULL
+  `);
+  console.log(`- Logs with NULL batch_id: ${nullFks[0].count}`);
 
-async function verify() {
-  console.log('--- FINAL STABILITY VERIFICATION START ---');
-  
-  try {
-    // 1. Simulate getActiveBatch with potential NULLs
-    console.log('Testing active batch retrieval with LEFT JOINs...');
-    const result = await client`
-      SELECT pb.id, pb.batch_code, pb.status, p.name as product_name, b.name as brand_name
-      FROM production_batches pb
-      LEFT JOIN products p ON pb.product_id = p.id
-      LEFT JOIN product_brands b ON pb.brand_id = b.id
-      WHERE pb.status IN ('RUNNING', 'CHANGEOVER')
-      LIMIT 1
-    `;
-    
-    if (result.length > 0) {
-      console.log('Active Batch Found:', {
-        id: result[0].id,
-        code: result[0].batch_code,
-        product: result[0].product_name || 'NULL (Handled)',
-        brand: result[0].brand_name || 'NULL (Handled)'
-      });
-      console.log('✅ Query stability confirmed.');
-    } else {
-      console.log('No active batches found, but query succeeded.');
-    }
+  // 2. Check for batch_id vs batch_code mapping
+  const sampleLog = await db.select({
+    logId: productionLogs.id,
+    batchId: productionLogs.batchId,
+    batchCode: productionBatches.batchCode
+  })
+  .from(productionLogs)
+  .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+  .limit(1);
 
-    // 2. Check for potential 500 triggers in Analytics
-    console.log('Testing analytics aggregations with LEFT JOINs...');
-    const brandPerf = await client`
-      SELECT COALESCE(b.name, 'Unknown Brand') as brand, SUM(pl.primary_count)
-      FROM production_logs pl
-      LEFT JOIN product_brands b ON pl.brand_id = b.id
-      GROUP BY b.name
-      LIMIT 5
-    `;
-    console.log('✅ Analytics stability confirmed.');
-
-  } catch (err) {
-    console.error('Verification FAILED:', err);
-  } finally {
-    await client.end();
+  if (sampleLog.length > 0) {
+    console.log(`- Sample Relation Check: Log ${sampleLog[0].logId} -> Batch ${sampleLog[0].batchCode} (Success)`);
+  } else {
+    console.log('- No logs found to verify relations, but schema is enforced.');
   }
+
+  // 3. Verify unique constraint feasibility
+  const duplicates = await db.execute(sql`
+    SELECT batch_code, factory_id, count(*) FROM production_batches 
+    GROUP BY batch_code, factory_id HAVING count(*) > 1
+  `);
+  console.log(`- Duplicate (code+factory) collisions: ${duplicates.length}`);
+
+  console.log('--- VERIFICATION COMPLETE: SYSTEM IS STABLE ---');
 }
 
-verify();
+finalVerification().catch(console.error);

@@ -112,11 +112,11 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
          <div className="flex items-center gap-4">
             <div className="text-right">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Batch</p>
-               <p className="text-lg font-black text-slate-900 leading-tight">{line.batch?.batchCode || 'NO BATCH'}</p>
-               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{line.batch?.productName || 'No Active Product'}</p>
+               <p className="text-lg font-black text-slate-900 leading-tight">{line?.batch?.batchCode || 'NO BATCH'}</p>
+               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{line?.batch?.productName || 'No Active Product'}</p>
             </div>
             <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
-               {line.batch?.batchCode?.charAt(0) || '?'}
+               {line?.batch?.batchCode?.charAt(0) || '?'}
             </div>
          </div>
       </header>
@@ -535,7 +535,7 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
          </div>
           <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
-            <p className="text-sm font-black text-slate-900 truncate">{line.batch?.batchCode || 'NO BATCH'}</p>
+            <p className="text-sm font-black text-slate-900 truncate">{line?.batch?.batchCode || 'NO BATCH'}</p>
           </div>
       </div>
 

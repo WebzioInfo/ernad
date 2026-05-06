@@ -36,31 +36,31 @@ export function BatchTrackingView() {
         </thead>
         <tbody className="divide-y divide-slate-50">
           {batches?.map((item: any) => (
-            <tr key={item.batch.id} className="hover:bg-slate-50/50 transition-colors group">
+            <tr key={item?.batch?.id || Math.random()} className="hover:bg-slate-50/50 transition-colors group">
               <td className="px-8 py-6">
                 <div className="flex flex-col">
-                  <span className="text-sm font-black text-slate-900">{item.batch.batchCode || 'N/A'}</span>
-                  <span className="text-xs font-medium text-slate-500">{item.brand.name} - {item.product.name}</span>
+                  <span className="text-sm font-black text-slate-900">{item?.batch?.batchCode || 'N/A'}</span>
+                  <span className="text-xs font-medium text-slate-500">{item?.brand?.name || 'N/A'} - {item?.product?.name || 'N/A'}</span>
                 </div>
               </td>
-              <td className="px-8 py-6 text-sm font-bold text-slate-700">{item.line.name}</td>
+              <td className="px-8 py-6 text-sm font-bold text-slate-700">{item?.line?.name || 'N/A'}</td>
               <td className="px-8 py-6">
                 <span className={`
                   px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest
-                  ${item.batch.status === 'RUNNING' ? 'bg-emerald-50 text-emerald-600' : 
-                    item.batch.status === 'QC_PENDING' ? 'bg-amber-50 text-amber-600' :
-                    item.batch.status === 'COMPLETED' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}
+                  ${item?.batch?.status === 'RUNNING' ? 'bg-emerald-50 text-emerald-600' : 
+                    item?.batch?.status === 'QC_PENDING' ? 'bg-amber-50 text-amber-600' :
+                    item?.batch?.status === 'COMPLETED' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}
                 `}>
-                  {item.batch.status}
+                  {item?.batch?.status || 'UNKNOWN'}
                 </span>
               </td>
               <td className="px-8 py-6">
                 <div className="flex flex-col gap-1 text-[11px] font-medium text-slate-400">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3" />
-                    {format(new Date(item.batch.startTime), 'MMM d, HH:mm')}
+                    {item?.batch?.startTime ? format(new Date(item.batch.startTime), 'MMM d, HH:mm') : 'N/A'}
                   </div>
-                  {item.batch.endTime && (
+                  {item?.batch?.endTime && (
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <CheckCircle2 className="w-3 h-3 text-indigo-500" />
                       {format(new Date(item.batch.endTime), 'MMM d, HH:mm')}
@@ -101,7 +101,7 @@ export function QualityCheckView() {
             </div>
           </div>
           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-slate-100">
-            Batch Reference: {log.batchId.slice(0, 8)}
+            Batch Reference: {log?.batchId?.slice(0, 8) || 'N/A'}
           </div>
         </div>
       ))}

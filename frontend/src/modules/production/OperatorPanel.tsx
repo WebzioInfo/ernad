@@ -200,23 +200,23 @@ export default function OperatorPanel() {
                 </div>
               </div>
             )}
-            {/* Context Header */}
-            <div className="col-span-12 bg-white/5 p-4 rounded-2xl flex justify-between items-center border border-white/10 mb-2">
-              <div className="flex gap-6">
-                <div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Brand</span>
-                  <span className="text-sm font-bold text-blue-400">{activeBatch.brand?.name || 'KENBY'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Product SKU</span>
-                  <span className="text-sm font-bold text-blue-400">{activeBatch.product?.name || '500ml Water'}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Batch</span>
-                  <span className="text-sm font-mono text-white">{activeBatch.batchCode}</span>
-                </div>
-              </div>
-            </div>
+      {/* Context Header */}
+      <div className="col-span-12 bg-white/5 p-4 rounded-2xl flex justify-between items-center border border-white/10 mb-2">
+        <div className="flex gap-6">
+          <div>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Brand</span>
+            <span className="text-sm font-bold text-blue-400">{activeBatch?.brand?.name || activeBatch?.brandName || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Product SKU</span>
+            <span className="text-sm font-bold text-blue-400">{activeBatch?.product?.name || activeBatch?.productName || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Batch</span>
+            <span className="text-sm font-mono text-white">{activeBatch?.batchCode || 'N/A'}</span>
+          </div>
+        </div>
+      </div>
 
             {/* Main Logging Section */}
             <div className="col-span-8 flex flex-col gap-6">

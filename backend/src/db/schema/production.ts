@@ -22,12 +22,14 @@ export const productionBatches = pgTable('production_batches', {
   materialReturn: jsonb('material_return'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
 }, (table) => {
   return [
     index('idx_batches_line_status').on(table.lineId, table.status),
     index('idx_batches_product').on(table.productId),
-    uniqueIndex('idx_batches_code_global').on(table.batchCode),
+    uniqueIndex('idx_batches_code_factory').on(table.batchCode, table.factoryId),
     index('idx_batches_factory').on(table.factoryId),
+    index('idx_batches_deleted').on(table.deletedAt),
   ];
 });
 
