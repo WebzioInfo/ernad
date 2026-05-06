@@ -1,5 +1,20 @@
 {
+  "version": 2,
+  "cleanUrls": true,
+  "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "http://localhost:4000/api/$1" },
+    { "source": "/((?!assets/|favicon.ico|OneSignalSDKWorker.js|site.webmanifest|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.css|.*\\.js).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
   ]
 }

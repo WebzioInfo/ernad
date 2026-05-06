@@ -5,6 +5,12 @@ import { ApiExcludeController } from '@nestjs/swagger';
 @Controller()
 export class AppController {
   @Get()
-  @Redirect('/api/docs', 302)
-  root() {}
+  root() {
+    return {
+      status: 'online',
+      message: 'Ernad MES API is operational',
+      timestamp: new Date().toISOString(),
+      docs: '/api/docs'
+    };
+  }
 }

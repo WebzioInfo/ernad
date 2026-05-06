@@ -3,9 +3,15 @@ import useAuthStore from './store/useAuthStore';
 import { toast } from 'sonner';
 
 const getBaseURL = () => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  if (window.location.hostname === 'localhost') return 'http://localhost:4000/api';
-  // Default to relative /api which works if front and back are on same domain or proxied
+  const url = import.meta.env.VITE_API_URL;
+  if (url) return url;
+  
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:4000/api';
+  }
+  
+  // Production Safety Warning
+  console.error('%c[FATAL] VITE_API_URL is missing in production environment.', 'color: white; background: red; padding: 4px; font-weight: bold;');
   return '/api';
 };
 

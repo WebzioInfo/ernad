@@ -28,13 +28,19 @@ async function bootstrap() {
         'http://localhost:5173',
       ];
       
-      if (process.env.FRONTEND_URL) {
-        process.env.FRONTEND_URL.split(',').forEach(url => allowedOrigins.push(url.trim()));
+      const frontendUrl = process.env.FRONTEND_URL;
+      if (frontendUrl) {
+        frontendUrl.split(',').forEach(url => allowedOrigins.push(url.trim()));
       }
 
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      // Allow Vercel preview deployments and localhost
+      const isVercel = origin && origin.endsWith('.vercel.app');
+      const isLocal = !origin || allowedOrigins.includes(origin);
+
+      if (isVercel || isLocal) {
         callback(null, true);
       } else {
+        console.warn(`[CORS] Blocked request from origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
