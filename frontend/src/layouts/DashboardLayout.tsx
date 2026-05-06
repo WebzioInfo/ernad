@@ -4,7 +4,7 @@ import {
   Package, Bell, Search,
   Menu, X, LogOut, Globe, Command,
   UserCog, Sparkles, ShieldCheck,
-  History, LayoutDashboard, ClipboardCheck
+  History, ClipboardCheck
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
