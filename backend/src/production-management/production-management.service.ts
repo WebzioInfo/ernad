@@ -114,6 +114,10 @@ export class ProductionManagementService {
       // 2. AUTOMATIC INVENTORY DEDUCTION (ERP Integration)
       const flows = await tx.select().from(materialFlows).where(eq(materialFlows.batchId, batchId));
       
+      // Fetch closer's role for bypass logic
+      const [closer] = await tx.select({ roles: users.roles }).from(users).where(eq(users.id, reqUserId)).limit(1);
+      const isSuperAdmin = closer?.roles?.includes('SUPER_ADMIN');
+
       for (const flow of flows) {
         if (flow.used > 0 || flow.wasted > 0) {
           const totalDeduction = flow.used + flow.wasted;
@@ -123,10 +127,13 @@ export class ProductionManagementService {
             .for('update');
           
           if (material) {
-            // Enterprise Hardening: Block negative stock
             const current = Number(material.currentStock);
             if (current < totalDeduction) {
-              throw new BadRequestException(`Insufficient inventory for ${material.name}. Available: ${current}, Required: ${totalDeduction}`);
+              if (isSuperAdmin) {
+                this.logger.warn(`[CORS/Inventory Bypass] SuperAdmin ${reqUserId} forced close despite inventory shortage for ${material.name}. Required: ${totalDeduction}, Available: ${current}`);
+              } else {
+                throw new BadRequestException(`Insufficient inventory for ${material.name}. Available: ${current}, Required: ${totalDeduction}`);
+              }
             }
 
             await tx.insert(stockTransactions).values({
@@ -135,7 +142,7 @@ export class ProductionManagementService {
               type: 'OUT',
               quantity: totalDeduction.toString(),
               referenceId: batchId,
-              remarks: `Consumption for Batch ${batch.batchCode}`,
+              remarks: `Consumption for Batch ${batch.batchCode}${isSuperAdmin ? ' (Forced by Admin)' : ''}`,
               createdAt: new Date(),
             });
 

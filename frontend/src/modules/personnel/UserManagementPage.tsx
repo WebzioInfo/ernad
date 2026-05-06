@@ -34,6 +34,7 @@ export default function UserManagementPage() {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery<User[]>({
@@ -46,6 +47,10 @@ export default function UserManagementPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('User status updated');
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || error.message;
+      toast.error(`Status update failed: ${Array.isArray(msg) ? msg[0] : msg}`);
     }
   });
 
@@ -53,7 +58,12 @@ export default function UserManagementPage() {
     mutationFn: (id: string) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleteConfirmation({ isOpen: false, userId: '', userName: '' });
       toast.success('User deleted successfully');
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || error.message;
+      toast.error(`Deletion failed: ${Array.isArray(msg) ? msg[0] : msg}`);
     }
   });
 
@@ -178,12 +188,29 @@ export default function UserManagementPage() {
           <UserCard
             key={user.id}
             user={user}
-            onEdit={() => setEditingUser(user)}
-            onToggleActive={() => toggleActiveMutation.mutate(user.id)}
-            onDelete={() => setDeleteConfirmation({ isOpen: true, userId: user.id, userName: user.name })}
+            onOpen={() => setViewingUser(user)}
           />
         ))}
       </div>
+
+      {viewingUser && (
+        <UserDetailModal
+          user={viewingUser}
+          onClose={() => setViewingUser(null)}
+          onEdit={() => {
+            setEditingUser(viewingUser);
+            setViewingUser(null);
+          }}
+          onToggleActive={() => {
+            toggleActiveMutation.mutate(viewingUser.id);
+            setViewingUser(null);
+          }}
+          onDelete={() => {
+            setDeleteConfirmation({ isOpen: true, userId: viewingUser.id, userName: viewingUser.name });
+            setViewingUser(null);
+          }}
+        />
+      )}
 
       {(isAddModalOpen || editingUser) && (
         <UserFormModal 
@@ -198,7 +225,7 @@ export default function UserManagementPage() {
   );
 }
 
-function UserCard({ user, onEdit, onToggleActive, onDelete }: { user: User, onEdit: () => void, onToggleActive: () => void, onDelete: () => void }) {
+function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
   const getRoleStyle = (role: string) => {
     switch (role) {
       case 'SUPER_ADMIN': return { icon: <ShieldCheck />, color: 'from-purple-500 to-indigo-600', bg: 'bg-purple-50 text-purple-700' };
@@ -209,7 +236,10 @@ function UserCard({ user, onEdit, onToggleActive, onDelete }: { user: User, onEd
   };
 
   return (
-    <div className="glass rounded-[3rem] p-8 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 transition-all duration-500 group relative overflow-hidden flex flex-col h-full">
+    <div 
+      onClick={onOpen}
+      className="glass rounded-[3rem] p-8 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 cursor-pointer transition-all duration-500 group relative overflow-hidden flex flex-col h-full"
+    >
       {/* Background Accent */}
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${getRoleStyle(user.roles[0]).color} opacity-[0.03] rounded-full translate-x-10 -translate-y-10 group-hover:opacity-[0.07] transition-opacity duration-700`} />
       
@@ -244,15 +274,6 @@ function UserCard({ user, onEdit, onToggleActive, onDelete }: { user: User, onEd
               })}
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-col gap-2 opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 relative z-10">
-          <button onClick={onEdit} className="p-3 bg-white/80 hover:bg-white text-slate-400 hover:text-indigo-600 rounded-2xl shadow-sm border border-slate-50 transition-all active:scale-90">
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button onClick={onDelete} className="p-3 bg-white/80 hover:bg-white text-slate-400 hover:text-rose-600 rounded-2xl shadow-sm border border-slate-50 transition-all active:scale-90">
-            <Trash2 className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -295,21 +316,82 @@ function UserCard({ user, onEdit, onToggleActive, onDelete }: { user: User, onEd
       </div>
 
       <div className="pt-6 border-t border-slate-100/50 flex items-center justify-between mt-auto relative z-10">
-        <button
-          onClick={onToggleActive}
-          className={`flex items-center gap-3 px-6 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${user.isActive
-            ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 hover:shadow-lg hover:shadow-rose-100/50 border border-rose-100'
-            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:shadow-lg hover:shadow-emerald-100/50 border border-emerald-100'
-            }`}
-        >
-          {user.isActive ? <XCircle className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-          {user.isActive ? 'Block' : 'Unblock'}
-        </button>
+        <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl ${user.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+          {user.isActive ? 'Active Member' : 'System Blocked'}
+        </span>
+        <div className="flex items-center gap-2 text-indigo-600 text-[10px] font-black uppercase tracking-widest group-hover:translate-x-2 transition-transform">
+          Manage <BadgeCheck className="w-4 h-4" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        <button className="flex items-center gap-3 px-6 py-3 glass hover:bg-white text-slate-600 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all border-none">
-          <Fingerprint className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-          Access
-        </button>
+function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
+        <div className="p-12 text-center relative overflow-hidden">
+           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-50 to-transparent" />
+           <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all z-10">
+              <X className="w-6 h-6" />
+           </button>
+
+           <div className="relative z-10 flex flex-col items-center">
+              <div className="relative mb-6">
+                <div className="w-32 h-32 rounded-[2.5rem] bg-white shadow-2xl overflow-hidden border-4 border-white">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
+                  ) : (
+                    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
+                      <Users className="w-16 h-16" />
+                    </div>
+                  )}
+                </div>
+                <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                   {user.isActive ? <Unlock className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4 text-white" />}
+                </div>
+              </div>
+
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{user.name}</h3>
+              <p className="text-slate-500 font-bold mb-8">@{user.username} • {user.jobTitle || 'System User'}</p>
+
+              <div className="grid grid-cols-2 gap-4 w-full mb-10">
+                 <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Department</p>
+                    <p className="text-sm font-black text-slate-700">{user.department || 'Not Assigned'}</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Roles</p>
+                    <div className="flex flex-wrap gap-1">
+                      {user.roles.map(r => <span key={r} className="text-[9px] font-black text-indigo-600">{r}</span>)}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 w-full">
+                 <button 
+                   onClick={onToggleActive}
+                   className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 ${
+                    user.isActive ? 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white shadow-lg shadow-rose-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white shadow-lg shadow-emerald-100'
+                   }`}
+                 >
+                   {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                   {user.isActive ? 'Suspend User' : 'Restore User'}
+                 </button>
+                 <button onClick={onEdit} className="flex-1 py-5 bg-indigo-50 text-indigo-600 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-600 hover:text-white transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                    <Edit2 className="w-4 h-4" /> Modify Profile
+                 </button>
+              </div>
+
+              <button 
+                onClick={onDelete}
+                className="mt-8 text-[10px] font-black text-slate-300 hover:text-rose-500 uppercase tracking-widest transition-colors flex items-center gap-2"
+              >
+                 <Trash2 className="w-3 h-3" /> Terminate Account
+              </button>
+           </div>
+        </div>
       </div>
     </div>
   );

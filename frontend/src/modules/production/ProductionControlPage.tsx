@@ -261,6 +261,10 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
       invalidate(); 
       setStopConfirmOpen(false); 
       toast.success('Production moved to QC_PENDING'); 
+    },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || error.message;
+      toast.error(`Stop failed: ${Array.isArray(msg) ? msg[0] : msg}`);
     }
   });
 
@@ -269,7 +273,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
       productId: changeoverProduct,
       batchId: line.batch?.id
     }),
-    onSuccess: () => { invalidate(); setChangeoverModalOpen(false); toast.success('Changeover initiated'); }
+    onSuccess: () => { invalidate(); setChangeoverModalOpen(false); toast.success('Changeover initiated'); },
+    onError: (error: any) => {
+      const msg = error.response?.data?.message || error.message;
+      toast.error(`Changeover failed: ${Array.isArray(msg) ? msg[0] : msg}`);
+    }
   });
 
   if (line.status === 'IDLE') {
