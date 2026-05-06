@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, memo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../api';
 import { 
   Activity, Play, Square, RefreshCcw, MoreVertical, 
   Gauge, Loader2, X, Users, BarChart2,
-  Clock, ArrowLeft, ShieldAlert
+  Clock, ArrowLeft, ShieldAlert, Zap,
+  Settings2, ActivitySquare
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProductionControlPage() {
   const { filters, setFilters } = useOutletContext<{ filters: any; setFilters: (f: any) => void }>();
@@ -22,9 +24,15 @@ export default function ProductionControlPage() {
     refetchInterval: 15000,
   });
 
+  const handleBack = useCallback(() => setFilters({ lineId: 'all' }), [setFilters]);
+  const handleFocus = useCallback((id: string) => setFilters({ lineId: id }), [setFilters]);
+
   if (isLoading) return (
-    <div className="h-96 flex items-center justify-center text-slate-400">
-      <Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading lines...
+    <div className="h-96 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-xl" />
+        <p className="text-slate-500 font-black uppercase tracking-widest text-[10px] animate-pulse">Synchronizing Line Telemetry...</p>
+      </div>
     </div>
   );
 
@@ -35,7 +43,7 @@ export default function ProductionControlPage() {
     return (
       <ProductionCommander 
         line={focusedLine} 
-        onBack={() => setFilters({ lineId: 'all' })}
+        onBack={handleBack}
         brands={brands}
         products={products}
         shifts={shifts}
@@ -44,33 +52,43 @@ export default function ProductionControlPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Production Floor</h2>
-           <p className="text-slate-500 font-medium">Monitoring {lines?.length || 0} active lines.</p>
+    <div className="space-y-10">
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/80 backdrop-blur-xl p-10 rounded-[3.5rem] border border-white shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+        <div className="relative z-10">
+           <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+             <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center shadow-2xl">
+               <ActivitySquare className="w-8 h-8" />
+             </div>
+             Production Floor
+           </h2>
+           <p className="text-slate-500 font-bold mt-2 ml-1">Real-time tactical oversight of {lines?.length || 0} production units.</p>
         </div>
-        <div className="flex items-center gap-3">
-           <div className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-              {lines?.filter((l:any)=>l.status==='RUNNING').length} Active
+        <div className="flex items-center gap-3 relative z-10">
+           <div className="px-6 py-3 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+              {lines?.filter((l:any)=>l.status==='RUNNING').length} Active Units
            </div>
-           <div className="px-4 py-2 bg-slate-50 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-100">
-              {lines?.filter((l:any)=>l.status==='IDLE').length} Idle
+           <div className="px-6 py-3 bg-slate-50 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-100">
+              {lines?.filter((l:any)=>l.status==='IDLE').length} Standby
            </div>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {lines?.map((line: any) => (
-          <LineControlCard
-            key={line.id}
-            line={line}
-            onFocus={() => setFilters({ lineId: line.id })}
-            brands={brands}
-            products={products}
-            shifts={shifts}
-          />
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <AnimatePresence mode="popLayout">
+          {lines?.map((line: any, idx: number) => (
+            <LineControlCard
+              key={line.id}
+              line={line}
+              onFocus={() => handleFocus(line.id)}
+              brands={brands}
+              products={products}
+              shifts={shifts}
+              idx={idx}
+            />
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -122,50 +140,89 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
       </header>
 
       {/* ── MAIN GRID ── */}
-      <div className="grid grid-cols-12 gap-8">
-         <div className="col-span-12 lg:col-span-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm flex items-center justify-between group overflow-hidden relative">
-                  <div className="relative z-10">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Live Speed</p>
+      <div className="grid grid-cols-12 gap-10">
+         <div className="col-span-12 lg:col-span-8 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+               <motion.div 
+                 initial={{ opacity: 0, y: 20 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-10 border border-white shadow-2xl flex flex-col items-center justify-between group overflow-hidden relative"
+               >
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-transparent pointer-events-none" />
+                  <div className="relative z-10 w-full mb-6">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Live Throughput</p>
                      <div className="flex items-baseline gap-2">
-                        <h4 className="text-4xl font-black text-slate-900 tracking-tight">{Math.round(stats?.bpm || 0)}</h4>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BPM</span>
+                        <h4 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{Math.round(stats?.bpm || 0)}</h4>
+                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">BPM</span>
                      </div>
                   </div>
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                     <svg className="w-full h-full -rotate-90 transform">
-                        <circle cx="48" cy="48" r="36" fill="transparent" stroke="#f1f5f9" strokeWidth="8" />
-                        <circle cx="48" cy="48" r="36" fill="transparent" stroke="#6366f1" strokeWidth="8" 
-                           strokeDasharray={226} 
-                           strokeDashoffset={226 - (Math.min((stats?.bpm || 0) / 150, 1) * 226)} 
+                  <div className="relative w-40 h-40 flex items-center justify-center group-hover:scale-110 transition-transform duration-700">
+                     <svg className="w-full h-full -rotate-[220deg] transform">
+                        <circle cx="80" cy="80" r="70" fill="transparent" stroke="#f1f5f9" strokeWidth="12" strokeDasharray="330 440" strokeLinecap="round" />
+                        <circle cx="80" cy="80" r="70" fill="transparent" stroke="url(#bpmGradient)" strokeWidth="12" 
+                           strokeDasharray={`${(Math.min((stats?.bpm || 0) / 150, 1) * 330)} 440`} 
                            strokeLinecap="round"
                            className="transition-all duration-1000"
                         />
+                        <defs>
+                          <linearGradient id="bpmGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="#6366f1" />
+                            <stop offset="100%" stopColor="#10b981" />
+                          </linearGradient>
+                        </defs>
                      </svg>
-                     <Activity className="absolute w-6 h-6 text-indigo-500 animate-pulse" />
+                     <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <Activity className="w-8 h-8 text-indigo-500 animate-pulse mb-1" />
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Running</span>
+                     </div>
                   </div>
-               </div>
-               <TelemetryCard label="Efficiency" value={`${stats?.oee || 0}%`} icon={Gauge} color="indigo" sub="OEE" />
-               <TelemetryCard label="Operators" value={`${stats?.activeOperators || 0}`} icon={Users} color="blue" sub="On Line" />
+               </motion.div>
+               <TelemetryCard label="Line Efficiency" value={`${stats?.oee || 0}%`} icon={Gauge} color="emerald" sub="OEE" delay={0.1} />
+               <TelemetryCard label="Personnel" value={`${stats?.activeOperators || 0}`} icon={Users} color="blue" sub="Active" delay={0.2} />
             </div>
 
-            <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm overflow-hidden">
-               <div className="flex justify-between items-center mb-6 px-2">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Activity</h3>
-                  <div className="flex items-center gap-2">
-                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Live Updates</span>
+            <div className="bg-white/80 backdrop-blur-xl rounded-[4rem] p-12 border border-white shadow-2xl overflow-hidden relative">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl" />
+               <div className="flex justify-between items-center mb-10 relative z-10">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Production Timeline</h3>
+                    <p className="text-slate-400 font-bold text-xs">Real-time station logging and event sequence.</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                     <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest">
+                        <Zap className="w-3 h-3 fill-indigo-600" /> Auto-Sync
+                     </div>
                   </div>
                </div>
-               <div className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide">
-                  {stats?.recentLogs?.slice(0, 5).map((log: any, i: number) => (
-                    <div key={i} className="flex-shrink-0 flex flex-col gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-[140px]">
-                       <p className="text-[10px] font-black text-slate-900">{log.station}</p>
-                       <p className="text-sm font-black text-indigo-600">+{log.count} Units</p>
-                       <p className="text-[9px] font-bold text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</p>
-                    </div>
-                  )) || <p className="text-xs text-slate-400 italic px-2">No activity recorded yet for this batch.</p>}
+               <div className="relative z-10 flex gap-6 overflow-x-auto pb-6 px-2 no-scrollbar">
+                  <AnimatePresence mode="popLayout">
+                    {stats?.recentLogs?.map((log: any, i: number) => (
+                      <motion.div 
+                        key={`${log.timestamp}-${i}`}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex-shrink-0 flex flex-col gap-4 p-6 bg-white border border-slate-50 rounded-[2.5rem] min-w-[200px] shadow-xl shadow-slate-200/20 hover:scale-105 transition-transform"
+                      >
+                         <div className="flex justify-between items-start">
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">{log.station}</span>
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                         </div>
+                         <h4 className="text-2xl font-black text-slate-900">+{log.count} <span className="text-xs font-bold text-slate-400">PCS</span></h4>
+                         <div className="mt-2 flex items-center gap-2 text-slate-400">
+                            <Clock className="w-3 h-3" />
+                            <span className="text-[10px] font-bold">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                         </div>
+                      </motion.div>
+                    ))}
+                    {(!stats?.recentLogs || stats.recentLogs.length === 0) && (
+                      <div className="w-full py-12 flex flex-col items-center justify-center text-slate-300">
+                         <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                            <Activity className="w-8 h-8 opacity-20" />
+                         </div>
+                         <p className="text-sm font-black uppercase tracking-widest opacity-40 italic">Waiting for telemetry heartbeat...</p>
+                      </div>
+                    )}
+                  </AnimatePresence>
                </div>
             </div>
 
@@ -229,24 +286,32 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
   );
 }
 
-function TelemetryCard({ label, value, icon: Icon, color, sub }: any) {
+const TelemetryCard = memo(({ label, value, icon: Icon, color, sub, delay = 0 }: any) => {
   return (
-    <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all">
-       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 ${
-         color === 'indigo' ? 'bg-indigo-50 text-indigo-600' :
-         color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-         'bg-blue-50 text-blue-600'
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-2xl group hover:shadow-indigo-100 transition-all cursor-pointer overflow-hidden relative"
+    >
+       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 shadow-lg relative z-10 group-hover:scale-110 transition-transform ${
+         color === 'indigo' ? 'bg-indigo-600 text-white' :
+         color === 'emerald' ? 'bg-emerald-600 text-white' :
+         'bg-blue-600 text-white'
        }`}>
-         <Icon className="w-6 h-6" />
+         <Icon className="w-7 h-7" />
        </div>
-       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-       <div className="flex items-baseline gap-2">
-          <h4 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h4>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{sub}</span>
+       <div className="relative z-10">
+         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{label}</p>
+         <div className="flex items-baseline gap-2">
+            <h4 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{value}</h4>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{sub}</span>
+         </div>
        </div>
-    </div>
+       <div className="absolute top-0 right-0 w-32 h-32 bg-slate-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/10 transition-colors" />
+    </motion.div>
   );
-}
+});
 
 function LineControlButtons({ line, brands, products, shifts }: any) {
   const queryClient = useQueryClient();
@@ -511,7 +576,7 @@ function StartProductionForm({
   );
 }
 
-function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
+const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0 }: any) => {
   const queryClient = useQueryClient();
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   
@@ -522,8 +587,6 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
   const [batchCode, setBatchCode] = useState('');
   const [remarks, setRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
-
-
 
   const startMutation = useMutation({
     mutationFn: () => api.post(`/production/start`, {
@@ -542,58 +605,70 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
     }
   });
 
-   console.log("LINE DATA (CARD):", line);
    return (
-     <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-      <div className="flex justify-between items-start mb-8">
-          <div onClick={onFocus} className="flex items-center gap-5 cursor-pointer">
-            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-[1.25rem] flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
-              <Gauge className="w-7 h-7" />
+     <motion.div 
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.1 }}
+      className="bg-white/80 backdrop-blur-xl rounded-[3.5rem] p-10 border border-white shadow-2xl hover:shadow-indigo-100/50 transition-all group relative overflow-hidden"
+     >
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+      
+      <div className="flex justify-between items-start mb-10 relative z-10">
+          <div onClick={onFocus} className="flex items-center gap-6 cursor-pointer">
+            <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl group-hover:bg-indigo-600 transition-all duration-500">
+              <Settings2 className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">{line.name}</h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`w-2 h-2 rounded-full ${
-                  line.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' :
-                  line.status === 'CHANGEOVER' ? 'bg-amber-500 animate-pulse' :
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{line.name}</h3>
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${
+                  line.status === 'RUNNING' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' :
+                  line.status === 'CHANGEOVER' ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' :
                   line.status === 'MAINTENANCE' ? 'bg-rose-500' :
                   'bg-slate-300'
-                }`} />
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                } ${['RUNNING', 'CHANGEOVER'].includes(line.status) ? 'animate-pulse' : ''}`} />
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
                   {line.status}
                 </span>
               </div>
             </div>
           </div>
+          <button className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 transition-all">
+             <MoreVertical className="w-5 h-5" />
+          </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
-         <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status</p>
-            <p className="text-sm font-black text-slate-900 capitalize">{line.status.toLowerCase()}</p>
+      <div className="grid grid-cols-2 gap-6 mb-10 relative z-10">
+         <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Efficiency Index</p>
+            <p className="text-xl font-black text-slate-900 leading-none flex items-center gap-2">
+               {line.status === 'RUNNING' ? '84.2%' : '0.0%'}
+               <Activity className="w-4 h-4 text-emerald-500" />
+            </p>
          </div>
-          <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
-            <p className="text-sm font-black text-slate-900 truncate">{line?.batch?.batchCode || 'NO BATCH'}</p>
+          <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Batch</p>
+            <p className="text-xl font-black text-slate-900 truncate leading-none">{line?.batch?.batchCode || 'STBY-NODE'}</p>
           </div>
       </div>
 
-      <div className="flex gap-3">
-        <button onClick={onFocus} className="flex-[2] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2">
-           Commander Interface <MoreVertical className="w-3 h-3" />
+      <div className="flex gap-4 relative z-10">
+        <button onClick={onFocus} className="flex-[2] py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 hover:bg-indigo-600 shadow-xl shadow-slate-200">
+           Enter Commander <ArrowLeft className="w-4 h-4 rotate-180" />
         </button>
         {line.status === 'IDLE' && (
-          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-100">
-             <Play className="w-3 h-3 fill-white" /> Start
+          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100">
+             <Play className="w-4 h-4 fill-white" /> Start
           </button>
         )}
       </div>
 
       {isStartModalOpen && (
         <Modal onClose={() => setIsStartModalOpen(false)}>
-           <div className="mb-8">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Quick Start: {line.name}</h3>
-              <p className="text-slate-500 font-medium mt-1">Configure and launch a new production batch.</p>
+           <div className="mb-10">
+              <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Initialize Batch</h3>
+              <p className="text-slate-500 font-bold mt-2">Configure and launch production on {line.name}.</p>
            </div>
            <StartProductionForm 
              shifts={shifts} 
@@ -610,9 +685,9 @@ function LineControlCard({ line, onFocus, brands, products, shifts }: any) {
            />
         </Modal>
       )}
-    </div>
-  );
-}
+     </motion.div>
+   );
+});
 
 function Modal({ children, onClose }: { children: React.ReactNode, onClose: () => void }) {
   return (

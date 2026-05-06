@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../db/db';
-import { attendanceLogs, users } from '../db/schema';
+import { attendanceLogs, users, auditLogs } from '../db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 
 @Injectable()
@@ -43,6 +43,15 @@ export class EsslSyncService {
         externalSyncId: externalId,
         status: 'PRESENT',
       });
+
+      // Emit Audit Log
+      await db.insert(auditLogs).values({
+        actorId: user.id,
+        action: `BIOMETRIC_CLOCK_IN ${externalId}`,
+        entityType: 'ATTENDANCE',
+        entityId: user.id,
+        payload: { actorName: user.name }
+      });
     } else {
       // Update active record with clock-out
       const [activeLog] = await db.select()
@@ -55,6 +64,15 @@ export class EsslSyncService {
         await db.update(attendanceLogs)
           .set({ clockOut: timestamp })
           .where(eq(attendanceLogs.id, activeLog.id));
+
+        // Emit Audit Log
+        await db.insert(auditLogs).values({
+          actorId: user.id,
+          action: `BIOMETRIC_CLOCK_OUT ${externalId}`,
+          entityType: 'ATTENDANCE',
+          entityId: user.id,
+          payload: { actorName: user.name }
+        });
       }
     }
   }
@@ -79,6 +97,15 @@ export class EsslSyncService {
           remarks: 'Auto-ClockOut (System Safety Override)' 
         })
         .where(eq(attendanceLogs.id, log.id));
+
+      // Emit Audit Log (System Action)
+      await db.insert(auditLogs).values({
+        actorId: '00000000-0000-0000-0000-000000000000', // System
+        action: `AUTO_CLOCK_OUT_OVERRIDE ${log.userId}`,
+        entityType: 'ATTENDANCE',
+        entityId: log.userId,
+        payload: { actorName: 'SYSTEM_CRON' }
+      });
     }
     this.logger.log(`Auto-ClockOut complete. Repaired ${abandoned.length} logs.`);
   }

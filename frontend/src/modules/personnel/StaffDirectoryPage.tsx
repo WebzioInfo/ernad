@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api';
 import { 
   Users, Search, Filter, Mail, 
-  ShieldCheck, Loader2, UserPlus, MoreHorizontal
+  ShieldCheck, Loader2, MoreHorizontal
 } from 'lucide-react';
 
 interface Staff {

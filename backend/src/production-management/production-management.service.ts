@@ -229,45 +229,56 @@ export class ProductionManagementService {
   async logPackaging(batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
     const factoryId = await this.getFactoryContext();
     
-    // 1. State Machine Enforcement
-    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
-    if (!batch) throw new BadRequestException('Batch not found.');
-    if (!['RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED'].includes(batch.status)) {
-       throw new BadRequestException(`Cannot log packaging for batch in ${batch.status} state.`);
-    }
+    return await db.transaction(async (tx) => {
+      const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
+      if (!batch) throw new BadRequestException('Batch not found.');
+      if (!['RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED'].includes(batch.status)) {
+         throw new BadRequestException(`Cannot log packaging for batch in ${batch.status} state.`);
+      }
 
-    return await db.insert(packagingLogs).values({
-      batchId,
-      factoryId,
-      operatorId,
-      packType,
-      quantity,
-      unitsPerPack,
-      remarks: remarks,
-      createdAt: new Date(),
-    }).returning();
+      const res = await tx.insert(packagingLogs).values({
+        batchId,
+        factoryId,
+        operatorId,
+        packType,
+        quantity,
+        unitsPerPack,
+        remarks: remarks,
+        createdAt: new Date(),
+      }).returning();
+
+      // Update aggregate totals if needed
+      await tx.update(batchTotals)
+        .set({ packingTotal: sql`${batchTotals.packingTotal} + ${quantity * unitsPerPack}` })
+        .where(eq(batchTotals.batchId, batchId));
+
+      return res[0];
+    });
   }
 
   async logDispatch(batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
     const factoryId = await this.getFactoryContext();
     
-    // 1. State Machine Enforcement
-    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
-    if (!batch) throw new BadRequestException('Batch not found.');
-    if (batch.status !== 'COMPLETED' && batch.status !== 'QC_PENDING') {
-       throw new BadRequestException('Batch must be at least QC_PENDING or COMPLETED to dispatch.');
-    }
+    return await db.transaction(async (tx) => {
+      const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
+      if (!batch) throw new BadRequestException('Batch not found.');
+      if (batch.status !== 'COMPLETED' && batch.status !== 'QC_PENDING') {
+         throw new BadRequestException('Batch must be at least QC_PENDING or COMPLETED to dispatch.');
+      }
 
-    return await db.insert(dispatchLogs).values({
-      batchId,
-      factoryId,
-      dispatchManagerId: managerId,
-      destination,
-      quantity,
-      vehicleNumber: vehicle,
-      remarks: remarks,
-      dispatchedAt: new Date(),
-    }).returning();
+      const res = await tx.insert(dispatchLogs).values({
+        batchId,
+        factoryId,
+        dispatchManagerId: managerId,
+        destination,
+        quantity,
+        vehicleNumber: vehicle,
+        remarks: remarks,
+        dispatchedAt: new Date(),
+      }).returning();
+      
+      return res[0];
+    });
   }
 
 

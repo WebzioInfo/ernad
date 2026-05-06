@@ -11,10 +11,13 @@ import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import NotificationBell from '../components/NotificationBell';
 import CommandPalette from '../components/common/CommandPalette';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isSidebarOpen, setSidebarOpen] = useState(true);
 
@@ -127,36 +130,45 @@ export default function DashboardLayout() {
           )}
         </div>
 
-        <nav className="flex-1 px-4 py-8 space-y-1.5 overflow-y-auto no-scrollbar">
-          {filteredMenuItems.map((item) => {
+        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto no-scrollbar">
+          {filteredMenuItems.map((item, idx) => {
             const Icon = item.icon;
             return (
-              <NavLink
+              <motion.div
                 key={item.id}
-                to={getModulePath(item.id)}
-                className={({ isActive }) => `
-                  w-full flex items-center py-3.5 rounded-2xl transition-all duration-200 group
-                  ${isSidebarOpen ? 'px-4' : 'justify-center'}
-                  ${isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
-                `}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
               >
-                {({ isActive }) => (
-                  <>
-                    <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                    {isSidebarOpen && (
-                      <span className="ml-4 font-bold text-sm tracking-tight truncate animate-in fade-in slide-in-from-left-2 flex-1">{item.label}</span>
-                    )}
-                    {item.isComingSoon && isSidebarOpen && (
-                      <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
-                    )}
-                    {isActive && isSidebarOpen && !item.isComingSoon && (
-                      <div className="ml-auto w-1.5 h-1.5 bg-white rounded-full flex-shrink-0" />
-                    )}
-                  </>
-                )}
-              </NavLink>
+                <NavLink
+                  to={getModulePath(item.id)}
+                  className={({ isActive }) => `
+                    w-full flex items-center py-4 rounded-2xl transition-all duration-300 group relative
+                    ${isSidebarOpen ? 'px-5' : 'justify-center'}
+                    ${isActive
+                      ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40 translate-x-1'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'}
+                  `}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-125'}`} />
+                      {isSidebarOpen && (
+                        <span className="ml-4 font-bold text-sm tracking-tight truncate flex-1">{item.label}</span>
+                      )}
+                      {item.isComingSoon && isSidebarOpen && (
+                        <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
+                      )}
+                      {isActive && (
+                        <motion.div 
+                          layoutId="active-pill"
+                          className="absolute left-0 w-1 h-8 bg-white rounded-r-full" 
+                        />
+                      )}
+                    </>
+                  )}
+                </NavLink>
+              </motion.div>
             );
           })}
         </nav>
@@ -184,10 +196,15 @@ export default function DashboardLayout() {
               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">Control Panel</h1>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 flex items-center gap-1.5">
-                <Globe className="w-3 h-3" /> Status: OK
-              </p>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">Executive Control</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  System Pulse: OK
+                </div>
+                <div className="h-3 w-px bg-slate-100" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Factory v4.0.2</p>
+              </div>
             </div>
           </div>
 
@@ -226,13 +243,19 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        {/* Viewport Area */}
-        <div className="flex-1 overflow-y-auto bg-[#FAFBFF] p-10">
+        <div className="flex-1 overflow-y-auto bg-[#FAFBFF] p-10 relative">
           <div className="max-w-[1700px] mx-auto">
-
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 fill-mode-both">
-              <Outlet context={{ filters, setFilters }} />
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+              >
+                <Outlet context={{ filters, setFilters }} />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </main>
