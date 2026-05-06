@@ -3,7 +3,8 @@ import {
   BarChart3, Settings, Users, Activity,
   Package, LayoutDashboard, Bell, Search,
   Menu, X, LogOut, Globe, Command,
-  UserCog, Sparkles, ClipboardList, ShieldCheck
+  UserCog, Sparkles, ClipboardList, ShieldCheck,
+  History, LayoutDashboard, ClipboardCheck
 } from 'lucide-react';
 import useAuthStore from '../store/useAuthStore';
 import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
@@ -60,27 +61,27 @@ export default function DashboardLayout() {
     { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
     { id: 'users', label: 'Users', icon: ShieldCheck, path: '/admin/users' },
     { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardList, path: '/admin/attendance' },
+    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, path: '/admin/attendance' },
     { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
-    { id: 'audit', label: 'Logs', icon: ClipboardList, path: '/admin/audit' },
+    { id: 'audit', label: 'Logs', icon: History, path: '/admin/audit' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
   const ADMIN_MENU = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/admin/overview' },
+    { id: 'overview', label: 'Overview', icon: Globe, path: '/admin/overview' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
     { id: 'production', label: 'Production', icon: Activity, path: '/admin/production' },
     { id: 'quality', label: 'Quality', icon: Bell, path: '/admin/quality' },
     { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
     { id: 'users', label: 'Users', icon: UserCog, path: '/admin/users' },
     { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardList, path: '/admin/attendance' },
+    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, path: '/admin/attendance' },
     { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
   ];
 
   const MANAGER_MENU = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/manager/overview' },
+    { id: 'overview', label: 'Overview', icon: Globe, path: '/manager/overview' },
     { id: 'production', label: 'Production', icon: Activity, path: '/manager/production' },
     { id: 'quality', label: 'Quality', icon: Bell, path: '/manager/quality' },
     { id: 'inventory', label: 'Inventory', icon: Package, path: '/manager/inventory' },
