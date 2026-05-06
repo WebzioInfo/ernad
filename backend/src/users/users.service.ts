@@ -320,7 +320,7 @@ export class UsersService {
   }
 
   /**
-   * Delete an operator (soft-delete by setting isActive = false preferred in production).
+   * Delete an operator (Soft-delete).
    */
   async deleteOperator(id: string) {
     const rows = await db
@@ -332,9 +332,22 @@ export class UsersService {
       throw new NotFoundException(`Operator with id "${id}" not found`);
     }
 
-    await db.delete(users).where(eq(users.id, id));
+    await db.update(users).set({ 
+      isActive: false, 
+      deletedAt: new Date(),
+      username: sql`${users.username} || '_deleted_' || ${id.slice(0, 8)}`,
+      email: sql`${users.email} || '_deleted_' || ${id.slice(0, 8)}`
+    }).where(eq(users.id, id));
 
-    return { message: `Operator "${rows[0].name}" has been deleted.` };
+    return { message: `Operator "${rows[0].name}" has been soft-deleted.` };
+  }
+
+  async getUserAuditLogs(userId: string) {
+     return await db.select()
+       .from(auditLogs)
+       .where(eq(auditLogs.actorId, userId))
+       .orderBy(desc(auditLogs.occurredAt))
+       .limit(20);
   }
 
   async getAuditLogs() {

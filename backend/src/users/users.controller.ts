@@ -135,13 +135,24 @@ export class UsersController {
 
   /**
    * DELETE /api/users/:id
-   * Super Admin only — Permanently delete an operator
+   * Super Admin only — Soft delete an operator
    */
   @Delete(':id')
   @Permissions('users:manage')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete operator (Super Admin only)' })
+  @ApiOperation({ summary: 'Soft delete operator (Super Admin only)' })
   deleteOperator(@Param('id') id: string) {
     return this.usersService.deleteOperator(id);
+  }
+
+  /**
+   * GET /api/users/:id/audit-logs
+   * Admin only — Get audit logs for a specific user
+   */
+  @Get(':id/audit-logs')
+  @Permissions('users:view')
+  @ApiOperation({ summary: 'Get user-specific audit logs' })
+  getUserAuditLogs(@Param('id') id: string) {
+    return this.usersService.getUserAuditLogs(id);
   }
 }

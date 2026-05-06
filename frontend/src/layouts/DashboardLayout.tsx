@@ -10,6 +10,7 @@ import useAuthStore from '../store/useAuthStore';
 import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import NotificationBell from '../components/NotificationBell';
+import CommandPalette from '../components/common/CommandPalette';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
@@ -106,6 +107,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex h-screen bg-[#FDFDFD]">
+      <CommandPalette />
       <NotificationPermissionModal />
 
       {/* Sidebar */}

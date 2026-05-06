@@ -7,7 +7,7 @@ import {
   Mail, 
   Lock, Unlock, BadgeCheck,
   ShieldCheck, ShieldAlert, UserCog,
-  Filter, XCircle
+  Filter, XCircle, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
@@ -328,81 +328,114 @@ function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
 }
 
 function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void }) {
+  const { data: logs } = useQuery({
+    queryKey: ['user-audit-logs', user.id],
+    queryFn: async () => (await api.get(`/users/${user.id}/audit-logs`)).data
+  });
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-500">
-        <div className="p-12 text-center relative overflow-hidden">
-           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-50 to-transparent" />
-           <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all z-10">
-              <X className="w-6 h-6" />
-           </button>
+      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-500">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <div className="p-12 text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-50 to-transparent" />
+            <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all z-10">
+               <X className="w-6 h-6" />
+            </button>
 
-           <div className="relative z-10 flex flex-col items-center">
-              <div className="relative mb-6">
-                <div className="w-32 h-32 rounded-[2.5rem] bg-white shadow-2xl overflow-hidden border-4 border-white">
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
-                  ) : (
-                    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
-                      <Users className="w-16 h-16" />
-                    </div>
-                  )}
-                </div>
-                <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                   {user.isActive ? <Unlock className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4 text-white" />}
-                </div>
-              </div>
-
-              <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{user.name}</h3>
-              <p className="text-slate-500 font-bold mb-8">@{user.username} • {user.jobTitle || 'System User'}</p>
-
-              <div className="grid grid-cols-2 gap-4 w-full mb-10">
-                 <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Department</p>
-                    <p className="text-sm font-black text-slate-700">{user.department || 'Not Assigned'}</p>
+            <div className="relative z-10 flex flex-col items-center">
+               <div className="relative mb-6">
+                 <div className="w-32 h-32 rounded-[2.5rem] bg-white shadow-2xl overflow-hidden border-4 border-white">
+                   {user.avatarUrl ? (
+                     <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
+                   ) : (
+                     <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
+                       <Users className="w-16 h-16" />
+                     </div>
+                   )}
                  </div>
-                 <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Roles</p>
-                    <div className="flex flex-wrap gap-1">
-                      {user.roles.map(r => <span key={r} className="text-[9px] font-black text-indigo-600">{r}</span>)}
-                    </div>
+                 <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                    {user.isActive ? <Unlock className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4 text-white" />}
                  </div>
-              </div>
+               </div>
 
-              <div className="flex flex-wrap gap-4 w-full mb-8">
-                 <button 
-                   onClick={onToggleActive}
-                   className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${
-                    user.isActive 
-                      ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600' 
-                      : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
-                   }`}
-                 >
-                   {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                   {user.isActive ? 'Suspend User' : 'Restore User'}
-                 </button>
-                 <button onClick={onEdit} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
-                    <Edit2 className="w-4 h-4" /> Modify Profile
-                 </button>
-              </div>
+               <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{user.name}</h3>
+               <p className="text-slate-500 font-bold mb-8">@{user.username} • {user.jobTitle || 'System User'}</p>
 
-              {/* Danger Zone */}
-              <div className="w-full pt-8 border-t border-slate-100">
-                <div className="flex items-center justify-between bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50 group/danger">
-                  <div className="text-left">
-                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Danger Zone</p>
-                    <p className="text-[11px] font-bold text-slate-500">Permanently remove this user and all associated data.</p>
+               <div className="grid grid-cols-2 gap-4 w-full mb-10">
+                  <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Department</p>
+                     <p className="text-sm font-black text-slate-700">{user.department || 'Not Assigned'}</p>
                   </div>
+                  <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Roles</p>
+                     <div className="flex flex-wrap gap-1">
+                       {user.roles.map(r => <span key={r} className="text-[9px] font-black text-indigo-600">{r}</span>)}
+                     </div>
+                  </div>
+               </div>
+
+               {/* Activity Timeline */}
+               <div className="w-full text-left mb-10">
+                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 px-2">
+                   <Activity className="w-3 h-3 text-indigo-500" />
+                   Recent Activity Timeline
+                 </h4>
+                 <div className="space-y-4">
+                    {logs?.length > 0 ? logs.map((log: any, idx: number) => (
+                      <div key={log.id} className="flex gap-4 group/log">
+                        <div className="flex flex-col items-center">
+                          <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                          {idx !== logs.length - 1 && <div className="w-[1px] h-full bg-slate-100 my-1" />}
+                        </div>
+                        <div className="flex-1 pb-4">
+                          <p className="text-xs font-bold text-slate-700 group-hover/log:text-indigo-600 transition-colors">{log.action.split(' /')[0].replace('POST', 'Created').replace('PATCH', 'Updated').replace('GET', 'Accessed') || 'Performed System Action'}</p>
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{new Date(log.occurredAt).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    )) : (
+                      <div className="p-8 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                        No activity recorded
+                      </div>
+                    )}
+                 </div>
+               </div>
+
+               <div className="flex flex-wrap gap-4 w-full mb-8">
                   <button 
-                    onClick={onDelete}
-                    className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border border-rose-100 flex items-center gap-2"
+                    onClick={onToggleActive}
+                    className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${
+                     user.isActive 
+                       ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600' 
+                       : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                    }`}
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Account
+                    {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                    {user.isActive ? 'Suspend User' : 'Restore User'}
                   </button>
-                </div>
-              </div>
-           </div>
+                  <button onClick={onEdit} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
+                     <Edit2 className="w-4 h-4" /> Modify Profile
+                  </button>
+               </div>
+
+               {/* Danger Zone */}
+               <div className="w-full pt-8 border-t border-slate-100">
+                 <div className="flex items-center justify-between bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50 group/danger">
+                   <div className="text-left">
+                     <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Danger Zone</p>
+                     <p className="text-[11px] font-bold text-slate-500">Permanently remove this user and all associated data.</p>
+                   </div>
+                   <button 
+                     onClick={onDelete}
+                     className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border border-rose-100 flex items-center gap-2"
+                   >
+                     <Trash2 className="w-4 h-4" />
+                     Delete Account
+                   </button>
+                 </div>
+               </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

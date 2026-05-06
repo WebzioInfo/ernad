@@ -125,9 +125,48 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
       <div className="grid grid-cols-12 gap-8">
          <div className="col-span-12 lg:col-span-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+               <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm flex items-center justify-between group overflow-hidden relative">
+                  <div className="relative z-10">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Live Speed</p>
+                     <div className="flex items-baseline gap-2">
+                        <h4 className="text-4xl font-black text-slate-900 tracking-tight">{Math.round(stats?.bpm || 0)}</h4>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BPM</span>
+                     </div>
+                  </div>
+                  <div className="relative w-24 h-24 flex items-center justify-center">
+                     <svg className="w-full h-full -rotate-90 transform">
+                        <circle cx="48" cy="48" r="36" fill="transparent" stroke="#f1f5f9" strokeWidth="8" />
+                        <circle cx="48" cy="48" r="36" fill="transparent" stroke="#6366f1" strokeWidth="8" 
+                           strokeDasharray={226} 
+                           strokeDashoffset={226 - (Math.min((stats?.bpm || 0) / 150, 1) * 226)} 
+                           strokeLinecap="round"
+                           className="transition-all duration-1000"
+                        />
+                     </svg>
+                     <Activity className="absolute w-6 h-6 text-indigo-500 animate-pulse" />
+                  </div>
+               </div>
                <TelemetryCard label="Efficiency" value={`${stats?.oee || 0}%`} icon={Gauge} color="indigo" sub="OEE" />
-               <TelemetryCard label="Speed" value={`${Math.round(stats?.bpm || 0)}`} icon={Activity} color="emerald" sub="BPM" />
                <TelemetryCard label="Operators" value={`${stats?.activeOperators || 0}`} icon={Users} color="blue" sub="On Line" />
+            </div>
+
+            <div className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-sm overflow-hidden">
+               <div className="flex justify-between items-center mb-6 px-2">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Activity</h3>
+                  <div className="flex items-center gap-2">
+                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Live Updates</span>
+                  </div>
+               </div>
+               <div className="flex gap-4 overflow-x-auto pb-4 px-2 scrollbar-hide">
+                  {stats?.recentLogs?.slice(0, 5).map((log: any, i: number) => (
+                    <div key={i} className="flex-shrink-0 flex flex-col gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-[140px]">
+                       <p className="text-[10px] font-black text-slate-900">{log.station}</p>
+                       <p className="text-sm font-black text-indigo-600">+{log.count} Units</p>
+                       <p className="text-[9px] font-bold text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                    </div>
+                  )) || <p className="text-xs text-slate-400 italic px-2">No activity recorded yet for this batch.</p>}
+               </div>
             </div>
 
             <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
