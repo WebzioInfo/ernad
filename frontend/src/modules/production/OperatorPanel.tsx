@@ -3,15 +3,14 @@ import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   PackageOpen, LogOut, Wind, Box,
-  Loader2, Zap, ShieldCheck,
-  AlertTriangle, Cpu, Save, RefreshCw,
+  Loader2, Zap,
+  AlertTriangle, Save, RefreshCw,
   Construction,
   Sparkles,
   History as HistoryIcon
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
-import { db } from '../../utils/sync-service';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -91,7 +90,7 @@ export default function OperatorPanel() {
       toast.error('Only whole number counts are allowed.');
       return;
     }
-    
+
     if (isAdd) {
       setSplitValues(prev => [...prev, val]);
       setPrimaryCount(prev => prev + val);
@@ -167,11 +166,11 @@ export default function OperatorPanel() {
       setIsSubmitting(true);
       // Send directly to API
       await api.post('/telemetry', logEntry);
-      
-      const successMsg = isManual 
-        ? `Logged ${type.toLowerCase()} successfully` 
+
+      const successMsg = isManual
+        ? `Logged ${type.toLowerCase()} successfully`
         : `${safePrimaryCount} units logged successfully for ${currentStation.title}`;
-        
+
       toast.success(successMsg, {
         icon: '✅',
         style: {
@@ -181,7 +180,7 @@ export default function OperatorPanel() {
           border: '1px solid #10b981',
         },
       });
-      
+
       refetchHistory();
 
       // Selective reset
@@ -382,7 +381,7 @@ export default function OperatorPanel() {
                     </div>
                   ))}
                 </div>
-                
+
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-6">
                   * Production counts must be whole numbers.
                 </p>
@@ -510,31 +509,32 @@ export default function OperatorPanel() {
                         {[1, 5, 10].map(v => {
                           const existingQty = materials.find(m => m.materialName === mat)?.quantity || 0;
                           return (
-                          <div key={v} className="flex gap-1 w-full">
-                            <button
-                              onClick={() => {
-                                const newQty = Math.max(0, existingQty - v);
-                                setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: newQty } : m));
-                              }}
-                              disabled={existingQty - v < 0}
-                              className="w-1/3 py-3 bg-white/5 hover:bg-white/10 rounded-l-xl text-[10px] font-black border border-white/5 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              -
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (existingQty > 0) {
-                                  setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: existingQty + v } : m));
-                                } else {
-                                  setMaterials([...materials, { materialName: mat, quantity: v, unit: 'PCS' }]);
-                                }
-                              }}
-                              className="w-2/3 py-3 bg-white/5 hover:bg-white/10 rounded-r-xl text-[10px] font-black border border-white/5 transition-all active:scale-95"
-                            >
-                              +{v}
-                            </button>
-                          </div>
-                        )})}
+                            <div key={v} className="flex gap-1 w-full">
+                              <button
+                                onClick={() => {
+                                  const newQty = Math.max(0, existingQty - v);
+                                  setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: newQty } : m));
+                                }}
+                                disabled={existingQty - v < 0}
+                                className="w-1/3 py-3 bg-white/5 hover:bg-white/10 rounded-l-xl text-[10px] font-black border border-white/5 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                -
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (existingQty > 0) {
+                                    setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: existingQty + v } : m));
+                                  } else {
+                                    setMaterials([...materials, { materialName: mat, quantity: v, unit: 'PCS' }]);
+                                  }
+                                }}
+                                className="w-2/3 py-3 bg-white/5 hover:bg-white/10 rounded-r-xl text-[10px] font-black border border-white/5 transition-all active:scale-95"
+                              >
+                                +{v}
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   ))}
