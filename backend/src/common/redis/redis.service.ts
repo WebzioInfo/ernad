@@ -1,9 +1,9 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 
 @Injectable()
-export class RedisService implements OnModuleInit {
+export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('RedisService');
   private client: Redis | null = null;
   private isAvailable = false;
@@ -12,33 +12,57 @@ export class RedisService implements OnModuleInit {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.configService.get('UPSTASH_REDIS_REST_URL') || this.configService.get('REDIS_URL');
-    const token = this.configService.get('UPSTASH_REDIS_REST_TOKEN');
+    const redisUrl = this.configService.get('REDIS_URL');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
 
-    if (!url || !token) {
-      // Check if we can extract from REDIS_URL (legacy/compatibility)
-      if (url && url.startsWith('rediss://') && !token) {
-         this.logger.warn('⚠️ Upstash REST Token missing. Attempting TCP fallback (ioredis).');
-         // We might need to keep ioredis as a fallback, but user specifically asked for REST use.
-      }
-      
-      this.logger.log('🕒 Upstash REST not fully configured. Using Memory Fallback.');
+    if (!redisUrl) {
+      this.logger.log('🕒 Redis URL not provided. Operating in Memory Fallback mode.');
+      this.isAvailable = false;
+      return;
+    }
+
+    if (isProduction && isLocal) {
+      this.logger.warn('🚫 Localhost Redis detected in Production. Bypassing to prevent crash.');
       this.isAvailable = false;
       return;
     }
 
     try {
-      this.client = new Redis({
-        url: url.startsWith('http') ? url : `https://${url.split('@')[1]?.split(':')[0]}`, // Smart extract if URL is TCP format
-        token: token,
+      this.client = new Redis(redisUrl, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 0,
+        connectTimeout: 10000,
+        disconnectTimeout: 2000,
+        commandTimeout: 5000,
+        tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+        retryStrategy: (times) => {
+          if (times > 3) {
+            this.logger.warn(`Redis connection retry limit reached. Using memory fallback.`);
+            return null;
+          }
+          return Math.min(times * 200, 2000);
+        }
       });
 
-      // Verify connection (Ping)
-      await this.client.ping();
-      this.isAvailable = true;
-      this.logger.log('🚀 Upstash REST Redis connected successfully.');
+      this.client.on('error', (err) => {
+        if (this.isAvailable) {
+          this.logger.error(`Redis Runtime Error: ${err.message}`);
+          this.isAvailable = false;
+        }
+      });
+
+      this.client.on('connect', () => {
+        this.logger.log('🚀 Enterprise Redis (ioredis) connected successfully.');
+        this.isAvailable = true;
+      });
+
+      await this.client.connect().catch(err => {
+        this.logger.warn(`Redis failed to connect: ${err.message}. Stable fallback active.`);
+        this.isAvailable = false;
+      });
     } catch (err: any) {
-      this.logger.error(`Upstash REST Initialization Failed: ${err.message}`);
+      this.logger.error(`Redis Initialization Failed: ${err.message}`);
       this.isAvailable = false;
     }
   }
@@ -47,13 +71,19 @@ export class RedisService implements OnModuleInit {
     return this.isAvailable;
   }
 
+  onModuleDestroy() {
+    if (this.client) {
+      this.client.quit();
+    }
+  }
+
   // --- Resilient API ---
 
   async set(key: string, value: string, mode?: 'EX', duration?: number) {
     if (this.isAvailable && this.client) {
       try {
         if (mode === 'EX' && duration) {
-          return await this.client.set(key, value, { ex: duration });
+          return await this.client.set(key, value, mode, duration);
         }
         return await this.client.set(key, value);
       } catch (err) {
@@ -67,8 +97,7 @@ export class RedisService implements OnModuleInit {
   async get(key: string): Promise<string | null> {
     if (this.isAvailable && this.client) {
       try {
-        const val = await this.client.get(key);
-        return typeof val === 'string' ? val : JSON.stringify(val);
+        return await this.client.get(key);
       } catch {
         this.isAvailable = false;
       }
@@ -127,7 +156,7 @@ export class RedisService implements OnModuleInit {
     const key = `batch:totals:${batchId}`;
     if (this.isAvailable && this.client) {
       try {
-        return await this.client.hset(key, totals);
+        return await this.client.hmset(key, totals);
       } catch {
         this.isAvailable = false;
       }
