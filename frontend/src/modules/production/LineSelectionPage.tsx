@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api';
+import { api } from '../../services/api-client';
 import {
   Cpu, ArrowRight, Loader2,
   Activity, ShieldCheck, LogOut,
   Wind, PackageOpen, Zap, Box, ArrowLeft
 } from 'lucide-react';
-import useAuthStore from '../../store/useAuthStore';
+import useAuthStore from '../../modules/auth/auth.store';
 import { toast } from 'sonner';
 
 export default function LineSelectionPage() {
@@ -42,7 +42,7 @@ export default function LineSelectionPage() {
 
   const startSessionMutation = useMutation({
     mutationFn: (data: { lineId: string, station: string, force?: boolean }) => api.post('/operator/session/start', data),
-    onSuccess: (res) => {
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
       navigate(`/line/${res.data.lineId}/operator`);
     },

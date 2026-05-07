@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api';
+import { api } from '../services/api-client';
 import { io } from 'socket.io-client';
 import Pusher from 'pusher-js';
 

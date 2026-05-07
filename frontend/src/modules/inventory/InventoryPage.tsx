@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api';
+import { api } from '../../services/api-client';
 import {
   Plus, Package, Droplet, RefreshCcw,
   Search, History, AlertCircle, Check, Loader2, X,

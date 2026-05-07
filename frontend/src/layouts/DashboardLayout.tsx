@@ -6,7 +6,7 @@ import {
   UserCog, Sparkles, ShieldCheck,
   History, ClipboardCheck
 } from 'lucide-react';
-import useAuthStore from '../store/useAuthStore';
+import useAuthStore from '../modules/auth/auth.store';
 import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import NotificationBell from '../components/NotificationBell';

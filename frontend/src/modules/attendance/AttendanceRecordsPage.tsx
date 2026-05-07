@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api';
+import { api } from '../../services/api-client';
 import { 
   Clock, RefreshCw, CheckCircle2, AlertCircle, User, Loader2
 } from 'lucide-react';

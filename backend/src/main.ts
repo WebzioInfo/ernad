@@ -21,37 +21,33 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (origin, callback) => {
-      // 1. Allow no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
-
-      // 2. Parse Environment-Driven Origins (Comma-separated)
       const frontendUrls = process.env.FRONTEND_URL || '';
       const allowedOrigins = frontendUrls.split(',').map(url => url.trim()).filter(Boolean);
-
-      // 3. Add Production Defaults
       const productionDefaults = [
         'https://ernad.vercel.app',
         'https://ernad-mes.vercel.app',
       ];
-      
-      // 4. Check for Match
       const isExplicitlyAllowed = allowedOrigins.includes(origin) || productionDefaults.includes(origin);
-      
-      // 5. Support Vercel Preview Deployments (Dynamic subdomains)
       const isVercelPreview = /\.vercel\.app$/.test(origin);
-
-      if (isExplicitlyAllowed || isVercelPreview) {
+      if (isExplicitlyAllowed || isVercelPreview || origin.includes('localhost')) {
         callback(null, true);
       } else {
-        // [DIAGNOSTIC] Log rejected origin but don't throw Error to prevent preflight crash
-        console.warn(`[CORS_REJECTED] Origin: ${origin} | Not in whitelist or Vercel preview.`);
+        console.warn(`[CORS_REJECTED] Origin: ${origin}`);
         callback(null, false);
       }
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'x-mes-request-id',
+      'x-correlation-id'
+    ],
     exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],
-    allowedHeaders: '*',
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
@@ -59,7 +55,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api', { exclude: ['/'] });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  
+
   // AuthGuard will be registered as a global guard in app.module.ts for better DI support
 
   const { AuditInterceptor } = await import('./common/interceptors/audit.interceptor');
@@ -74,7 +70,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document, {
     customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css',

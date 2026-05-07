@@ -6,8 +6,8 @@ import {
   AlertTriangle, Cpu, Save, RefreshCw,
   Construction
 } from 'lucide-react';
-import useAuthStore from '../../store/useAuthStore';
-import { api } from '../../api';
+import useAuthStore from '../../modules/auth/auth.store';
+import { api } from '../../services/api-client';
 import { db } from '../../utils/sync-service';
 import toast from 'react-hot-toast';
 import { v4 as uuidv4 } from 'uuid';

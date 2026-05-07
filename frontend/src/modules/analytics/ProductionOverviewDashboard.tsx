@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
-import { api } from '../../api';
+import { api } from '../../services/api-client';
 import { 
   Zap, Package, CheckCircle2, AlertTriangle
 } from 'lucide-react';

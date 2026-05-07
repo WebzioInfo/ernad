@@ -1,7 +1,7 @@
 import { useState, memo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
-import { api } from '../../api';
+import { api } from '../../services/api-client';
 import { 
   Activity, Play, Square, RefreshCcw, MoreVertical, 
   Gauge, Loader2, X, Users, BarChart2,

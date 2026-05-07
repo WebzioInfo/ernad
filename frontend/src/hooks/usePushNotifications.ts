@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import useAuthStore from '../store/useAuthStore';
-import { api } from '../api';
+import useAuthStore from '../modules/auth/auth.store';
+import { api } from '../services/api-client';
 
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 let isOneSignalInitialized = false;

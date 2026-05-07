@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import useAuthStore from '../store/useAuthStore';
+import useAuthStore from '../modules/auth/auth.store';
 import {
   PackageOpen, Clock, LogOut, Wind, Box,
   Loader2, Zap, ShieldCheck,
@@ -8,7 +8,7 @@ import {
   History
 } from 'lucide-react';
 
-import { api } from '../api';
+import { api } from '../services/api-client';
 import toast from 'react-hot-toast';
 import Watermark from './Watermark';
 import { db as offlineDb } from '../utils/db'; // Dexie

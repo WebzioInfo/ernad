@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../../api';
-import useAuthStore from '../../store/useAuthStore';
+import { api } from '../../services/api-client';
+import useAuthStore from '../../modules/auth/auth.store';
 import { 
   Package, CheckCircle2, AlertTriangle, 
   Users, Activity, Clock, TrendingUp,
