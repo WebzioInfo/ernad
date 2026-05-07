@@ -20,7 +20,34 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      // 1. Allow no origin (e.g. mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // 2. Parse Environment-Driven Origins (Comma-separated)
+      const frontendUrls = process.env.FRONTEND_URL || '';
+      const allowedOrigins = frontendUrls.split(',').map(url => url.trim()).filter(Boolean);
+
+      // 3. Add Production Defaults
+      const productionDefaults = [
+        'https://ernad.vercel.app',
+        'https://ernad-mes.vercel.app',
+      ];
+      
+      // 4. Check for Match
+      const isExplicitlyAllowed = allowedOrigins.includes(origin) || productionDefaults.includes(origin);
+      
+      // 5. Support Vercel Preview Deployments (Dynamic subdomains)
+      const isVercelPreview = /\.vercel\.app$/.test(origin);
+
+      if (isExplicitlyAllowed || isVercelPreview) {
+        callback(null, true);
+      } else {
+        // [DIAGNOSTIC] Log rejected origin but don't throw Error to prevent preflight crash
+        console.warn(`[CORS_REJECTED] Origin: ${origin} | Not in whitelist or Vercel preview.`);
+        callback(null, false);
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],

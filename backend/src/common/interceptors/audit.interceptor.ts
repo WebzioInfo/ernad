@@ -18,7 +18,10 @@ export class AuditInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
     const { method, url, body, user } = request;
 
-    // Only log state-changing operations
+    // 1. Skip preflight requests
+    if (method === 'OPTIONS') return next.handle();
+
+    // 2. Only log state-changing operations
     const isWriteOperation = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
     if (!isWriteOperation) return next.handle();
 
