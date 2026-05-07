@@ -13,44 +13,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const redisUrl = this.configService.get('REDIS_URL');
-    const redisHost = this.configService.get('REDIS_HOST');
-    
-    // Safety check for localhost in production (Vercel)
-    const isLocalhost = (redisHost === '127.0.0.1' || redisHost === 'localhost' || (redisUrl && redisUrl.includes('127.0.0.1')));
     const isProduction = process.env.NODE_ENV === 'production';
+    const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
 
-    if (!redisUrl && !redisHost) {
-      this.logger.log('🕒 Redis not configured. Using Memory Fallback.');
+    if (!redisUrl) {
+      this.logger.log('🕒 Redis URL not provided. Operating in Memory Fallback mode.');
       this.isAvailable = false;
       return;
     }
 
-    if (isProduction && isLocalhost) {
-      this.logger.warn('🚫 Localhost Redis detected in Production environment. Bypassing to prevent ECONNREFUSED.');
+    if (isProduction && isLocal) {
+      this.logger.warn('🚫 Localhost Redis URL detected in Production. Bypassing to prevent infrastructure crash.');
       this.isAvailable = false;
       return;
     }
 
     try {
-      const isRemote = redisHost && !isLocalhost;
-      const useTls = isRemote || (redisUrl && (redisUrl.startsWith('rediss://') || !redisUrl.includes('localhost')));
-
-      const options = redisUrl ? redisUrl : {
-        host: redisHost || '127.0.0.1',
-        port: Number(this.configService.get('REDIS_PORT')) || 6379,
-        password: this.configService.get('REDIS_PASSWORD'),
-        tls: useTls ? {} : undefined,
-      };
-
-      this.client = new Redis(options as any, {
+      this.client = new Redis(redisUrl, {
         lazyConnect: true,
         maxRetriesPerRequest: 0,
-        connectTimeout: 10000, // Increased for remote cloud connection
+        connectTimeout: 10000,
         disconnectTimeout: 2000,
         commandTimeout: 5000,
+        tls: redisUrl.startsWith('rediss://') ? {} : undefined,
         retryStrategy: (times) => {
           if (times > 3) {
-            this.logger.warn(`Redis retry limit reached (${times}). Switching to fallback.`);
+            this.logger.warn(`Redis connection retry limit reached. Falling back to memory.`);
             return null;
           }
           return Math.min(times * 200, 2000);
@@ -59,23 +47,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on('error', (err) => {
         if (this.isAvailable) {
-          this.logger.error(`Redis Error: ${err.message}`);
+          this.logger.error(`Redis Runtime Error: ${err.message}`);
           this.isAvailable = false;
         }
       });
 
       this.client.on('connect', () => {
-        this.logger.log('🚀 Redis connected successfully.');
+        this.logger.log('🚀 Enterprise Redis connected successfully.');
         this.isAvailable = true;
       });
 
-      // Attempt initial connection
       await this.client.connect().catch(err => {
-        this.logger.warn(`Redis connection failed: ${err.message}. Using Memory Fallback.`);
+        this.logger.warn(`Redis failed to connect: ${err.message}. Stable fallback active.`);
         this.isAvailable = false;
       });
     } catch (err) {
-      this.logger.error(`Failed to initialize Redis: ${err.message}`);
+      this.logger.error(`Redis Initialization Failed: ${err.message}`);
       this.isAvailable = false;
     }
   }

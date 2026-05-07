@@ -15,22 +15,29 @@ export class RedisQueueService {
   private _reportGenQueue: any = null;
 
   constructor() {
-    this.isEnabled = !!(process.env.REDIS_HOST || process.env.REDIS_URL);
+    const redisUrl = process.env.REDIS_URL;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
+    
+    this.isEnabled = !!redisUrl && !(isProduction && isLocal);
 
     if (this.isEnabled) {
       this.initQueues();
     } else {
-      this.logger.warn('Redis not configured — queue operations disabled (local dev mode). Set REDIS_HOST to enable.');
+      this.logger.warn('Redis Queue disabled (Local/Unconfigured). Set REDIS_URL to enable.');
     }
   }
 
   private async initQueues() {
     try {
       const { Queue } = await import('bullmq');
+      const redisUrl = process.env.REDIS_URL;
+      
       const connection = {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+        url: redisUrl,
+        tls: redisUrl?.startsWith('rediss://') ? {} : undefined,
         lazyConnect: true,
+        maxRetriesPerRequest: null,
       };
 
       this._tallySyncQueue = new Queue('tally-sync', {
@@ -41,15 +48,15 @@ export class RedisQueueService {
       this._reportGenQueue = new Queue('report-gen', { connection });
 
       this._tallySyncQueue.on('error', (err: any) => {
-        this.logger.warn(`Queue connection error (non-fatal): ${err.message}`);
+        this.logger.warn(`Queue (tally) connection error: ${err.message}`);
       });
       this._reportGenQueue.on('error', (err: any) => {
-        this.logger.warn(`Queue connection error (non-fatal): ${err.message}`);
+        this.logger.warn(`Queue (report) connection error: ${err.message}`);
       });
 
-      this.logger.log('Redis Queues Initialized: tally-sync, report-gen');
+      this.logger.log('🚀 Redis Cloud Queues Initialized.');
     } catch (err: any) {
-      this.logger.warn(`Queue init failed (non-fatal): ${err.message}`);
+      this.logger.error(`Queue initialization failed: ${err.message}`);
     }
   }
 

@@ -9,12 +9,10 @@ import { FactoryConfigModule } from '../factory-config/factory-config.module';
 import { QueueModule } from '../common/queue/queue.module';
 import { OperatorSessionModule } from '../operator-session/operator-session.module';
 
-const isProduction = process.env.NODE_ENV === 'production';
-const redisHost = process.env.REDIS_HOST;
 const redisUrl = process.env.REDIS_URL;
-
-const isLocalhost = (redisHost === '127.0.0.1' || redisHost === 'localhost' || (redisUrl && redisUrl.includes('127.0.0.1')));
-const redisIsConfigured = !!(redisHost || redisUrl) && !(isProduction && isLocalhost);
+const isProduction = process.env.NODE_ENV === 'production';
+const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
+const redisIsConfigured = !!redisUrl && !(isProduction && isLocal);
 
 @Module({
   imports: [

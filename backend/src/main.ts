@@ -20,57 +20,11 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // 1. System/Local/Dev tools (e.g. no origin for mobile/curl)
-      if (!origin) return callback(null, true);
-
-      // 2. Exact Allowed Origins
-      const allowedOrigins = [
-        'https://ernad.vercel.app',
-        'https://ernad-mes.vercel.app',
-        'http://localhost:3000',
-        'http://localhost:5173',
-      ];
-      
-      const frontendUrl = process.env.FRONTEND_URL;
-      if (frontendUrl) {
-        frontendUrl.split(',').forEach(url => {
-          const trimmed = url.trim();
-          if (trimmed) allowedOrigins.push(trimmed);
-        });
-      }
-
-      // 3. Dynamic Vercel Domains Regex (Matches all preview deployments)
-      const vercelRegex = /\.vercel\.app$/;
-      
-      const isAllowed = allowedOrigins.includes(origin) || vercelRegex.test(origin);
-
-      if (isAllowed) {
-        // [ENTERPRISE] Echo exactly the incoming origin for credential support
-        callback(null, true);
-      } else {
-        // [DIAGNOSTIC] Log rejected origins for audit trail
-        console.warn(`[CORS_REJECTED] Origin: ${origin} | Allowed: ${allowedOrigins.join(', ')}`);
-        // We still allow it but without headers if it's a known non-browser client
-        // Actually, for browser safety, we return an error.
-        callback(new Error(`Origin ${origin} not allowed by MES Security Policy`));
-      }
-    },
+    origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Accept', 
-      'Authorization', 
-      'X-Requested-With', 
-      'X-HTTP-Method-Override', 
-      'x-vercel-protection-skip',
-      'x-mes-request-id',
-      'x-mes-client-id',
-      'x-request-id',
-      'x-correlation-id'
-    ],
+    allowedHeaders: '*',
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
