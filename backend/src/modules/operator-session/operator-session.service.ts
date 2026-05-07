@@ -1,7 +1,7 @@
 import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { db } from '../../database/db';
 import { operatorSessions, productionBatches, users as usersTable, productionLines } from '../../database/schema';
-import { eq, and, desc, not, sql } from 'drizzle-orm';
+import { eq, and, desc, not, sql, lt } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 
 @Injectable()
@@ -159,10 +159,13 @@ export class OperatorSessionService {
   async cleanupStaleSessions() {
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
     
-    const stale = await db.select().from(operatorSessions)
+    const stale = await db.select({
+      id: operatorSessions.id,
+      userId: operatorSessions.userId
+    }).from(operatorSessions)
       .where(and(
         eq(operatorSessions.isActive, true),
-        sql`${operatorSessions.lastActivityAt} < ${fourHoursAgo}`
+        lt(operatorSessions.lastActivityAt, fourHoursAgo)
       ));
 
     for (const session of stale) {

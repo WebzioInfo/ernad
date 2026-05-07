@@ -43,16 +43,9 @@ export class FactoryConfigService {
 
   async createLine(dto: { name: string; description?: string }) {
     try {
+      // Removed strict limit of 2 lines and name validation for flexibility
       const factoryId = await this.getFactoryContext();
-      const existingLines = await db.select().from(productionLines).where(eq(productionLines.factoryId, factoryId));
-      if (existingLines.length >= 2) {
-        throw new BadRequestException('Factory is limited to exactly 2 production lines (Line 1 & Line 2).');
-      }
-
-      if (!['Line 1', 'Line 2'].includes(dto.name)) {
-        throw new BadRequestException('Invalid line name. Must be "Line 1" or "Line 2".');
-      }
-
+      
       const [line] = await db.insert(productionLines).values({
         name: dto.name,
         description: dto.description,

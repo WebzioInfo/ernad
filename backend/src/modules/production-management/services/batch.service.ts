@@ -45,7 +45,7 @@ export class BatchService {
 
       const finalBatchCode = batchCode || await this.generateBatchCode(tx);
       if (batchCode) {
-        const [existing] = await tx.select().from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
+        const [existing] = await tx.select({ id: productionBatches.id }).from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
         if (existing) throw new BadRequestException(`Batch code ${finalBatchCode} already exists.`);
       }
 

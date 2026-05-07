@@ -1,4 +1,5 @@
 import { useState, memo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api-client';
@@ -79,7 +80,7 @@ export default function ProductionControlPage() {
         <AnimatePresence mode="popLayout">
           {lines?.map((line: any, idx: number) => (
             <LineControlCard
-              key={line.id}
+              key={`${line.id}-${idx}`}
               line={line}
               onFocus={() => handleFocus(line.id)}
               brands={brands}
@@ -665,33 +666,62 @@ const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0
       </div>
 
       {isStartModalOpen && (
-        <Modal onClose={() => setIsStartModalOpen(false)}>
-           <div className="mb-10">
-              <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Initialize Batch</h3>
-              <p className="text-slate-500 font-bold mt-2">Configure and launch production on {line.name}.</p>
+        <Modal full onClose={() => setIsStartModalOpen(false)}>
+           <div className="mb-12">
+              <h3 className="text-5xl font-black text-slate-900 tracking-tighter">Initialize Batch</h3>
+              <p className="text-slate-500 font-bold mt-3 text-lg">Configure and launch production on {line.name}. All systems will be synchronized upon commitment.</p>
            </div>
-           <StartProductionForm 
-             shifts={shifts} 
-             brands={brands} 
-             products={products} 
-             selectedShift={selectedShift} setSelectedShift={setSelectedShift}
-             selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
-             selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
-             batchCode={batchCode} setBatchCode={setBatchCode}
-             startTime={startTime} setStartTime={setStartTime}
-             remarks={remarks} setRemarks={setRemarks}
-             onSubmit={() => startMutation.mutate()}
-             isPending={startMutation.isPending}
-           />
+           <div className="bg-slate-50/50 p-12 rounded-[3rem] border border-slate-100 shadow-inner">
+             <StartProductionForm 
+               shifts={shifts} 
+               brands={brands} 
+               products={products} 
+               selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+               selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+               selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+               batchCode={batchCode} setBatchCode={setBatchCode}
+               startTime={startTime} setStartTime={setStartTime}
+               remarks={remarks} setRemarks={setRemarks}
+               onSubmit={() => startMutation.mutate()}
+               isPending={startMutation.isPending}
+             />
+           </div>
         </Modal>
       )}
      </motion.div>
    );
 });
 
-function Modal({ children, onClose }: { children: React.ReactNode, onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+function Modal({ children, onClose, full = false }: { children: React.ReactNode, onClose: () => void, full?: boolean }) {
+  const content = full ? (
+    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-16 animate-in fade-in duration-500">
+       <div className="bg-white rounded-[4rem] w-full max-w-6xl max-h-full flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.3)] relative animate-in zoom-in-95 duration-500 overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20" />
+          
+          <header className="flex justify-between items-center p-12 md:p-16 border-b border-slate-50 bg-white relative z-10 shrink-0">
+             <div className="flex items-center gap-8">
+                <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl">
+                  <ActivitySquare className="w-8 h-8" />
+                </div>
+                <div>
+                  <h2 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">Line Command Center</h2>
+                  <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px] mt-3">Production Intelligence / System Init</p>
+                </div>
+             </div>
+             <button onClick={onClose} className="w-16 h-16 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 text-slate-400 rounded-[2rem] flex items-center justify-center transition-all group">
+                <X className="w-8 h-8 group-hover:rotate-90 transition-transform duration-500" />
+             </button>
+          </header>
+
+          <div className="p-12 md:p-16 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="max-w-4xl mx-auto w-full">
+               {children}
+            </div>
+          </div>
+       </div>
+    </div>
+  ) : (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
        <div className="bg-white rounded-[3rem] p-12 max-w-xl w-full shadow-2xl relative animate-in zoom-in-95 duration-300">
           <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all">
              <X className="w-6 h-6" />
@@ -700,4 +730,6 @@ function Modal({ children, onClose }: { children: React.ReactNode, onClose: () =
        </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

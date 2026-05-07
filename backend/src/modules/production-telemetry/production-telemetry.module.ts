@@ -7,12 +7,6 @@ import { ProductionManagementModule } from '../production-management/production-
 import { FactoryConfigModule } from '../factory-config/factory-config.module';
 import { QueueModule } from '../../providers/queue/queue.module';
 import { OperatorSessionModule } from '../operator-session/operator-session.module';
-
-const redisUrl = process.env.REDIS_URL;
-const isProduction = process.env.NODE_ENV === 'production';
-const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
-const redisIsConfigured = !!redisUrl && !(isProduction && isLocal);
-
 import { IngestionService } from './services/ingestion.service';
 import { ProcessingService } from './services/processing.service';
 
@@ -22,14 +16,14 @@ import { ProcessingService } from './services/processing.service';
     NotificationsModule,
     ProductionManagementModule,
     FactoryConfigModule,
-    ...(redisIsConfigured ? [QueueModule] : []),
+    QueueModule,
     OperatorSessionModule
   ],
   controllers: [ProductionTelemetryController],
   providers: [
     IngestionService,
     ProcessingService,
-    ...(redisIsConfigured ? [TelemetryProcessor] : []),
+    TelemetryProcessor,
   ],
   exports: [IngestionService, ProcessingService],
 })

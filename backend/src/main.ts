@@ -10,11 +10,18 @@ import * as dns from 'dns';
 // Fix for Node >= 17 IPv6 DNS resolution issues with Supabase Pooler
 dns.setDefaultResultOrder('ipv4first');
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  if (reason?.message?.includes('ECONNREFUSED') && reason?.message?.includes('6379')) {
+    return; // Silence stray Redis noise
+  }
   console.warn('[Process] Unhandled Rejection at:', promise, 'reason:', reason);
-  // Do not exit, just log it. This prevents Redis connection failures from killing the app.
 });
+
 async function bootstrap() {
+  console.log('[Bootstrap] NODE_ENV:', process.env.NODE_ENV);
+  console.log('[Bootstrap] REDIS_URL length:', process.env.REDIS_URL?.length || 0);
+  console.log('[Bootstrap] REDIS_URL partial:', process.env.REDIS_URL ? process.env.REDIS_URL.substring(0, 15) + '...' : 'NONE');
+  
   const app = await NestFactory.create(AppModule);
 
   // ── 1. GLOBAL CORS & DEBUG LOGGING (Absolute Priority) ──

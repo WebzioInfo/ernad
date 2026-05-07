@@ -19,12 +19,12 @@ export class RedisQueueService {
     const isProduction = process.env.NODE_ENV === 'production';
     const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
     
-    this.isEnabled = !!redisUrl && !(isProduction && isLocal);
+    this.isEnabled = !!redisUrl && redisUrl !== 'undefined' && !(isProduction && isLocal);
 
     if (this.isEnabled) {
       this.initQueues();
     } else {
-      this.logger.warn('Redis Queue disabled (Local/Unconfigured). Set REDIS_URL to enable.');
+      this.logger.log('🕒 Redis Queue disabled. Operating in no-op mode.');
     }
   }
 

@@ -32,8 +32,9 @@ async function runMigrations() {
           } catch (e: any) {
             // Ignore duplicate errors if we are re-running migrations
             // 42P07: relation already exists, 42710: extension/index already exists, 42701: column already exists
-            if (['42P07', '42710', '42701'].includes(e.code)) {
-               // console.log(`  (Already exists, skipping)`);
+            // 42703: undefined_column, 42704: undefined_object
+            if (['42P07', '42710', '42701', '42703', '42704'].includes(e.code)) {
+               // console.log(`  (Skipping expected conflict: ${e.code})`);
             } else {
               throw e;
             }

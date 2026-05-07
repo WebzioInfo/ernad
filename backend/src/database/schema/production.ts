@@ -7,7 +7,6 @@ export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'C
 export const productionBatches = pgTable('production_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
   batchCode: varchar('batch_code', { length: 50 }).notNull(),
-  productionDate: timestamp('production_date').defaultNow(), // @deprecated - Use startTime
   lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'restrict' }).notNull(),
   brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'restrict' }).notNull(),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
@@ -22,14 +21,12 @@ export const productionBatches = pgTable('production_batches', {
   materialReturn: jsonb('material_return'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  deletedAt: timestamp('deleted_at'),
 }, (table) => {
   return [
     index('idx_batches_line_status').on(table.lineId, table.status),
     index('idx_batches_product').on(table.productId),
     uniqueIndex('idx_batches_code_factory').on(table.batchCode, table.factoryId),
     index('idx_batches_factory').on(table.factoryId),
-    index('idx_batches_deleted').on(table.deletedAt),
   ];
 });
 
@@ -114,10 +111,6 @@ export const operatorSessions = pgTable('operator_sessions', {
   endReason: varchar('end_reason', { length: 100 }), // manual, timeout, forced, batch_closed
   lastActivityAt: timestamp('last_activity_at').defaultNow().notNull(),
   
-  // Legacy Aliases (Deprecated - mapped to startTime/endTime)
-  loginTime: timestamp('login_time'), 
-  logoutTime: timestamp('logout_time'),
-
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => {
   return [

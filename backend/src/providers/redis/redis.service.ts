@@ -12,40 +12,39 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const redisUrl = this.configService.get('REDIS_URL');
+    const rawUrl = this.configService.get('REDIS_URL');
+    const redisUrl = rawUrl?.trim();
     const isProduction = process.env.NODE_ENV === 'production';
     const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
 
-    if (!redisUrl) {
-      this.logger.log('🕒 Redis URL not provided. Operating in Memory Fallback mode.');
-      this.isAvailable = false;
-      return;
-    }
-
-    if (isProduction && isLocal) {
-      this.logger.warn('🚫 Localhost Redis detected in Production. Bypassing to prevent crash.');
+    if (!redisUrl || redisUrl === 'undefined' || (isProduction && isLocal)) {
+      this.logger.log('🕒 Redis disabled or missing. Stable Memory Fallback active.');
       this.isAvailable = false;
       return;
     }
 
     try {
+      this.logger.log(`📡 Initializing Redis connection to: ${redisUrl.split('@')[1] || 'private-host'}`);
+      
       this.client = new Redis(redisUrl, {
         lazyConnect: true,
         maxRetriesPerRequest: 0,
-        connectTimeout: 10000,
-        disconnectTimeout: 2000,
-        commandTimeout: 5000,
-        tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+        connectTimeout: 5000,
+        tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
         retryStrategy: (times) => {
-          if (times > 3) {
-            this.logger.warn(`Redis connection retry limit reached. Using memory fallback.`);
+          if (times > 1) {
+            this.logger.warn(`Redis unreachable. Using memory fallback.`);
             return null;
           }
-          return Math.min(times * 200, 2000);
+          return 500;
         }
       });
 
       this.client.on('error', (err) => {
+        // If we already know it's unavailable, don't flood the logs with connection retries
+        if (!this.isAvailable && (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND'))) {
+           return; 
+        }
         if (this.isAvailable) {
           this.logger.error(`Redis Runtime Error: ${err.message}`);
           this.isAvailable = false;
@@ -57,7 +56,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.isAvailable = true;
       });
 
-      await this.client.connect().catch(err => {
+      // Attempt initial connection without blocking bootstrap
+      this.client.connect().catch(err => {
         this.logger.warn(`Redis failed to connect: ${err.message}. Stable fallback active.`);
         this.isAvailable = false;
       });
