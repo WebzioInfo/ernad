@@ -52,13 +52,18 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config;
     
-    // 1. Handle Network/CORS Errors
+    // 1. Handle Network/CORS/Blocked Errors
     if (!error.response) {
-      console.error('%c[CORS_OR_NETWORK_FAILURE] The request was blocked or the server is unreachable.', 'color: #ef4444; font-weight: bold;', {
+      const isBlocked = error.message.includes('Network Error') || error.code === 'ERR_NETWORK';
+      console.error(`%c[${isBlocked ? 'BLOCKED_OR_OFFLINE' : 'CONNECTION_FAILURE'}] Request failed.`, 'color: #ef4444; font-weight: bold;', {
         url: config?.url,
-        method: config?.method,
-        origin: window.location.origin
+        message: error.message,
+        code: error.code
       });
+
+      if (isBlocked) {
+        toast.error('Network blocked or server unreachable. Please check your connection.');
+      }
       
       // Retry once for GET requests if it looks like a transient network issue
       if (config && config.method === 'get' && !(config as any)._retry) {
@@ -77,10 +82,23 @@ api.interceptors.response.use(
       }
     }
 
-    // 3. Handle 403 Forbidden (Audit Logged)
+    // 3. Handle 403 Forbidden (Audit Logged & Detailed)
     if (error.response?.status === 403) {
-      console.error('[AUTH_REJECTION] 403 Forbidden. Current roles/permissions insufficient for this resource.');
-      toast.error('Access Denied: Insufficient Privileges');
+      console.error('[AUTH_REJECTION] 403 Forbidden.', {
+        url: config?.url,
+        headers: config?.headers,
+        reason: 'Internal protection or insufficient permissions'
+      });
+      
+      const message = (error.response.data as any)?.message || 'Access Denied: Insufficient Privileges';
+      toast.error(message);
+    }
+
+    // 4. Handle 404 for Assets/Chunks
+    if (error.response?.status === 404 && config?.url?.includes('.js')) {
+      console.error('[CHUNK_MISSING] A required JS module could not be loaded.');
+      toast.error('Application update detected. Reloading...');
+      setTimeout(() => window.location.reload(), 2000);
     }
 
     return Promise.reject(error);

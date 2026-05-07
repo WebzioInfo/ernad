@@ -17,40 +17,43 @@ process.on('unhandledRejection', (reason, promise) => {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.use(cookieParser());
+  // ── 1. GLOBAL CORS & DEBUG LOGGING (Absolute Priority) ──
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      console.log(`[CORS_MONITOR] Request from Origin: ${origin} | Method: ${req.method} | Path: ${req.url}`);
+    }
+    
+    // Explicit OPTIONS preflight handling for production resilience
+    if (req.method === 'OPTIONS') {
+      res.header('Access-Control-Allow-Origin', origin || '*');
+      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With, x-mes-request-id');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      return res.status(200).send();
+    }
+    next();
+  });
 
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      const frontendUrls = process.env.FRONTEND_URL || '';
-      const allowedOrigins = frontendUrls.split(',').map(url => url.trim()).filter(Boolean);
-      const productionDefaults = [
-        'https://ernad.vercel.app',
-        'https://ernad-mes.vercel.app',
-      ];
-      const isExplicitlyAllowed = allowedOrigins.includes(origin) || productionDefaults.includes(origin);
-      const isVercelPreview = /\.vercel\.app$/.test(origin);
-      if (isExplicitlyAllowed || isVercelPreview || origin.includes('localhost')) {
-        callback(null, true);
-      } else {
-        console.warn(`[CORS_REJECTED] Origin: ${origin}`);
-        callback(null, false);
-      }
-    },
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    origin: [
+      'https://ernad.vercel.app',
+      'https://www.ernad.vercel.app',
+      'http://localhost:5173'
+    ],
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'X-Requested-With',
       'Accept',
+      'Origin',
+      'X-Requested-With',
       'x-mes-request-id',
-      'x-correlation-id'
     ],
-    exposedHeaders: ['Content-Range', 'X-Content-Range', 'Authorization'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
   });
+
+  app.use(cookieParser());
 
   app.setGlobalPrefix('api', { exclude: ['/'] });
   app.useGlobalFilters(new GlobalExceptionFilter());
