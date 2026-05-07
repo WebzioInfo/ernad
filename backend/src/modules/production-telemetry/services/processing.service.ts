@@ -32,12 +32,7 @@ export class ProcessingService {
         return existing[0];
       }
 
-      const [user] = await tx.select({ factoryId: users.factoryId }).from(users).where(eq(users.id, userId)).limit(1);
-      if (!user || !user.factoryId) {
-        throw new BadRequestException('User not assigned to a factory.');
-      }
-      const factoryId = user.factoryId;
-
+      // 2. Recovery: Get Factory Context from Batch/Session
       const totalsList = await tx.select().from(batchTotals)
         .where(eq(batchTotals.batchId, dto.batchId))
         .for('update');
@@ -47,6 +42,7 @@ export class ProcessingService {
       }
       
       const current = totalsList[0];
+      const factoryId = current.factoryId; // Get factory context from the batch itself
 
       const isValidShift = await this.shiftService.validateShiftEntry(dto.shiftId, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
       if (!isValidShift) {
@@ -106,7 +102,12 @@ export class ProcessingService {
 
       if (!dto.isRework) {
         const updateField = this.getFieldName(dto.station);
-        await this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount);
+        
+        // Fast-fail Redis increment
+        if (this.redisService.getAvailability()) {
+          this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => {});
+        }
+
         await tx.update(batchTotals)
           .set({ 
             [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount}`,

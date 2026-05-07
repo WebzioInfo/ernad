@@ -21,7 +21,7 @@ async function bootstrap() {
   console.log('[Bootstrap] NODE_ENV:', process.env.NODE_ENV);
   console.log('[Bootstrap] REDIS_URL length:', process.env.REDIS_URL?.length || 0);
   console.log('[Bootstrap] REDIS_URL partial:', process.env.REDIS_URL ? process.env.REDIS_URL.substring(0, 15) + '...' : 'NONE');
-  
+
   const app = await NestFactory.create(AppModule);
 
   // ── 1. GLOBAL CORS & DEBUG LOGGING (Absolute Priority) ──
@@ -30,7 +30,7 @@ async function bootstrap() {
     if (origin) {
       console.log(`[CORS_MONITOR] Request from Origin: ${origin} | Method: ${req.method} | Path: ${req.url}`);
     }
-    
+
     // Explicit OPTIONS preflight handling for production resilience
     if (req.method === 'OPTIONS') {
       res.header('Access-Control-Allow-Origin', origin || '*');
@@ -45,7 +45,6 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://ernad.vercel.app',
-      'https://www.ernad.vercel.app',
       'http://localhost:5173'
     ],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],

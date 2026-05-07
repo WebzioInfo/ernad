@@ -90,15 +90,23 @@ export class OperatorSessionService {
       .returning();
 
     // Invalidate Cache
-    await this.redis.del(`operator_session:${userId}`);
+    if (this.redis.getAvailability()) {
+      this.redis.del(`operator_session:${userId}`).catch(() => {});
+    }
 
     return session;
   }
 
   async getCurrentSession(userId: string) {
-    // Try cache first
-    const cached = await this.redis.get(`operator_session:${userId}`);
-    if (cached) return JSON.parse(cached);
+    // Try cache first (only if available)
+    if (this.redis.getAvailability()) {
+      try {
+        const cached = await this.redis.get(`operator_session:${userId}`);
+        if (cached) return JSON.parse(cached);
+      } catch {
+        // Silently fail to DB
+      }
+    }
 
     const [session] = await db.select().from(operatorSessions)
       .where(and(
@@ -107,8 +115,8 @@ export class OperatorSessionService {
       ))
       .limit(1);
 
-    if (session) {
-      await this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12);
+    if (session && this.redis.getAvailability()) {
+      this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12).catch(() => {});
     }
 
     return session || null;

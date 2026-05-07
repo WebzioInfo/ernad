@@ -147,6 +147,7 @@ export class BatchService {
         startTime: batch.startTime,
         productId: batch.productId,
         brandId: batch.brandId,
+        shiftId: batch.shiftId,
         productName: product?.name || 'Unknown Product',
         brandName: brand?.name || 'Unknown Brand'
       }

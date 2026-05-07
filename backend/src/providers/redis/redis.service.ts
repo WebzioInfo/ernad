@@ -14,11 +14,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     const rawUrl = this.configService.get('REDIS_URL');
     const redisUrl = rawUrl?.trim();
-    const isProduction = process.env.NODE_ENV === 'production';
-    const isLocal = redisUrl && (redisUrl.includes('127.0.0.1') || redisUrl.includes('localhost'));
 
-    if (!redisUrl || redisUrl === 'undefined' || (isProduction && isLocal)) {
-      this.logger.log('🕒 Redis disabled or missing. Stable Memory Fallback active.');
+    if (!redisUrl || redisUrl === 'undefined') {
+      this.logger.log('🕒 Redis missing. Stable Memory Fallback active.');
       this.isAvailable = false;
       return;
     }
@@ -41,7 +39,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.client.on('error', (err) => {
-        // If we already know it's unavailable, don't flood the logs with connection retries
         if (!this.isAvailable && (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND'))) {
            return; 
         }
@@ -56,7 +53,6 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         this.isAvailable = true;
       });
 
-      // Attempt initial connection without blocking bootstrap
       this.client.connect().catch(err => {
         this.logger.warn(`Redis failed to connect: ${err.message}. Stable fallback active.`);
         this.isAvailable = false;

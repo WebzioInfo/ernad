@@ -54,22 +54,27 @@ api.interceptors.response.use(
     
     // 1. Handle Network/CORS/Blocked Errors
     if (!error.response) {
-      const isBlocked = error.message.includes('Network Error') || error.code === 'ERR_NETWORK';
-      console.error(`%c[${isBlocked ? 'BLOCKED_OR_OFFLINE' : 'CONNECTION_FAILURE'}] Request failed.`, 'color: #ef4444; font-weight: bold;', {
+      const isCorsOrNetwork = error.message.includes('Network Error') || error.code === 'ERR_NETWORK';
+      console.error(`%c[${isCorsOrNetwork ? 'CORS_OR_OFFLINE' : 'CONNECTION_FAILURE'}] Request failed.`, 'color: #ef4444; font-weight: bold;', {
         url: config?.url,
         message: error.message,
         code: error.code
       });
 
-      if (isBlocked) {
-        toast.error('Network blocked or server unreachable. Please check your connection.');
+      if (isCorsOrNetwork) {
+        toast.error('Connection failed. The server might be unreachable or blocked by CORS.');
       }
       
-      // Retry once for GET requests if it looks like a transient network issue
-      if (config && config.method === 'get' && !(config as any)._retry) {
-        (config as any)._retry = true;
-        console.warn('[RETRYING] Transient network error, attempting one last time...');
-        return api(config);
+      // Strict Retry Logic: Only retry GET requests ONCE to prevent storms
+      if (config && config.method === 'get') {
+        const retryCount = (config as any)._retryCount || 0;
+        if (retryCount < 1) {
+          (config as any)._retryCount = retryCount + 1;
+          console.warn(`[RETRYING] Transient network error, attempting retry ${retryCount + 1}...`);
+          return api(config);
+        } else {
+          console.error('[RETRY_EXHAUSTED] Giving up after maximum retries.');
+        }
       }
     }
 

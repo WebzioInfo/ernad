@@ -25,12 +25,12 @@ export default function OperatorPanel() {
   const [activeBatch, setActiveBatch] = useState<any>(null);
   const [line, setLine] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [primaryCount, setPrimaryCount] = useState(0);
   const [splitValues, setSplitValues] = useState<number[]>([]);
   const [wastageCount, setWastageCount] = useState(0);
   const [eventType, setEventType] = useState('NORMAL_PRODUCTION');
   const [remarks, setRemarks] = useState('');
-  const [isRework, setIsRework] = useState(false);
   const [materials, setMaterials] = useState<any[]>([]);
 
   const navigate = useNavigate();
@@ -86,65 +86,125 @@ export default function OperatorPanel() {
     if (lineId) fetchData();
   }, [lineId]);
 
-  const addSplitValue = (val: number) => {
-    setSplitValues(prev => [...prev, val]);
-    setPrimaryCount(prev => prev + val);
+  const adjustSplitValue = (val: number, isAdd: boolean = true) => {
+    if (!Number.isInteger(val)) {
+      toast.error('Only whole number counts are allowed.');
+      return;
+    }
+    
+    if (isAdd) {
+      setSplitValues(prev => [...prev, val]);
+      setPrimaryCount(prev => prev + val);
+    } else {
+      if (primaryCount - val < 0) {
+        toast.error('Count cannot be less than 0.');
+        return;
+      }
+      setSplitValues(prev => [...prev, -val]);
+      setPrimaryCount(prev => prev - val);
+    }
   };
 
   const { data: history, refetch: refetchHistory } = useQuery({
-    queryKey: ['station-log-history', activeBatch?.id, currentStation.id],
+    queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
     queryFn: async () => {
-      if (!activeBatch?.id) return [];
-      return (await api.get(`/telemetry/history/${activeBatch.id}/${currentStation.id}`)).data;
+      if (!activeBatch?.batch?.id) return [];
+      return (await api.get(`/telemetry/history/${activeBatch.batch.id}/${currentStation.id}`)).data;
     },
-    enabled: !!activeBatch?.id,
+    enabled: !!activeBatch?.batch?.id,
   });
 
-  const handleSaveToOffline = async () => {
-    if (primaryCount === 0 && wastageCount === 0 && eventType === 'NORMAL_PRODUCTION') {
+  const handleSaveToOffline = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'MATERIAL' | 'WASTE' = 'ALL') => {
+    if (!activeBatch?.batch && !session?.batchId) {
+      return toast.error('No active batch found. Please wait for sync.');
+    }
+
+    const currentBatch = activeBatch?.batch;
+    const isManual = type !== 'ALL';
+
+    if (isSubmitting) return;
+
+    // Validation based on type
+    if (type === 'COUNT' && primaryCount === 0) return toast.error('Enter count first');
+    if (type === 'EVENT' && eventType === 'NORMAL_PRODUCTION' && !remarks) return toast.error('Add remarks for event');
+    if (type === 'MATERIAL' && materials.length === 0) return toast.error('Add materials first');
+    if (type === 'WASTE' && wastageCount === 0) return toast.error('Enter wastage first');
+    if (type === 'ALL' && primaryCount === 0 && wastageCount === 0 && materials.length === 0 && eventType === 'NORMAL_PRODUCTION') {
       return toast.error('Nothing to log');
+    }
+
+    // SANITIZE SPLIT VALUES AND TOTAL
+    const sanitizedValues = splitValues.map(v => Math.floor(Number(v) || 0));
+    const calculatedPrimary = sanitizedValues.reduce((a, b) => a + b, 0);
+    const safePrimaryCount = (type === 'ALL' || type === 'COUNT') ? (calculatedPrimary > 0 ? calculatedPrimary : Math.floor(Number(primaryCount) || 0)) : 0;
+    const safeWastageCount = (type === 'ALL' || type === 'WASTE') ? Math.floor(Number(wastageCount) || 0) : 0;
+
+    // Reject un-sanitized leftover decimals (Safety Net)
+    if (splitValues.some(v => !Number.isInteger(v)) || !Number.isInteger(primaryCount) || !Number.isInteger(wastageCount)) {
+      return toast.error('Only whole number counts are allowed.');
     }
 
     const logEntry = {
       requestId: uuidv4(),
-      batchId: activeBatch?.id || session?.batchId,
+      batchId: currentBatch?.id || session?.batchId,
       sessionId: session.id,
       lineId: lineId!,
-      brandId: activeBatch?.brandId || session?.brandId,
-      productId: activeBatch?.productId || session?.productId,
-      shiftId: session.shiftId || activeBatch?.shiftId,
+      brandId: currentBatch?.brandId || session?.brandId,
+      productId: currentBatch?.productId || session?.productId,
+      shiftId: currentBatch?.shiftId || session?.shiftId,
       station: currentStation.id,
-      primaryCount,
-      splitValues,
-      wastageCount,
-      eventType,
-      isRework,
-      materials,
-      remarks,
-      loggedAt: new Date().toISOString(),
-      synced: 0
+      primaryCount: safePrimaryCount,
+      splitValues: sanitizedValues,
+      wastageCount: safeWastageCount,
+      eventType: (type === 'ALL' || type === 'EVENT') ? eventType : 'NORMAL_PRODUCTION',
+      isRework: false, // Default to standard
+      materials: (type === 'ALL' || type === 'MATERIAL') ? materials : [],
+      remarks: (type === 'ALL' || type === 'EVENT') ? remarks : '',
+      loggedAt: new Date().toISOString()
     };
 
     try {
-      await db.offlineLogs.add(logEntry);
-      toast.success('Log saved locally (Offline-First)');
+      setIsSubmitting(true);
+      // Send directly to API
+      await api.post('/telemetry', logEntry);
+      
+      const successMsg = isManual 
+        ? `Logged ${type.toLowerCase()} successfully` 
+        : `${safePrimaryCount} units logged successfully for ${currentStation.title}`;
+        
+      toast.success(successMsg, {
+        icon: '✅',
+        style: {
+          borderRadius: '10px',
+          background: '#1e293b',
+          color: '#fff',
+          border: '1px solid #10b981',
+        },
+      });
+      
+      refetchHistory();
 
-      // Sync attempt (optional, background worker usually handles it)
-      api.post('/telemetry', logEntry).then(() => {
-        refetchHistory();
-      }).catch(() => { });
+      // Selective reset
+      if (type === 'ALL' || type === 'COUNT') {
+        setPrimaryCount(0);
+        setSplitValues([]);
+      }
+      if (type === 'ALL' || type === 'WASTE') {
+        setWastageCount(0);
+      }
+      if (type === 'ALL' || type === 'MATERIAL') {
+        setMaterials([]);
+      }
+      if (type === 'ALL' || type === 'EVENT') {
+        setEventType('NORMAL_PRODUCTION');
+        setRemarks('');
+      }
 
-      // Reset state
-      setPrimaryCount(0);
-      setSplitValues([]);
-      setWastageCount(0);
-      setIsRework(false);
-      setMaterials([]);
-      setEventType('NORMAL_PRODUCTION');
-      setRemarks('');
-
-    } catch (err) {
-      toast.error('Failed to save log locally');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Connection Error: Failed to save log';
+      toast.error(typeof msg === 'string' ? msg : 'Validation Error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -177,15 +237,15 @@ export default function OperatorPanel() {
           <div className="flex gap-12">
             <div className="group cursor-default">
               <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.25em] block mb-1 group-hover:text-indigo-400 transition-colors">Active Batch</span>
-              <span className="text-lg font-mono font-black text-white group-hover:text-indigo-200 transition-colors">{activeBatch?.batchCode || '---'}</span>
+              <span className="text-lg font-mono font-black text-white group-hover:text-indigo-200 transition-colors">{activeBatch?.batch?.batchCode || '---'}</span>
             </div>
             <div className="group cursor-default">
               <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.25em] block mb-1 group-hover:text-blue-400 transition-colors">Production Brand</span>
-              <span className="text-lg font-black text-blue-400 group-hover:text-blue-300 transition-colors">{activeBatch?.brand?.name || '---'}</span>
+              <span className="text-lg font-black text-blue-400 group-hover:text-blue-300 transition-colors">{activeBatch?.batch?.brandName || '---'}</span>
             </div>
             <div className="group cursor-default">
               <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.25em] block mb-1 group-hover:text-emerald-400 transition-colors">Target Product</span>
-              <span className="text-lg font-black text-emerald-400 group-hover:text-emerald-300 transition-colors">{activeBatch?.product?.name || '---'}</span>
+              <span className="text-lg font-black text-emerald-400 group-hover:text-emerald-300 transition-colors">{activeBatch?.batch?.productName || '---'}</span>
             </div>
           </div>
         </div>
@@ -266,22 +326,8 @@ export default function OperatorPanel() {
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Total Real-Time Production Output</p>
-                <div className={`text-[12rem] font-black tabular-nums tracking-tighter leading-none mb-8 filter drop-shadow-[0_0_50px_rgba(79,70,229,0.3)] ${currentStation.color}`}>
+                <div className={`text-[12rem] font-black tabular-nums tracking-tighter leading-none mb-12 filter drop-shadow-[0_0_50px_rgba(79,70,229,0.3)] ${currentStation.color}`}>
                   {primaryCount}
-                </div>
-
-                {/* Rework Toggle */}
-                <div className="flex items-center gap-6 mb-10 px-8 py-3 bg-white/5 rounded-full border border-white/10">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${!isRework ? 'text-white' : 'text-slate-500'}`}>Standard</span>
-                    <button
-                      onClick={() => setIsRework(!isRework)}
-                      className={`w-14 h-7 rounded-full relative transition-all duration-500 ${isRework ? 'bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'bg-slate-800'}`}
-                    >
-                      <div className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-xl transition-all duration-500 ${isRework ? 'left-8' : 'left-1'}`} />
-                    </button>
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${isRework ? 'text-amber-500' : 'text-slate-500'}`}>Rework Mode</span>
-                  </div>
                 </div>
 
                 {splitValues.length > 0 && (
@@ -291,9 +337,9 @@ export default function OperatorPanel() {
                         initial={{ opacity: 0, scale: 0.5 }}
                         animate={{ opacity: 1, scale: 1 }}
                         key={i}
-                        className={`px-4 py-1.5 bg-white/5 rounded-full text-xs font-black border border-white/10 ${currentStation.color}`}
+                        className={`px-4 py-1.5 bg-white/5 rounded-full text-xs font-black border border-white/10 ${v > 0 ? currentStation.color : 'text-rose-400'}`}
                       >
-                        +{v}
+                        {v > 0 ? '+' : ''}{v}
                       </motion.span>
                     ))}
                   </div>
@@ -301,41 +347,75 @@ export default function OperatorPanel() {
 
                 <div className="grid grid-cols-4 gap-6 w-full max-w-4xl">
                   {[1000, 500, 100, 50].map(val => (
-                    <button
-                      key={val}
-                      onClick={() => addSplitValue(val)}
-                      className={`py-12 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-[2rem] font-black text-4xl shadow-xl active:scale-95 transition-all group overflow-hidden relative`}
-                    >
-                      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      <span className="relative z-10">+{val}</span>
-                    </button>
+                    <div key={val} className="flex gap-2 w-full">
+                      <button
+                        onClick={() => adjustSplitValue(val, false)}
+                        disabled={primaryCount - val < 0}
+                        className={`w-1/3 py-12 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-l-[2rem] font-black text-4xl shadow-xl active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
+                      >
+                        -
+                      </button>
+                      <button
+                        onClick={() => adjustSplitValue(val, true)}
+                        className={`w-2/3 py-12 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-r-[2rem] font-black text-4xl shadow-xl active:scale-95 transition-all group overflow-hidden relative`}
+                      >
+                        <div className="relative z-10">{val}</div>
+                        <div className="absolute inset-0 bg-gradient-to-t from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    </div>
                   ))}
-                  {[10, 5, 1, 0.5].map(val => (
-                    <button
-                      key={val}
-                      onClick={() => addSplitValue(val)}
-                      className="py-10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-[2rem] font-black text-2xl border border-white/5 active:scale-95 transition-all"
-                    >
-                      +{val}
-                    </button>
+                  {[20, 10, 5, 1].map(val => (
+                    <div key={val} className="flex gap-2 w-full">
+                      <button
+                        onClick={() => adjustSplitValue(val, false)}
+                        disabled={primaryCount - val < 0}
+                        className="w-1/3 py-10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-l-[2rem] font-black text-2xl border border-white/5 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        -
+                      </button>
+                      <button
+                        onClick={() => adjustSplitValue(val, true)}
+                        className="w-2/3 py-10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-r-[2rem] font-black text-2xl border border-white/5 active:scale-95 transition-all"
+                      >
+                        +{val}
+                      </button>
+                    </div>
                   ))}
+                </div>
+                
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-6">
+                  * Production counts must be whole numbers.
+                </p>
+
+                <div className="mt-12 flex gap-4 w-full max-w-4xl">
+                  <button
+                    onClick={() => handleSaveToOffline('COUNT')}
+                    disabled={isSubmitting}
+                    className={`flex-1 py-6 bg-white/5 hover:bg-white/10 border ${currentStation.border} rounded-3xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50`}
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    {isSubmitting ? 'Processing...' : 'Log Output Only'}
+                  </button>
+                  <button
+                    onClick={() => { setPrimaryCount(0); setSplitValues([]); }}
+                    disabled={isSubmitting}
+                    className="px-8 py-6 bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white rounded-3xl font-black uppercase tracking-widest text-[10px] transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    Clear
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-6">
-                <button
-                  onClick={() => { setPrimaryCount(0); setSplitValues([]); }}
-                  className="py-6 bg-white/5 rounded-3xl text-slate-400 font-black uppercase tracking-widest text-xs hover:bg-rose-500/10 hover:text-rose-400 transition-all border border-transparent hover:border-rose-500/20"
-                >
-                  Clear Entry
-                </button>
-                <button
-                  onClick={handleSaveToOffline}
-                  className="col-span-2 py-6 bg-indigo-600 rounded-3xl text-white font-black uppercase tracking-[0.3em] text-sm hover:bg-indigo-500 transition-all shadow-[0_20px_50px_rgba(79,70,229,0.3)] active:scale-[0.98] flex items-center justify-center gap-3"
-                >
-                  <Save className="w-5 h-5" /> Commit Production Log
-                </button>
-              </div>
+              {/* Commit All */}
+              <button
+                onClick={() => handleSaveToOffline('ALL')}
+                disabled={isSubmitting}
+                className="w-full py-10 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[3rem] font-black uppercase tracking-[0.4em] text-sm shadow-2xl shadow-indigo-500/40 transition-all active:scale-[0.98] flex items-center justify-center gap-6 group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                {isSubmitting ? <Loader2 className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
+                {isSubmitting ? 'Processing Telemetry...' : 'Commit Full Telemetry Log'}
+              </button>
             </div>
 
             {/* Right: History & Events (4 cols) */}
@@ -343,37 +423,36 @@ export default function OperatorPanel() {
               {/* Event Selector */}
               <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10">
                 <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-6">Process Status</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'NORMAL_PRODUCTION', label: 'Running', icon: ShieldCheck, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-                    { id: 'DOWNTIME_PAUSE', label: 'Paused', icon: RefreshCw, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-                    { id: 'MACHINE_BREAKDOWN', label: 'Breakdown', icon: Cpu, color: 'text-rose-400', bg: 'bg-rose-500/10' },
-                    { id: 'POWER_FAILURE', label: 'Power Cut', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-                    { id: 'MATERIAL_SHORTAGE', label: 'Mat. Low', icon: PackageOpen, color: 'text-blue-400', bg: 'bg-blue-500/10' }
-                  ].map(e => (
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {['NORMAL_PRODUCTION', 'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'DOWNTIME_PAUSE'].map(type => (
                     <button
-                      key={e.id}
-                      onClick={() => setEventType(e.id)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${eventType === e.id
-                        ? `${e.bg} border-white/20 shadow-xl`
-                        : 'bg-transparent border-transparent opacity-40 hover:opacity-100 hover:bg-white/5'
+                      key={type}
+                      onClick={() => setEventType(type)}
+                      className={`p-4 rounded-2xl border transition-all text-[10px] font-black uppercase tracking-widest text-center ${eventType === type
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+                        : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'
                         }`}
                     >
-                      <e.icon className={`w-5 h-5 ${e.color}`} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{e.label}</span>
+                      {type.replace('_', ' ')}
                     </button>
                   ))}
                 </div>
                 <textarea
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Additional notes..."
-                  className="w-full mt-6 bg-black/60 border border-white/5 rounded-2xl p-4 text-sm font-bold text-slate-300 focus:outline-none focus:border-indigo-500/50 h-20 resize-none transition-all placeholder:text-slate-700"
+                  placeholder="Technical remarks or event details..."
+                  className="w-full bg-black/20 border border-white/5 rounded-2xl p-4 text-xs font-medium text-slate-300 h-24 resize-none focus:border-indigo-500/50 outline-none transition-colors"
                 />
+                <button
+                  onClick={() => handleSaveToOffline('EVENT')}
+                  className="w-full mt-4 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
+                >
+                  <AlertTriangle className="w-4 h-4 text-amber-500" /> Log Process Event
+                </button>
               </div>
 
               {/* Log History */}
-              <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10 flex-1 flex flex-col overflow-hidden shadow-2xl">
+              <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10 h-[400px] flex flex-col overflow-hidden shadow-2xl">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Batch Log Feed</h3>
                   <div className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border border-white/5">
@@ -428,25 +507,43 @@ export default function OperatorPanel() {
                         <span className={`text-xs font-black ${currentStation.color}`}>{materials.find(m => m.materialName === mat)?.quantity || 0} PCS</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        {[1, 5, 10].map(v => (
-                          <button
-                            key={v}
-                            onClick={() => {
-                              const existing = materials.find(m => m.materialName === mat);
-                              if (existing) {
-                                setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: m.quantity + v } : m));
-                              } else {
-                                setMaterials([...materials, { materialName: mat, quantity: v, unit: 'PCS' }]);
-                              }
-                            }}
-                            className="py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black border border-white/5 transition-all active:scale-95"
-                          >
-                            +{v}
-                          </button>
-                        ))}
+                        {[1, 5, 10].map(v => {
+                          const existingQty = materials.find(m => m.materialName === mat)?.quantity || 0;
+                          return (
+                          <div key={v} className="flex gap-1 w-full">
+                            <button
+                              onClick={() => {
+                                const newQty = Math.max(0, existingQty - v);
+                                setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: newQty } : m));
+                              }}
+                              disabled={existingQty - v < 0}
+                              className="w-1/3 py-3 bg-white/5 hover:bg-white/10 rounded-l-xl text-[10px] font-black border border-white/5 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              -
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (existingQty > 0) {
+                                  setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: existingQty + v } : m));
+                                } else {
+                                  setMaterials([...materials, { materialName: mat, quantity: v, unit: 'PCS' }]);
+                                }
+                              }}
+                              className="w-2/3 py-3 bg-white/5 hover:bg-white/10 rounded-r-xl text-[10px] font-black border border-white/5 transition-all active:scale-95"
+                            >
+                              +{v}
+                            </button>
+                          </div>
+                        )})}
                       </div>
                     </div>
                   ))}
+                  <button
+                    onClick={() => handleSaveToOffline('MATERIAL')}
+                    className={`w-full py-5 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '30')} border ${currentStation.border} rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95 mt-4`}
+                  >
+                    <Box className="w-4 h-4" /> Log Usage Only
+                  </button>
                 </div>
               </div>
 
@@ -469,15 +566,29 @@ export default function OperatorPanel() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[1, 5, 10, 50].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => setWastageCount(prev => prev + v)}
-                      className="py-4 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95"
-                    >
-                      +{v}
-                    </button>
+                    <div key={v} className="flex gap-1 w-full">
+                      <button
+                        onClick={() => setWastageCount(prev => Math.max(0, prev - v))}
+                        disabled={wastageCount - v < 0}
+                        className="w-1/3 py-4 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-l-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        -
+                      </button>
+                      <button
+                        onClick={() => setWastageCount(prev => prev + v)}
+                        className="w-2/3 py-4 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-r-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95"
+                      >
+                        +{v}
+                      </button>
+                    </div>
                   ))}
                 </div>
+                <button
+                  onClick={() => handleSaveToOffline('WASTE')}
+                  className="w-full mt-6 py-5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
+                >
+                  <AlertTriangle className="w-4 h-4 text-rose-500" /> Log Waste Only
+                </button>
               </div>
             </div>
           </div>

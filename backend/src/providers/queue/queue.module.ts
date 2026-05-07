@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import Redis from 'ioredis';
 
 @Module({
   imports: [
@@ -8,36 +9,31 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const url = configService.get('REDIS_URL');
-        const isProduction = process.env.NODE_ENV === 'production';
-        const isLocal = url && (url.includes('127.0.0.1') || url.includes('localhost'));
+        const url = configService.get<string>('REDIS_URL');
         
-        // If no URL or local Redis in production/Vercel, we return a config that won't connect to 127.0.0.1
-        if (!url || (isProduction && isLocal)) {
-          return {
-            connection: {
-              host: 'disabled-redis-host', // Purposefully invalid to prevent default localhost connection
-              port: 6379,
-              offlineQueue: false,
-              maxRetriesPerRequest: 0,
-            },
-          };
+        if (!url || url === 'undefined') {
+           return {
+             connection: { host: 'disabled', port: 6379, offlineQueue: false }
+           };
         }
 
-        return {
-          connection: {
-            url,
-            tls: url?.startsWith('rediss://') ? {} : undefined,
-            maxRetriesPerRequest: null,
-            enableReadyCheck: false,
-            offlineQueue: true,
-            retryStrategy: (times: number) => Math.min(times * 500, 30000),
-          },
-        };
+        // CORRECT WAY TO PASS URL TO BULLMQ: use an ioredis connection directly
+        const connection = new Redis(url, {
+          maxRetriesPerRequest: null,
+          enableReadyCheck: false,
+          tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
+          retryStrategy: (times) => Math.min(times * 500, 30000),
+        });
+
+        return { connection };
       },
     }),
-    BullModule.registerQueue({ name: 'telemetry' }),
+    BullModule.registerQueue({ 
+      name: 'telemetry',
+      defaultJobOptions: { removeOnComplete: true },
+      ...({ skipConfigCheck: true } as any) // Suppresses the "Eviction policy" warning
+    }),
   ],
   exports: [BullModule],
 })
-export class QueueModule {}
+export class QueueModule { }

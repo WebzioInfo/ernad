@@ -27,6 +27,10 @@ export const useWebSocket = () => {
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
       queryClient.invalidateQueries({ queryKey: ['line-performance-detail'] });
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
     };
 
     const channel = pusher.subscribe('managers');

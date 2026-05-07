@@ -21,6 +21,12 @@ export class RolesGuard implements CanActivate {
     ]);
 
     const request = context.switchToHttp().getRequest();
+    
+    // STRICT BYPASS for preflight requests
+    if (request.method === 'OPTIONS') {
+      return true;
+    }
+
     const { user } = request;
 
     if (!user) {
