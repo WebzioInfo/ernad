@@ -107,12 +107,12 @@ export default function OperatorPanel() {
 
     const logEntry = {
       requestId: uuidv4(),
-      batchId: activeBatch?.id,
+      batchId: activeBatch?.id || session?.batchId,
       sessionId: session.id,
       lineId: lineId!,
-      brandId: activeBatch?.brandId,
-      productId: activeBatch?.productId,
-      shiftId: session.shiftId || activeBatch?.shiftId || 'SHIFT_A',
+      brandId: activeBatch?.brandId || session?.brandId,
+      productId: activeBatch?.productId || session?.productId,
+      shiftId: session.shiftId || activeBatch?.shiftId,
       station: currentStation.id,
       primaryCount,
       splitValues,
@@ -149,7 +149,7 @@ export default function OperatorPanel() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950 text-white font-sans overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-slate-950 text-white font-sans">
       {/* Ultra-Premium Header */}
       <header className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-3xl relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-blue-500/5" />
@@ -212,7 +212,7 @@ export default function OperatorPanel() {
         </div>
       </header>
 
-      <main className="flex-1 p-8 grid grid-cols-12 gap-8 overflow-hidden">
+      <main className="flex-1 p-8 grid grid-cols-12 gap-8 lg:overflow-hidden">
         {loading ? (
           <div className="col-span-12 flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
@@ -261,7 +261,7 @@ export default function OperatorPanel() {
             )}
 
             {/* Left: Logging Controls (8 cols) */}
-            <div className="col-span-8 flex flex-col gap-8 h-full overflow-hidden">
+            <div className="col-span-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar pr-2">
               <div className="bg-white/5 rounded-[3rem] p-10 border border-white/10 flex flex-col items-center relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
@@ -339,7 +339,7 @@ export default function OperatorPanel() {
             </div>
 
             {/* Right: History & Events (4 cols) */}
-            <div className="col-span-4 flex flex-col gap-8 h-full overflow-hidden">
+            <div className="col-span-4 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar pr-2">
               {/* Event Selector */}
               <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10">
                 <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-6">Process Status</h3>
