@@ -1,7 +1,7 @@
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { Controller, Post, Body, UseGuards, UseInterceptors, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UseInterceptors, Request, Get, Param } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { ProductionTelemetryDto } from './dto/production-telemetry.dto';
@@ -46,6 +46,12 @@ export class ProductionTelemetryController {
   @Permissions('telemetry:log')
   async logPacking(@Request() req, @Body() dto: any) {
     return this.ingestionService.createLog(req.user.sub, { ...dto, station: 'PACKING' });
+  }
+
+  @Get('history/:batchId/:station')
+  @Permissions('telemetry:log')
+  async getHistory(@Param('batchId') batchId: string, @Param('station') station: string) {
+    return this.ingestionService.getLogHistory(batchId, station);
   }
 }
 

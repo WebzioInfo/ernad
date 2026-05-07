@@ -693,6 +693,20 @@ const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0
 });
 
 function Modal({ children, onClose, full = false }: { children: React.ReactNode, onClose: () => void, full?: boolean }) {
+  useEffect(() => {
+    const scrollContainer = document.getElementById('main-scroll-container');
+    
+    // Lock scroll
+    document.body.style.overflow = 'hidden';
+    if (scrollContainer) scrollContainer.style.overflow = 'hidden';
+
+    return () => {
+      // Unlock scroll
+      document.body.style.overflow = '';
+      if (scrollContainer) scrollContainer.style.overflow = '';
+    };
+  }, []);
+
   const content = full ? (
     <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-16 animate-in fade-in duration-500">
        <div className="bg-white rounded-[4rem] w-full max-w-6xl max-h-full flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.3)] relative animate-in zoom-in-95 duration-500 overflow-hidden">

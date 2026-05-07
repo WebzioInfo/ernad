@@ -82,4 +82,8 @@ export class IngestionService {
       return { status: 'ACCEPTED', requestId: dto.requestId, message: 'Processed synchronously (Queue Error)' };
     }
   }
+
+  async getLogHistory(batchId: string, station: string) {
+    return this.processingService.getLogHistory(batchId, station);
+  }
 }

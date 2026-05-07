@@ -27,25 +27,47 @@ async function inspectSchema() {
     console.log('\nColumns in production_batches:');
     batches.rows.forEach(row => console.log(`- ${row.column_name} (${row.data_type})`));
 
-    console.log('\nTesting failing insert query...');
+    console.log('\nChecking Roles and Permissions...');
+    const roleData = await client.query(`
+      SELECT r.slug as role, p.slug as permission
+      FROM roles r
+      JOIN role_permissions rp ON r.id = rp.role_id
+      JOIN permissions p ON p.id = rp.permission_id
+      ORDER BY r.slug, p.slug
+    `);
+    
+    const roleMap: Record<string, string[]> = {};
+    roleData.rows.forEach(row => {
+      if (!roleMap[row.role]) roleMap[row.role] = [];
+      roleMap[row.role].push(row.permission);
+    });
+    
+    Object.entries(roleMap).forEach(([role, perms]) => {
+      console.log(`Role [${role}]: ${perms.join(', ')}`);
+    });
+
+    console.log('\nAll Available Permissions:');
+    console.log('\nFixing permissions: Adding settings:view...');
     try {
-      const params = [
-        'KB-TEST-99', 
-        '094da561-e622-42c6-b7a1-99102bf5bc0f', 
-        'ad725e67-e8a3-4bee-aefb-335779708d62', 
-        '94c4f69e-20a8-436d-aafd-571f836c0e7a', 
-        'ff7d4636-5d6e-4162-9d2d-e28f6075af41', 
-        '63342f66-77d0-4e5e-b66c-5e33ecdaa9f4', 
-        new Date(), 
-        'RUNNING', 
-        '15b5c75c-255d-46db-b21b-5a3b661411c6', 
-        ''
-      ];
-      await client.query('insert into "production_batches" ("batch_code", "line_id", "brand_id", "product_id", "shift_id", "factory_id", "start_time", "status", "created_by", "remarks") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)', params);
-      console.log('✅ Insert worked in manual test!');
+      // 1. Ensure permission exists
+      await client.query("INSERT INTO permissions (id, name, slug) VALUES (gen_random_uuid(), 'View Settings', 'settings:view') ON CONFLICT (slug) DO NOTHING");
+      
+      const rolesToGrant = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING'];
+      
+      for (const roleSlug of rolesToGrant) {
+        await client.query(`
+          INSERT INTO role_permissions (role_id, permission_id)
+          SELECT r.id, p.id
+          FROM roles r, permissions p
+          WHERE r.slug = $1 AND p.slug = 'settings:view'
+          ON CONFLICT DO NOTHING
+        `, [roleSlug]);
+        console.log(`- Granted settings:view to ${roleSlug}`);
+      }
+      
+      console.log('✅ Permissions fixed.');
     } catch (e: any) {
-      console.error('❌ Insert failed in manual test:', e.message);
-      console.error('Error details:', e);
+      console.error('❌ Failed to fix permissions:', e.message);
     }
 
   } catch (err) {

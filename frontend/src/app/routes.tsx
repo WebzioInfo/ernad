@@ -83,6 +83,7 @@ export function AppRoutes() {
         >
           <Route index element={<Navigate to="/line/select" replace />} />
           <Route path="select" element={<LineSelectionPage />} />
+          <Route path=":id/:station/operator" element={<OperatorPanel />} />
           <Route path=":id/operator" element={<OperatorPanel />} />
         </Route>
 

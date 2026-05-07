@@ -44,7 +44,7 @@ export default function LineSelectionPage() {
     mutationFn: (data: { lineId: string, station: string, force?: boolean }) => api.post('/operator/session/start', data),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
-      navigate(`/line/${res.data.lineId}/operator`);
+      navigate(`/line/${res.data.lineId}/${res.data.station.toLowerCase()}/operator`);
     },
     onError: (err: any) => {
       const message = err.response?.data?.message || 'Failed to start session';
@@ -58,7 +58,7 @@ export default function LineSelectionPage() {
 
   // If already has session, redirect
   if (currentSession) {
-    navigate(`/line/${currentSession.lineId}/operator`);
+    navigate(`/line/${currentSession.lineId}/${currentSession.station.toLowerCase()}/operator`);
     return null;
   }
 

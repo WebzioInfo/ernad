@@ -198,4 +198,14 @@ export class ProcessingService {
     };
     return map[station];
   }
+
+  async getLogHistory(batchId: string, station: string, limit = 20) {
+    return await db.select()
+      .from(productionLogs)
+      .where(
+        sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
+      )
+      .orderBy(sql`${productionLogs.loggedAt} DESC`)
+      .limit(limit);
+  }
 }

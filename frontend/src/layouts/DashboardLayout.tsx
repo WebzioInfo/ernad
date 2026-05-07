@@ -243,7 +243,7 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-[#FAFBFF] p-10 relative">
+        <div id="main-scroll-container" className="flex-1 overflow-y-auto bg-[#FAFBFF] p-10 relative custom-scrollbar">
           <div className="max-w-[1700px] mx-auto">
             <AnimatePresence mode="wait">
               <motion.div
