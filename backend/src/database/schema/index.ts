@@ -5,3 +5,4 @@ export * from './master-data';
 export * from './archive';
 // sessions.ts is deprecated - logic consolidated into production.ts
 // export * from './sessions';
+export * from './inventory';

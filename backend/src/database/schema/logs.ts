@@ -29,6 +29,21 @@ export const productionLogs = pgTable('production_logs', {
   eventType: eventTypeEnum('event_type').default('NORMAL_PRODUCTION').notNull(),
   isRework: boolean('is_rework').default(false).notNull(), // New: Handle rework logic
   remarks: varchar('remarks', { length: 500 }),
+
+  // Material Consumption Analytics (Enterprise Upgrade)
+  capUsage: integer('cap_usage').default(0),
+  capRejection: integer('cap_rejection').default(0),
+  preformUsage: integer('preform_usage').default(0),
+  preformRejection: integer('preform_rejection').default(0),
+  bopRollUsage: decimal('bop_roll_usage', { precision: 8, scale: 2 }).default('0'),
+  bopRejection: decimal('bop_rejection', { precision: 8, scale: 2 }).default('0'),
+  shrinkWeightUsed: decimal('shrink_weight_used', { precision: 8, scale: 2 }).default('0'),
+  shrinkWeightRejected: decimal('shrink_weight_rejected', { precision: 8, scale: 2 }).default('0'),
+  casesProduced: integer('cases_produced').default(0),
+  packingTypeId: uuid('packing_type_id'), // Relates to packaging_configurations
+  finishedGoodsProduced: integer('finished_goods_produced').default(0),
+  materialCost: decimal('material_cost', { precision: 12, scale: 2 }).default('0'),
+  boxCount: integer('box_count').default(0),
   
   loggedAt: timestamp('logged_at').notNull(),
   receivedAt: timestamp('received_at').defaultNow().notNull(),
@@ -66,6 +81,15 @@ export const batchTotals = pgTable('batch_totals', {
   labelingTotal: integer('labeling_total').default(0).notNull(),
   packingTotal: integer('packing_total').default(0).notNull(),
   scrapTotal: integer('scrap_total').default(0).notNull(), // New: Tracking waste/rejects
+  
+  // Material Totals (Enterprise Upgrade)
+  capTotal: integer('cap_total').default(0).notNull(),
+  preformTotal: integer('preform_total').default(0).notNull(),
+  bopRollTotal: decimal('bop_roll_total', { precision: 10, scale: 2 }).default('0').notNull(),
+  shrinkWeightTotal: decimal('shrink_weight_total', { precision: 10, scale: 2 }).default('0').notNull(),
+  finishedGoodsTotal: integer('finished_goods_total').default(0).notNull(),
+  casesTotal: integer('cases_total').default(0).notNull(),
+  
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 

@@ -288,7 +288,7 @@ const ManagerDashboard = memo(() => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <StatusCard label="Active Lines" value={`${activeLinesCount}/${lines?.length || 0}`} subLabel="Standard Capacity" icon={Activity} color="indigo" />
-        <StatusCard label="Material Risk" value={inventory?.filter((m:any)=>Number(m.currentStock) <= Number(m.minimumStock)).length || 0} subLabel="Requires Attention" icon={Package} color="amber" />
+        <StatusCard label="Material Risk" value={inventory?.filter((m:any)=>Number(m.quantity) <= Number(m.minimumStock)).length || 0} subLabel="Requires Attention" icon={Package} color="amber" />
         <StatusCard label="Team Status" value="88%" subLabel="Attendance Score" icon={Users} color="emerald" />
       </div>
 
@@ -350,12 +350,12 @@ const ManagerDashboard = memo(() => {
              </div>
              <h3 className="text-xl font-black mb-8">Inventory Watch</h3>
              <div className="space-y-6">
-               {inventory?.filter((m:any) => Number(m.currentStock) <= Number(m.minimumStock)).slice(0, 4).map((item: any) => (
+               {inventory?.filter((m:any) => Number(m.quantity) <= Number(m.minimumStock)).slice(0, 4).map((item: any) => (
                  <div key={item.id} className="p-5 bg-white/5 border border-white/10 rounded-2xl">
-                   <p className="text-xs font-black uppercase text-amber-400 mb-1">{item.category}</p>
-                   <p className="text-sm font-bold mb-2">{item.name}</p>
+                   <p className="text-xs font-black uppercase text-amber-400 mb-1">{item.categoryName}</p>
+                   <p className="text-sm font-bold mb-2">{item.itemName}</p>
                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                      <span>Stock: {item.currentStock}</span>
+                      <span>Stock: {item.quantity}</span>
                       <span className="text-rose-400">Low Stock</span>
                    </div>
                  </div>

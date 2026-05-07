@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
-import { rawMaterials, stockTransactions, factories } from '../../database/schema';
+import { 
+  inventoryStock, 
+  inventoryTransactions, 
+  materialCategories, 
+  warehouseLocations, 
+  packagingConfigurations,
+  factories 
+} from '../../database/schema';
 import { eq, sql, desc } from 'drizzle-orm';
 
 @Injectable()
@@ -16,67 +23,92 @@ export class InventoryService {
   constructor() {}
 
   async getInventory() {
-    // Return all materials with their current stock levels
-    return await db.select().from(rawMaterials).orderBy(rawMaterials.name);
+    // Join with categories for better UI
+    return await db.select({
+      id: inventoryStock.id,
+      itemName: inventoryStock.itemName,
+      sku: inventoryStock.sku,
+      unit: inventoryStock.unit,
+      quantity: inventoryStock.quantity,
+      minimumStock: inventoryStock.minimumStock,
+      categoryName: materialCategories.name,
+      warehouseName: warehouseLocations.name,
+    })
+    .from(inventoryStock)
+    .leftJoin(materialCategories, eq(inventoryStock.categoryId, materialCategories.id))
+    .leftJoin(warehouseLocations, eq(inventoryStock.warehouseId, warehouseLocations.id))
+    .orderBy(inventoryStock.itemName);
   }
 
-  async getMaterialLedger(materialId: string) {
-    // Return transaction history for a specific material
+  async getMaterialLedger(stockId: string) {
     return await db.select()
-      .from(stockTransactions)
-      .where(eq(stockTransactions.materialId, materialId))
-      .orderBy(desc(stockTransactions.createdAt))
-      .limit(50);
+      .from(inventoryTransactions)
+      .where(eq(inventoryTransactions.stockId, stockId))
+      .orderBy(desc(inventoryTransactions.createdAt))
+      .limit(100);
+  }
+
+  async getPackagingConfigs(productId: string) {
+    return await db.select()
+      .from(packagingConfigurations)
+      .where(eq(packagingConfigurations.productId, productId));
+  }
+
+  async getWarehouses() {
+    return await db.select().from(warehouseLocations);
+  }
+
+  async getCategories() {
+    return await db.select().from(materialCategories);
   }
 
   async updateStock(dto: { 
-    materialId: string; 
+    stockId: string; 
     quantity: number; 
-    type: 'IN' | 'OUT' | 'ADJUSTMENT'; 
+    type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'CONSUMPTION'; 
     remarks?: string; 
     referenceId?: string;
+    performedBy?: string;
   }) {
-    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
-      // 1. Record in Ledger
-      await tx.insert(stockTransactions).values({
-        materialId: dto.materialId,
-        factoryId,
+      const [stock] = await tx.select().from(inventoryStock).where(eq(inventoryStock.id, dto.stockId)).for('update');
+      if (!stock) throw new Error('Stock item not found');
+
+      const currentQty = Number(stock.quantity);
+      let newQty = currentQty;
+
+      if (dto.type === 'IN') newQty += dto.quantity;
+      else if (dto.type === 'OUT' || dto.type === 'CONSUMPTION') newQty -= dto.quantity;
+      else if (dto.type === 'ADJUSTMENT') newQty = dto.quantity;
+
+      // 1. Update stock
+      await tx.update(inventoryStock)
+        .set({ quantity: String(newQty), updatedAt: new Date() })
+        .where(eq(inventoryStock.id, dto.stockId));
+
+      // 2. Record transaction
+      const [transaction] = await tx.insert(inventoryTransactions).values({
+        stockId: dto.stockId,
         type: dto.type,
-        quantity: dto.quantity.toString(),
+        quantityChange: String(dto.type === 'OUT' || dto.type === 'CONSUMPTION' ? -dto.quantity : dto.quantity),
+        balanceAfter: String(newQty),
         remarks: dto.remarks,
         referenceId: dto.referenceId,
-      });
+        performedBy: dto.performedBy,
+      }).returning();
 
-      // 2. Update Master Balance (Current Stock)
-      const operator = dto.type === 'IN' ? '+' : dto.type === 'OUT' ? '-' : '=';
-      
-      if (operator === '=') {
-        await tx.update(rawMaterials)
-          .set({ currentStock: dto.quantity.toString() })
-          .where(eq(rawMaterials.id, dto.materialId));
-      } else {
-        await tx.update(rawMaterials)
-          .set({ 
-            currentStock: sql`${rawMaterials.currentStock} ${sql.raw(operator)} ${dto.quantity.toString()}` 
-          })
-          .where(eq(rawMaterials.id, dto.materialId));
-      }
-
-      const [updated] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, dto.materialId));
-      this.logger.log(`Inventory updated for material ${dto.materialId}. New balance: ${updated.currentStock}`);
-      return updated;
+      this.logger.log(`Stock ${dto.stockId} updated: ${currentQty} -> ${newQty} (${dto.type})`);
+      return { stock: { ...stock, quantity: String(newQty) }, transaction };
     });
   }
 
-  async createMaterial(dto: { name: string; unit: string; category?: string; minimumStock?: string }) {
+  async createStockItem(dto: any) {
     const factoryId = await this.getFactoryContext();
-    const [material] = await db.insert(rawMaterials).values({
+    const [item] = await db.insert(inventoryStock).values({
       ...dto,
       factoryId,
-      currentStock: '0',
-      minimumStock: dto.minimumStock || '0',
+      quantity: dto.quantity || '0',
     }).returning();
-    return material;
+    return item;
   }
 }

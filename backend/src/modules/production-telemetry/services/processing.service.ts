@@ -1,7 +1,15 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
-import { users, productionLogs, batchTotals, materialsUsage, rawMaterials, stockTransactions } from '../../../database/schema';
-import { eq, sql } from 'drizzle-orm';
+import { 
+  users, 
+  productionLogs, 
+  batchTotals, 
+  materialsUsage, 
+  inventoryStock, 
+  inventoryTransactions,
+  packagingConfigurations 
+} from '../../../database/schema';
+import { eq, sql, and } from 'drizzle-orm';
 import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -75,30 +83,33 @@ export class ProcessingService {
         isRework: dto.isRework || false,
         eventType: dto.eventType || 'NORMAL_PRODUCTION',
         remarks: dto.remarks,
+
+        // Enterprise Extensions
+        capUsage: dto.capUsage || 0,
+        capRejection: dto.capRejection || 0,
+        preformUsage: dto.preformUsage || 0,
+        preformRejection: dto.preformRejection || 0,
+        bopRollUsage: String(dto.bopRollUsage || 0),
+        bopRejection: String(dto.bopRejection || 0),
+        shrinkWeightUsed: String(dto.shrinkWeightUsed || 0),
+        shrinkWeightRejected: String(dto.shrinkWeightRejected || 0),
+        casesProduced: dto.casesProduced || 0,
+        packingTypeId: dto.packingTypeId,
+        finishedGoodsProduced: dto.finishedGoodsProduced || 0,
+        materialCost: String(dto.materialCost || 0),
+        boxCount: dto.boxCount || 0,
+
         loggedAt: dto.loggedAt ? new Date(dto.loggedAt) : new Date(),
       }).returning();
 
       if (dto.materials && dto.materials.length > 0) {
         for (const mat of dto.materials) {
-          await this.processMaterialUsage(tx, log.id, dto.batchId, factoryId, mat, log.loggedAt);
-        }
-      } else if (!dto.isRework) {
-        const autoMap: Record<string, string> = {
-          BLOWING: 'Preforms',
-          FILLING: 'Caps',
-          LABELING: 'Labels',
-          PACKING: 'Shrink Roll'
-        };
-
-        const materialName = autoMap[dto.station];
-        if (materialName) {
-          await this.processMaterialUsage(tx, log.id, dto.batchId, factoryId, {
-            materialName,
-            quantity: finalPrimaryCount,
-            unit: 'Pcs'
-          }, log.loggedAt);
+          await this.processLegacyMaterialUsage(tx, log.id, dto.batchId, factoryId, mat, log.loggedAt);
         }
       }
+
+      // New Enterprise Material Logic
+      await this.processEnterpriseInventory(tx, factoryId, dto, log.id);
 
       if (!dto.isRework) {
         const updateField = this.getFieldName(dto.station);
@@ -111,6 +122,16 @@ export class ProcessingService {
         await tx.update(batchTotals)
           .set({ 
             [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount}`,
+            scrapTotal: sql`${batchTotals.scrapTotal} + ${dto.wastageCount}`,
+            
+            // Enterprise Material Totals
+            capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
+            preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
+            bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.bopRollUsage || 0}`,
+            shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
+            finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
+            casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
+            
             updatedAt: new Date()
           })
           .where(eq(batchTotals.batchId, dto.batchId));
@@ -134,7 +155,7 @@ export class ProcessingService {
     });
   }
 
-  private async processMaterialUsage(tx: any, logId: number, batchId: string, factoryId: string, mat: any, loggedAt: Date) {
+  private async processLegacyMaterialUsage(tx: any, logId: number, batchId: string, factoryId: string, mat: any, loggedAt: Date) {
     await tx.insert(materialsUsage).values({
       logId,
       batchId,
@@ -144,35 +165,63 @@ export class ProcessingService {
       waste: mat.waste ? String(mat.waste) : '0',
       loggedAt
     });
+  }
 
-    const [material] = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, mat.materialName));
-    
-    if (material) {
-      await tx.update(rawMaterials)
-        .set({ 
-          currentStock: sql`${rawMaterials.currentStock} - ${mat.quantity}`,
-          updatedAt: new Date()
-        })
-        .where(eq(rawMaterials.id, material.id));
+  private async processEnterpriseInventory(tx: any, factoryId: string, dto: ProductionTelemetryDto, logId: number) {
+    const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
-      await tx.insert(stockTransactions).values({
-        materialId: material.id,
-        factoryId,
-        type: 'OUT',
-        quantity: String(mat.quantity),
-        referenceId: batchId,
-        remarks: `Auto-deduction from Production Log #${logId}`,
-        createdAt: new Date()
-      });
+    if (dto.capUsage) consumptionMap.push({ name: 'Caps', qty: dto.capUsage + (dto.capRejection || 0), category: 'Caps' });
+    if (dto.preformUsage) consumptionMap.push({ name: 'Preforms', qty: dto.preformUsage + (dto.preformRejection || 0), category: 'Preforms' });
+    if (dto.bopRollUsage) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage) + Number(dto.bopRejection || 0), category: 'Labels' });
+    if (dto.shrinkWeightUsed) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
 
-      const newStock = Number(material.currentStock) - Number(mat.quantity);
-      if (newStock <= Number(material.minimumStock)) {
-        await this.notificationsService.createNotification(
-          'LOW_STOCK',
-          `Low Stock Alert: ${material.name}`,
-          `Inventory for ${material.name} has dropped below minimum threshold (${material.minimumStock} ${material.unit}). Current: ${newStock}`,
-          'WARNING'
-        );
+    for (const item of consumptionMap) {
+      let stock;
+      
+      if (dto.selectedStockId) {
+        const results = await tx.select().from(inventoryStock).where(eq(inventoryStock.id, dto.selectedStockId)).limit(1);
+        stock = results[0];
+      }
+
+      if (!stock) {
+        const stockItems = await tx.select()
+          .from(inventoryStock)
+          .where(and(
+            eq(inventoryStock.factoryId, factoryId),
+            eq(inventoryStock.itemName, item.name)
+          ))
+          .limit(1);
+        stock = stockItems[0];
+      }
+
+      if (stock) {
+        const newQty = Number(stock.quantity) - item.qty;
+
+        await tx.update(inventoryStock)
+          .set({ 
+            quantity: String(newQty),
+            updatedAt: new Date()
+          })
+          .where(eq(inventoryStock.id, stock.id));
+
+        await tx.insert(inventoryTransactions).values({
+          stockId: stock.id,
+          type: 'CONSUMPTION',
+          quantityChange: String(-item.qty),
+          balanceAfter: String(newQty),
+          referenceId: String(logId),
+          remarks: `Production Log #${logId} (${dto.station})`,
+          createdAt: new Date()
+        });
+
+        if (newQty <= Number(stock.minimumStock)) {
+          await this.notificationsService.createNotification(
+            'LOW_STOCK',
+            `Enterprise Stock Alert: ${stock.itemName}`,
+            `Current: ${newQty} ${stock.unit} | Min: ${stock.minimumStock}`,
+            'WARNING'
+          );
+        }
       }
     }
   }

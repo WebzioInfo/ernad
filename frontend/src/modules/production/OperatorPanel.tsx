@@ -7,7 +7,10 @@ import {
   AlertTriangle, Save, RefreshCw,
   Construction,
   Sparkles,
-  History as HistoryIcon
+  History as HistoryIcon,
+  ChevronDown,
+  Database,
+  Layers
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
@@ -21,6 +24,45 @@ export default function OperatorPanel() {
   const { user } = useAuthStore();
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
 
+  const stations = [
+    {
+      id: 'BLOWING', title: 'Blowing Station', icon: Wind, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20',
+      materials: ['Preforms'],
+      category: 'Preforms',
+      increments: [1000, 500, 100, 50, 20, 10, 5, 1],
+      wasteIncrements: [50, 10, 5, 1]
+    },
+    {
+      id: 'FILLING', title: 'Filling Station', icon: PackageOpen, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20',
+      materials: ['Caps'],
+      category: 'Caps',
+      increments: [500, 100, 50, 20, 10, 5, 2, 1],
+      wasteIncrements: [20, 10, 5, 1]
+    },
+    {
+      id: 'LABELING', title: 'Labeling Station', icon: Zap, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20',
+      materials: ['Labels'],
+      category: 'Labels',
+      increments: [500, 100, 50, 20, 10, 5, 2, 1],
+      wasteIncrements: [20, 10, 5, 1]
+    },
+    {
+      id: 'PACKING', title: 'Packing Station', icon: Box, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20',
+      materials: ['Shrink Rolls', 'Cartons'],
+      category: 'Shrink Rolls',
+      increments: [100, 50, 20, 10, 5, 2, 1],
+      wasteIncrements: [10, 5, 2, 1]
+    },
+  ];
+
+  const { data: session, isLoading: isLoadingSession } = useQuery({
+    queryKey: ['current-operator-session'],
+    queryFn: async () => (await api.get('/operator/session/current')).data,
+  });
+
+  const currentStationId = urlStation?.toUpperCase() || session?.station || 'FILLING';
+  const currentStation = stations.find(s => s.id === currentStationId) || stations[1];
+
   const [activeBatch, setActiveBatch] = useState<any>(null);
   const [line, setLine] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -32,13 +74,21 @@ export default function OperatorPanel() {
   const [remarks, setRemarks] = useState('');
   const [materials, setMaterials] = useState<any[]>([]);
 
+  // Enterprise State
+  const [selectedStock, setSelectedStock] = useState<Record<string, string>>({}); // { BLOWING: stockId, ... }
+  const [rejections, setRejections] = useState<Record<string, number>>({
+    BLOWING: 0,
+    FILLING: 0,
+    LABELING: 0,
+    PACKING: 0
+  });
+  const [boxCount, setBoxCount] = useState(0);
+  const [packingConfigId, setPackingConfigId] = useState<string>('');
+  const [shrinkWeight, setShrinkWeight] = useState(0);
+  const [shrinkRejection, setShrinkRejection] = useState(0);
+
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-
-  const { data: session, isLoading: isLoadingSession } = useQuery({
-    queryKey: ['current-operator-session'],
-    queryFn: async () => (await api.get('/operator/session/current')).data,
-  });
 
   const endSessionMutation = useMutation({
     mutationFn: () => api.post('/operator/session/end'),
@@ -46,6 +96,23 @@ export default function OperatorPanel() {
       queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
       navigate('/line/select');
     }
+  });
+
+  // Enterprise Inventory Fetching
+  const { data: inventory } = useQuery({
+    queryKey: ['operator-inventory', currentStationId],
+    queryFn: async () => {
+      return (await api.get('/inventory')).data;
+    }
+  });
+
+  const { data: packingConfigs } = useQuery({
+    queryKey: ['packing-configs', activeBatch?.batch?.productId],
+    queryFn: async () => {
+      if (!activeBatch?.batch?.productId) return [];
+      return (await api.get(`/inventory/packaging/${activeBatch.batch.productId}`)).data;
+    },
+    enabled: !!activeBatch?.batch?.productId
   });
 
   // Redirect if no session and not loading
@@ -56,15 +123,7 @@ export default function OperatorPanel() {
   }, [session, isLoadingSession, navigate]);
 
 
-  const stations = [
-    { id: 'BLOWING', title: 'Blowing Station', icon: Wind, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', materials: ['Preform Bags'] },
-    { id: 'FILLING', title: 'Filling Station', icon: PackageOpen, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', materials: ['Cap Boxes', 'Ozone Status'] },
-    { id: 'LABELING', title: 'Labeling Station', icon: Zap, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', materials: ['Label Rolls', 'Ink/Ribbon'] },
-    { id: 'PACKING', title: 'Packing Station', icon: Box, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', materials: ['Shrink Rolls', 'Master Cartons'] },
-  ];
-
-  const currentStationId = urlStation?.toUpperCase() || session?.station || 'FILLING';
-  const currentStation = stations.find(s => s.id === currentStationId) || stations[1];
+  const [activeRightTab, setActiveRightTab] = useState<'HISTORY' | 'MATERIAL' | 'WASTAGE' | 'EVENTS'>('HISTORY');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -156,8 +215,24 @@ export default function OperatorPanel() {
       splitValues: sanitizedValues,
       wastageCount: safeWastageCount,
       eventType: (type === 'ALL' || type === 'EVENT') ? eventType : 'NORMAL_PRODUCTION',
-      isRework: false, // Default to standard
+      isRework: false,
       materials: (type === 'ALL' || type === 'MATERIAL') ? materials : [],
+      selectedStockId: selectedStock[currentStation.id],
+
+      // Enterprise Extensions
+      capUsage: currentStation.id === 'FILLING' ? safePrimaryCount : 0,
+      capRejection: currentStation.id === 'FILLING' ? rejections.FILLING : 0,
+      preformUsage: currentStation.id === 'BLOWING' ? safePrimaryCount : 0,
+      preformRejection: currentStation.id === 'BLOWING' ? rejections.BLOWING : 0,
+      bopRollUsage: currentStation.id === 'LABELING' ? safePrimaryCount : 0,
+      bopRejection: currentStation.id === 'LABELING' ? rejections.LABELING : 0,
+      shrinkWeightUsed: currentStation.id === 'PACKING' ? shrinkWeight : 0,
+      shrinkWeightRejected: currentStation.id === 'PACKING' ? shrinkRejection : 0,
+      casesProduced: currentStation.id === 'PACKING' ? Math.floor(safePrimaryCount / (packingConfigs?.find((c: any) => c.id === packingConfigId)?.bottlesPerCase || 1)) : 0,
+      packingTypeId: packingConfigId,
+      finishedGoodsProduced: currentStation.id === 'PACKING' ? safePrimaryCount : 0,
+      boxCount: boxCount,
+
       remarks: (type === 'ALL' || type === 'EVENT') ? remarks : '',
       loggedAt: new Date().toISOString()
     };
@@ -197,6 +272,14 @@ export default function OperatorPanel() {
       if (type === 'ALL' || type === 'EVENT') {
         setEventType('NORMAL_PRODUCTION');
         setRemarks('');
+      }
+
+      // Enterprise Reset
+      if (type === 'ALL' || type === 'COUNT') {
+        setRejections(prev => ({ ...prev, [currentStation.id]: 0 }));
+        setBoxCount(0);
+        setShrinkWeight(0);
+        setShrinkRejection(0);
       }
 
     } catch (err: any) {
@@ -320,7 +403,7 @@ export default function OperatorPanel() {
             )}
 
             {/* Left: Logging Controls (8 cols) */}
-            <div className="col-span-8 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar pr-2">
+            <div className="col-span-8 flex flex-col gap-8 h-full pr-2">
               <div className="bg-white/5 rounded-[3rem] p-10 border border-white/10 flex flex-col items-center relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
 
@@ -344,37 +427,37 @@ export default function OperatorPanel() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-4 gap-6 w-full max-w-4xl">
-                  {[1000, 500, 100, 50].map(val => (
+                <div className="grid grid-cols-4 gap-4 w-full max-w-4xl flex-1">
+                  {currentStation.increments?.slice(0, 4).map(val => (
                     <div key={val} className="flex gap-2 w-full">
                       <button
                         onClick={() => adjustSplitValue(val, false)}
                         disabled={primaryCount - val < 0}
-                        className={`w-1/3 py-12 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-l-[2rem] font-black text-4xl shadow-xl active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
+                        className={`w-1/3 py-8 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-l-[1.5rem] font-black text-2xl shadow-xl active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed`}
                       >
                         -
                       </button>
                       <button
                         onClick={() => adjustSplitValue(val, true)}
-                        className={`w-2/3 py-12 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-r-[2rem] font-black text-4xl shadow-xl active:scale-95 transition-all group overflow-hidden relative`}
+                        className={`w-2/3 py-8 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '40')} border ${currentStation.border} text-white rounded-r-[1.5rem] font-black text-2xl shadow-xl active:scale-95 transition-all group overflow-hidden relative`}
                       >
                         <div className="relative z-10">{val}</div>
                         <div className="absolute inset-0 bg-gradient-to-t from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       </button>
                     </div>
                   ))}
-                  {[20, 10, 5, 1].map(val => (
+                  {currentStation.increments?.slice(4).map(val => (
                     <div key={val} className="flex gap-2 w-full">
                       <button
                         onClick={() => adjustSplitValue(val, false)}
                         disabled={primaryCount - val < 0}
-                        className="w-1/3 py-10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-l-[2rem] font-black text-2xl border border-white/5 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="w-1/3 py-6 bg-white/5 hover:bg-white/10 text-slate-300 rounded-l-[1.5rem] font-black text-xl border border-white/5 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         -
                       </button>
                       <button
                         onClick={() => adjustSplitValue(val, true)}
-                        className="w-2/3 py-10 bg-white/5 hover:bg-white/10 text-slate-300 rounded-r-[2rem] font-black text-2xl border border-white/5 active:scale-95 transition-all"
+                        className="w-2/3 py-6 bg-white/5 hover:bg-white/10 text-slate-300 rounded-r-[1.5rem] font-black text-xl border border-white/5 active:scale-95 transition-all"
                       >
                         +{val}
                       </button>
@@ -418,178 +501,265 @@ export default function OperatorPanel() {
             </div>
 
             {/* Right: History & Events (4 cols) */}
-            <div className="col-span-4 flex flex-col gap-8 h-full overflow-y-auto custom-scrollbar pr-2">
-              {/* Event Selector */}
-              <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10">
-                <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-6">Process Status</h3>
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {['NORMAL_PRODUCTION', 'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'DOWNTIME_PAUSE'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setEventType(type)}
-                      className={`p-4 rounded-2xl border transition-all text-[10px] font-black uppercase tracking-widest text-center ${eventType === type
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
-                        : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'
-                        }`}
-                    >
-                      {type.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Technical remarks or event details..."
-                  className="w-full bg-black/20 border border-white/5 rounded-2xl p-4 text-xs font-medium text-slate-300 h-24 resize-none focus:border-indigo-500/50 outline-none transition-colors"
-                />
-                <button
-                  onClick={() => handleSaveToOffline('EVENT')}
-                  className="w-full mt-4 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
-                >
-                  <AlertTriangle className="w-4 h-4 text-amber-500" /> Log Process Event
-                </button>
+            <div className="col-span-4 flex flex-col gap-6 h-full pr-2">
+              {/* Tab Navigation */}
+              <div className="flex bg-white/5 rounded-2xl p-2 border border-white/10">
+                {[
+                  { id: 'HISTORY', label: 'Feed' },
+                  { id: 'MATERIAL', label: 'Material' },
+                  { id: 'WASTAGE', label: 'Waste' },
+                  { id: 'EVENTS', label: 'Events' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveRightTab(tab.id as any)}
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeRightTab === tab.id
+                        ? 'bg-indigo-600 text-white shadow-lg'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
+              {/* Event Selector */}
+              {activeRightTab === 'EVENTS' && (
+                <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10 flex-1 flex flex-col">
+                  <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-6">Process Status</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    {['NORMAL_PRODUCTION', 'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'DOWNTIME_PAUSE'].map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setEventType(type)}
+                        className={`p-4 rounded-2xl border transition-all text-[10px] font-black uppercase tracking-widest text-center ${eventType === type
+                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg'
+                          : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'
+                          }`}
+                      >
+                        {type.replace('_', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Technical remarks or event details..."
+                    className="w-full bg-black/20 border border-white/5 rounded-2xl p-4 text-xs font-medium text-slate-300 flex-1 resize-none focus:border-indigo-500/50 outline-none transition-colors"
+                  />
+                  <button
+                    onClick={() => handleSaveToOffline('EVENT')}
+                    className="w-full mt-4 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
+                  >
+                    <AlertTriangle className="w-4 h-4 text-amber-500" /> Log Process Event
+                  </button>
+                </div>
+              )}
 
               {/* Log History */}
-              <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10 h-[400px] flex flex-col overflow-hidden shadow-2xl">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Batch Log Feed</h3>
-                  <div className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border border-white/5">
-                    Live Session
+              {activeRightTab === 'HISTORY' && (
+                <div className="bg-white/5 rounded-[2.5rem] p-8 border border-white/10 flex-1 flex flex-col overflow-hidden shadow-2xl">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Batch Log Feed</h3>
+                    <div className="px-3 py-1 bg-white/5 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest border border-white/5">
+                      Live Session
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                    {!history || history.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center opacity-20 py-10">
+                        <HistoryIcon className="w-10 h-10 mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">No logs recorded yet</p>
+                      </div>
+                    ) : (
+                      history.map((log: any, i: number) => (
+                        <motion.div
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          key={log.id || log.requestId}
+                          className="p-5 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all group"
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${log.eventType === 'NORMAL_PRODUCTION' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                              <span className="text-xs font-black text-white">+{log.primaryCount}</span>
+                            </div>
+                            <span className="text-[9px] font-black text-slate-600 group-hover:text-slate-400 transition-colors">
+                              {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{log.eventType.replace('_', ' ')}</span>
+                            {log.wastageCount > 0 && (
+                              <span className="text-[9px] font-black text-rose-500 uppercase">Waste: {log.wastageCount}</span>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                  {!history || history.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center opacity-20 py-10">
-                      <HistoryIcon className="w-10 h-10 mb-4" />
-                      <p className="text-[10px] font-black uppercase tracking-widest">No logs recorded yet</p>
+              {/* Enterprise Material Intake */}
+              {activeRightTab === 'MATERIAL' && (
+                <div className={`${currentStation.bg} rounded-[2.5rem] p-8 border ${currentStation.border} shadow-xl flex-1 flex flex-col`}>
+                  <h3 className={`text-[10px] font-black ${currentStation.color} uppercase tracking-[0.3em] mb-6`}>Material Resource Log</h3>
+
+                  <div className="space-y-6 flex-1 overflow-y-auto custom-scrollbar pr-2">
+                    {/* Item Selector */}
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Stock Item</label>
+                      <div className="relative group">
+                        <Database className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                        <select
+                          value={selectedStock[currentStation.id] || ''}
+                          onChange={(e) => setSelectedStock(prev => ({ ...prev, [currentStation.id]: e.target.value }))}
+                          className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-white appearance-none outline-none focus:border-indigo-500/50 transition-all"
+                        >
+                          <option value="">Select Stock Batch...</option>
+                          {inventory?.filter((i: any) => i.itemName.includes(currentStation.category) || i.categoryName === currentStation.category).map((item: any) => (
+                            <option key={item.id} value={item.id}>
+                              {item.itemName} ({item.quantity} {item.unit})
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+                      </div>
                     </div>
-                  ) : (
-                    history.map((log: any, i: number) => (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.05 }}
-                        key={log.id || log.requestId}
-                        className="p-5 bg-white/5 rounded-3xl border border-white/5 hover:border-white/10 transition-all group"
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${log.eventType === 'NORMAL_PRODUCTION' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                            <span className="text-xs font-black text-white">+{log.primaryCount}</span>
-                          </div>
-                          <span className="text-[9px] font-black text-slate-600 group-hover:text-slate-400 transition-colors">
-                            {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+
+                    {/* Packaging Config for Packing Station */}
+                    {currentStation.id === 'PACKING' && (
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Packaging Configuration</label>
+                        <div className="relative">
+                          <Layers className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                          <select
+                            value={packingConfigId}
+                            onChange={(e) => setPackingConfigId(e.target.value)}
+                            className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-xs font-bold text-white appearance-none outline-none focus:border-indigo-500/50 transition-all"
+                          >
+                            <option value="">Standard Pack...</option>
+                            {packingConfigs?.map((config: any) => (
+                              <option key={config.id} value={config.id}>{config.name} ({config.bottlesPerCase} btl)</option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                         </div>
+                      </div>
+                    )}
+
+                    {/* Shrink Weight Tracking */}
+                    {currentStation.id === 'PACKING' && (
+                      <div className="space-y-4 pt-4 border-t border-white/5">
                         <div className="flex justify-between items-center">
-                          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{log.eventType.replace('_', ' ')}</span>
-                          {log.wastageCount > 0 && (
-                            <span className="text-[9px] font-black text-rose-500 uppercase">Waste: {log.wastageCount}</span>
-                          )}
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Shrink Consumption (Kg)</span>
+                          <span className="text-xl font-black text-amber-500">{shrinkWeight}</span>
                         </div>
-                      </motion.div>
-                    ))
-                  )}
-                </div>
-              </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[0.1, 0.5, 1, 5].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setShrinkWeight(prev => Number((prev + v).toFixed(2)))}
+                              className="py-4 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black border border-white/5"
+                            >
+                              +{v}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Material Intake */}
-              <div className={`${currentStation.bg} rounded-[2.5rem] p-8 border ${currentStation.border} shadow-xl`}>
-                <h3 className={`text-[10px] font-black ${currentStation.color} uppercase tracking-[0.3em] mb-6`}>Material Resource Log</h3>
-                <div className="space-y-6">
-                  {currentStation.materials?.map(mat => (
-                    <div key={mat} className="flex flex-col gap-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{mat}</span>
-                        <span className={`text-xs font-black ${currentStation.color}`}>{materials.find(m => m.materialName === mat)?.quantity || 0} PCS</span>
+                    {/* Filling Station Box Count */}
+                    {currentStation.id === 'FILLING' && (
+                      <div className="space-y-4 pt-4 border-t border-white/5">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Box Count Logged</span>
+                          <span className="text-xl font-black text-emerald-500">{boxCount}</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[1, 5, 10, 50].map(v => (
+                            <button
+                              key={v}
+                              onClick={() => setBoxCount(prev => prev + v)}
+                              className="py-4 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black border border-white/5"
+                            >
+                              +{v}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[1, 5, 10].map(v => {
-                          const existingQty = materials.find(m => m.materialName === mat)?.quantity || 0;
-                          return (
-                            <div key={v} className="flex gap-1 w-full">
-                              <button
-                                onClick={() => {
-                                  const newQty = Math.max(0, existingQty - v);
-                                  setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: newQty } : m));
-                                }}
-                                disabled={existingQty - v < 0}
-                                className="w-1/3 py-3 bg-white/5 hover:bg-white/10 rounded-l-xl text-[10px] font-black border border-white/5 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                              >
-                                -
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (existingQty > 0) {
-                                    setMaterials(materials.map(m => m.materialName === mat ? { ...m, quantity: existingQty + v } : m));
-                                  } else {
-                                    setMaterials([...materials, { materialName: mat, quantity: v, unit: 'PCS' }]);
-                                  }
-                                }}
-                                className="w-2/3 py-3 bg-white/5 hover:bg-white/10 rounded-r-xl text-[10px] font-black border border-white/5 transition-all active:scale-95"
-                              >
-                                +{v}
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+
                   <button
                     onClick={() => handleSaveToOffline('MATERIAL')}
-                    className={`w-full py-5 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '30')} border ${currentStation.border} rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95 mt-4`}
+                    className={`w-full mt-4 py-5 ${currentStation.bg.replace('10', '20')} hover:${currentStation.bg.replace('10', '30')} border ${currentStation.border} rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95`}
                   >
-                    <Box className="w-4 h-4" /> Log Usage Only
+                    <Box className="w-4 h-4" /> Save Material State
                   </button>
                 </div>
-              </div>
+              )}
 
               {/* Wastage */}
-              <div className="bg-rose-500/10 rounded-[2.5rem] p-8 border border-rose-500/20 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <AlertTriangle className="w-12 h-12 text-rose-500" />
-                </div>
-                <div className="flex justify-between items-end mb-6">
-                  <div>
-                    <h3 className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-1">Session Rejects</h3>
-                    <div className="text-6xl font-black text-rose-500 tabular-nums tracking-tighter leading-none">{wastageCount}</div>
+              {activeRightTab === 'WASTAGE' && (
+                <div className="bg-rose-500/10 rounded-[2.5rem] p-8 border border-rose-500/20 shadow-2xl relative overflow-hidden flex-1 flex flex-col">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <AlertTriangle className="w-12 h-12 text-rose-500" />
+                  </div>
+                  <div className="flex justify-between items-end mb-6">
+                    <div>
+                      <h3 className="text-[10px] font-black text-rose-400 uppercase tracking-[0.3em] mb-1">
+                        {currentStation.id === 'PACKING' ? 'Shrink Reject (Kg)' : `${currentStation.category} Reject`}
+                      </h3>
+                      <div className="text-6xl font-black text-rose-500 tabular-nums tracking-tighter leading-none">
+                        {currentStation.id === 'PACKING' ? shrinkRejection : rejections[currentStation.id]}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (currentStation.id === 'PACKING') setShrinkRejection(0);
+                        else setRejections(prev => ({ ...prev, [currentStation.id]: 0 }));
+                        setWastageCount(0);
+                      }}
+                      className="p-3 bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 rounded-xl transition-all"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 flex-1">
+                    {(currentStation.id === 'PACKING' ? [0.1, 0.5, 1, 5] : currentStation.wasteIncrements)?.map((v: number) => (
+                      <div key={v} className="flex gap-1 w-full">
+                        <button
+                          onClick={() => {
+                            if (currentStation.id === 'PACKING') setShrinkRejection(prev => Math.max(0, Number((prev - v).toFixed(2))));
+                            else setRejections(prev => ({ ...prev, [currentStation.id]: Math.max(0, prev[currentStation.id] - v) }));
+                          }}
+                          className="w-1/3 py-6 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-l-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95"
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (currentStation.id === 'PACKING') setShrinkRejection(prev => Number((prev + v).toFixed(2)));
+                            else setRejections(prev => ({ ...prev, [currentStation.id]: prev[currentStation.id] + v }));
+                          }}
+                          className="w-2/3 py-6 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-r-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95"
+                        >
+                          +{v}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                   <button
-                    onClick={() => setWastageCount(0)}
-                    className="p-3 bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 rounded-xl transition-all"
+                    onClick={() => handleSaveToOffline('WASTE')}
+                    className="w-full mt-6 py-5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <AlertTriangle className="w-4 h-4 text-rose-500" /> Log Waste Only
                   </button>
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[1, 5, 10, 50].map(v => (
-                    <div key={v} className="flex gap-1 w-full">
-                      <button
-                        onClick={() => setWastageCount(prev => Math.max(0, prev - v))}
-                        disabled={wastageCount - v < 0}
-                        className="w-1/3 py-4 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-l-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                      >
-                        -
-                      </button>
-                      <button
-                        onClick={() => setWastageCount(prev => prev + v)}
-                        className="w-2/3 py-4 bg-rose-500/10 hover:bg-rose-500/30 text-rose-400 rounded-r-2xl font-black text-sm border border-rose-500/10 transition-all active:scale-95"
-                      >
-                        +{v}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={() => handleSaveToOffline('WASTE')}
-                  className="w-full mt-6 py-5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 transition-all active:scale-95"
-                >
-                  <AlertTriangle className="w-4 h-4 text-rose-500" /> Log Waste Only
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}

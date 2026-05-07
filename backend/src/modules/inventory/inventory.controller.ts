@@ -19,9 +19,30 @@ export class InventoryController {
     return await this.inventoryService.getInventory();
   }
 
+  @Get('warehouses')
+  @Permissions('inventory:view')
+  @ApiOperation({ summary: 'Get all warehouse locations' })
+  async getWarehouses() {
+    return await this.inventoryService.getWarehouses();
+  }
+
+  @Get('categories')
+  @Permissions('inventory:view')
+  @ApiOperation({ summary: 'Get all material categories' })
+  async getCategories() {
+    return await this.inventoryService.getCategories();
+  }
+
+  @Get('packaging/:productId')
+  @Permissions('inventory:view')
+  @ApiOperation({ summary: 'Get packaging configurations for a product' })
+  async getPackagingConfigs(@Param('productId') productId: string) {
+    return await this.inventoryService.getPackagingConfigs(productId);
+  }
+
   @Get(':id/ledger')
   @Permissions('inventory:view')
-  @ApiOperation({ summary: 'Get transaction ledger for a material' })
+  @ApiOperation({ summary: 'Get transaction ledger for a stock item' })
   async getMaterialLedger(@Param('id') id: string) {
     return await this.inventoryService.getMaterialLedger(id);
   }
@@ -29,14 +50,17 @@ export class InventoryController {
   @Post('stock')
   @Permissions('inventory:update')
   @ApiOperation({ summary: 'Update stock levels (IN/OUT/ADJUSTMENT)' })
-  async updateStock(@Body() dto: any) {
-    return await this.inventoryService.updateStock(dto);
+  async updateStock(@Body() dto: any, @Req() req: any) {
+    return await this.inventoryService.updateStock({
+      ...dto,
+      performedBy: req.user.id
+    });
   }
 
-  @Post('materials')
+  @Post('items')
   @Permissions('settings:manage')
-  @ApiOperation({ summary: 'Define a new raw material' })
-  async createMaterial(@Body() dto: any) {
-    return await this.inventoryService.createMaterial(dto);
+  @ApiOperation({ summary: 'Define a new inventory stock item' })
+  async createStockItem(@Body() dto: any) {
+    return await this.inventoryService.createStockItem(dto);
   }
 }

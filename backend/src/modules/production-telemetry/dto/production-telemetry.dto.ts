@@ -71,10 +71,29 @@ export class ProductionTelemetryDto {
   remarks?: string;
 
   @IsOptional()
+  @IsUUID()
+  selectedStockId?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MaterialUsageDto)
   materials?: MaterialUsageDto[];
+
+  // Enterprise Extensions
+  @IsOptional() @IsInt() capUsage?: number;
+  @IsOptional() @IsInt() capRejection?: number;
+  @IsOptional() @IsInt() preformUsage?: number;
+  @IsOptional() @IsInt() preformRejection?: number;
+  @IsOptional() @IsNumber() bopRollUsage?: number;
+  @IsOptional() @IsNumber() bopRejection?: number;
+  @IsOptional() @IsNumber() shrinkWeightUsed?: number;
+  @IsOptional() @IsNumber() shrinkWeightRejected?: number;
+  @IsOptional() @IsInt() casesProduced?: number;
+  @IsOptional() @IsUUID() packingTypeId?: string;
+  @IsOptional() @IsInt() finishedGoodsProduced?: number;
+  @IsOptional() @IsNumber() materialCost?: number;
+  @IsOptional() @IsInt() boxCount?: number;
 
   @IsDateString()
   @IsOptional()
