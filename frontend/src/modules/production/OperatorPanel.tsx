@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
   PackageOpen, LogOut, Wind, Box,
   Loader2, Zap, ShieldCheck,
   AlertTriangle, Cpu, Save, RefreshCw,
   Construction,
-  Sparkles
+  Sparkles,
+  History as HistoryIcon
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
@@ -382,7 +384,7 @@ export default function OperatorPanel() {
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                   {!history || history.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center opacity-20 py-10">
-                      <History className="w-10 h-10 mb-4" />
+                      <HistoryIcon className="w-10 h-10 mb-4" />
                       <p className="text-[10px] font-black uppercase tracking-widest">No logs recorded yet</p>
                     </div>
                   ) : (
