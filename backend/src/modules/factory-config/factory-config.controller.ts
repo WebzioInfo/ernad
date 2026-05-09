@@ -7,9 +7,7 @@ import { Permissions } from '../auth/permissions.decorator';
 import { 
   CreateLineDto, 
   CreateBrandDto, 
-  CreateProductDto, 
-  CreateRawMaterialDto, 
-  UpdateStockDto 
+  CreateProductDto
 } from './dto/factory-config.dto';
 
 @ApiTags('Factory Configuration')
@@ -21,7 +19,7 @@ export class FactoryConfigController {
   constructor(private readonly factoryConfigService: FactoryConfigService) {}
 
   @Get('lines')
-  @Permissions('settings:view')
+  @UseGuards(AuthGuard) // Use generic auth guard instead of strict permission
   async getLines() {
     return await this.factoryConfigService.getLines();
   }
@@ -62,24 +60,6 @@ export class FactoryConfigController {
   @Permissions('settings:view')
   async getBrands() {
     return await this.factoryConfigService.getBrands();
-  }
-
-  @Get('raw-materials')
-  @Permissions('settings:view')
-  async getRawMaterials() {
-    return await this.factoryConfigService.getRawMaterials();
-  }
-
-  @Post('raw-materials')
-  @Permissions('settings:manage')
-  async createRawMaterial(@Body() dto: CreateRawMaterialDto) {
-    return await this.factoryConfigService.createRawMaterial(dto);
-  }
-
-  @Post('raw-materials/stock')
-  @Permissions('inventory:update')
-  async updateStock(@Body() dto: UpdateStockDto) {
-    return await this.factoryConfigService.updateStock(dto);
   }
 
   @Post('brands')

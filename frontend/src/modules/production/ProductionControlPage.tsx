@@ -7,7 +7,7 @@ import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
   Gauge, Loader2, X, Users, BarChart2,
   Clock, ArrowLeft, ShieldAlert, Zap,
-  Settings2, ActivitySquare
+  Settings2, ActivitySquare, History, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -103,6 +103,11 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
     queryKey: ['line-performance-detail', line.id],
     queryFn: async () => (await api.get('/analytics/line-performance', { params: { lineId: line.id } })).data,
     refetchInterval: 5000
+  });
+
+  const { data: batchHistory } = useQuery({
+    queryKey: ['line-batch-history', line.id],
+    queryFn: async () => (await api.get(`/production/batches`, { params: { lineId: line.id, status: 'COMPLETED,CLOSED,QC_PENDING' } })).data,
   });
 
   return (
@@ -255,6 +260,46 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* ── BATCH HISTORY ── */}
+          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Batch History</h3>
+                  <p className="text-xs font-bold text-slate-400">Previous production runs on this line.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {batchHistory?.map((batch: any) => (
+                <div key={batch.id} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
+                  <div className="flex items-center gap-6">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:bg-indigo-50 transition-colors">
+                      <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-slate-900 leading-none">{batch.batchCode}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-1">{batch.productName} • {new Date(batch.startTime).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-black text-slate-900 leading-none">{batch.totalProduction || 0} PCS</p>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 block">{batch.status}</span>
+                  </div>
+                </div>
+              ))}
+              {(!batchHistory || batchHistory.length === 0) && (
+                <div className="py-12 text-center text-slate-400 italic text-sm font-bold">
+                  No previous batch records found for this unit.
+                </div>
+              )}
             </div>
           </div>
         </div>

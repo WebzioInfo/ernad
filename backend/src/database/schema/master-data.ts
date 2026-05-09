@@ -42,25 +42,3 @@ export const products = pgTable('products', {
   targetBPM: integer('target_bpm').default(120).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
-
-export const rawMaterials = pgTable('raw_materials', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  unit: varchar('unit', { length: 20 }).notNull(), // Pcs, Bags, Kg, Ml
-  category: varchar('category', { length: 50 }), // Packaging, Closure, Consumable
-  currentStock: decimal('current_stock', { precision: 12, scale: 2 }).default('0').notNull(),
-  minimumStock: decimal('minimum_stock', { precision: 12, scale: 2 }).default('0').notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
-
-export const stockTransactions = pgTable('stock_transactions', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  materialId: uuid('material_id').references(() => rawMaterials.id, { onDelete: 'cascade' }).notNull(),
-  type: varchar('type', { length: 20 }).notNull(), // 'IN', 'OUT', 'ADJUSTMENT'
-  quantity: decimal('quantity', { precision: 12, scale: 2 }).notNull(),
-  referenceId: varchar('reference_id', { length: 100 }), // e.g. Batch ID or PO number
-  remarks: varchar('remarks', { length: 255 }),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});

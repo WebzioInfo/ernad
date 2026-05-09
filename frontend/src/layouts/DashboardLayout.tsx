@@ -54,7 +54,7 @@ export default function DashboardLayout() {
   };
 
   const sidebarGroups = moduleRegistry.getAllSidebarGroups();
-  
+
   const filterByRole = (allowedRoles?: string[]) => {
     if (!allowedRoles || allowedRoles.length === 0) return true;
     const userRoles = user?.roles || (user?.role ? [user.role] : []);
@@ -63,6 +63,9 @@ export default function DashboardLayout() {
   };
 
   const getModulePath = (path: string) => {
+    // If the path is intended for the operator terminal, don't prefix it
+    if (path.startsWith('/line')) return path;
+
     const base = (user?.role === 'MANAGER') ? '/manager' : '/admin';
     return `${base}${path}`;
   };
@@ -82,7 +85,7 @@ export default function DashboardLayout() {
           </div>
           {isSidebarOpen && (
             <div className="ml-4 animate-in fade-in slide-in-from-left-2 duration-500">
-              <span className="block font-black text-xl tracking-tight text-white">ERNAD<span className="text-indigo-400">MES</span></span>
+              <span className="block font-black text-xl tracking-tight text-white">ERANAD<span className="text-indigo-400">MES</span></span>
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System</span>
             </div>
           )}
@@ -126,9 +129,9 @@ export default function DashboardLayout() {
                               <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
                             )}
                             {isActive && (
-                              <motion.div 
+                              <motion.div
                                 layoutId="active-pill"
-                                className="absolute left-0 w-1 h-8 bg-white rounded-r-full" 
+                                className="absolute left-0 w-1 h-8 bg-white rounded-r-full"
                               />
                             )}
                           </>

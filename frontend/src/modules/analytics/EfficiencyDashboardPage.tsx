@@ -141,17 +141,24 @@ export default function EfficiencyDashboardPage() {
       <div className="grid grid-cols-12 gap-6">
         {/* Output by Station */}
         <div className="col-span-7 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Station Throughput (BPM)</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-6">
+            {isLive ? 'Station Throughput (BPM)' : 'Daily Production Vol.'}
+          </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.stats}>
+              <BarChart data={isLive ? (stats?.stats || []) : historicalTrend}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="station" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                <XAxis 
+                  dataKey={isLive ? "station" : "time"} 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
                 <Tooltip 
                    contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="throughput" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
+                <Bar dataKey={isLive ? "throughput" : "val"} fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

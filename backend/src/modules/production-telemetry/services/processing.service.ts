@@ -8,7 +8,8 @@ import {
   inventoryTransactions,
   packagingConfigurations
 } from '../../../database/schema';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, inArray } from 'drizzle-orm';
+import { billOfMaterials } from '../../../database/schema';
 import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -174,20 +175,46 @@ export class ProcessingService {
     if (dto.bopRollUsage) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage) + Number(dto.bopRejection || 0), category: 'Labels' });
     if (dto.shrinkWeightUsed) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
 
+    // ── NEW: Automated BOM Consumption ──
+    // If this is a final station log, trigger BOM-based deduction
+    if (dto.station === 'PACKING' && dto.productId) {
+      const bomItems = await tx.select().from(billOfMaterials).where(eq(billOfMaterials.productId, dto.productId));
+      for (const bom of bomItems) {
+        const qty = Number(bom.quantityPerUnit) * dto.primaryCount;
+        
+        // Find existing or add new
+        const existingIdx = consumptionMap.findIndex(c => c.name === bom.stockId); // Using stockId as key for internal loop
+        if (existingIdx > -1) {
+          consumptionMap[existingIdx].qty += qty;
+        } else {
+          consumptionMap.push({ 
+            name: bom.stockId, // We'll handle stock lookup by ID now
+            qty: qty, 
+            category: 'BOM_AUTO' 
+          });
+        }
+      }
+    }
+
     for (const item of consumptionMap) {
       if (item.qty <= 0) continue;
 
       let stock;
 
       // Mandatory Stock Selection for Production Stability
-      if (dto.selectedStockId) {
+      if (item.category === 'BOM_AUTO') {
+        const results = await tx.select().from(inventoryStock)
+          .where(eq(inventoryStock.id, item.name))
+          .for('update');
+        stock = results[0];
+      } else if (dto.selectedStockId) {
         const results = await tx.select().from(inventoryStock)
           .where(eq(inventoryStock.id, dto.selectedStockId))
-          .for('update'); // PESSIMISTIC LOCKING
+          .for('update'); 
         stock = results[0];
       }
 
-      if (!stock) {
+      if (!stock && item.category !== 'BOM_AUTO') {
         const stockItems = await tx.select()
           .from(inventoryStock)
           .where(and(

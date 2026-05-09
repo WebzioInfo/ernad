@@ -11,7 +11,7 @@ export const settingsConfig: ModuleConfig = {
     {
       path: 'settings',
       element: lazy(() => import('./SettingsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -24,7 +24,7 @@ export const settingsConfig: ModuleConfig = {
           label: 'Global Settings',
           icon: Settings,
           path: '/settings',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         }
       ]
     }

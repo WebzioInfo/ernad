@@ -75,3 +75,11 @@ export const packagingConfigurations = pgTable('packaging_configurations', {
   cartonsPerCase: integer('cartons_per_case').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const billOfMaterials = pgTable('bill_of_materials', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  stockId: uuid('stock_id').references(() => inventoryStock.id, { onDelete: 'cascade' }).notNull(),
+  quantityPerUnit: decimal('quantity_per_unit', { precision: 12, scale: 6 }).notNull(), // e.g. 1 Bottle = 1 Preform, 1 Cap, 0.0001 Roll of labels
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

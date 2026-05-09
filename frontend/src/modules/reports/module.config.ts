@@ -11,12 +11,12 @@ export const reportsConfig: ModuleConfig = {
     {
       path: 'reports/production',
       element: lazy(() => import('./pages/ProductionReportsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     },
     {
       path: 'reports/sales',
       element: lazy(() => import('./pages/SalesAnalyticsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     },
     {
       path: 'reports/attendance',
@@ -34,21 +34,22 @@ export const reportsConfig: ModuleConfig = {
           label: 'Production Ledger',
           icon: FileText,
           path: '/reports/production',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         },
         {
           id: 'sales_reports',
           label: 'Sales Analytics',
           icon: BarChart4,
           path: '/reports/sales',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         },
         {
           id: 'attendance_reports',
           label: 'Staff Attendance',
           icon: ClipboardList,
           path: '/reports/attendance',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN'],
+          isComingSoon: true
         }
       ]
     }

@@ -370,16 +370,26 @@ export default function OperatorPanel() {
             <p className="text-4xl font-black uppercase tracking-tighter text-white">Line Under Maintenance</p>
             <p className="text-slate-400 mt-4 max-w-md font-bold text-lg leading-relaxed">This production line is currently offline for technical service. Production logging is disabled for safety.</p>
           </div>
-        ) : !activeBatch ? (
-          <div className="col-span-12 flex items-center justify-center flex-col">
-            <div className="w-32 h-32 bg-amber-500/10 text-amber-500 rounded-[3rem] flex items-center justify-center mb-8 border border-amber-500/20 shadow-2xl">
-              <AlertTriangle className="w-16 h-16" />
-            </div>
-            <p className="text-4xl font-black uppercase tracking-tighter text-white">No Active Batch</p>
-            <p className="text-slate-400 mt-4 max-w-md font-bold text-lg leading-relaxed">This production line is waiting for a supervisor to initiate a new batch run.</p>
-          </div>
         ) : (
-          <div className="col-span-12 grid grid-cols-12 gap-8 h-full overflow-hidden">
+          <div className="col-span-12 grid grid-cols-12 gap-8 h-full overflow-hidden relative">
+            {!activeBatch && (
+              <div className="absolute inset-0 z-[60] bg-slate-950/80 backdrop-blur-md flex items-center justify-center">
+                <div className="text-center p-16 bg-white/5 border border-white/10 rounded-[4rem] shadow-2xl max-w-xl">
+                  <div className="w-24 h-24 bg-amber-500/10 text-amber-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 border border-amber-500/20 shadow-2xl">
+                    <RefreshCw className="w-12 h-12 animate-spin" />
+                  </div>
+                  <h2 className="text-4xl font-black mb-6 uppercase tracking-tight text-white">Line Idle</h2>
+                  <p className="text-slate-400 font-bold text-lg leading-relaxed">
+                    This production line is currently <span className="text-amber-500">Idle</span>.
+                    Logging will be enabled once a supervisor initiates a production batch.
+                  </p>
+                  <div className="mt-10 p-6 bg-black/40 border border-white/5 rounded-2xl flex items-center gap-4 justify-center">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Awaiting Remote Start Signal...</p>
+                  </div>
+                </div>
+              </div>
+            )}
             {activeBatch.status === 'CHANGEOVER' && (
               <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-2xl flex items-center justify-center">
                 <div className="text-center p-16 bg-white/5 border border-white/10 rounded-[4rem] shadow-2xl max-w-2xl relative overflow-hidden">

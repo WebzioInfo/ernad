@@ -20,6 +20,7 @@ export default function InventoryPage() {
   const [updatingMaterial, setUpdatingMaterial] = useState<any>(null);
   const [viewingLedger, setViewingLedger] = useState<any>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'ledger' | 'config'>('ledger');
 
   const queryClient = useQueryClient();
 
@@ -92,162 +93,188 @@ export default function InventoryPage() {
               <p className="text-slate-400 font-bold mt-2 text-sm">Industrial resource tracking with automated depletion alerts.</p>
             </div>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-white text-slate-950 px-10 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center gap-3 shadow-2xl transition-all whitespace-nowrap"
-          >
-            <Plus className="w-5 h-5" />
-            Add Stock Batch
-          </motion.button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white/50 backdrop-blur-md p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 items-center">
-        <div className="relative flex-1 group w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-          <input
-            type="text"
-            placeholder="Query materials by SKU or Item Name..."
-            className="w-full bg-white border border-slate-100 rounded-[1.5rem] py-5 pl-16 pr-8 font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-3 overflow-x-auto pb-2 md:pb-0 no-scrollbar w-full md:w-auto">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-8 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat
-                ? 'bg-slate-900 text-white shadow-xl translate-y-[-2px]'
-                : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'
-                }`}
+          <div className="flex flex-col gap-3">
+            <div className="flex bg-white/5 p-1.5 rounded-[1.5rem] border border-white/10">
+              <button 
+                onClick={() => setActiveTab('ledger')}
+                className={`px-8 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'ledger' ? 'bg-white text-slate-950 shadow-xl' : 'text-white/40 hover:text-white'}`}
+              >
+                Stock Ledger
+              </button>
+              <button 
+                onClick={() => setActiveTab('config')}
+                className={`px-8 py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'config' ? 'bg-white text-slate-950 shadow-xl' : 'text-white/40 hover:text-white'}`}
+              >
+                Configuration
+              </button>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsCreateModalOpen(true)}
+              className="bg-indigo-600 text-white px-10 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-2xl transition-all whitespace-nowrap"
             >
-              {cat}
-            </button>
-          ))}
+              <Plus className="w-5 h-5" />
+              Add Stock Batch
+            </motion.button>
+          </div>
         </div>
       </div>
 
-      {/* List View (Table) */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Material / SKU</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category & Warehouse</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Current Stock</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Min. Required</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              <AnimatePresence mode="popLayout">
-                {filteredInventory?.map((material: any, idx: number) => {
-                  const isLow = parseFloat(material.quantity) <= parseFloat(material.minimumStock);
-                  return (
-                    <motion.tr 
-                      layout
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ delay: idx * 0.03 }}
-                      key={material.id} 
-                      className="hover:bg-slate-50/50 transition-colors group"
-                    >
-                      <td className="px-10 py-8">
-                        <div className="flex items-center gap-6">
-                          <div className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center transition-all group-hover:scale-110 ${isLow ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-lg' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-lg'
-                            }`}>
-                            <Droplet className="w-7 h-7" />
-                          </div>
-                          <div>
-                            <span className="font-black text-slate-900 tracking-tight text-lg block">{material.itemName}</span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Hash className="w-3 h-3 text-slate-400" />
-                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{material.sku || 'NO-SKU'}</span>
+      {activeTab === 'ledger' ? (
+        <>
+          {/* Filters */}
+          <div className="bg-white/50 backdrop-blur-md p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 items-center">
+            <div className="relative flex-1 group w-full">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <input
+                type="text"
+                placeholder="Query materials by SKU or Item Name..."
+                className="w-full bg-white border border-slate-100 rounded-[1.5rem] py-5 pl-16 pr-8 font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 md:pb-0 no-scrollbar w-full md:w-auto">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-8 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat
+                    ? 'bg-slate-900 text-white shadow-xl translate-y-[-2px]'
+                    : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'
+                    }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* List View (Table) */}
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Material / SKU</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category & Warehouse</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Current Stock</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Min. Required</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  <AnimatePresence mode="popLayout">
+                    {filteredInventory?.map((material: any, idx: number) => {
+                      const isLow = parseFloat(material.quantity) <= parseFloat(material.minimumStock);
+                      return (
+                        <motion.tr 
+                          layout
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ delay: idx * 0.03 }}
+                          key={material.id} 
+                          className="hover:bg-slate-50/50 transition-colors group"
+                        >
+                          <td className="px-10 py-8">
+                            <div className="flex items-center gap-6">
+                              <div className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center transition-all group-hover:scale-110 ${isLow ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-lg' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-lg'
+                                }`}>
+                                <Droplet className="w-7 h-7" />
+                              </div>
+                              <div>
+                                <span className="font-black text-slate-900 tracking-tight text-lg block">{material.itemName}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Hash className="w-3 h-3 text-slate-400" />
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{material.sku || 'NO-SKU'}</span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-10 py-8">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-3 h-3 text-slate-400" />
-                            <span className="px-3 py-1 bg-slate-900/5 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-[0.1em]">
-                              {material.categoryName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-3 h-3 text-slate-400" />
-                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{material.warehouseName}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-10 py-8">
-                        {isLow ? (
-                          <div className="inline-flex items-center gap-2 bg-rose-600 text-white px-5 py-2 rounded-xl shadow-xl shadow-rose-200 animate-pulse">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Depleted</span>
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-2 bg-emerald-500 text-white px-5 py-2 rounded-xl shadow-xl shadow-emerald-100">
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Optimal</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-10 py-8 text-right">
-                        <div className="flex flex-col items-end">
-                          <span className={`text-2xl font-black tabular-nums tracking-tighter ${isLow ? 'text-rose-600' : 'text-slate-900'}`}>
-                            {parseFloat(material.quantity).toLocaleString()}
-                          </span>
-                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{material.unit} available</span>
-                        </div>
-                      </td>
-                      <td className="px-10 py-8 text-right">
-                        <div className="flex flex-col items-end opacity-60">
-                          <span className="text-base font-black text-slate-500 tabular-nums">
-                            {parseFloat(material.minimumStock).toLocaleString()}
-                          </span>
-                          <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Trigger Level</span>
-                        </div>
-                      </td>
-                      <td className="px-10 py-8">
-                        <div className="flex items-center justify-center gap-3">
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setUpdatingMaterial(material)}
-                            className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all shadow-sm"
-                            title="Update Stock"
-                          >
-                            <RefreshCcw className="w-5 h-5" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setViewingLedger(material)}
-                            className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 hover:border-slate-200 transition-all shadow-sm"
-                            title="View History"
-                          >
-                            <History className="w-5 h-5" />
-                          </motion.button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </AnimatePresence>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                          </td>
+                          <td className="px-10 py-8">
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <Tag className="w-3 h-3 text-slate-400" />
+                                <span className="px-3 py-1 bg-slate-900/5 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-[0.1em]">
+                                  {material.categoryName}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-3 h-3 text-slate-400" />
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{material.warehouseName}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-10 py-8">
+                            {isLow ? (
+                              <div className="inline-flex items-center gap-2 bg-rose-600 text-white px-5 py-2 rounded-xl shadow-xl shadow-rose-200 animate-pulse">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Depleted</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-2 bg-emerald-500 text-white px-5 py-2 rounded-xl shadow-xl shadow-emerald-100">
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Optimal</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-10 py-8 text-right">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-2xl font-black tabular-nums tracking-tighter ${isLow ? 'text-rose-600' : 'text-slate-900'}`}>
+                                {parseFloat(material.quantity).toLocaleString()}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{material.unit} available</span>
+                            </div>
+                          </td>
+                          <td className="px-10 py-8 text-right">
+                            <div className="flex flex-col items-end opacity-60">
+                              <span className="text-base font-black text-slate-500 tabular-nums">
+                                {parseFloat(material.minimumStock).toLocaleString()}
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Trigger Level</span>
+                            </div>
+                          </td>
+                          <td className="px-10 py-8">
+                            <div className="flex items-center justify-center gap-3">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setUpdatingMaterial(material)}
+                                className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all shadow-sm"
+                                title="Update Stock"
+                              >
+                                <RefreshCcw className="w-5 h-5" />
+                              </motion.button>
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setViewingLedger(material)}
+                                className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 hover:border-slate-200 transition-all shadow-sm"
+                                title="View History"
+                              >
+                                <History className="w-5 h-5" />
+                              </motion.button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </AnimatePresence>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : (
+        <InventoryConfigView 
+          categories={categoriesData} 
+          warehouses={warehousesData} 
+          queryClient={queryClient}
+        />
+      )}
 
       {/* Modals */}
       {updatingMaterial && (
@@ -477,6 +504,88 @@ function CreateMaterialModal({ categories, warehouses, onClose, onSubmit, isPend
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function InventoryConfigView({ categories, warehouses, queryClient }: any) {
+  const createCategoryMutation = useMutation({
+    mutationFn: (data: any) => api.post('/inventory/categories', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
+      toast.success('Material Category Created');
+    }
+  });
+
+  const createWarehouseMutation = useMutation({
+    mutationFn: (data: any) => api.post('/inventory/warehouses', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-warehouses'] });
+      toast.success('Warehouse Location Registered');
+    }
+  });
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {/* Categories */}
+      <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-8">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Material Categories</h3>
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Tag className="w-6 h-6" /></div>
+        </div>
+        <div className="space-y-3">
+          {categories?.map((cat: any) => (
+            <div key={cat.id} className="flex items-center justify-between p-5 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
+              <span className="font-bold text-slate-700">{cat.name}</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{cat.description || 'Master Component'}</span>
+            </div>
+          ))}
+          <QuickAddForm 
+            placeholder="New Category Name (e.g. Resins)" 
+            onSubmit={(name) => createCategoryMutation.mutate({ name, description: 'Operational Category' })} 
+          />
+        </div>
+      </div>
+
+      {/* Warehouses */}
+      <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-8">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Warehouse Locations</h3>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Building2 className="w-6 h-6" /></div>
+        </div>
+        <div className="space-y-3">
+          {warehouses?.map((w: any) => (
+            <div key={w.id} className="flex items-center justify-between p-5 bg-slate-50/50 rounded-2xl border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
+              <span className="font-bold text-slate-700">{w.name}</span>
+              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-widest">{w.type}</span>
+            </div>
+          ))}
+          <QuickAddForm 
+            placeholder="New Location (e.g. WH-B)" 
+            onSubmit={(name) => createWarehouseMutation.mutate({ name, type: 'RAW_MATERIAL' })} 
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickAddForm({ placeholder, onSubmit }: { placeholder: string; onSubmit: (val: string) => void }) {
+  const [val, setVal] = useState('');
+  return (
+    <div className="flex gap-2 pt-4">
+      <input 
+        value={val} 
+        onChange={(e) => setVal(e.target.value)}
+        className="flex-1 bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold border-2 border-transparent focus:border-indigo-600/10 outline-none" 
+        placeholder={placeholder} 
+      />
+      <button 
+        onClick={() => { if(val) { onSubmit(val); setVal(''); } }}
+        className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-indigo-600 transition-all shadow-lg"
+      >
+        <Plus className="w-5 h-5" />
+      </button>
     </div>
   );
 }

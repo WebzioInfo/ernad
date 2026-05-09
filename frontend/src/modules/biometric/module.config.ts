@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Fingerprint, ClipboardCheck, Clock, FileText } from 'lucide-react';
+import { Fingerprint, ClipboardCheck, FileText } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const biometricConfig: ModuleConfig = {
@@ -56,7 +56,8 @@ export const biometricConfig: ModuleConfig = {
           label: 'Daily Attendance',
           icon: ClipboardCheck,
           path: '/attendance',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          isComingSoon: true
         },
         {
           id: 'biometric',
@@ -66,18 +67,12 @@ export const biometricConfig: ModuleConfig = {
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         },
         {
-          id: 'shifts',
-          label: 'Shift Management',
-          icon: Clock,
-          path: '/biometric/shifts',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-        },
-        {
           id: 'attendance_reports',
           label: 'Attendance Reports',
           icon: FileText,
           path: '/biometric/reports',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          isComingSoon: true
         }
       ]
     }

@@ -1,6 +1,6 @@
 import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { factories, productionLines, productBrands, products, rawMaterials } from './master-data';
+import { factories, productionLines, productBrands, products } from './master-data';
 import { shifts } from './biometric';
 
 export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED', 'CLOSED']);
@@ -29,16 +29,6 @@ export const productionBatches = pgTable('production_batches', {
     uniqueIndex('idx_batches_code_factory').on(table.batchCode, table.factoryId),
     index('idx_batches_factory').on(table.factoryId),
   ];
-});
-
-export const batchMaterials = pgTable('batch_materials', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
-  materialId: uuid('material_id').references(() => rawMaterials.id, { onDelete: 'restrict' }).notNull(),
-  plannedQuantity: decimal('planned_quantity', { precision: 12, scale: 2 }),
-  actualConsumed: decimal('actual_consumed', { precision: 12, scale: 2 }).default('0'),
-  wasteQuantity: decimal('waste_quantity', { precision: 12, scale: 2 }).default('0'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // @deprecated - Use batchTotals for tracking aggregates

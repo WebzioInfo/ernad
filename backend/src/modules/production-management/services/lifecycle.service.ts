@@ -2,8 +2,8 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import { 
   productionBatches, batchTotals, productionLines, factories,
-  qualityChecks, packagingLogs, dispatchLogs, materialFlows,
-  rawMaterials, stockTransactions, roles, userRoles, operatorSessions
+  qualityChecks, packagingLogs, dispatchLogs, userRoles, roles, operatorSessions,
+  finishedGoodsInventory, inventoryStock, warehouseLocations, inventoryTransactions
 } from '../../../database/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -38,45 +38,10 @@ export class LifecycleService {
         throw new BadRequestException(`Invalid transition from ${batch.status} to QC_PENDING.`);
       }
 
-      const flows = await tx.select().from(materialFlows).where(eq(materialFlows.batchId, batchId));
-      
       const closerRoles = await tx.select({ slug: roles.slug })
         .from(userRoles)
         .innerJoin(roles, eq(userRoles.roleId, roles.id))
         .where(eq(userRoles.userId, reqUserId));
-      
-      const isSuperAdmin = closerRoles.some(r => r.slug === 'SUPER_ADMIN');
-
-      for (const flow of flows) {
-        if (flow.used > 0 || flow.wasted > 0) {
-          const totalDeduction = flow.used + flow.wasted;
-          
-          const [material] = await tx.select().from(rawMaterials)
-            .where(and(eq(rawMaterials.name, flow.materialName), eq(rawMaterials.factoryId, factoryId)))
-            .for('update');
-          
-          if (material) {
-            const current = Number(material.currentStock);
-            if (current < totalDeduction && !isSuperAdmin) {
-               throw new BadRequestException(`Insufficient inventory for ${material.name}. Available: ${current}, Required: ${totalDeduction}`);
-            }
-
-            await tx.insert(stockTransactions).values({
-              materialId: material.id,
-              factoryId,
-              type: 'OUT',
-              quantity: totalDeduction.toString(),
-              referenceId: batchId,
-              remarks: `Consumption for Batch ${batch.batchCode}${isSuperAdmin ? ' (Forced by Admin)' : ''}`,
-              createdAt: new Date(),
-            });
-
-            await tx.update(rawMaterials)
-              .set({ currentStock: sql`${rawMaterials.currentStock} - ${totalDeduction}` })
-              .where(eq(rawMaterials.id, material.id));
-          }
-        }
-      }
 
       const [updatedBatch] = await tx.update(productionBatches)
         .set({ 
@@ -96,6 +61,28 @@ export class LifecycleService {
       const boundSessions = await tx.select().from(operatorSessions).where(and(eq(operatorSessions.batchId, batchId), eq(operatorSessions.isActive, true)));
       for (const session of boundSessions) {
         await this.sessionService.endSession(session.userId, reqUserId, 'batch_closed');
+      }
+
+      // ── HANDLE MATERIAL RETURNS ──
+      if (materialReturn) {
+        for (const [stockId, qty] of Object.entries(materialReturn)) {
+          const quantity = Number(qty);
+          if (isNaN(quantity) || quantity <= 0) continue;
+
+          await tx.update(inventoryStock)
+            .set({ quantity: sql`${inventoryStock.quantity} + ${quantity}`, updatedAt: new Date() })
+            .where(eq(inventoryStock.id, stockId));
+
+          await tx.insert(inventoryTransactions).values({
+            stockId: stockId,
+            type: 'IN',
+            quantityChange: quantity.toString(),
+            balanceAfter: '0', 
+            remarks: `Material Return from Batch ${batch.batchCode}`,
+            referenceId: batchId,
+            createdAt: new Date(),
+          });
+        }
       }
 
       return updatedBatch;
@@ -131,6 +118,29 @@ export class LifecycleService {
         await tx.update(productionBatches)
           .set({ status: 'COMPLETED' })
           .where(and(eq(productionBatches.id, batchId), eq(productionBatches.status, 'QC_PENDING')));
+
+        // ── GENERATE FINISHED GOODS ──
+        const [totals] = await tx.select().from(batchTotals).where(eq(batchTotals.batchId, batchId));
+        const [warehouse] = await tx.select().from(warehouseLocations)
+          .where(and(eq(warehouseLocations.factoryId, factoryId), eq(warehouseLocations.type, 'FINISHED_GOODS')))
+          .limit(1);
+
+        if (warehouse && totals.packingTotal > 0) {
+          await tx.insert(finishedGoodsInventory).values({
+            factoryId,
+            productId: batch.productId,
+            warehouseId: warehouse.id,
+            quantity: totals.packingTotal,
+            status: 'AVAILABLE',
+            updatedAt: new Date(),
+          }).onConflictDoUpdate({
+            target: [finishedGoodsInventory.productId, finishedGoodsInventory.warehouseId],
+            set: { 
+              quantity: sql`${finishedGoodsInventory.quantity} + ${totals.packingTotal}`,
+              updatedAt: new Date()
+            }
+          });
+        }
       }
 
       return check[0];

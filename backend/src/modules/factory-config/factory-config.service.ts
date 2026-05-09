@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, products, productBrands, rawMaterials, stockTransactions, factories, productionBatches } from '../../database/schema';
+import { productionLines, products, productBrands, factories, productionBatches } from '../../database/schema';
 
 @Injectable()
 export class FactoryConfigService {
@@ -79,11 +79,6 @@ export class FactoryConfigService {
     return await db.select().from(productBrands);
   }
 
-  async getRawMaterials() {
-    const factoryId = await this.getFactoryContext();
-    return await db.select().from(rawMaterials).where(eq(rawMaterials.factoryId, factoryId));
-  }
-
   async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
     const factoryId = await this.getFactoryContext();
     const [product] = await db.insert(products).values({ ...dto, factoryId }).returning();
@@ -93,48 +88,6 @@ export class FactoryConfigService {
   async createBrand(dto: { name: string }) {
     const [brand] = await db.insert(productBrands).values(dto).returning();
     return brand;
-  }
-
-  async createRawMaterial(dto: { name: string; unit: string; category?: string; currentStock?: string; minimumStock?: string }) {
-    const factoryId = await this.getFactoryContext();
-    const [material] = await db.insert(rawMaterials).values({
-      ...dto,
-      factoryId,
-      currentStock: dto.currentStock || '0',
-      minimumStock: dto.minimumStock || '0',
-    }).returning();
-    return material;
-  }
-
-  async updateStock(dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
-    const factoryId = await this.getFactoryContext();
-    return await db.transaction(async (tx) => {
-      await tx.insert(stockTransactions).values({
-        materialId: dto.materialId,
-        factoryId,
-        type: dto.type,
-        quantity: dto.quantity.toString(),
-        remarks: dto.remarks,
-        referenceId: dto.referenceId,
-      });
-
-      const operator = dto.type === 'IN' ? '+' : dto.type === 'OUT' ? '-' : '=';
-      
-      if (operator === '=') {
-        await tx.update(rawMaterials)
-          .set({ currentStock: dto.quantity.toString() })
-          .where(eq(rawMaterials.id, dto.materialId));
-      } else {
-        await tx.update(rawMaterials)
-          .set({ 
-            currentStock: sql`${rawMaterials.currentStock} ${sql.raw(operator)} ${dto.quantity.toString()}` 
-          })
-          .where(eq(rawMaterials.id, dto.materialId));
-      }
-
-      const [updated] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, dto.materialId));
-      return updated;
-    });
   }
 
   async updateBrand(id: string, dto: { name: string }) {
@@ -160,19 +113,6 @@ export class FactoryConfigService {
 
   async deleteProduct(id: string) {
     await db.delete(products).where(eq(products.id, id));
-    return { success: true };
-  }
-
-  async updateRawMaterial(id: string, dto: any) {
-    const [material] = await db.update(rawMaterials)
-      .set({ ...dto })
-      .where(eq(rawMaterials.id, id))
-      .returning();
-    return material;
-  }
-
-  async deleteRawMaterial(id: string) {
-    await db.delete(rawMaterials).where(eq(rawMaterials.id, id));
     return { success: true };
   }
 }

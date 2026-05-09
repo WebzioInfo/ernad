@@ -4,20 +4,22 @@ import { api } from '../../services/api-client';
 import {
   Users, UserPlus, Search,
   Trash2, Edit2, UserCheck,
-  Mail, 
+  Mail,
   Lock, Unlock, BadgeCheck,
   ShieldCheck, ShieldAlert, UserCog,
   Filter, XCircle, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+import useAuthStore from '../auth/auth.store';
+
 
 interface User {
   id: string;
   name: string;
   username: string;
   email: string;
-  roles: string[]; 
+  roles: string[];
   assignedLines?: string[]; // Added: Multi-line assignment
   department?: string;
   jobTitle?: string;
@@ -27,11 +29,17 @@ interface User {
 }
 
 export default function UserManagementPage() {
+  const { user } = useAuthStore();
+  const roles = user?.roles || [];
+  const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
+  const isManager = roles.includes('MANAGER');
+  const canAddUser = isAdmin && !isManager; 
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
@@ -76,14 +84,14 @@ export default function UserManagementPage() {
   const departments = Array.from(new Set(users?.map(u => u.department).filter(Boolean))) as string[];
 
   const filteredUsers = users?.filter(u => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.roles.some(r => r.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     const matchesRole = roleFilter === 'ALL' || u.roles.includes(roleFilter);
     const matchesDept = deptFilter === 'ALL' || u.department === deptFilter;
-    const matchesStatus = statusFilter === 'ALL' || 
+    const matchesStatus = statusFilter === 'ALL' ||
       (statusFilter === 'ACTIVE' ? u.isActive : !u.isActive);
 
     return matchesSearch && matchesRole && matchesDept && matchesStatus;
@@ -135,13 +143,15 @@ export default function UserManagementPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-slate-900 hover:bg-indigo-600 text-white px-8 py-4 rounded-[2rem] font-black flex items-center gap-3 shadow-xl shadow-slate-200 hover:shadow-indigo-200 transition-all duration-300 active:scale-95 whitespace-nowrap uppercase tracking-widest text-xs"
-          >
-            <UserPlus className="w-5 h-5" />
-            Add User
-          </button>
+          {canAddUser && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-slate-900 hover:bg-indigo-600 text-white px-8 py-4 rounded-[2rem] font-black flex items-center gap-3 shadow-xl shadow-slate-200 hover:shadow-indigo-200 transition-all duration-300 active:scale-95 whitespace-nowrap uppercase tracking-widest text-xs"
+            >
+              <UserPlus className="w-5 h-5" />
+              Add User
+            </button>
+          )}
         </div>
       </div>
 
@@ -158,7 +168,7 @@ export default function UserManagementPage() {
             { value: deptFilter, setter: setDeptFilter, options: [{ slug: 'ALL', label: 'All Departments' }, ...departments.map(d => ({ slug: d, label: d }))] },
             { value: statusFilter, setter: setStatusFilter, options: [{ slug: 'ALL', label: 'All Status' }, { slug: 'ACTIVE', label: 'Active' }, { slug: 'SUSPENDED', label: 'Blocked' }] }
           ].map((filter, i) => (
-            <select 
+            <select
               key={i}
               className="bg-white border border-slate-100 rounded-2xl px-5 py-3 text-xs font-black text-slate-600 focus:ring-4 focus:ring-indigo-50 focus:border-indigo-200 outline-none cursor-pointer transition-all hover:bg-slate-50"
               value={filter.value}
@@ -172,7 +182,7 @@ export default function UserManagementPage() {
         </div>
 
         {(searchTerm || roleFilter !== 'ALL' || deptFilter !== 'ALL' || statusFilter !== 'ALL') && (
-          <button 
+          <button
             onClick={clearFilters}
             className="flex items-center gap-2 px-6 py-3 text-rose-500 hover:bg-rose-50 rounded-2xl text-[10px] font-black transition-all ml-auto uppercase tracking-widest border border-transparent hover:border-rose-100"
           >
@@ -213,12 +223,12 @@ export default function UserManagementPage() {
       )}
 
       {(isAddModalOpen || editingUser) && (
-        <UserFormModal 
-          user={editingUser || undefined} 
+        <UserFormModal
+          user={editingUser || undefined}
           onClose={() => {
             setIsAddModalOpen(false);
             setEditingUser(null);
-          }} 
+          }}
         />
       )}
     </div>
@@ -236,13 +246,13 @@ function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
   };
 
   return (
-    <div 
+    <div
       onClick={onOpen}
       className="glass rounded-[3rem] p-8 hover:shadow-2xl hover:shadow-indigo-100/50 hover:-translate-y-2 cursor-pointer transition-all duration-500 group relative overflow-hidden flex flex-col h-full"
     >
       {/* Background Accent */}
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${getRoleStyle(user.roles[0]).color} opacity-[0.03] rounded-full translate-x-10 -translate-y-10 group-hover:opacity-[0.07] transition-opacity duration-700`} />
-      
+
       <div className="flex items-start justify-between mb-8 relative z-10">
         <div className="flex items-center gap-6">
           <div className="relative group/avatar">
@@ -258,7 +268,7 @@ function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
               {user.isActive ? <Unlock className="w-3 h-3 text-white" /> : <Lock className="w-3 h-3 text-white" />}
             </div>
           </div>
-          
+
           <div>
             <h4 className="font-black text-slate-900 tracking-tight text-xl leading-tight mb-2 group-hover:text-indigo-600 transition-colors">
               {user.name}
@@ -287,7 +297,7 @@ function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
             <span className="text-sm font-bold text-slate-600 truncate max-w-[200px]">{user.email}</span>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4 group/item">
           <div className="w-10 h-10 glass rounded-xl flex items-center justify-center text-slate-400 group-hover/item:text-indigo-500 group-hover/item:bg-white transition-all duration-300">
             <BadgeCheck className="w-4 h-4" />
@@ -340,100 +350,99 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { 
           <div className="p-12 text-center relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-50 to-transparent" />
             <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all z-10">
-               <X className="w-6 h-6" />
+              <X className="w-6 h-6" />
             </button>
 
             <div className="relative z-10 flex flex-col items-center">
-               <div className="relative mb-6">
-                 <div className="w-32 h-32 rounded-[2.5rem] bg-white shadow-2xl overflow-hidden border-4 border-white">
-                   {user.avatarUrl ? (
-                     <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
-                   ) : (
-                     <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
-                       <Users className="w-16 h-16" />
-                     </div>
-                   )}
-                 </div>
-                 <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                    {user.isActive ? <Unlock className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4 text-white" />}
-                 </div>
-               </div>
+              <div className="relative mb-6">
+                <div className="w-32 h-32 rounded-[2.5rem] bg-white shadow-2xl overflow-hidden border-4 border-white">
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} className="w-full h-full object-cover" alt="Avatar" />
+                  ) : (
+                    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
+                      <Users className="w-16 h-16" />
+                    </div>
+                  )}
+                </div>
+                <div className={`absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center ${user.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                  {user.isActive ? <Unlock className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4 text-white" />}
+                </div>
+              </div>
 
-               <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{user.name}</h3>
-               <p className="text-slate-500 font-bold mb-8">@{user.username} • {user.jobTitle || 'System User'}</p>
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-2">{user.name}</h3>
+              <p className="text-slate-500 font-bold mb-8">@{user.username} • {user.jobTitle || 'System User'}</p>
 
-               <div className="grid grid-cols-2 gap-4 w-full mb-10">
-                  <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Department</p>
-                     <p className="text-sm font-black text-slate-700">{user.department || 'Not Assigned'}</p>
+              <div className="grid grid-cols-2 gap-4 w-full mb-10">
+                <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Department</p>
+                  <p className="text-sm font-black text-slate-700">{user.department || 'Not Assigned'}</p>
+                </div>
+                <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Roles</p>
+                  <div className="flex flex-wrap gap-1">
+                    {user.roles.map(r => <span key={r} className="text-[9px] font-black text-indigo-600">{r}</span>)}
                   </div>
-                  <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
-                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Access Roles</p>
-                     <div className="flex flex-wrap gap-1">
-                       {user.roles.map(r => <span key={r} className="text-[9px] font-black text-indigo-600">{r}</span>)}
-                     </div>
-                  </div>
-               </div>
+                </div>
+              </div>
 
-               {/* Activity Timeline */}
-               <div className="w-full text-left mb-10">
-                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 px-2">
-                   <Activity className="w-3 h-3 text-indigo-500" />
-                   Recent Activity Timeline
-                 </h4>
-                 <div className="space-y-4">
-                    {logs?.length > 0 ? logs.map((log: any, idx: number) => (
-                      <div key={log.id} className="flex gap-4 group/log">
-                        <div className="flex flex-col items-center">
-                          <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
-                          {idx !== logs.length - 1 && <div className="w-[1px] h-full bg-slate-100 my-1" />}
-                        </div>
-                        <div className="flex-1 pb-4">
-                          <p className="text-xs font-bold text-slate-700 group-hover/log:text-indigo-600 transition-colors">{log.action.split(' /')[0].replace('POST', 'Created').replace('PATCH', 'Updated').replace('GET', 'Accessed') || 'Performed System Action'}</p>
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{new Date(log.occurredAt).toLocaleString()}</p>
-                        </div>
+              {/* Activity Timeline */}
+              <div className="w-full text-left mb-10">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 px-2">
+                  <Activity className="w-3 h-3 text-indigo-500" />
+                  Recent Activity Timeline
+                </h4>
+                <div className="space-y-4">
+                  {logs?.length > 0 ? logs.map((log: any, idx: number) => (
+                    <div key={log.id} className="flex gap-4 group/log">
+                      <div className="flex flex-col items-center">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                        {idx !== logs.length - 1 && <div className="w-[1px] h-full bg-slate-100 my-1" />}
                       </div>
-                    )) : (
-                      <div className="p-8 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                        No activity recorded
+                      <div className="flex-1 pb-4">
+                        <p className="text-xs font-bold text-slate-700 group-hover/log:text-indigo-600 transition-colors">{log.action.split(' /')[0].replace('POST', 'Created').replace('PATCH', 'Updated').replace('GET', 'Accessed') || 'Performed System Action'}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{new Date(log.occurredAt).toLocaleString()}</p>
                       </div>
-                    )}
-                 </div>
-               </div>
+                    </div>
+                  )) : (
+                    <div className="p-8 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center text-slate-400 text-[10px] font-black uppercase tracking-widest">
+                      No activity recorded
+                    </div>
+                  )}
+                </div>
+              </div>
 
-               <div className="flex flex-wrap gap-4 w-full mb-8">
-                  <button 
-                    onClick={onToggleActive}
-                    className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${
-                     user.isActive 
-                       ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600' 
-                       : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+              <div className="flex flex-wrap gap-4 w-full mb-8">
+                <button
+                  onClick={onToggleActive}
+                  className={`flex-1 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${user.isActive
+                    ? 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
+                    : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
                     }`}
-                  >
-                    {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                    {user.isActive ? 'Suspend User' : 'Restore User'}
-                  </button>
-                  <button onClick={onEdit} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
-                     <Edit2 className="w-4 h-4" /> Modify Profile
-                  </button>
-               </div>
+                >
+                  {user.isActive ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                  {user.isActive ? 'Suspend User' : 'Restore User'}
+                </button>
+                <button onClick={onEdit} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2">
+                  <Edit2 className="w-4 h-4" /> Modify Profile
+                </button>
+              </div>
 
-               {/* Danger Zone */}
-               <div className="w-full pt-8 border-t border-slate-100">
-                 <div className="flex items-center justify-between bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50 group/danger">
-                   <div className="text-left">
-                     <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Danger Zone</p>
-                     <p className="text-[11px] font-bold text-slate-500">Permanently remove this user and all associated data.</p>
-                   </div>
-                   <button 
-                     onClick={onDelete}
-                     className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border border-rose-100 flex items-center gap-2"
-                   >
-                     <Trash2 className="w-4 h-4" />
-                     Delete Account
-                   </button>
-                 </div>
-               </div>
+              {/* Danger Zone */}
+              <div className="w-full pt-8 border-t border-slate-100">
+                <div className="flex items-center justify-between bg-rose-50/50 p-6 rounded-3xl border border-rose-100/50 group/danger">
+                  <div className="text-left">
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Danger Zone</p>
+                    <p className="text-[11px] font-bold text-slate-500">Permanently remove this user and all associated data.</p>
+                  </div>
+                  <button
+                    onClick={onDelete}
+                    className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border border-rose-100 flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Account
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -518,7 +527,7 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
     e.preventDefault();
     const data = { ...formData };
     if (!data.pin) delete (data as any).pin;
-    
+
     // Sanitize roles
     if (data.roles && Array.isArray(data.roles)) {
       data.roles = Array.from(new Set(data.roles.map(r => String(r).trim().toUpperCase())));
@@ -631,30 +640,30 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
           {/* Line Assignment (Only for Operators) */}
           {formData.roles.some(r => r.startsWith('OPERATOR')) && (
             <div className="space-y-4 p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Production Lines</label>
-               <div className="grid grid-cols-2 gap-3">
-                  {lines?.map((line: any) => (
-                    <button
-                      key={line.id}
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          assignedLines: prev.assignedLines.includes(line.id)
-                            ? prev.assignedLines.filter(id => id !== line.id)
-                            : [...prev.assignedLines, line.id]
-                        }));
-                      }}
-                      className={`px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all flex items-center justify-between ${formData.assignedLines.includes(line.id)
-                        ? 'bg-white border-indigo-600 text-indigo-600 shadow-lg shadow-indigo-100'
-                        : 'bg-white border-white text-slate-400 hover:border-slate-200'
-                        }`}
-                    >
-                      <span>{line.name}</span>
-                      {formData.assignedLines.includes(line.id) && <BadgeCheck className="w-4 h-4" />}
-                    </button>
-                  ))}
-               </div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Production Lines</label>
+              <div className="grid grid-cols-2 gap-3">
+                {lines?.map((line: any) => (
+                  <button
+                    key={line.id}
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        assignedLines: prev.assignedLines.includes(line.id)
+                          ? prev.assignedLines.filter(id => id !== line.id)
+                          : [...prev.assignedLines, line.id]
+                      }));
+                    }}
+                    className={`px-4 py-4 rounded-2xl text-[10px] font-black uppercase tracking-wider border-2 transition-all flex items-center justify-between ${formData.assignedLines.includes(line.id)
+                      ? 'bg-white border-indigo-600 text-indigo-600 shadow-lg shadow-indigo-100'
+                      : 'bg-white border-white text-slate-400 hover:border-slate-200'
+                      }`}
+                  >
+                    <span>{line.name}</span>
+                    {formData.assignedLines.includes(line.id) && <BadgeCheck className="w-4 h-4" />}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

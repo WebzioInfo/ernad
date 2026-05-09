@@ -107,32 +107,40 @@ export default function LineSelectionPage() {
         {/* Grid */}
         {step === 'line' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {lines?.map((line: any) => (
-              <button
-                key={line.id}
-                onClick={() => { setSelectedLine(line); setStep('station'); }}
-                className="group bg-white/5 border border-white/10 p-10 rounded-[3rem] text-left hover:bg-blue-600 hover:border-blue-500 hover:-translate-y-2 transition-all duration-500 relative overflow-hidden"
-              >
-                <div className="relative z-10">
-                  <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center mb-8 group-hover:bg-white/20 transition-colors">
-                    <Cpu className="w-8 h-8 text-blue-400 group-hover:text-white" />
-                  </div>
-                  <h3 className="text-3xl font-black tracking-tight mb-2 group-hover:text-white">{line.name}</h3>
-                  <p className="text-slate-500 font-medium group-hover:text-blue-100 mb-8">{line.description}</p>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-black/20 rounded-full border border-white/5">
-                      <div className={`w-2 h-2 rounded-full ${line.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">{line.status}</span>
+            {lines?.map((line: any) => {
+              const isSelectable = line.status === 'RUNNING' || line.status === 'CHANGEOVER';
+              return (
+                <button
+                  key={line.id}
+                  disabled={!isSelectable}
+                  onClick={() => { setSelectedLine(line); setStep('station'); }}
+                  className={`group bg-white/5 border border-white/10 p-10 rounded-[3rem] text-left transition-all duration-500 relative overflow-hidden ${
+                    isSelectable 
+                      ? 'hover:bg-blue-600 hover:border-blue-500 hover:-translate-y-2 cursor-pointer' 
+                      : 'opacity-50 grayscale cursor-not-allowed bg-slate-800/20'
+                  }`}
+                >
+                  <div className="relative z-10">
+                    <div className={`w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center mb-8 group-hover:bg-white/20 transition-colors ${!isSelectable && 'opacity-30'}`}>
+                      <Cpu className={`w-8 h-8 ${isSelectable ? 'text-blue-400 group-hover:text-white' : 'text-slate-600'}`} />
                     </div>
-                    <ArrowRight className="w-6 h-6 text-slate-700 group-hover:text-white group-hover:translate-x-2 transition-all" />
-                  </div>
-                </div>
+                    <h3 className={`text-3xl font-black tracking-tight mb-2 ${isSelectable ? 'group-hover:text-white' : 'text-slate-500'}`}>{line.name}</h3>
+                    <p className={`text-slate-500 font-medium group-hover:text-blue-100 mb-8 ${!isSelectable && 'text-slate-600'}`}>{line.description}</p>
 
-                {/* Background Glow */}
-                <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-500/20 rounded-full blur-[100px] opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            ))}
+                    <div className="flex items-center justify-between">
+                      <div className={`flex items-center gap-2 px-4 py-2 bg-black/20 rounded-full border ${isSelectable ? 'border-white/5' : 'border-white/0'}`}>
+                        <div className={`w-2 h-2 rounded-full ${line.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : line.status === 'CHANGEOVER' ? 'bg-amber-500 animate-pulse' : 'bg-slate-700'}`} />
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${isSelectable ? 'text-white' : 'text-slate-600'}`}>{line.status}</span>
+                      </div>
+                      {isSelectable && <ArrowRight className="w-6 h-6 text-slate-700 group-hover:text-white group-hover:translate-x-2 transition-all" />}
+                    </div>
+                  </div>
+
+                  {/* Background Glow */}
+                  {isSelectable && <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-blue-500/20 rounded-full blur-[100px] opacity-0 group-hover:opacity-100 transition-opacity" />}
+                </button>
+              );
+            })}
 
             {/* Maintenance Card */}
             <div className="bg-slate-800/50 border border-dashed border-white/10 p-10 rounded-[3rem] flex flex-col items-center justify-center text-center opacity-50">

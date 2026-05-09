@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
 import {
-  Settings, Tags, Box, Factory, Clock, Package,
-  Plus, Trash2, Loader2, AlertCircle
+  Settings, Tags, Box, Factory, Clock,
+  Plus, Trash2, Loader2
 } from 'lucide-react';
 
 // --- Shared Types ---
@@ -12,7 +12,6 @@ type Brand = { id: string; name: string; description: string; isActive: boolean 
 type Product = { id: string; name: string; brandId: string; targetWeight: number; targetSpeed: number; unit: string; sku: string };
 type Line = { id: string; name: string; status: string; efficiency: number };
 type Shift = { id: string; name: string; startTime: string; endTime: string };
-type RawMaterial = { id: string; name: string; category: string; type: string; unit: string; currentStock: number; minimumStock: number };
 
 // --- Subcomponents ---
 
@@ -433,201 +432,16 @@ const ShiftsTab = () => {
   );
 };
 
-const RawMaterialsTab = () => {
-  const queryClient = useQueryClient();
-  const { data: materials, isLoading } = useQuery<RawMaterial[]>({ queryKey: ['raw-materials'], queryFn: async () => (await api.get('/master-data/raw-materials')).data });
-  const [isAdding, setIsAdding] = useState(false);
-  const [newMaterial, setNewMaterial] = useState({ name: '', category: 'Packaging', type: 'Preform', unit: 'Units', minimumStock: 1000 });
-  const [customFields, setCustomFields] = useState({ category: false, type: false, unit: false });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => await api.post('/master-data/raw-materials', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['raw-materials'] });
-      toast.success('Raw material added successfully');
-      setIsAdding(false);
-      setNewMaterial({ name: '', category: 'Packaging', type: 'Preform', unit: 'Units', minimumStock: 1000 });
-      setCustomFields({ category: false, type: false, unit: false });
-    },
-    onError: () => toast.error('Failed to add material')
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMaterial.name) return toast.error('Name is required');
-
-    // Combine Category and Type to fit into the existing "category" DB column (DATABASE PROTECTION MODE)
-    const combinedCategory = newMaterial.type ? `${newMaterial.category} - ${newMaterial.type}` : newMaterial.category;
-
-    createMutation.mutate({
-      name: newMaterial.name,
-      unit: newMaterial.unit,
-      minimumStock: newMaterial.minimumStock,
-      category: combinedCategory
-    });
-  };
-
-  if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-500" /></div>;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-bold text-slate-800">Raw Materials</h3>
-        <button onClick={() => setIsAdding(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 transition-colors">
-          <Plus className="w-4 h-4" /> Add Material
-        </button>
-      </div>
-
-      {isAdding && (
-        <form onSubmit={handleSubmit} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name</label>
-              <input type="text" value={newMaterial.name} onChange={e => setNewMaterial({ ...newMaterial, name: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="e.g., 500ml Preform" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Category</label>
-              {!customFields.category ? (
-                <select 
-                  value={newMaterial.category} 
-                  onChange={e => {
-                    if (e.target.value === 'OTHER') {
-                      setCustomFields({ ...customFields, category: true });
-                      setNewMaterial({ ...newMaterial, category: '' });
-                    } else {
-                      setNewMaterial({ ...newMaterial, category: e.target.value });
-                    }
-                  }} 
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                >
-                  <option value="Packaging">Packaging</option>
-                  <option value="Ingredient">Ingredient</option>
-                  <option value="Consumable">Consumable</option>
-                  <option value="OTHER">Other (Custom)...</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input type="text" value={newMaterial.category} onChange={e => setNewMaterial({ ...newMaterial, category: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Type custom category..." autoFocus />
-                  <button type="button" onClick={() => { setCustomFields({ ...customFields, category: false }); setNewMaterial({ ...newMaterial, category: 'Packaging' }); }} className="px-3 py-2 text-slate-500 hover:bg-slate-200 rounded-lg">✕</button>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
-              {!customFields.type ? (
-                <select 
-                  value={newMaterial.type} 
-                  onChange={e => {
-                    if (e.target.value === 'OTHER') {
-                      setCustomFields({ ...customFields, type: true });
-                      setNewMaterial({ ...newMaterial, type: '' });
-                    } else {
-                      setNewMaterial({ ...newMaterial, type: e.target.value });
-                    }
-                  }} 
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                >
-                  <option value="Preform">Preform</option>
-                  <option value="Cap">Cap</option>
-                  <option value="Label">Label</option>
-                  <option value="Carton">Carton</option>
-                  <option value="OTHER">Other (Custom)...</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input type="text" value={newMaterial.type} onChange={e => setNewMaterial({ ...newMaterial, type: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Type custom type..." autoFocus />
-                  <button type="button" onClick={() => { setCustomFields({ ...customFields, type: false }); setNewMaterial({ ...newMaterial, type: 'Preform' }); }} className="px-3 py-2 text-slate-500 hover:bg-slate-200 rounded-lg">✕</button>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unit</label>
-              {!customFields.unit ? (
-                <select 
-                  value={newMaterial.unit} 
-                  onChange={e => {
-                    if (e.target.value === 'OTHER') {
-                      setCustomFields({ ...customFields, unit: true });
-                      setNewMaterial({ ...newMaterial, unit: '' });
-                    } else {
-                      setNewMaterial({ ...newMaterial, unit: e.target.value });
-                    }
-                  }} 
-                  className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
-                >
-                  <option value="Units">Units</option>
-                  <option value="Kilograms">Kilograms</option>
-                  <option value="Liters">Liters</option>
-                  <option value="OTHER">Other (Custom)...</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input type="text" value={newMaterial.unit} onChange={e => setNewMaterial({ ...newMaterial, unit: e.target.value })} className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Type custom unit..." autoFocus />
-                  <button type="button" onClick={() => { setCustomFields({ ...customFields, unit: false }); setNewMaterial({ ...newMaterial, unit: 'Units' }); }} className="px-3 py-2 text-slate-500 hover:bg-slate-200 rounded-lg">✕</button>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Min Stock Alert</label>
-              <input type="number" value={newMaterial.minimumStock} onChange={e => setNewMaterial({ ...newMaterial, minimumStock: Number(e.target.value) })} className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setIsAdding(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-bold">Cancel</button>
-            <button type="submit" disabled={createMutation.isPending} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50">
-              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Material'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-black">
-            <tr>
-              <th className="px-6 py-4">Material</th>
-              <th className="px-6 py-4">Category/Type</th>
-              <th className="px-6 py-4">Stock Level</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {materials?.length === 0 && (
-              <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-500">No raw materials found.</td></tr>
-            )}
-            {materials?.map(m => (
-              <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-slate-800">{m.name}</td>
-                <td className="px-6 py-4 text-slate-600 text-sm">
-                  {m.category || '-'}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono ${m.currentStock <= m.minimumStock ? 'text-rose-600 font-bold' : 'text-slate-700'}`}>
-                      {m.currentStock} {m.unit}
-                    </span>
-                    {m.currentStock <= m.minimumStock && <AlertCircle className="w-4 h-4 text-rose-500" />}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
 // --- Main Page Component ---
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'brands' | 'products' | 'lines' | 'shifts' | 'materials'>('brands');
+  const [activeTab, setActiveTab] = useState<'brands' | 'products' | 'lines' | 'shifts'>('brands');
 
   const tabs = [
     { id: 'brands', label: 'Brands', icon: Tags },
     { id: 'products', label: 'Products', icon: Box },
     { id: 'lines', label: 'Production Lines', icon: Factory },
     { id: 'shifts', label: 'Shifts', icon: Clock },
-    { id: 'materials', label: 'Raw Materials', icon: Package },
   ] as const;
 
   return (
@@ -679,7 +493,6 @@ export default function SettingsPage() {
             {activeTab === 'products' && <ProductsTab />}
             {activeTab === 'lines' && <LinesTab />}
             {activeTab === 'shifts' && <ShiftsTab />}
-            {activeTab === 'materials' && <RawMaterialsTab />}
           </div>
         </div>
 
