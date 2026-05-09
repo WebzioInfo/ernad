@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { db } from '../../database/db';
@@ -124,10 +125,30 @@ export class UsersService {
 
   /**
    * Create a new operator with a bcrypt-hashed PIN.
+   * STRICT: Only SUPER_ADMIN can create ADMIN/MANAGER/HR_ADMIN.
+   * ADMIN can only create OPERATOR.
    */
-  async createOperator(dto: any) {
+  async createOperator(actorRoles: string[], dto: any) {
     if (!dto.name || !dto.username || !dto.pin) {
       throw new BadRequestException('name, username, and pin are required');
+    }
+
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isAdmin = actorRoles.includes('ADMIN');
+
+    if (!isSuperAdmin && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to create users');
+    }
+
+    // Role Hierarchy Validation
+    const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
+    
+    if (!isSuperAdmin) {
+      // Admin constraint: Can ONLY create OPERATOR
+      const hasNonOperatorRole = requestedRoles.some(r => r !== 'OPERATOR');
+      if (hasNonOperatorRole) {
+        throw new ForbiddenException('Admins can only create users with the OPERATOR role');
+      }
     }
 
     return await db.transaction(async (tx) => {
@@ -197,9 +218,17 @@ export class UsersService {
 
   /**
    * Update operator details.
+   * STRICT: Hierarchy check to prevent role elevation by non-SuperAdmins.
    */
-  async updateOperator(id: string, dto: any) {
+  async updateOperator(actorRoles: string[], id: string, dto: any) {
     this.logger.log(`[UsersService] Updating operator ${id} with DTO: ${JSON.stringify(dto)}`);
+    
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isAdmin = actorRoles.includes('ADMIN');
+
+    if (!isSuperAdmin && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to update users');
+    }
     try {
       return await db.transaction(async (tx) => {
         const existing = await tx.select().from(users).where(eq(users.id, id));
@@ -218,6 +247,17 @@ export class UsersService {
 
         if (dto.pin) {
           updateData.pinCode = await bcrypt.hash(dto.pin, 10);
+        }
+
+        // Hierarchy validation for role updates
+        if (dto.roles || dto.role) {
+          const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
+          if (!isSuperAdmin) {
+            const hasNonOperatorRole = requestedRoles.some(r => r !== 'OPERATOR');
+            if (hasNonOperatorRole) {
+              throw new ForbiddenException('Only SuperAdmins can assign Admin/Manager roles');
+            }
+          }
         }
 
         await tx.update(users).set(updateData).where(eq(users.id, id));

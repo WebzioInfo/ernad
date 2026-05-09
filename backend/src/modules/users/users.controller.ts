@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -71,8 +72,8 @@ export class UsersController {
   @Permissions('users:manage')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new operator (Admin only)' })
-  createOperator(@Body() dto: CreateUserDto) {
-    return this.usersService.createOperator(dto);
+  createOperator(@Req() req: any, @Body() dto: CreateUserDto) {
+    return this.usersService.createOperator(req.user.roles || [], dto);
   }
 
   /**
@@ -82,9 +83,9 @@ export class UsersController {
   @Patch(':id')
   @Permissions('users:manage')
   @ApiOperation({ summary: 'Update operator details (Admin only)' })
-  updateOperator(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+  updateOperator(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateUserDto) {
     console.log(`[UsersController] PATCH user ${id} with DTO:`, dto);
-    return this.usersService.updateOperator(id, dto);
+    return this.usersService.updateOperator(req.user.roles || [], id, dto);
   }
 
   /**

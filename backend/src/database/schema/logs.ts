@@ -1,7 +1,8 @@
 import { pgTable, uuid, timestamp, integer, decimal, bigserial, index, pgEnum, varchar, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { productionBatches, operatorSessions } from './production';
 import { users } from './users';
-import { factories, productionLines, shifts, productBrands, products } from './master-data';
+import { factories, productionLines, productBrands, products } from './master-data';
+import { shifts } from './biometric';
 
 export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);

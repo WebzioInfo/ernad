@@ -47,12 +47,6 @@ export class FactoryConfigController {
     return await this.factoryConfigService.deleteLine(id);
   }
 
-  @Get('shifts')
-  @Permissions('settings:view')
-  async getShifts() {
-    return await this.factoryConfigService.getShifts();
-  }
-
   @Get('products')
   @Permissions('settings:view')
   async getProducts() {
@@ -62,12 +56,6 @@ export class FactoryConfigController {
       this.logger.error(`Failed to fetch products: ${err.message}`, err.stack);
       throw err;
     }
-  }
-
-  @Get('current-shift')
-  @Permissions('settings:view')
-  async getCurrentShift() {
-    return await this.factoryConfigService.getCurrentShift();
   }
 
   @Get('brands')
@@ -104,17 +92,5 @@ export class FactoryConfigController {
   @Permissions('settings:manage')
   async createProduct(@Body() dto: CreateProductDto) {
     return await this.factoryConfigService.createProduct(dto);
-  }
-
-  @Delete('shifts/:id')
-  @Permissions('settings:manage')
-  async deleteShift(@Param('id') id: string) {
-    return await this.factoryConfigService.deleteShift(id);
-  }
-
-  @Post('shifts')
-  @Permissions('settings:manage')
-  async createShift(@Body() dto: { name: string; startTime: string; endTime: string }) {
-    return await this.factoryConfigService.createShift(dto);
   }
 }

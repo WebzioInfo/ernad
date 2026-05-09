@@ -1,5 +1,6 @@
 import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
-import { factories, productionLines, shifts } from './master-data';
+import { factories, productionLines } from './master-data';
+import { shifts } from './biometric';
 
 // ── RBAC SYSTEM (Phase 3 Redesign) ──
 

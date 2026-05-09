@@ -1,6 +1,7 @@
 import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { factories, productionLines, productBrands, products, shifts, rawMaterials } from './master-data';
+import { factories, productionLines, productBrands, products, rawMaterials } from './master-data';
+import { shifts } from './biometric';
 
 export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED', 'CLOSED']);
 

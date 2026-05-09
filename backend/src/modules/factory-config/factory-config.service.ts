@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, shifts, products, productBrands, rawMaterials, stockTransactions, factories, productionBatches } from '../../database/schema';
+import { productionLines, products, productBrands, rawMaterials, stockTransactions, factories, productionBatches } from '../../database/schema';
 
 @Injectable()
 export class FactoryConfigService {
@@ -43,9 +43,7 @@ export class FactoryConfigService {
 
   async createLine(dto: { name: string; description?: string }) {
     try {
-      // Removed strict limit of 2 lines and name validation for flexibility
       const factoryId = await this.getFactoryContext();
-      
       const [line] = await db.insert(productionLines).values({
         name: dto.name,
         description: dto.description,
@@ -72,45 +70,18 @@ export class FactoryConfigService {
     return { success: true };
   }
 
-  async getShifts() {
-    const factoryId = await this.getFactoryContext();
-    return await db.select().from(shifts).where(eq(shifts.factoryId, factoryId));
-  }
-
   async getProducts() {
     const factoryId = await this.getFactoryContext();
     return await db.select().from(products).where(eq(products.factoryId, factoryId));
   }
 
   async getBrands() {
-    // Brands are global in this schema (no factoryId)
     return await db.select().from(productBrands);
   }
 
   async getRawMaterials() {
     const factoryId = await this.getFactoryContext();
     return await db.select().from(rawMaterials).where(eq(rawMaterials.factoryId, factoryId));
-  }
-
-  async getCurrentShift() {
-    const now = new Date();
-    const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    const allShifts = await this.getShifts();
-    
-    // Cross-midnight logic
-    for (const shift of allShifts) {
-      const { startTime, endTime } = shift;
-      if (startTime <= endTime) {
-        // Normal shift (e.g., 06:00 - 14:00)
-        if (timeStr >= startTime && timeStr < endTime) return shift;
-      } else {
-        // Cross-midnight shift (e.g., 22:00 - 06:00)
-        if (timeStr >= startTime || timeStr < endTime) return shift;
-      }
-    }
-    
-    return null;
   }
 
   async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
@@ -138,7 +109,6 @@ export class FactoryConfigService {
   async updateStock(dto: { materialId: string; quantity: number; type: 'IN' | 'OUT' | 'ADJUSTMENT'; remarks?: string; referenceId?: string }) {
     const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
-      // 1. Record transaction
       await tx.insert(stockTransactions).values({
         materialId: dto.materialId,
         factoryId,
@@ -148,7 +118,6 @@ export class FactoryConfigService {
         referenceId: dto.referenceId,
       });
 
-      // 2. Update current stock
       const operator = dto.type === 'IN' ? '+' : dto.type === 'OUT' ? '-' : '=';
       
       if (operator === '=') {
@@ -206,24 +175,4 @@ export class FactoryConfigService {
     await db.delete(rawMaterials).where(eq(rawMaterials.id, id));
     return { success: true };
   }
-
-  async createShift(dto: { name: string; startTime: string; endTime: string }) {
-    const factoryId = await this.getFactoryContext();
-    const [shift] = await db.insert(shifts).values({ ...dto, factoryId }).returning();
-    return shift;
-  }
-
-  async updateShift(id: string, dto: { name?: string; startTime?: string; endTime?: string }) {
-    const [shift] = await db.update(shifts)
-      .set({ ...dto })
-      .where(eq(shifts.id, id))
-      .returning();
-    return shift;
-  }
-
-  async deleteShift(id: string) {
-    await db.delete(shifts).where(eq(shifts.id, id));
-    return { success: true };
-  }
 }
-

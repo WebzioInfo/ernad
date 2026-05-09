@@ -25,18 +25,6 @@ export const productionLines = pgTable('production_lines', {
   ];
 });
 
-export const shifts = pgTable('shifts', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
-  name: varchar('name', { length: 50 }).notNull(), // e.g., 'Morning', 'Afternoon', 'Night'
-  startTime: varchar('start_time', { length: 5 }).notNull(), // 'HH:mm'
-  endTime: varchar('end_time', { length: 5 }).notNull(), // 'HH:mm'
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (table) => {
-  return [
-    uniqueIndex('idx_shifts_name_factory').on(table.name, table.factoryId),
-  ];
-});
 
 export const productBrands = pgTable('product_brands', {
   id: uuid('id').defaultRandom().primaryKey(),

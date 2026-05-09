@@ -55,4 +55,38 @@ export class AnalyticsController {
   async getProductPerformance() {
     return this.analyticsService.getProductPerformance();
   }
+
+  @Get('historical')
+  @Permissions('analytics:view')
+  async getHistoricalPerformance(
+    @Query('lineId') lineId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('productId') productId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('interval') interval: 'hour' | 'day' | 'week' = 'day'
+  ) {
+    return this.analyticsService.getHistoricalPerformance(
+      lineId, 
+      brandId, 
+      productId, 
+      startDate ? new Date(startDate) : undefined, 
+      endDate ? new Date(endDate) : undefined,
+      interval
+    );
+  }
+
+  @Get('kpis')
+  @Permissions('analytics:view')
+  async getAggregatedKPIs(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('factoryId') factoryId?: string
+  ) {
+    return this.analyticsService.getAggregatedKPIs(
+      new Date(startDate),
+      new Date(endDate),
+      factoryId
+    );
+  }
 }

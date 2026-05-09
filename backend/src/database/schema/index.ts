@@ -6,3 +6,6 @@ export * from './archive';
 // sessions.ts is deprecated - logic consolidated into production.ts
 // export * from './sessions';
 export * from './inventory';
+export * from './notes';
+export * from './biometric';
+export * from './sales';

@@ -12,6 +12,8 @@ import {
 
 export default function EfficiencyDashboardPage() {
   const { filters } = useOutletContext<{ filters: any }>();
+  const isLive = filters.timeRange === 'live';
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['line-performance', filters],
     queryFn: async () => {
@@ -24,13 +26,58 @@ export default function EfficiencyDashboardPage() {
       });
       return res.data;
     },
-    enabled: !!filters.lineId && filters.lineId !== 'all',
+    enabled: !!filters.lineId && filters.lineId !== 'all' && isLive,
     refetchInterval: 5000 
+  });
+
+  const getDates = () => {
+    const end = new Date();
+    const start = new Date();
+    if (filters.timeRange === 'today') start.setHours(0,0,0,0);
+    else if (filters.timeRange === 'week') start.setDate(start.getDate() - 7);
+    else if (filters.timeRange === 'month') start.setDate(start.getDate() - 30);
+    return { start, end };
+  };
+
+  const { start, end } = getDates();
+
+  const { data: historicalKPIs } = useQuery({
+    queryKey: ['line-kpis', filters],
+    queryFn: async () => {
+      const res = await api.get('/analytics/kpis', {
+        params: { 
+          startDate: start.toISOString(), 
+          endDate: end.toISOString(),
+          lineId: filters.lineId
+        }
+      });
+      return res.data;
+    },
+    enabled: !!filters.lineId && filters.lineId !== 'all' && !isLive
+  });
+
+  const { data: historicalTrend } = useQuery({
+    queryKey: ['line-historical-trend', filters],
+    queryFn: async () => {
+      const res = await api.get('/analytics/historical', {
+        params: { 
+          startDate: start.toISOString(), 
+          endDate: end.toISOString(),
+          lineId: filters.lineId,
+          interval: filters.timeRange === 'today' ? 'hour' : 'day'
+        }
+      });
+      return res.data.map((d: any) => ({
+        time: filters.timeRange === 'today' ? new Date(d.time).getHours() + ':00' : new Date(d.time).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+        val: Number(d.totalProduction)
+      }));
+    },
+    enabled: !!filters.lineId && filters.lineId !== 'all' && !isLive
   });
 
   if (isLoading) return <div className="h-96 flex items-center justify-center text-slate-400">Synchronizing factory telemetry...</div>;
 
-  if (!stats) {
+  if (!stats && isLive) {
     return (
       <div className="h-96 flex flex-col items-center justify-center text-slate-400 bg-white rounded-[3rem] border border-dashed border-slate-200 gap-4">
         <Activity className="w-12 h-12 text-slate-200 animate-pulse" />
@@ -42,37 +89,49 @@ export default function EfficiencyDashboardPage() {
     );
   }
 
+  const displayKPIs = isLive ? {
+    oee: stats?.oee || 0,
+    throughput: "104 BPM",
+    bottleneck: stats?.bottleneck || 'N/A',
+    quality: "99.2%"
+  } : {
+    oee: historicalKPIs?.oee || 0,
+    throughput: historicalKPIs?.throughput || 0,
+    bottleneck: 'Aggregated',
+    quality: `${historicalKPIs?.quality || 0}%`
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Metrics */}
       <div className="grid grid-cols-4 gap-6">
         <MetricCard 
           label="Overall Efficiency (OEE)" 
-          value={`${stats.oee}%`} 
-          trend="+2.4%" 
+          value={`${displayKPIs.oee}%`} 
+          trend={isLive ? "+2.4%" : "Avg"} 
           isPositive={true}
           icon={Activity}
           color="blue"
         />
         <MetricCard 
-          label="Current Throughput" 
-          value="104 BPM" 
-          trend="-5%" 
-          isPositive={false}
+          label={isLive ? "Current Throughput" : "Total Throughput"} 
+          value={isLive ? displayKPIs.throughput : (Number(displayKPIs.throughput) / 1000).toFixed(1) + 'k'} 
+          trend={isLive ? "-5%" : "Total"} 
+          isPositive={isLive ? false : true}
           icon={TrendingUp}
           color="emerald"
         />
         <MetricCard 
-          label="Bottleneck Station" 
-          value={stats.bottleneck} 
+          label="Operational Status" 
+          value={displayKPIs.bottleneck} 
           icon={Zap}
           color="amber"
-          isWarning={true}
+          isWarning={isLive}
         />
         <MetricCard 
           label="Quality Yield" 
-          value="99.2%" 
-          trend="+0.1%" 
+          value={displayKPIs.quality} 
+          trend={isLive ? "+0.1%" : "Avg"} 
           isPositive={true}
           icon={AlertCircle}
           color="indigo"
@@ -100,16 +159,18 @@ export default function EfficiencyDashboardPage() {
 
         {/* Efficiency Trend */}
         <div className="col-span-5 bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
-          <h3 className="text-lg font-bold text-slate-900 mb-6">Efficiency Trend (24h)</h3>
+          <h3 className="text-lg font-bold text-slate-900 mb-6">
+            {isLive ? 'Efficiency Trend (24h)' : `Throughput Trend (${filters.timeRange})`}
+          </h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={[
+              <AreaChart data={isLive ? [
                 { time: '06:00', val: 88 },
                 { time: '08:00', val: 92 },
                 { time: '10:00', val: 85 },
                 { time: '12:00', val: 94 },
                 { time: '14:00', val: 91 },
-              ]}>
+              ] : historicalTrend}>
                 <defs>
                   <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>

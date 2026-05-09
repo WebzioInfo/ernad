@@ -5,24 +5,38 @@ import Login from '../modules/auth/Login';
 import RequireAuth from '../modules/auth/RequireAuth';
 import SmartRedirect from './SmartRedirect';
 import ComingSoonPage from '../components/common/ComingSoonPage';
-import { Sparkle, Sparkles } from 'lucide-react';
+import { Sparkle, Sparkles, Bell, Database, Command, Users } from 'lucide-react';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 
 // Optimized Module Loading
-const ExecutiveDashboard = lazy(() => import('../modules/analytics/ExecutiveDashboard'));
-const EfficiencyDashboardPage = lazy(() => import('../modules/analytics/EfficiencyDashboardPage'));
-const ProductionControlPage = lazy(() => import('../modules/production/ProductionControlPage'));
-const UserManagementPage = lazy(() => import('../modules/personnel/UserManagementPage'));
-const StaffDirectoryPage = lazy(() => import('../modules/personnel/StaffDirectoryPage'));
-const AuditLogsPage = lazy(() => import('../modules/personnel/AuditLogsPage'));
-const InventoryPage = lazy(() => import('../modules/inventory/InventoryPage'));
-const AttendanceRecordsPage = lazy(() => import('../modules/attendance/AttendanceRecordsPage'));
-const QualityManagementPage = lazy(() => import('../modules/production/QualityManagementPage'));
 const OperatorPanel = lazy(() => import('../modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('../modules/production/LineSelectionPage'));
-const SettingsPage = lazy(() => import('../modules/settings/SettingsPage'));
+
+import { moduleRegistry } from './registry/moduleRegistry';
+import { RouteDefinition } from './registry/types';
 
 export function AppRoutes() {
+  const renderRoutes = (routes: RouteDefinition[]) => {
+    return routes.map((route, idx) => (
+      <Route 
+        key={idx}
+        path={route.path} 
+        element={
+          <RequireAuth 
+            allowedRoles={route.allowedRoles} 
+            requiredPermissions={route.requiredPermissions}
+          >
+            <route.element />
+          </RequireAuth>
+        }
+      >
+        {route.children && renderRoutes(route.children)}
+      </Route>
+    ));
+  };
+
+  const dynamicRoutes = moduleRegistry.getAllRoutes();
+
   return (
     <Suspense fallback={<LoadingScreen message="Initializing System Module..." />}>
       <Routes>
@@ -40,17 +54,14 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/admin/overview" replace />} />
-          <Route path="overview" element={<ExecutiveDashboard />} />
-          <Route path="analytics" element={<EfficiencyDashboardPage />} />
-          <Route path="users" element={<UserManagementPage />} />
-          <Route path="audit" element={<AuditLogsPage />} />
-          <Route path="staffs" element={<StaffDirectoryPage />} />
-          <Route path="attendance" element={<AttendanceRecordsPage />} />
+          {renderRoutes(dynamicRoutes)}
+          
+          {/* Static / Compatibility Routes (Coming Soon) */}
           <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkle} />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="production" element={<ProductionControlPage />} />
-          <Route path="quality" element={<QualityManagementPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />
+          <Route path="tally" element={<ComingSoonPage title="Tally ERP Integration" description="Bi-directional synchronization with Tally ERP for automated accounting and voucher generation." icon={Database} />} />
+          <Route path="billing" element={<ComingSoonPage title="Payments & Billing" description="Integrated payment gateway and customer invoicing system for streamlined financial operations." icon={Command} />} />
+          <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
         </Route>
 
         {/* 2. MANAGEMENT (Managers) */}
@@ -63,20 +74,21 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/manager/overview" replace />} />
-          <Route path="overview" element={<ExecutiveDashboard />} />
-          <Route path="production" element={<ProductionControlPage />} />
-          <Route path="quality" element={<QualityManagementPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="users" element={<UserManagementPage />} />
-          <Route path="staffs" element={<StaffDirectoryPage />} />
+          {renderRoutes(dynamicRoutes)}
+
+          {/* Static / Compatibility Routes (Coming Soon) */}
+          <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />
           <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkles} />} />
+          <Route path="tally" element={<ComingSoonPage title="Tally ERP Integration" description="Bi-directional synchronization with Tally ERP for automated accounting and voucher generation." icon={Database} />} />
+          <Route path="billing" element={<ComingSoonPage title="Payments & Billing" description="Integrated payment gateway and customer invoicing system for streamlined financial operations." icon={Command} />} />
+          <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
         </Route>
 
         {/* 3. OPERATOR (All Operator Roles) */}
         <Route
           path="/line"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
               <Outlet />
             </RequireAuth>
           }

@@ -1,6 +1,7 @@
 import { pgTable, uuid, timestamp, index } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { factories, productionLines, shifts } from './master-data';
+import { factories, productionLines } from './master-data';
+import { shifts } from './biometric';
 
 export const operatorSessions = pgTable('operator_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { registerModules } from './app/registry';
+
+// Initialize ERP Module Registry
+registerModules();
 
 // Handle "Failed module loading" / ChunkLoadError for zero-downtime deployment resilience
 window.addEventListener('error', (event) => {

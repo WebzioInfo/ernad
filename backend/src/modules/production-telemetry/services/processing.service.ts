@@ -1,13 +1,12 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
-import { 
-  users, 
-  productionLogs, 
-  batchTotals, 
-  materialsUsage, 
-  inventoryStock, 
+import {
+  productionLogs,
+  batchTotals,
+  materialsUsage,
+  inventoryStock,
   inventoryTransactions,
-  packagingConfigurations 
+  packagingConfigurations
 } from '../../../database/schema';
 import { eq, sql, and } from 'drizzle-orm';
 import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
@@ -27,14 +26,14 @@ export class ProcessingService {
     private readonly shiftService: ShiftService,
     private readonly redisService: RedisService,
     private readonly sessionService: OperatorSessionService,
-  ) {}
+  ) { }
 
   async handleTelemetryLog(userId: string, dto: ProductionTelemetryDto) {
     return await db.transaction(async (tx) => {
       const existing = await tx.select().from(productionLogs)
         .where(eq(productionLogs.requestId, dto.requestId))
         .limit(1);
-      
+
       if (existing.length > 0) {
         this.logger.warn(`Duplicate request detected in DB: ${dto.requestId}`);
         return existing[0];
@@ -44,11 +43,11 @@ export class ProcessingService {
       const totalsList = await tx.select().from(batchTotals)
         .where(eq(batchTotals.batchId, dto.batchId))
         .for('update');
-      
+
       if (totalsList.length === 0) {
         throw new BadRequestException('Batch tracking not initialized.');
       }
-      
+
       const current = totalsList[0];
       const factoryId = current.factoryId; // Get factory context from the batch itself
 
@@ -113,17 +112,17 @@ export class ProcessingService {
 
       if (!dto.isRework) {
         const updateField = this.getFieldName(dto.station);
-        
+
         // Fast-fail Redis increment
         if (this.redisService.getAvailability()) {
-          this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => {});
+          this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => { });
         }
 
         await tx.update(batchTotals)
-          .set({ 
+          .set({
             [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount}`,
             scrapTotal: sql`${batchTotals.scrapTotal} + ${dto.wastageCount}`,
-            
+
             // Enterprise Material Totals
             capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
             preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
@@ -131,7 +130,7 @@ export class ProcessingService {
             shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
             finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
             casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
-            
+
             updatedAt: new Date()
           })
           .where(eq(batchTotals.batchId, dto.batchId));
@@ -139,18 +138,18 @@ export class ProcessingService {
 
       if (dto.eventType && dto.eventType !== 'NORMAL_PRODUCTION') {
         await this.notificationsService.createNotification(
-          'MACHINE_ISSUE', 
-          `Issue on Station: ${dto.station}`, 
-          `${dto.eventType}: ${dto.remarks || 'No remarks provided'}`, 
+          'MACHINE_ISSUE',
+          `Issue on Station: ${dto.station}`,
+          `${dto.eventType}: ${dto.remarks || 'No remarks provided'}`,
           'CRITICAL'
         );
       }
 
       this.eventsService.emitNewLog(log);
       this.eventsService.emitProductionUpdated(dto.batchId, dto.lineId);
-      
+
       await this.sessionService.heartbeat(userId);
-      
+
       return log;
     });
   }
@@ -170,16 +169,21 @@ export class ProcessingService {
   private async processEnterpriseInventory(tx: any, factoryId: string, dto: ProductionTelemetryDto, logId: number) {
     const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
-    if (dto.capUsage) consumptionMap.push({ name: 'Caps', qty: dto.capUsage + (dto.capRejection || 0), category: 'Caps' });
-    if (dto.preformUsage) consumptionMap.push({ name: 'Preforms', qty: dto.preformUsage + (dto.preformRejection || 0), category: 'Preforms' });
+    if (dto.capUsage) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage) + Number(dto.capRejection || 0), category: 'Caps' });
+    if (dto.preformUsage) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage) + Number(dto.preformRejection || 0), category: 'Preforms' });
     if (dto.bopRollUsage) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage) + Number(dto.bopRejection || 0), category: 'Labels' });
     if (dto.shrinkWeightUsed) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
 
     for (const item of consumptionMap) {
+      if (item.qty <= 0) continue;
+
       let stock;
-      
+
+      // Mandatory Stock Selection for Production Stability
       if (dto.selectedStockId) {
-        const results = await tx.select().from(inventoryStock).where(eq(inventoryStock.id, dto.selectedStockId)).limit(1);
+        const results = await tx.select().from(inventoryStock)
+          .where(eq(inventoryStock.id, dto.selectedStockId))
+          .for('update'); // PESSIMISTIC LOCKING
         stock = results[0];
       }
 
@@ -190,72 +194,79 @@ export class ProcessingService {
             eq(inventoryStock.factoryId, factoryId),
             eq(inventoryStock.itemName, item.name)
           ))
-          .limit(1);
+          .for('update');
         stock = stockItems[0];
       }
 
-      if (stock) {
-        const newQty = Number(stock.quantity) - item.qty;
+      if (!stock) {
+        throw new BadRequestException(`Material stock not found for ${item.name}. Please assign stock in the Operator Panel.`);
+      }
 
-        await tx.update(inventoryStock)
-          .set({ 
-            quantity: String(newQty),
-            updatedAt: new Date()
-          })
-          .where(eq(inventoryStock.id, stock.id));
+      const currentQty = Number(stock.quantity);
+      if (currentQty < item.qty) {
+        throw new BadRequestException(`INSUFFICIENT_STOCK: Required ${item.qty} ${stock.unit} of ${stock.itemName}, but only ${currentQty} available.`);
+      }
 
-        await tx.insert(inventoryTransactions).values({
-          stockId: stock.id,
-          type: 'CONSUMPTION',
-          quantityChange: String(-item.qty),
-          balanceAfter: String(newQty),
-          referenceId: String(logId),
-          remarks: `Production Log #${logId} (${dto.station})`,
-          createdAt: new Date()
-        });
+      const newQty = currentQty - item.qty;
 
-        if (newQty <= Number(stock.minimumStock)) {
-          await this.notificationsService.createNotification(
-            'LOW_STOCK',
-            `Enterprise Stock Alert: ${stock.itemName}`,
-            `Current: ${newQty} ${stock.unit} | Min: ${stock.minimumStock}`,
-            'WARNING'
-          );
-        }
+      await tx.update(inventoryStock)
+        .set({
+          quantity: String(newQty),
+          updatedAt: new Date()
+        })
+        .where(eq(inventoryStock.id, stock.id));
+
+      await tx.insert(inventoryTransactions).values({
+        stockId: stock.id,
+        type: 'CONSUMPTION',
+        quantityChange: String(-item.qty),
+        balanceAfter: String(newQty),
+        referenceId: String(logId),
+        remarks: `Production Log #${logId} (${dto.station})`,
+        createdAt: new Date()
+      });
+
+      if (newQty <= Number(stock.minimumStock)) {
+        await this.notificationsService.createNotification(
+          'LOW_STOCK',
+          `Enterprise Stock Alert: ${stock.itemName}`,
+          `Current: ${newQty} ${stock.unit} | Min: ${stock.minimumStock}`,
+          'WARNING'
+        );
       }
     }
   }
 
   private async validateProductionFlow(station: string, count: number, totals: any) {
-    const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
-    if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
-      throw new BadRequestException(`Flow Violation: Filling (${nextTotal}) > Blowing (${totals.blowingTotal}).`);
-    }
-    if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
-      throw new BadRequestException(`Flow Violation: Labeling (${nextTotal}) > Filling (${totals.fillingTotal}).`);
-    }
-    if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
-      throw new BadRequestException(`Flow Violation: Packing (${nextTotal}) > Labeling (${totals.labelingTotal}).`);
-    }
+  const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
+  if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
+    throw new BadRequestException(`Flow Violation: Filling (${nextTotal}) > Blowing (${totals.blowingTotal}).`);
   }
+  if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
+    throw new BadRequestException(`Flow Violation: Labeling (${nextTotal}) > Filling (${totals.fillingTotal}).`);
+  }
+  if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
+    throw new BadRequestException(`Flow Violation: Packing (${nextTotal}) > Labeling (${totals.labelingTotal}).`);
+  }
+}
 
   private getFieldName(station: string): any {
-    const map: any = {
-      BLOWING: 'blowingTotal',
-      FILLING: 'fillingTotal',
-      LABELING: 'labelingTotal',
-      PACKING: 'packingTotal',
-    };
-    return map[station];
-  }
+  const map: any = {
+    BLOWING: 'blowingTotal',
+    FILLING: 'fillingTotal',
+    LABELING: 'labelingTotal',
+    PACKING: 'packingTotal',
+  };
+  return map[station];
+}
 
   async getLogHistory(batchId: string, station: string, limit = 20) {
-    return await db.select()
-      .from(productionLogs)
-      .where(
-        sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
-      )
-      .orderBy(sql`${productionLogs.loggedAt} DESC`)
-      .limit(limit);
-  }
+  return await db.select()
+    .from(productionLogs)
+    .where(
+      sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
+    )
+    .orderBy(sql`${productionLogs.loggedAt} DESC`)
+    .limit(limit);
+}
 }

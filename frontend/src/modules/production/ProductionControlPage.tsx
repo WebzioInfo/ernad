@@ -664,10 +664,6 @@ const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0
 
       {isStartModalOpen && (
         <Modal full onClose={() => setIsStartModalOpen(false)}>
-          <div className="mb-12">
-            <h3 className="text-5xl font-black text-slate-900 tracking-tighter">Initialize Batch</h3>
-            <p className="text-slate-500 font-bold mt-3 text-lg">Configure and launch production on {line.name}. All systems will be synchronized upon commitment.</p>
-          </div>
           <div className="bg-slate-50/50 p-12 rounded-[3rem] border border-slate-100 shadow-inner">
             <StartProductionForm
               shifts={shifts}
@@ -705,7 +701,7 @@ function Modal({ children, onClose, full = false }: { children: React.ReactNode,
   }, []);
 
   const content = full ? (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-16 animate-in fade-in duration-500">
+    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-6 animate-in fade-in duration-500">
       <div className="bg-white rounded-[4rem] w-full max-w-6xl max-h-full flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.3)] relative animate-in zoom-in-95 duration-500 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20" />
 
@@ -724,7 +720,7 @@ function Modal({ children, onClose, full = false }: { children: React.ReactNode,
           </button>
         </header>
 
-        <div className="p-12 md:p-16 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
           <div className="max-w-4xl mx-auto w-full">
             {children}
           </div>

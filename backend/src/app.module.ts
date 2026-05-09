@@ -1,11 +1,11 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './modules/auth/auth.guard';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ProductionTelemetryModule } from './modules/production-telemetry/production-telemetry.module';
 import { ProductionManagementModule } from './modules/production-management/production-management.module';
-import { ReportsController } from './modules/reports/reports.controller';
-import { ReportsService } from './modules/reports/reports.service';
+import { ReportsModule } from './modules/reports/reports.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { FactoryConfigModule } from './modules/factory-config/factory-config.module';
@@ -23,6 +23,8 @@ import { RedisModule } from './providers/redis/redis.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { OperatorSessionModule } from './modules/operator-session/operator-session.module';
 import { DataLifecycleModule } from './modules/data-lifecycle/data-lifecycle.module';
+import { NotesModule } from './modules/notes/notes.module';
+import { BiometricModule } from './modules/biometric/biometric.module';
 
 import { AppController } from './app.controller';
 
@@ -47,14 +49,16 @@ import { AppController } from './app.controller';
     InventoryModule,
     OperatorSessionModule,
     DataLifecycleModule,
+    NotesModule,
+    BiometricModule,
+    ReportsModule,
+    ScheduleModule.forRoot(),
   ],
 
   controllers: [
     AppController,
-    ReportsController,
   ],
    providers: [
-    ReportsService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard,

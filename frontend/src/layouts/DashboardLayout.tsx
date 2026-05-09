@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
-  BarChart3, Settings, Users, Activity,
-  Package, Bell, Search,
-  Menu, X, LogOut, Globe, Command,
-  UserCog, Sparkles, ShieldCheck,
-  History, ClipboardCheck
+  Search, Menu, X, LogOut, Command
 } from 'lucide-react';
 import useAuthStore from '../modules/auth/auth.store';
+import { moduleRegistry } from '../app/registry/moduleRegistry';
 import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
-import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import NotificationBell from '../components/NotificationBell';
 import CommandPalette from '../components/common/CommandPalette';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,7 +23,8 @@ export default function DashboardLayout() {
     lineId: searchParams.get('lineId') || '',
     brandId: searchParams.get('brandId') || 'all',
     productId: searchParams.get('productId') || 'all',
-    shiftId: searchParams.get('shiftId') || 'all'
+    shiftId: searchParams.get('shiftId') || 'all',
+    timeRange: searchParams.get('timeRange') || 'live'
   };
 
   const setFilters = (newFilters: any) => {
@@ -37,6 +34,7 @@ export default function DashboardLayout() {
     if (updated.brandId !== 'all') params.brandId = updated.brandId;
     if (updated.productId !== 'all') params.productId = updated.productId;
     if (updated.shiftId !== 'all') params.shiftId = updated.shiftId;
+    if (updated.timeRange !== 'live') params.timeRange = updated.timeRange;
     setSearchParams(params);
   };
 
@@ -50,68 +48,28 @@ export default function DashboardLayout() {
   }, [searchParams, setSearchParams]);
 
 
-  const getModulePath = (id: string) => {
-    if (id === 'terminal') return '/line/select';
-    
-    const base = (user?.role === 'MANAGER') ? '/manager' : '/admin';
-    return `${base}/${id}`;
-  };
-
-  const SUPER_ADMIN_MENU = [
-    { id: 'overview', label: 'Overview', icon: Globe, path: '/admin/overview' },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
-    { id: 'production', label: 'Lines', icon: Activity, path: '/admin/production' },
-    { id: 'quality', label: 'Quality', icon: Bell, path: '/admin/quality' },
-    { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
-    { id: 'users', label: 'Users', icon: ShieldCheck, path: '/admin/users' },
-    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, path: '/admin/attendance' },
-    { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
-    { id: 'audit', label: 'Logs', icon: History, path: '/admin/audit' },
-    { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
-  ];
-
-  const ADMIN_MENU = [
-    { id: 'overview', label: 'Overview', icon: Globe, path: '/admin/overview' },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/admin/analytics' },
-    { id: 'production', label: 'Production', icon: Activity, path: '/admin/production' },
-    { id: 'quality', label: 'Quality', icon: Bell, path: '/admin/quality' },
-    { id: 'inventory', label: 'Inventory', icon: Package, path: '/admin/inventory' },
-    { id: 'users', label: 'Users', icon: UserCog, path: '/admin/users' },
-    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/admin/staffs' },
-    { id: 'attendance', label: 'Attendance', icon: ClipboardCheck, path: '/admin/attendance' },
-    { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/admin/ai-advices', isComingSoon: true },
-    { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
-  ];
-
-  const MANAGER_MENU = [
-    { id: 'overview', label: 'Overview', icon: Globe, path: '/manager/overview' },
-    { id: 'production', label: 'Production', icon: Activity, path: '/manager/production' },
-    { id: 'quality', label: 'Quality', icon: Bell, path: '/manager/quality' },
-    { id: 'inventory', label: 'Inventory', icon: Package, path: '/manager/inventory' },
-    { id: 'users', label: 'Users', icon: Users, path: '/manager/users' },
-    { id: 'staffs', label: 'Staff', icon: UserCog, path: '/manager/staffs' },
-    { id: 'ai-advices', label: 'AI Tips', icon: Sparkles, path: '/manager/ai-advices', isComingSoon: true },
-  ];
-
-  const getMenuItems = () => {
-    if (user?.role === 'SUPER_ADMIN') return SUPER_ADMIN_MENU;
-    if (user?.role === 'ADMIN') return ADMIN_MENU;
-    if (user?.role === 'MANAGER') return MANAGER_MENU;
-    return [{ id: 'terminal', label: 'Terminal', icon: Command, path: '/line/select' }];
-  };
-
-  const filteredMenuItems = getMenuItems();
-
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const sidebarGroups = moduleRegistry.getAllSidebarGroups();
+  
+  const filterByRole = (allowedRoles?: string[]) => {
+    if (!allowedRoles || allowedRoles.length === 0) return true;
+    const userRoles = user?.roles || (user?.role ? [user.role] : []);
+    if (userRoles.includes('SUPER_ADMIN')) return true;
+    return allowedRoles.some(role => userRoles.includes(role));
+  };
+
+  const getModulePath = (path: string) => {
+    const base = (user?.role === 'MANAGER') ? '/manager' : '/admin';
+    return `${base}${path}`;
+  };
+
   return (
     <div className="flex h-screen bg-[#FDFDFD]">
       <CommandPalette />
-      <NotificationPermissionModal />
 
       {/* Sidebar */}
       <aside className={`
@@ -130,47 +88,58 @@ export default function DashboardLayout() {
           )}
         </div>
 
-        <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto no-scrollbar">
-          {filteredMenuItems.map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <NavLink
-                  to={getModulePath(item.id)}
-                  className={({ isActive }) => `
-                    w-full flex items-center py-4 rounded-2xl transition-all duration-300 group relative
-                    ${isSidebarOpen ? 'px-5' : 'justify-center'}
-                    ${isActive
-                      ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-white/5 hover:text-white'}
-                  `}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-125'}`} />
-                      {isSidebarOpen && (
-                        <span className="ml-4 font-bold text-sm tracking-tight truncate flex-1">{item.label}</span>
-                      )}
-                      {item.isComingSoon && isSidebarOpen && (
-                        <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
-                      )}
-                      {isActive && (
-                        <motion.div 
-                          layoutId="active-pill"
-                          className="absolute left-0 w-1 h-8 bg-white rounded-r-full" 
-                        />
-                      )}
-                    </>
-                  )}
-                </NavLink>
-              </motion.div>
-            );
-          })}
+        <nav className="flex-1 px-4 py-8 space-y-8 overflow-y-auto no-scrollbar">
+          {sidebarGroups.filter(g => filterByRole(g.allowedRoles)).map((group) => (
+            <div key={group.id} className="space-y-3">
+              {isSidebarOpen && (
+                <h3 className="px-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                  {group.label}
+                </h3>
+              )}
+              <div className="space-y-1">
+                {group.items.filter(i => filterByRole(i.allowedRoles)).map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                    >
+                      <NavLink
+                        to={getModulePath(item.path)}
+                        className={({ isActive }) => `
+                          w-full flex items-center py-4 rounded-2xl transition-all duration-300 group relative
+                          ${isSidebarOpen ? 'px-5' : 'justify-center'}
+                          ${isActive
+                            ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-white/5 hover:text-white'}
+                        `}
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-125'}`} />
+                            {isSidebarOpen && (
+                              <span className="ml-4 font-bold text-sm tracking-tight truncate flex-1">{item.label}</span>
+                            )}
+                            {item.isComingSoon && isSidebarOpen && (
+                              <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
+                            )}
+                            {isActive && (
+                              <motion.div 
+                                layoutId="active-pill"
+                                className="absolute left-0 w-1 h-8 bg-white rounded-r-full" 
+                              />
+                            )}
+                          </>
+                        )}
+                      </NavLink>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div className="p-4 bg-slate-950/30">

@@ -13,12 +13,12 @@ export default function SmartRedirect() {
   const isOperator = userRoles.some(r => r.includes('OPERATOR'));
   const isManager = userRoles.includes('MANAGER');
   
-  if (isOperator) {
-    return <Navigate to="/line/select" replace />;
-  }
-
   if (isManager) {
     return <Navigate to="/manager/overview" replace />;
+  }
+
+  if (isOperator) {
+    return <Navigate to="/line/select" replace />;
   }
 
   // Default for Admin/SuperAdmin

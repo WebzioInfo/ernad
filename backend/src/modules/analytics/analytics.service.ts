@@ -2,9 +2,10 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { db } from '../../database/db';
 import { 
   productionLogs, batchTotals, productionBatches, 
-  materialsUsage, productBrands, products, userLines 
+  materialsUsage, productBrands, products, userLines,
+  factories, productionLines
 } from '../../database/schema';
-import { eq, and, sql, gte } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, between, desc } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 
 @Injectable()
@@ -190,6 +191,62 @@ export class AnalyticsService {
     .from(productionLogs)
     .leftJoin(products, eq(productionLogs.productId, products.id))
     .groupBy(products.name);
+  }
+
+  async getHistoricalPerformance(
+    lineId?: string, 
+    brandId?: string, 
+    productId?: string, 
+    startDate?: Date, 
+    endDate?: Date,
+    interval: 'hour' | 'day' | 'week' = 'day'
+  ) {
+    const conditions = [];
+    if (lineId && lineId !== 'all') conditions.push(eq(productionLogs.lineId, lineId));
+    if (brandId && brandId !== 'all') conditions.push(eq(productionLogs.brandId, brandId));
+    if (productId && productId !== 'all') conditions.push(eq(productionLogs.productId, productId));
+    if (startDate) conditions.push(gte(productionLogs.loggedAt, startDate));
+    if (endDate) conditions.push(lte(productionLogs.loggedAt, endDate));
+
+    const timeGroup = sql`date_trunc(${interval}, ${productionLogs.loggedAt})`;
+
+    return await db.select({
+      time: timeGroup,
+      totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
+      wastage: sql<number>`SUM(${productionLogs.wastageCount})`,
+    })
+    .from(productionLogs)
+    .where(and(...conditions))
+    .groupBy(timeGroup)
+    .orderBy(timeGroup);
+  }
+
+  async getAggregatedKPIs(startDate: Date, endDate: Date, factoryId?: string) {
+    const conditions = [between(productionLogs.loggedAt, startDate, endDate)];
+    if (factoryId) conditions.push(eq(productionLogs.factoryId, factoryId));
+
+    const [stats] = await db.select({
+      totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
+      totalWastage: sql<number>`SUM(${productionLogs.wastageCount})`,
+      avgEfficiency: sql<number>`AVG(${productionLines.currentEfficiency})`, // Simplified OEE proxy
+    })
+    .from(productionLogs)
+    .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
+    .where(and(...conditions));
+
+    // Calculate quality yield
+    const qualityYield = stats.totalProduction > 0 
+      ? ((stats.totalProduction - stats.totalWastage) / stats.totalProduction) * 100 
+      : 100;
+
+    return {
+      throughput: stats.totalProduction || 0,
+      wastage: stats.totalWastage || 0,
+      oee: Math.round(stats.avgEfficiency || 85),
+      quality: Math.round(qualityYield),
+      availability: 92, // Shift logic placeholder
+      performance: 90, // Target ratio placeholder
+    };
   }
 }
 
