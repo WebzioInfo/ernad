@@ -47,6 +47,7 @@
     "socket.io": "^4.8.3",
     "streamifier": "^0.1.1",
     "swagger-ui-express": "^5.0.1",
+    "zklib": "^0.2.11",
     "zod": "^4.3.6"
   },
   "devDependencies": {

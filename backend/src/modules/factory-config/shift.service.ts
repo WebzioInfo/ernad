@@ -50,4 +50,17 @@ export class ShiftService {
     
     return true; 
   }
+
+  async getShifts() {
+    return await db.select().from(shifts);
+  }
+
+  async createShift(dto: { name: string; startTime: string; endTime: string }) {
+    const [shift] = await db.insert(shifts).values({
+      name: dto.name,
+      startTime: dto.startTime.includes(':') && dto.startTime.split(':').length === 2 ? `${dto.startTime}:00` : dto.startTime,
+      endTime: dto.endTime.includes(':') && dto.endTime.split(':').length === 2 ? `${dto.endTime}:00` : dto.endTime,
+    }).returning();
+    return shift;
+  }
 }

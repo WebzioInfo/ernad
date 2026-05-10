@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FactoryConfigService } from './factory-config.service';
+import { ShiftService } from './shift.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -16,7 +17,10 @@ import {
 @Controller(['factory-config', 'master-data'])
 export class FactoryConfigController {
   private readonly logger = new Logger(FactoryConfigController.name);
-  constructor(private readonly factoryConfigService: FactoryConfigService) {}
+  constructor(
+    private readonly factoryConfigService: FactoryConfigService,
+    private readonly shiftService: ShiftService
+  ) {}
 
   @Get('lines')
   @UseGuards(AuthGuard) // Use generic auth guard instead of strict permission
@@ -72,5 +76,17 @@ export class FactoryConfigController {
   @Permissions('settings:manage')
   async createProduct(@Body() dto: CreateProductDto) {
     return await this.factoryConfigService.createProduct(dto);
+  }
+
+  @Get('shifts')
+  @Permissions('settings:view')
+  async getShifts() {
+    return await this.shiftService.getShifts();
+  }
+
+  @Post('shifts')
+  @Permissions('settings:manage')
+  async createShift(@Body() dto: any) {
+    return await this.shiftService.createShift(dto);
   }
 }

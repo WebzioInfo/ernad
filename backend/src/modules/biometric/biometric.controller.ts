@@ -55,6 +55,14 @@ export class BiometricController {
     return await this.biometricService.syncLogs(id);
   }
 
+  @Post('devices/sync-all')
+  @HttpCode(HttpStatus.OK)
+  @Permissions('attendance:manage')
+  @ApiOperation({ summary: 'Trigger sync for all active devices' })
+  async syncAll() {
+    return await this.biometricService.syncAllDevices();
+  }
+
   @Get('logs')
   @Permissions('attendance:view')
   @ApiOperation({ summary: 'Get paginated raw attendance logs' })

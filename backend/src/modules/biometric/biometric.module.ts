@@ -5,14 +5,18 @@ import { BiometricConnectionService } from './biometric-connection.service';
 import { BiometricCronService } from './biometric-cron.service';
 import { PayrollAttendanceService } from './payroll-attendance.service';
 
+import { BiometricDebugController } from './biometric-debug.controller';
+import { BiometricDebugService } from './biometric-debug.service';
+
 @Module({
   imports: [],
-  controllers: [BiometricController],
+  controllers: [BiometricController, BiometricDebugController],
   providers: [
     BiometricService,
     BiometricConnectionService,
     BiometricCronService,
     PayrollAttendanceService,
+    BiometricDebugService,
   ],
   exports: [BiometricService, PayrollAttendanceService],
 })

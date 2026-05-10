@@ -9,9 +9,11 @@ import NotificationBell from '../components/NotificationBell';
 import CommandPalette from '../components/common/CommandPalette';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import { usePWA } from '../hooks/usePWA';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
+  const { installPrompt, installApp } = usePWA();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,7 +147,17 @@ export default function DashboardLayout() {
           ))}
         </nav>
 
-        <div className="p-4 bg-slate-950/30">
+        <div className="p-4 bg-slate-950/30 space-y-2">
+          {installPrompt && (
+            <button
+              onClick={installApp}
+              className={`w-full flex items-center py-3 rounded-2xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors border border-indigo-500/20 ${isSidebarOpen ? 'px-4' : 'justify-center'}`}
+            >
+              <Command className="w-5 h-5 flex-shrink-0" />
+              {isSidebarOpen && <span className="ml-4 font-bold text-sm truncate animate-in fade-in slide-in-from-left-2">Install System</span>}
+            </button>
+          )}
+
           <button
             onClick={handleLogout}
             className={`w-full flex items-center py-3 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-colors ${isSidebarOpen ? 'px-4' : 'justify-center'}`}

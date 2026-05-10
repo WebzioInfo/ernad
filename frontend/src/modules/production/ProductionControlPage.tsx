@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect } from 'react';
+import { useState, memo, useCallback, useEffect, forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
@@ -620,7 +620,7 @@ function StartProductionForm({
   );
 }
 
-const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0 }: any) => {
+const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shifts, idx = 0 }: any, ref: any) => {
   const queryClient = useQueryClient();
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
 
@@ -651,6 +651,7 @@ const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: idx * 0.1 }}
@@ -728,7 +729,7 @@ const LineControlCard = memo(({ line, onFocus, brands, products, shifts, idx = 0
       )}
     </motion.div>
   );
-});
+}));
 
 function Modal({ children, onClose, full = false }: { children: React.ReactNode, onClose: () => void, full?: boolean }) {
   useEffect(() => {
