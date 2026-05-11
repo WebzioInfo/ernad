@@ -110,3 +110,24 @@ export const operatorSessions = pgTable('operator_sessions', {
     index('idx_operator_sessions_batch').on(table.batchId),
   ];
 });
+
+export const downtimeLogs = pgTable('downtime_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
+  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
+  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
+  station: varchar('station', { length: 50 }).notNull(), // BLOWING, FILLING, etc.
+  reason: varchar('reason', { length: 100 }).notNull(), // POWER_FAILURE, MACHINE_BREAKDOWN, etc.
+  startTime: timestamp('start_time').defaultNow().notNull(),
+  endTime: timestamp('end_time'),
+  durationMinutes: integer('duration_minutes'),
+  remarks: varchar('remarks', { length: 500 }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_downtime_batch').on(table.batchId),
+    index('idx_downtime_line').on(table.lineId),
+    index('idx_downtime_active').on(table.batchId, table.endTime),
+  ];
+});

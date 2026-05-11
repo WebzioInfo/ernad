@@ -7,8 +7,10 @@ import { ProductionManagementModule } from '../production-management/production-
 import { FactoryConfigModule } from '../factory-config/factory-config.module';
 import { QueueModule } from '../../providers/queue/queue.module';
 import { OperatorSessionModule } from '../operator-session/operator-session.module';
+import { InventoryModule } from '../inventory/inventory.module';
 import { IngestionService } from './services/ingestion.service';
 import { ProcessingService } from './services/processing.service';
+import { ProductionReconciliationService } from './services/production-reconciliation.service';
 
 @Module({
   imports: [
@@ -17,14 +19,16 @@ import { ProcessingService } from './services/processing.service';
     ProductionManagementModule,
     FactoryConfigModule,
     QueueModule,
-    OperatorSessionModule
+    OperatorSessionModule,
+    InventoryModule
   ],
   controllers: [ProductionTelemetryController],
   providers: [
     IngestionService,
     ProcessingService,
+    ProductionReconciliationService,
     TelemetryProcessor,
   ],
-  exports: [IngestionService, ProcessingService],
+  exports: [IngestionService, ProcessingService, ProductionReconciliationService],
 })
 export class ProductionTelemetryModule { }

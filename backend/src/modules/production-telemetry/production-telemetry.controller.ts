@@ -7,6 +7,7 @@ import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { ProductionTelemetryDto } from './dto/production-telemetry.dto';
 
 import { IngestionService } from './services/ingestion.service';
+import { ProductionReconciliationService } from './services/production-reconciliation.service';
 
 @ApiTags('Production Telemetry')
 @ApiBearerAuth()
@@ -14,9 +15,17 @@ import { IngestionService } from './services/ingestion.service';
 @UseInterceptors(AuditInterceptor)
 @Controller('telemetry')
 export class ProductionTelemetryController {
-  constructor(private readonly ingestionService: IngestionService) {}
+  constructor(
+    private readonly ingestionService: IngestionService,
+    private readonly reconciliationService: ProductionReconciliationService
+  ) {}
   
-  @Post()
+  @Get('reconciliation/:batchId')
+  @Permissions('analytics:view')
+  @ApiOperation({ summary: 'Get material vs production reconciliation for a batch' })
+  async getReconciliation(@Param('batchId') batchId: string) {
+    return this.reconciliationService.getBatchReconciliation(batchId);
+  }
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Create a unified production log entry' })
   async createLog(@Request() req, @Body() dto: ProductionTelemetryDto) {

@@ -6,7 +6,7 @@ import {
   CheckCircle2, 
   Activity, TrendingUp,
   ShieldCheck, Database, HardDrive, Cpu,
-  UserCheck, Gauge
+  UserCheck, Gauge, Clock, AlertTriangle
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -175,175 +175,233 @@ const SuperAdminDashboard = memo(() => {
   );
 });
 
-// ─── ADMIN: THE OPERATIONAL COMMAND VIEW ───
+// ─── ADMIN: THE INDUSTRIAL WAR ROOM ───
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
-  const { data: lines } = useQuery({ queryKey: ['lines-status'], queryFn: async () => (await api.get('/master-data/lines')).data, staleTime: 10000 });
-  const { data: personnel } = useQuery({ queryKey: ['personnel-stats'], queryFn: async () => (await api.get('/users')).data });
+  const { data: factoryLive, refetch: refetchLive } = useQuery({ 
+    queryKey: ['factory-live-overview'], 
+    queryFn: async () => (await api.get('/analytics/factory/live')).data,
+    refetchInterval: 5000 // Real-time refresh
+  });
+
+  const { data: efficiency } = useQuery({ 
+    queryKey: ['machine-efficiency'], 
+    queryFn: async () => (await api.get('/analytics/factory/efficiency')).data 
+  });
+
+  const { data: salesSummary } = useQuery({
+    queryKey: ['tally-sales-summary'],
+    queryFn: async () => (await api.get('/tally/summary')).data
+  });
 
   const isLive = filters.timeRange === 'live';
   
-  // Calculate date range based on filters
-  const getDates = () => {
-    const end = new Date();
-    const start = new Date();
-    if (filters.timeRange === 'today') start.setHours(0,0,0,0);
-    else if (filters.timeRange === 'week') start.setDate(start.getDate() - 7);
-    else if (filters.timeRange === 'month') start.setDate(start.getDate() - 30);
-    return { start, end };
-  };
-
-  const { start, end } = getDates();
-
-  const { data: kpis } = useQuery({
-    queryKey: ['aggregated-kpis', filters.timeRange],
-    queryFn: async () => {
-      if (isLive) return null;
-      const res = await api.get('/analytics/kpis', {
-        params: { startDate: start.toISOString(), endDate: end.toISOString() }
-      });
-      return res.data;
-    },
-    enabled: !isLive
-  });
-
-  const { data: chartData } = useQuery({
-    queryKey: ['historical-performance', filters.timeRange],
-    queryFn: async () => {
-      if (isLive) return null;
-      const res = await api.get('/analytics/historical', {
-        params: { 
-          startDate: start.toISOString(), 
-          endDate: end.toISOString(),
-          interval: filters.timeRange === 'today' ? 'hour' : 'day'
-        }
-      });
-      return res.data.map((d: any) => ({
-        name: filters.timeRange === 'today' ? new Date(d.time).getHours() + ':00' : new Date(d.time).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        value: Number(d.totalProduction)
-      }));
-    },
-    enabled: !isLive
-  });
-
   const displayStats = {
-    throughput: kpis?.throughput ? (Number(kpis.throughput) / 1000).toFixed(1) + 'k' : '0k',
-    oee: kpis?.oee || 0,
-    quality: kpis?.quality || 0,
-    activeLines: lines?.filter((l: any) => l.status === 'RUNNING').length || 0,
-    performance: kpis?.performance || 0
+    blowing: factoryLive?.counters?.blowing || 0,
+    filling: factoryLive?.counters?.filling || 0,
+    packing: factoryLive?.counters?.packing || 0,
+    rejection: factoryLive?.counters?.rejection || 0,
+    yield: factoryLive?.counters?.blowing > 0 ? ((factoryLive?.counters?.packing / factoryLive?.counters?.blowing) * 100).toFixed(1) : '100',
+    totalSales: salesSummary?.totalSales || 0
   };
 
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="space-y-10"
+      className="space-y-10 pb-20"
     >
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h2 className="text-5xl font-black text-slate-900 tracking-tighter flex items-center gap-5">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-3xl flex items-center justify-center shadow-2xl shadow-blue-200">
-              <TrendingUp className="w-9 h-9" />
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-indigo-900 text-white rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200">
+              <Activity className="w-9 h-9" />
             </div>
-            Factory War Room
+            Factory Control Center
           </h2>
-          <p className="text-slate-500 font-bold mt-4 ml-1 text-lg">
-            {isLive ? 'Real-time tactical oversight of global production efficiency.' : `Historical performance analysis for ${filters.timeRange}.`}
+          <p className="text-slate-500 font-bold mt-4 ml-1 text-lg flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Live Industrial Terminal • <span className="text-slate-400 font-medium">Synchronized across {efficiency?.length || 0} production lines</span>
           </p>
         </div>
-        <div className="flex items-center gap-4 bg-white p-3 rounded-[2rem] shadow-xl border border-slate-50">
-           <div className="flex flex-col items-end px-6 border-r border-slate-100">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isLive ? 'Global OEE' : 'Avg OEE'}</span>
-              <span className="text-2xl font-black text-emerald-600">{displayStats.oee}%</span>
+        
+        <div className="flex items-center gap-4 bg-white p-3 rounded-[2.5rem] shadow-2xl border border-slate-50">
+           <div className="flex flex-col items-end px-8 border-r border-slate-100">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Yield</span>
+              <span className="text-3xl font-black text-emerald-600">{displayStats.yield}%</span>
            </div>
-           <div className="flex flex-col items-end px-6">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isLive ? 'Live Capacity' : 'Availability'}</span>
-              <span className="text-2xl font-black text-indigo-600">{displayStats.performance}%</span>
+           <div className="flex flex-col items-end px-8">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tally Sales (MTD)</span>
+              <span className="text-3xl font-black text-indigo-600">${(Number(displayStats.totalSales) / 1000).toFixed(1)}k</span>
            </div>
         </div>
       </header>
 
+      {/* Main Industrial Counters */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <KPICard label="Line Throughput" value={displayStats.throughput} trend={isLive ? "+5.2%" : "Aggregated"} icon={Gauge} color="emerald" chartColor="#10b981" delay={0.1} />
-        <KPICard label="Staff Allocation" value={`${personnel?.length || 0}`} trend="Optimal" icon={UserCheck} color="blue" chartColor="#3b82f6" delay={0.2} />
-        <KPICard label="Quality Compliance" value={`${displayStats.quality}%`} trend={isLive ? "+0.2%" : "Average"} icon={CheckCircle2} color="indigo" chartColor="#6366f1" delay={0.3} />
-        <KPICard label="Active Cycles" value={`${displayStats.activeLines}`} trend={isLive ? "Peak" : "Total Sessions"} icon={Activity} color="amber" chartColor="#f59e0b" delay={0.4} />
+        <KPICard label="Today's Blowing" value={displayStats.blowing.toLocaleString()} trend="+12.4%" icon={Gauge} color="blue" chartColor="#3b82f6" delay={0.1} />
+        <KPICard label="Today's Filling" value={displayStats.filling.toLocaleString()} trend="+8.1%" icon={TrendingUp} color="emerald" chartColor="#10b981" delay={0.2} />
+        <KPICard label="Today's Packing" value={displayStats.packing.toLocaleString()} trend="Optimal" icon={CheckCircle2} color="indigo" chartColor="#6366f1" delay={0.3} />
+        <KPICard label="Process Rejections" value={displayStats.rejection.toLocaleString()} trend="High" icon={Activity} color="rose" chartColor="#f43f5e" delay={0.4} />
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="col-span-12 lg:col-span-8 bg-white/40 backdrop-blur-3xl rounded-[4rem] p-12 border border-white shadow-2xl relative overflow-hidden"
-        >
-           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 pointer-events-none" />
-           <div className="flex justify-between items-center mb-12 relative z-10">
-             <div>
-               <h3 className="text-3xl font-black text-slate-900 tracking-tight">Efficiency Trends</h3>
-               <p className="text-slate-500 font-bold text-sm">
-                 {isLive ? 'Aggregated performance data across all active lines.' : `Output performance over ${filters.timeRange}.`}
-               </p>
+      <div className="grid grid-cols-12 gap-10">
+        {/* Active Batches & Progress */}
+        <div className="col-span-12 lg:col-span-8 space-y-10">
+          <div className="bg-white rounded-[3.5rem] p-10 shadow-xl border border-slate-50 relative overflow-hidden">
+             <div className="flex justify-between items-center mb-10">
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                  <Database className="w-6 h-6 text-indigo-600" />
+                  Active Production Batches
+                </h3>
+                <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                  {factoryLive?.activeBatches?.length || 0} Running
+                </span>
              </div>
-             <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 ${isLive ? 'bg-indigo-500 animate-ping' : 'bg-slate-300'} rounded-full`} />
-                <span className="text-xs font-black text-indigo-600 uppercase tracking-widest">{isLive ? 'Live Updates' : 'Historical Data'}</span>
-             </div>
-           </div>
-           
-           <div className="h-[400px] w-full relative z-10">
-              <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={chartData || []}>
-                    <defs>
-                       <linearGradient id="colorOee" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                       </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '2rem', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '1.5rem' }}
-                    />
-                    <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorOee)" />
-                 </AreaChart>
-              </ResponsiveContainer>
-              {(!chartData?.length && !isLive) && (
-                <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold">
-                  No data available for this range.
-                </div>
-              )}
-           </div>
-        </motion.div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="col-span-12 lg:col-span-4 space-y-8"
-        >
-           <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group h-full flex flex-col justify-between">
-              <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:opacity-20 transition-opacity">
-                 <ShieldCheck className="w-32 h-32" />
+             <div className="space-y-6">
+                {factoryLive?.activeBatches?.length === 0 ? (
+                  <div className="py-20 text-center text-slate-400 font-bold">No active batches on floor.</div>
+                ) : (
+                  factoryLive?.activeBatches?.map((batch: any) => {
+                    const elapsed = Math.round((new Date().getTime() - new Date(batch.startTime).getTime()) / 60000);
+                    const netTime = Math.max(0, elapsed - (batch.totalDowntimeMins || 0));
+                    
+                    return (
+                      <div key={batch.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 group hover:bg-white hover:shadow-xl transition-all">
+                        <div className="flex items-center gap-6 w-full md:w-auto">
+                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm font-black text-indigo-600">
+                               {batch.line?.split(' ')[1] || '1'}
+                            </div>
+                            <div>
+                               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch: {batch.batchCode}</p>
+                               <p className="text-lg font-black text-slate-900 truncate max-w-[200px]">{batch.product}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1 w-full md:max-w-md px-0 md:px-10">
+                           <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3 h-3 text-indigo-500" />
+                                <span>Production: <span className="text-slate-900">{Math.floor(netTime / 60)}h {netTime % 60}m</span></span>
+                              </div>
+                              {batch.totalDowntimeMins > 0 && (
+                                <span className="text-rose-500">Stop: {batch.totalDowntimeMins}m</span>
+                              )}
+                           </div>
+                           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-1000 ${batch.totalDowntimeMins > 30 ? 'bg-amber-500' : 'bg-indigo-500'}`} 
+                                style={{ width: '65%' }} 
+                              />
+                           </div>
+                        </div>
+  
+                        <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                           <div className="text-right">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Elapsed</p>
+                              <p className="text-xs font-bold text-slate-600">{Math.floor(elapsed / 60)}h {elapsed % 60}m</p>
+                           </div>
+                           <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                             batch.status === 'RUNNING' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                           }`}>
+                              {batch.status}
+                           </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+             </div>
+          </div>
+
+          {/* Machine Health Grid */}
+          <div className="grid grid-cols-2 gap-8">
+             {efficiency?.slice(0, 4).map((line: any) => (
+               <div key={line.id} className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-indigo-500/20 transition-all" />
+                  <div className="flex justify-between items-start mb-6">
+                     <div>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Line Efficiency</p>
+                        <h4 className="text-xl font-black">{line.name}</h4>
+                     </div>
+                     <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${line.status === 'RUNNING' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {line.status}
+                     </div>
+                  </div>
+                  <div className="flex items-end gap-3">
+                     <span className="text-4xl font-black tracking-tighter">{line.efficiency}%</span>
+                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">OEE</span>
+                  </div>
+               </div>
+             ))}
+          </div>
+        </div>
+
+        {/* Alerts & Inventory Right Rail */}
+        <div className="col-span-12 lg:col-span-4 space-y-10">
+           <div className="bg-rose-500 rounded-[3rem] p-10 text-white shadow-2xl shadow-rose-200 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-10 opacity-20">
+                 <Cpu className="w-32 h-32" />
               </div>
-              <div>
-                <h3 className="text-2xl font-black mb-2">Factory Health</h3>
-                <p className="text-slate-400 font-bold text-sm mb-10">Global infrastructure diagnostics.</p>
-                
-                <div className="space-y-6">
-                   <HealthMetric label="API Gateway" status="Operational" score={99} />
-                   <HealthMetric label="Database Latency" status="12ms" score={100} />
-                   <HealthMetric label="IoT Heartbeat" status="Active" score={85} />
-                   <HealthMetric label="Cloud Sync" status="Synchronized" score={95} />
-                </div>
-              </div>
+              <h3 className="text-2xl font-black mb-2 flex items-center gap-3">
+                <HardDrive className="w-6 h-6" />
+                Material Alerts
+              </h3>
+              <p className="text-white/60 font-bold text-sm mb-10 tracking-tight">Critical items requiring immediate inwarding.</p>
               
-              <button className="w-full mt-12 py-5 bg-white text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-400 hover:text-white transition-all active:scale-95">
-                 Run Deep Diagnostics
+              <div className="space-y-4">
+                 {factoryLive?.lowStockAlerts?.length === 0 ? (
+                   <p className="text-white/40 text-[10px] font-black uppercase tracking-widest py-4">No low stock alerts.</p>
+                 ) : (
+                   factoryLive?.lowStockAlerts?.map((item: any) => (
+                    <div key={item.id} className="p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md flex justify-between items-center">
+                       <div>
+                          <p className="text-xs font-black">{item.itemName}</p>
+                          <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Min: {item.minimumStock} {item.unit}</p>
+                       </div>
+                       <span className="text-lg font-black">{item.quantity}</span>
+                    </div>
+                   ))
+                 )}
+              </div>
+
+              <button className="w-full mt-10 py-5 bg-white text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95">
+                 View Inventory Ledger
               </button>
            </div>
-        </motion.div>
+
+           <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl">
+              <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-500" />
+                Latest Machine Stops
+              </h3>
+              <div className="space-y-6">
+                 {factoryLive?.latestStops?.length === 0 ? (
+                   <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center py-4">No recent stops recorded.</p>
+                 ) : (
+                   factoryLive?.latestStops?.map((stop: any) => (
+                    <div key={stop.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
+                       <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] ${
+                            stop.duration ? 'bg-slate-200 text-slate-600' : 'bg-rose-500 text-white animate-pulse shadow-lg shadow-rose-200'
+                          }`}>
+                             {stop.duration ? `${stop.duration}m` : 'LIVE'}
+                          </div>
+                          <div>
+                             <p className="text-xs font-black text-slate-900">{stop.reason.replace('_', ' ')}</p>
+                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stop.station} • {stop.batchCode}</p>
+                          </div>
+                       </div>
+                       <Clock className="w-4 h-4 text-slate-300" />
+                    </div>
+                   ))
+                 )}
+              </div>
+              <button className="w-full mt-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
+                Full Downtime Analysis
+              </button>
+           </div>
+        </div>
       </div>
     </motion.div>
   );

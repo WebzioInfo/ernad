@@ -3,9 +3,9 @@ import { db } from '../../database/db';
 import { 
   productionLogs, batchTotals, productionBatches, 
   materialsUsage, productBrands, products, userLines,
-  factories, productionLines
+  factories, productionLines, downtimeLogs, inventoryStock
 } from '../../database/schema';
-import { eq, and, sql, gte, lte, between, desc } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, between, desc, inArray, isNull } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 
 @Injectable()
@@ -246,6 +246,114 @@ export class AnalyticsService {
       quality: Math.round(qualityYield),
       availability: 92, // Shift logic placeholder
       performance: 90, // Target ratio placeholder
+    };
+  }
+
+  // ── NEW: INDUSTRIAL CONTROL CENTER LOGIC ──
+
+  async getFactoryOverview() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [productionToday] = await db.select({
+      blowing: sql<number>`SUM(CASE WHEN station = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+      filling: sql<number>`SUM(CASE WHEN station = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+      packing: sql<number>`SUM(CASE WHEN station = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+      rejection: sql<number>`SUM(${productionLogs.wastageCount})`
+    })
+    .from(productionLogs)
+    .where(gte(productionLogs.loggedAt, today));
+
+    const activeBatches = await db.select({
+      id: productionBatches.id,
+      batchCode: productionBatches.batchCode,
+      product: products.name,
+      line: productionLines.name,
+      status: productionBatches.status,
+      startTime: productionBatches.startTime,
+      totalDowntimeMins: sql<number>`COALESCE((SELECT SUM(duration_minutes) FROM downtime_logs WHERE batch_id = ${productionBatches.id}), 0)`
+    })
+    .from(productionBatches)
+    .leftJoin(products, eq(productionBatches.productId, products.id))
+    .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id)) // Fixed: Should join on id, not name
+    .where(inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']));
+
+    const lowStock = await db.select()
+      .from(inventoryStock)
+      .where(sql`${inventoryStock.quantity} <= ${inventoryStock.minimumStock}`)
+      .limit(5);
+
+    const activeDowntimes = await db.select()
+      .from(downtimeLogs)
+      .where(isNull(downtimeLogs.endTime))
+      .limit(5);
+
+    const latestStops = await db.select({
+      id: downtimeLogs.id,
+      batchCode: productionBatches.batchCode,
+      station: downtimeLogs.station,
+      reason: downtimeLogs.reason,
+      duration: downtimeLogs.durationMinutes,
+      startTime: downtimeLogs.startTime
+    })
+    .from(downtimeLogs)
+    .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
+    .orderBy(desc(downtimeLogs.startTime))
+    .limit(5);
+
+    return {
+      counters: {
+        blowing: Number(productionToday.blowing || 0),
+        filling: Number(productionToday.filling || 0),
+        packing: Number(productionToday.packing || 0),
+        rejection: Number(productionToday.rejection || 0)
+      },
+      activeBatches,
+      lowStockAlerts: lowStock,
+      activeDowntimes,
+      latestStops,
+      timestamp: new Date()
+    };
+  }
+
+  async getMachineEfficiency() {
+    return await db.select({
+      id: productionLines.id,
+      name: productionLines.name,
+      status: productionLines.status,
+      efficiency: productionLines.currentEfficiency,
+      downtimeMins: sql<number>`COALESCE((
+        SELECT SUM(duration_minutes) 
+        FROM downtime_logs 
+        WHERE line_id = ${productionLines.id} 
+        AND created_at >= CURRENT_DATE
+      ), 0)`
+    })
+    .from(productionLines);
+  }
+
+  async getProductionTimeStats(batchId: string) {
+    const batch = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+    if (batch.length === 0) throw new NotFoundException('Batch not found');
+
+    const downtimes = await db.select().from(downtimeLogs)
+      .where(eq(downtimeLogs.batchId, batchId))
+      .orderBy(desc(downtimeLogs.startTime));
+
+    const totalDowntimeMins = downtimes.reduce((sum, log) => sum + (log.durationMinutes || 0), 0);
+    
+    const startTime = new Date(batch[0].startTime);
+    const endTime = batch[0].endTime ? new Date(batch[0].endTime) : new Date();
+    const totalElapsedMins = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+    
+    return {
+      batchCode: batch[0].batchCode,
+      startTime,
+      endTime: batch[0].endTime,
+      totalElapsedMins,
+      totalDowntimeMins,
+      properProductionMins: Math.max(0, totalElapsedMins - totalDowntimeMins),
+      downtimeLogs: downtimes
     };
   }
 }

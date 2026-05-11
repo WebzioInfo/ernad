@@ -89,4 +89,22 @@ export class AnalyticsController {
       factoryId
     );
   }
+
+  @Get('factory/live')
+  @Permissions('analytics:view')
+  async getFactoryOverview() {
+    return this.analyticsService.getFactoryOverview();
+  }
+
+  @Get('factory/efficiency')
+  @Permissions('analytics:view')
+  async getMachineEfficiency() {
+    return this.analyticsService.getMachineEfficiency();
+  }
+
+  @Get('batch/production-time')
+  @Permissions('analytics:view')
+  async getProductionTimeStats(@Query('batchId') batchId: string) {
+    return this.analyticsService.getProductionTimeStats(batchId);
+  }
 }

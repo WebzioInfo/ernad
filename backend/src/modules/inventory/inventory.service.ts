@@ -65,39 +65,58 @@ export class InventoryService {
   async updateStock(dto: { 
     stockId: string; 
     quantity: number; 
-    type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'CONSUMPTION'; 
+    type: 'IN' | 'OUT' | 'ADJUSTMENT' | 'CONSUMPTION' | 'REJECTION' | 'WASTAGE' | 'TRANSFER' | 'RETURN'; 
     remarks?: string; 
-    referenceId?: string;
+    referenceId?: string; // e.g., Telemetry Log ID or Batch ID
     performedBy?: string;
   }) {
     return await db.transaction(async (tx) => {
-      const [stock] = await tx.select().from(inventoryStock).where(eq(inventoryStock.id, dto.stockId)).for('update');
-      if (!stock) throw new Error('Stock item not found');
+      // 1. Lock stock row for atomic update
+      const [stock] = await tx.select().from(inventoryStock)
+        .where(eq(inventoryStock.id, dto.stockId))
+        .for('update');
+      
+      if (!stock) throw new Error(`Stock item ${dto.stockId} not found`);
 
       const currentQty = Number(stock.quantity);
       let newQty = currentQty;
 
-      if (dto.type === 'IN') newQty += dto.quantity;
-      else if (dto.type === 'OUT' || dto.type === 'CONSUMPTION') newQty -= dto.quantity;
-      else if (dto.type === 'ADJUSTMENT') newQty = dto.quantity;
+      // 2. Calculate new quantity based on type
+      const isDeduction = ['OUT', 'CONSUMPTION', 'REJECTION', 'WASTAGE'].includes(dto.type);
+      const isInflow = ['IN', 'RETURN'].includes(dto.type);
 
-      // 1. Update stock
+      if (isInflow) {
+        newQty += dto.quantity;
+      } else if (isDeduction) {
+        if (currentQty < dto.quantity && dto.type !== 'ADJUSTMENT') {
+          throw new Error(`INSUFFICIENT_STOCK: Required ${dto.quantity}, Available ${currentQty} for ${stock.itemName}`);
+        }
+        newQty -= dto.quantity;
+      } else if (dto.type === 'ADJUSTMENT') {
+        newQty = dto.quantity;
+      }
+
+      // 3. Persist stock update
       await tx.update(inventoryStock)
-        .set({ quantity: String(newQty), updatedAt: new Date() })
+        .set({ 
+          quantity: String(newQty), 
+          updatedAt: new Date() 
+        })
         .where(eq(inventoryStock.id, dto.stockId));
 
-      // 2. Record transaction
+      // 4. Record Ledger Entry (Full Accountability)
       const [transaction] = await tx.insert(inventoryTransactions).values({
         stockId: dto.stockId,
         type: dto.type,
-        quantityChange: String(dto.type === 'OUT' || dto.type === 'CONSUMPTION' ? -dto.quantity : dto.quantity),
+        quantityChange: String(isDeduction ? -dto.quantity : dto.quantity),
         balanceAfter: String(newQty),
-        remarks: dto.remarks,
+        remarks: dto.remarks || `Industrial ${dto.type} movement`,
         referenceId: dto.referenceId,
         performedBy: dto.performedBy,
+        createdAt: new Date()
       }).returning();
 
-      this.logger.log(`Stock ${dto.stockId} updated: ${currentQty} -> ${newQty} (${dto.type})`);
+      this.logger.log(`Stock Movement [${dto.type}]: ${stock.itemName} | ${currentQty} -> ${newQty}`);
       return { stock: { ...stock, quantity: String(newQty) }, transaction };
     });
   }

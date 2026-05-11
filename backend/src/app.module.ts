@@ -25,6 +25,7 @@ import { OperatorSessionModule } from './modules/operator-session/operator-sessi
 import { DataLifecycleModule } from './modules/data-lifecycle/data-lifecycle.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { BiometricModule } from './modules/biometric/biometric.module';
+import { TallyModule } from './modules/tally/tally.module';
 
 import { AppController } from './app.controller';
 
@@ -51,6 +52,7 @@ import { AppController } from './app.controller';
     DataLifecycleModule,
     NotesModule,
     BiometricModule,
+    TallyModule,
     ReportsModule,
     ScheduleModule.forRoot(),
   ],

@@ -94,6 +94,27 @@ export class LifecycleService {
     return result;
   }
 
+  async closeShift(factoryId: string, shiftId: string, userId: string) {
+    return await db.transaction(async (tx) => {
+      // 1. Find all active batches for this shift
+      const activeBatchesList = await tx.select()
+        .from(productionBatches)
+        .where(and(
+          eq(productionBatches.factoryId, factoryId),
+          eq(productionBatches.shiftId, shiftId),
+          sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
+        ));
+
+      // 2. Transition them to QC_PENDING
+      for (const batch of activeBatchesList) {
+        await this.closeBatch(batch.id, userId, 'Shift Auto-Close');
+      }
+
+      this.logger.log(`Shift ${shiftId} closed. ${activeBatchesList.length} batches transitioned.`);
+      return { closedBatches: activeBatchesList.length };
+    });
+  }
+
   async submitQualityCheck(batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
     const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {

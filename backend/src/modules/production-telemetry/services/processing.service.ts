@@ -6,9 +6,10 @@ import {
   materialsUsage,
   inventoryStock,
   inventoryTransactions,
-  packagingConfigurations
+  productionBatches,
+  downtimeLogs
 } from '../../../database/schema';
-import { eq, sql, and, inArray } from 'drizzle-orm';
+import { eq, sql, and, inArray, isNull } from 'drizzle-orm';
 import { billOfMaterials } from '../../../database/schema';
 import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -50,7 +51,10 @@ export class ProcessingService {
       }
 
       const current = totalsList[0];
-      const factoryId = current.factoryId; // Get factory context from the batch itself
+      const factoryId = current.factoryId;
+
+      // 3. Batch Integrity Validation
+      await this.validateBatchStatus(tx, dto.batchId);
 
       const isValidShift = await this.shiftService.validateShiftEntry(dto.shiftId, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
       if (!isValidShift) {
@@ -136,15 +140,8 @@ export class ProcessingService {
           })
           .where(eq(batchTotals.batchId, dto.batchId));
       }
-
-      if (dto.eventType && dto.eventType !== 'NORMAL_PRODUCTION') {
-        await this.notificationsService.createNotification(
-          'MACHINE_ISSUE',
-          `Issue on Station: ${dto.station}`,
-          `${dto.eventType}: ${dto.remarks || 'No remarks provided'}`,
-          'CRITICAL'
-        );
-      }
+      // ── NEW: Downtime & Production Time Tracking ──
+      await this.handleDowntime(tx, factoryId, dto);
 
       this.eventsService.emitNewLog(log);
       this.eventsService.emitProductionUpdated(dto.batchId, dto.lineId);
@@ -181,16 +178,16 @@ export class ProcessingService {
       const bomItems = await tx.select().from(billOfMaterials).where(eq(billOfMaterials.productId, dto.productId));
       for (const bom of bomItems) {
         const qty = Number(bom.quantityPerUnit) * dto.primaryCount;
-        
+
         // Find existing or add new
         const existingIdx = consumptionMap.findIndex(c => c.name === bom.stockId); // Using stockId as key for internal loop
         if (existingIdx > -1) {
           consumptionMap[existingIdx].qty += qty;
         } else {
-          consumptionMap.push({ 
+          consumptionMap.push({
             name: bom.stockId, // We'll handle stock lookup by ID now
-            qty: qty, 
-            category: 'BOM_AUTO' 
+            qty: qty,
+            category: 'BOM_AUTO'
           });
         }
       }
@@ -210,7 +207,7 @@ export class ProcessingService {
       } else if (dto.selectedStockId) {
         const results = await tx.select().from(inventoryStock)
           .where(eq(inventoryStock.id, dto.selectedStockId))
-          .for('update'); 
+          .for('update');
         stock = results[0];
       }
 
@@ -265,35 +262,117 @@ export class ProcessingService {
   }
 
   private async validateProductionFlow(station: string, count: number, totals: any) {
-  const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
-  if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
-    throw new BadRequestException(`Flow Violation: Filling (${nextTotal}) > Blowing (${totals.blowingTotal}).`);
+    const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
+
+    if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
+      throw new BadRequestException(
+        `FLOW_VIOLATION: Filling count (${nextTotal}) cannot exceed Blowing output (${totals.blowingTotal}). ` +
+        `Shortfall: ${nextTotal - totals.blowingTotal} units.`
+      );
+    }
+    if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
+      throw new BadRequestException(
+        `FLOW_VIOLATION: Labeling count (${nextTotal}) cannot exceed Filling output (${totals.fillingTotal}). ` +
+        `Shortfall: ${nextTotal - totals.fillingTotal} units.`
+      );
+    }
+    if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
+      throw new BadRequestException(
+        `FLOW_VIOLATION: Packing count (${nextTotal}) cannot exceed Labeling output (${totals.labelingTotal}). ` +
+        `Shortfall: ${nextTotal - totals.labelingTotal} units.`
+      );
+    }
   }
-  if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
-    throw new BadRequestException(`Flow Violation: Labeling (${nextTotal}) > Filling (${totals.fillingTotal}).`);
+
+  private async validateBatchStatus(tx: any, batchId: string) {
+    const batch = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+    if (batch.length === 0) throw new BadRequestException('Batch not found.');
+    if (batch[0].status !== 'RUNNING' && batch[0].status !== 'CHANGEOVER') {
+      throw new BadRequestException(`CANNOT_LOG: Batch is currently in ${batch[0].status} state.`);
+    }
   }
-  if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
-    throw new BadRequestException(`Flow Violation: Packing (${nextTotal}) > Labeling (${totals.labelingTotal}).`);
+
+  private async handleDowntime(tx: any, factoryId: string, dto: ProductionTelemetryDto) {
+    const station = dto.station;
+    const batchId = dto.batchId;
+    const lineId = dto.lineId;
+    const eventType = dto.eventType || 'NORMAL_PRODUCTION';
+    const loggedAt = dto.loggedAt ? new Date(dto.loggedAt) : new Date();
+
+    if (eventType !== 'NORMAL_PRODUCTION') {
+      // 1. Check if there is an ongoing downtime for this station/batch with the SAME reason
+      const ongoing = await tx.select().from(downtimeLogs)
+        .where(and(
+          eq(downtimeLogs.batchId, batchId),
+          eq(downtimeLogs.station, station),
+          eq(downtimeLogs.reason, eventType),
+          isNull(downtimeLogs.endTime)
+        ))
+        .limit(1);
+
+      if (ongoing.length === 0) {
+        // Start new downtime log
+        await tx.insert(downtimeLogs).values({
+          batchId,
+          lineId,
+          factoryId,
+          station,
+          reason: eventType,
+          startTime: loggedAt,
+          remarks: dto.remarks
+        });
+
+        // Trigger notification for serious issues
+        if (['POWER_FAILURE', 'MACHINE_BREAKDOWN'].includes(eventType)) {
+          await this.notificationsService.createNotification(
+            'MACHINE_ISSUE',
+            `CRITICAL STOP: ${station} Line ${lineId}`,
+            `Production halted due to ${eventType}. Reason: ${dto.remarks || 'No details provided'}`,
+            'CRITICAL'
+          );
+        }
+      }
+    } else {
+      // 2. If NORMAL_PRODUCTION, end ANY ongoing downtime for this station/batch
+      const ongoingLogs = await tx.select().from(downtimeLogs)
+        .where(and(
+          eq(downtimeLogs.batchId, batchId),
+          eq(downtimeLogs.station, station),
+          isNull(downtimeLogs.endTime)
+        ));
+
+      for (const log of ongoingLogs) {
+        const durationMs = loggedAt.getTime() - new Date(log.startTime).getTime();
+        const durationMins = Math.max(1, Math.round(durationMs / 60000));
+
+        await tx.update(downtimeLogs)
+          .set({
+            endTime: loggedAt,
+            durationMinutes: durationMins,
+            updatedAt: new Date()
+          })
+          .where(eq(downtimeLogs.id, log.id));
+      }
+    }
   }
-}
 
   private getFieldName(station: string): any {
-  const map: any = {
-    BLOWING: 'blowingTotal',
-    FILLING: 'fillingTotal',
-    LABELING: 'labelingTotal',
-    PACKING: 'packingTotal',
-  };
-  return map[station];
-}
+    const map: any = {
+      BLOWING: 'blowingTotal',
+      FILLING: 'fillingTotal',
+      LABELING: 'labelingTotal',
+      PACKING: 'packingTotal',
+    };
+    return map[station];
+  }
 
   async getLogHistory(batchId: string, station: string, limit = 20) {
-  return await db.select()
-    .from(productionLogs)
-    .where(
-      sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
-    )
-    .orderBy(sql`${productionLogs.loggedAt} DESC`)
-    .limit(limit);
-}
+    return await db.select()
+      .from(productionLogs)
+      .where(
+        sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
+      )
+      .orderBy(sql`${productionLogs.loggedAt} DESC`)
+      .limit(limit);
+  }
 }
