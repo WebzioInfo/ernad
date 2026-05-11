@@ -24,41 +24,18 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  // ── 1. GLOBAL CORS & DEBUG LOGGING (Absolute Priority) ──
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin) {
-      console.log(`[CORS_MONITOR] Request from Origin: ${origin} | Method: ${req.method} | Path: ${req.url}`);
-    }
+  // ── 1. SECURITY HEADERS (HELMET) ──
+  const helmet = (await import('helmet')).default;
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    contentSecurityPolicy: false, // Managed by Vercel/Frontend if needed
+  }));
 
-    // Explicit OPTIONS preflight handling for production resilience
-    if (req.method === 'OPTIONS') {
-      res.header('Access-Control-Allow-Origin', origin || '*');
-      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With, x-mes-request-id');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      return res.status(200).send();
-    }
-    next();
-  });
+  // ── 2. INDUSTRIAL CORS CONFIGURATION ──
+  const { getCorsConfig } = await import('./common/config/cors.config');
+  app.enableCors(getCorsConfig());
 
-  app.enableCors({
-    origin: [
-      'https://ernad.vercel.app',
-      'http://localhost:5173'
-    ],
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    credentials: true,
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'Accept',
-      'Origin',
-      'X-Requested-With',
-      'x-mes-request-id',
-    ],
-  });
-
+  // ── 3. COOKIE PARSING ──
   app.use(cookieParser());
 
   app.setGlobalPrefix('api', { exclude: ['/'] });

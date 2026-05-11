@@ -1,24 +1,25 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import useAuthStore from '../modules/auth/auth.store';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
 const getBaseURL = () => {
-  const url = import.meta.env.VITE_API_URL;
-  if (url) return url;
+  // 1. Explicit VITE_API_URL from environment (Priority)
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl;
   
-  if (window.location.hostname === 'localhost') {
+  // 2. Automatic detection for Localhost
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:4000/api';
   }
   
-  // Production Safety Warning
-  console.error('%c[FATAL] VITE_API_URL is missing in production environment.', 'color: white; background: red; padding: 4px; font-weight: bold;');
+  // 3. Fallback to relative path (assuming same domain deployment)
   return '/api';
 };
 
 export const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 15000, // Enterprise timeout
+  timeout: 30000, // Increased for industrial stability
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -27,7 +28,7 @@ export const api = axios.create({
 });
 
 // ── REQUEST INTERCEPTOR (TRACING & AUTH) ──
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().token;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -37,8 +38,14 @@ api.interceptors.request.use((config) => {
   const requestId = uuidv4();
   config.headers['x-mes-request-id'] = requestId;
 
-  if (window.location.hostname === 'localhost') {
-    console.log(`%c[RESILIENT_API] OUT -> ${config.method?.toUpperCase()} ${config.url}`, 'color: #3b82f6; font-weight: bold;', { requestId });
+  // Add Vercel Protection Skip if available in storage (Optional hardening)
+  const protectionSkip = localStorage.getItem('vercel-protection-skip');
+  if (protectionSkip) {
+    config.headers['x-vercel-protection-skip'] = protectionSkip;
+  }
+
+  if (import.meta.env.DEV) {
+    console.debug(`%c[API_OUT] ${config.method?.toUpperCase()} ${config.url}`, 'color: #3b82f6; font-weight: bold;', { requestId });
   }
 
   return config;
@@ -50,60 +57,66 @@ api.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const config = error.config;
+    const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number };
     
     // 1. Handle Network/CORS/Blocked Errors
     if (!error.response) {
-      const isCorsOrNetwork = error.message.includes('Network Error') || error.code === 'ERR_NETWORK';
-      console.error(`%c[${isCorsOrNetwork ? 'CORS_OR_OFFLINE' : 'CONNECTION_FAILURE'}] Request failed.`, 'color: #ef4444; font-weight: bold;', {
-        url: config?.url,
-        message: error.message,
-        code: error.code
-      });
+      const isNetworkError = error.code === 'ERR_NETWORK' || error.message === 'Network Error';
+      
+      if (import.meta.env.DEV) {
+        console.error(`%c[NETWORK_FAILURE]`, 'color: #ef4444; font-weight: bold;', {
+          message: error.message,
+          code: error.code,
+          url: config?.url
+        });
+      }
 
-      if (isCorsOrNetwork) {
-        toast.error('Connection failed. The server might be unreachable or blocked by CORS.');
+      if (isNetworkError) {
+        toast.error('Network Error: The server is unreachable. This may be caused by a CORS block or a down server.', {
+          description: 'Please check your internet connection and verify the backend status.',
+          duration: 5000
+        });
       }
       
-      // Strict Retry Logic: Only retry GET requests ONCE to prevent storms
-      if (config && config.method === 'get') {
-        const retryCount = (config as any)._retryCount || 0;
-        if (retryCount < 1) {
-          (config as any)._retryCount = retryCount + 1;
-          console.warn(`[RETRYING] Transient network error, attempting retry ${retryCount + 1}...`);
+      // Strict Retry Logic for idempotent requests
+      if (config && (config.method === 'get' || config.method === 'head')) {
+        config._retryCount = config._retryCount || 0;
+        if (config._retryCount < 2) {
+          config._retryCount++;
+          const delay = config._retryCount * 1000;
+          console.warn(`[RETRY] Attempt ${config._retryCount} for ${config.url} in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
           return api(config);
-        } else {
-          console.error('[RETRY_EXHAUSTED] Giving up after maximum retries.');
         }
       }
     }
 
-    // 2. Handle 401 Unauthorized
+    // 2. Handle 401 Unauthorized (Session Management)
     if (error.response?.status === 401) {
       const isLoginRequest = config?.url?.includes('/auth/login');
       if (!isLoginRequest) {
+        console.warn('[AUTH] 401 Unauthorized. Clearing session.');
         useAuthStore.getState().logout();
         toast.error('Session expired. Please log in again.');
       }
     }
 
-    // 3. Handle 403 Forbidden (Audit Logged & Detailed)
+    // 3. Handle 403 Forbidden (CORS or Permissions)
     if (error.response?.status === 403) {
-      console.error('[AUTH_REJECTION] 403 Forbidden.', {
+      console.error('[SECURITY] 403 Forbidden rejection.', {
         url: config?.url,
-        headers: config?.headers,
-        reason: 'Internal protection or insufficient permissions'
+        data: error.response.data
       });
       
-      const message = (error.response.data as any)?.message || 'Access Denied: Insufficient Privileges';
+      const message = (error.response.data as any)?.message || 'Access Denied: You do not have permission to perform this action.';
       toast.error(message);
     }
 
-    // 4. Handle 404 for Assets/Chunks
-    if (error.response?.status === 404 && config?.url?.includes('.js')) {
-      console.error('[CHUNK_MISSING] A required JS module could not be loaded.');
-      toast.error('Application update detected. Reloading...');
-      setTimeout(() => window.location.reload(), 2000);
+    // 4. Handle 5xx Errors
+    if (error.response && error.response.status >= 500) {
+      toast.error('Server Error', {
+        description: 'The manufacturing system encountered an internal error. Our team has been notified.'
+      });
     }
 
     return Promise.reject(error);

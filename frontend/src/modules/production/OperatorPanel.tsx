@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   PackageOpen, LogOut, Wind, Box,
   Loader2, Zap,
-  AlertTriangle, Save, RefreshCw,
-  Construction,
+  AlertTriangle,
   Sparkles,
   History as HistoryIcon,
   Database,
@@ -61,14 +60,14 @@ export default function OperatorPanel() {
   const [line, setLine] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
   const [wastageCount, setWastageCount] = useState(0);
   const [rejectionCount, setRejectionCount] = useState(0);
   const [eventType, setEventType] = useState('NORMAL_PRODUCTION');
   const [remarks, setRemarks] = useState('');
-  
+
   // Enterprise State
   const [selectedStock, setSelectedStock] = useState<string>('');
   const [boxCount, setBoxCount] = useState(0);
@@ -151,7 +150,7 @@ export default function OperatorPanel() {
     // Fast Validations
     if (type === 'COUNT' && primaryCount === 0) return toast.error('Enter production count');
     if (type === 'WASTE' && wastageCount === 0) return toast.error('Enter wastage count');
-    
+
     // Industrial Rule: Material Source must be selected for Production Stations
     if ((type === 'ALL' || type === 'COUNT') && !selectedStock && currentStation.id !== 'PACKING') {
       return toast.error('MATERIAL_BATCH_REQUIRED: Select the current material batch (Preform/Cap/Label) being used.');
@@ -195,7 +194,7 @@ export default function OperatorPanel() {
       await api.post('/telemetry', logEntry);
       toast.success('Telemetry logged successfully');
       refetchHistory();
-      
+
       // Reset logic
       setPrimaryCount(0);
       setWastageCount(0);
@@ -207,13 +206,13 @@ export default function OperatorPanel() {
         setEventType('NORMAL_PRODUCTION');
         setRemarks('');
       }
-      
+
       // INDUSTRIAL HARDENING: Ensure focus returns to primary input for rapid entry
       setTimeout(() => {
         primaryInputRef.current?.focus();
         primaryInputRef.current?.select();
       }, 50);
-      
+
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save log');
     } finally {
@@ -254,17 +253,17 @@ export default function OperatorPanel() {
         </div>
 
         <div className="flex items-center gap-12">
-            <div className="text-right hidden md:block">
-              <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-0.5">Active Operator</span>
-              <p className="text-sm font-black text-white">{user?.name}</p>
-            </div>
-            <button
-              onClick={() => endSessionMutation.mutate()}
-              className="px-6 py-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3 hover:bg-rose-500 hover:text-white transition-all active:scale-95 group"
-            >
-              <LogOut className="w-4 h-4 text-rose-400 group-hover:text-white" />
-              <span className="text-[10px] font-black uppercase tracking-widest">End Session</span>
-            </button>
+          <div className="text-right hidden md:block">
+            <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-0.5">Active Operator</span>
+            <p className="text-sm font-black text-white">{user?.name}</p>
+          </div>
+          <button
+            onClick={() => endSessionMutation.mutate()}
+            className="px-6 py-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3 hover:bg-rose-500 hover:text-white transition-all active:scale-95 group"
+          >
+            <LogOut className="w-4 h-4 text-rose-400 group-hover:text-white" />
+            <span className="text-[10px] font-black uppercase tracking-widest">End Session</span>
+          </button>
         </div>
       </header>
 
@@ -310,7 +309,7 @@ export default function OperatorPanel() {
                       onKeyDown={(e) => e.key === 'Enter' && rejectionInputRef.current?.focus()}
                       autoFocus
                     />
-                    
+
                     <IndustrialNumericInput
                       ref={rejectionInputRef}
                       label="Rejection / QC Fail"
@@ -324,7 +323,7 @@ export default function OperatorPanel() {
 
                   {/* Secondary Inputs & Stock */}
                   <div className="col-span-1 space-y-6">
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Material Source Batch</label>
                       <div className="relative">
                         <Database className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
@@ -372,7 +371,7 @@ export default function OperatorPanel() {
                 </div>
 
                 <div className="mt-12 pt-8 border-t border-white/5 flex gap-4">
-                   <button
+                  <button
                     onClick={() => handleSaveTelemetry('ALL')}
                     disabled={isSubmitting}
                     className="flex-1 h-16 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
@@ -397,7 +396,7 @@ export default function OperatorPanel() {
                   </div>
                   <h3 className="text-sm font-black uppercase tracking-widest">Process Event Logger</h3>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-3 mb-6">
                   {['NORMAL_PRODUCTION', 'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'MATERIAL_SHORTAGE', 'LOW_SPEED', 'DOWNTIME_PAUSE'].map(type => (
                     <button
@@ -412,7 +411,7 @@ export default function OperatorPanel() {
                     </button>
                   ))}
                 </div>
-                
+
                 <div className="flex gap-4">
                   <textarea
                     value={remarks}
@@ -450,7 +449,7 @@ export default function OperatorPanel() {
                         <p className="text-[10px] font-black uppercase tracking-widest">No logs recorded</p>
                       </div>
                     ) : (
-                      history.map((log: any, i: number) => (
+                      history.map((log: any) => (
                         <motion.div
                           layout
                           initial={{ opacity: 0, y: 20 }}
@@ -508,7 +507,7 @@ export default function OperatorPanel() {
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MES Core v4.0</span>
           </div>
         </div>
-        
+
         <p className="text-[10px] text-slate-700 font-black uppercase tracking-[0.5em] pr-2">
           ERNAD INTELLIGENT MANUFACTURING
         </p>

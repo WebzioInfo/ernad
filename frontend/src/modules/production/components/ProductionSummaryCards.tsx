@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { Target, TrendingUp, AlertCircle, Clock } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
@@ -28,7 +27,7 @@ function SummaryCard({ label, value, subValue, icon: Icon, color, trend }: Summa
         </div>
         {trend && (
           <div className="flex items-center gap-2 mt-3">
-            <div className={cn("text-[10px] font-black px-2 py-0.5 rounded-full", 
+            <div className={cn("text-[10px] font-black px-2 py-0.5 rounded-full",
               trend.isPositive ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
             )}>
               {trend.value}
