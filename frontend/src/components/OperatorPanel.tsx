@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 import { api } from '../services/api-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import Watermark from './Watermark';
 import { db as offlineDb } from '../utils/db'; // Dexie
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -77,7 +77,7 @@ export default function OperatorPanel() {
   };
 
   const submitLogs = async () => {
-    if (primaryCount === 0 && wastageCount === 0) return toast.error('Logging buffer is empty');
+    if (primaryCount === 0 && wastageCount === 0) return toast.warning('Logging buffer is empty');
     setIsSubmitting(true);
 
     const payload = {
@@ -114,7 +114,7 @@ export default function OperatorPanel() {
       setIsRework(false);
       setMaterials([]); // Clear materials
     } catch (err: any) {
-      toast.error('Offline Mode Enabled: Data saved locally.');
+      toast.error(err.response?.data?.message || 'System error. Data saved locally.');
     } finally {
       setIsSubmitting(false);
     }

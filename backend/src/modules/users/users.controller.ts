@@ -43,6 +43,16 @@ export class UsersController {
   }
 
   /**
+   * GET /api/users/terminal-list
+   * Accessible by any authenticated operator to switch profiles
+   */
+  @Get('terminal-list')
+  @ApiOperation({ summary: 'Get basic operator list for shared terminals' })
+  getTerminalOperators() {
+    return this.usersService.getTerminalOperators();
+  }
+
+  /**
    * GET /api/users/audit-logs
    * Admin only — Get system audit logs
    */

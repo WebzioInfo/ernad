@@ -4,6 +4,7 @@ import { InventoryService } from './inventory.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { Roles } from '../auth/roles.decorator';
 
 @ApiTags('Inventory Management')
 @ApiBearerAuth()
@@ -13,28 +14,28 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get()
-  @Permissions('inventory:view')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get global inventory levels' })
   async getInventory() {
     return await this.inventoryService.getInventory();
   }
 
   @Get('warehouses')
-  @Permissions('inventory:view')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get all warehouse locations' })
   async getWarehouses() {
     return await this.inventoryService.getWarehouses();
   }
 
   @Get('categories')
-  @Permissions('inventory:view')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get all material categories' })
   async getCategories() {
     return await this.inventoryService.getCategories();
   }
 
   @Get('packaging/:productId')
-  @Permissions('inventory:view')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get packaging configurations for a product' })
   async getPackagingConfigs(@Param('productId') productId: string) {
     return await this.inventoryService.getPackagingConfigs(productId);

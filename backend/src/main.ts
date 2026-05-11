@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import cookieParser from 'cookie-parser';
@@ -40,7 +40,22 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api', { exclude: ['/'] });
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({ 
+    whitelist: true, 
+    transform: true,
+    stopAtFirstError: true,
+    exceptionFactory: (errors) => {
+      const result = errors.map((error) => ({
+        property: error.property,
+        message: Object.values(error.constraints || {})[0],
+      }));
+      return new BadRequestException({
+        message: result[0].message,
+        error: 'VALIDATION_ERROR',
+        details: result,
+      });
+    }
+  }));
 
   // AuthGuard will be registered as a global guard in app.module.ts for better DI support
 

@@ -85,10 +85,8 @@ export class ProcessingService {
         splitValues: dto.splitValues || [],
         wastageCount: dto.wastageCount,
         isRework: dto.isRework || false,
-        eventType: dto.eventType || 'NORMAL_PRODUCTION',
+        eventType: (dto.eventType || 'NORMAL_PRODUCTION') as any,
         remarks: dto.remarks,
-
-        // Enterprise Extensions
         capUsage: dto.capUsage || 0,
         capRejection: dto.capRejection || 0,
         preformUsage: dto.preformUsage || 0,
@@ -102,9 +100,8 @@ export class ProcessingService {
         finishedGoodsProduced: dto.finishedGoodsProduced || 0,
         materialCost: String(dto.materialCost || 0),
         boxCount: dto.boxCount || 0,
-
         loggedAt: dto.loggedAt ? new Date(dto.loggedAt) : new Date(),
-      }).returning();
+      } as any).returning();
 
       if (dto.materials && dto.materials.length > 0) {
         for (const mat of dto.materials) {

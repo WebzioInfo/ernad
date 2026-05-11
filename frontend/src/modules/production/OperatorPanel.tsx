@@ -14,9 +14,8 @@ import {
   Clock,
   LayoutDashboard
 } from 'lucide-react';
-import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -24,9 +23,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { IndustrialNumericInput } from '../../components/ui/industrial-numeric-input';
 import { ProductionSummaryCards } from './components/ProductionSummaryCards';
 import { cn } from '../../lib/utils';
+import { TerminalLogin } from './components/TerminalLogin';
 
 export default function OperatorPanel() {
-  const { user } = useAuthStore();
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
 
   const stations = [
@@ -56,10 +55,11 @@ export default function OperatorPanel() {
   const currentStationId = urlStation?.toUpperCase() || session?.station || 'FILLING';
   const currentStation = stations.find(s => s.id === currentStationId) || stations[1];
 
-  const [activeBatch, setActiveBatch] = useState<any>(null);
-  const [line, setLine] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // SHARED TERMINAL STATE
+  const [activeOperator, setActiveOperator] = useState<any>(null);
 
   // Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
@@ -91,10 +91,26 @@ export default function OperatorPanel() {
     }
   });
 
+  const { data: line } = useQuery({
+    queryKey: ['line', lineId],
+    queryFn: async () => (await api.get(`/master-data/lines/${lineId}`)).data,
+    enabled: !!lineId
+  });
+
   const { data: inventory } = useQuery({
     queryKey: ['operator-inventory', currentStationId],
     queryFn: async () => (await api.get('/inventory')).data
   });
+
+  // 2. Fetch Active Production Batch for this Line
+  const { data: batchData, isLoading: isLoadingBatch } = useQuery({
+    queryKey: ['active-batch', lineId],
+    queryFn: async () => (await api.get(`/production-batch/active/${lineId}`)).data,
+    enabled: !!lineId,
+    refetchInterval: 10000 
+  });
+
+  const activeBatch = batchData;
 
   const { data: packingConfigs } = useQuery({
     queryKey: ['packing-configs', activeBatch?.batch?.productId],
@@ -110,22 +126,10 @@ export default function OperatorPanel() {
   }, [session, isLoadingSession, navigate]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [batchRes, linesRes] = await Promise.all([
-          api.get(`/production-batch/active/${lineId}`),
-          api.get(`/master-data/lines`)
-        ]);
-        setActiveBatch(batchRes.data);
-        setLine(linesRes.data?.find((l: any) => l.id === lineId) || linesRes.data?.[0] || null);
-      } catch (err) {
-        console.error('Data fetch error', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (lineId) fetchData();
-  }, [lineId]);
+    if (!isLoadingBatch && !isLoadingSession) {
+      setLoading(false);
+    }
+  }, [isLoadingBatch, isLoadingSession]);
 
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
@@ -165,6 +169,7 @@ export default function OperatorPanel() {
       brandId: currentBatch?.brandId || session?.brandId,
       productId: currentBatch?.productId || session?.productId,
       shiftId: currentBatch?.shiftId || session?.shiftId,
+      userId: activeOperator.id, // THE REAL OPERATOR LOGGING THE DATA
       station: currentStation.id,
       primaryCount: Math.floor(primaryCount),
       wastageCount: Math.floor(wastageCount),
@@ -213,8 +218,12 @@ export default function OperatorPanel() {
         primaryInputRef.current?.select();
       }, 50);
 
+      // After logging, we can either stay or return to selection
+      // For shared tablets, usually we stay for multiple entries of the SAME operator
+      // or we can add a 'Submit & Switch' button later.
+      
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save log');
+      toast.error(err.response?.data?.message || 'An industrial error occurred. Please retry.');
     } finally {
       setIsSubmitting(false);
     }
@@ -254,21 +263,41 @@ export default function OperatorPanel() {
 
         <div className="flex items-center gap-12">
           <div className="text-right hidden md:block">
-            <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-0.5">Active Operator</span>
-            <p className="text-sm font-black text-white">{user?.name}</p>
+            <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-0.5">Active Station</span>
+            <p className="text-sm font-black text-white">{currentStation.title}</p>
           </div>
+          
+          {activeOperator && (
+            <button
+              onClick={() => setActiveOperator(null)}
+              className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 group"
+            >
+              <LogOut className="w-4 h-4 text-slate-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Switch Operator</span>
+            </button>
+          )}
+
           <button
             onClick={() => endSessionMutation.mutate()}
             className="px-6 py-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3 hover:bg-rose-500 hover:text-white transition-all active:scale-95 group"
           >
-            <LogOut className="w-4 h-4 text-rose-400 group-hover:text-white" />
-            <span className="text-[10px] font-black uppercase tracking-widest">End Session</span>
+            <LayoutDashboard className="w-4 h-4 text-rose-400 group-hover:text-white" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Exit Terminal</span>
           </button>
         </div>
       </header>
 
       <main className="flex-1 p-10 max-w-[1600px] mx-auto w-full grid grid-cols-12 gap-10">
-        {loading ? (
+        {!activeOperator ? (
+          <div className="col-span-12 h-full flex flex-col">
+            <TerminalLogin 
+              lineId={lineId!}
+              lineName={line?.name} 
+              onSuccess={(op: any) => setActiveOperator(op)} 
+              onClose={() => navigate('/admin/production')}
+            />
+          </div>
+        ) : loading ? (
           <div className="col-span-12 h-96 flex items-center justify-center">
             <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
           </div>

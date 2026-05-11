@@ -1,10 +1,10 @@
 import { lazy } from 'react';
-import { Activity, Play } from 'lucide-react';
+import { Activity, Monitor, Layout, ShieldCheck } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const productionConfig: ModuleConfig = {
   id: 'production',
-  name: 'Production',
+  name: 'Manufacturing',
   category: 'PRODUCTION',
   order: 30,
   routes: [
@@ -16,22 +16,42 @@ export const productionConfig: ModuleConfig = {
   ],
   sidebarGroups: [
     {
-      id: 'production_mgmt',
-      label: 'Manufacturing',
+      id: 'execution',
+      label: 'Shop Floor Execution',
       items: [
         {
-          id: 'production',
+          id: 'terminal',
+          label: 'Industrial Terminal',
+          icon: Monitor,
+          path: '/terminal',
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']
+        },
+        {
+          id: 'factory_tv',
+          label: 'Factory TV Monitor',
+          icon: Layout,
+          path: '/admin/production-tv',
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+        }
+      ]
+    },
+    {
+      id: 'production_mgmt',
+      label: 'Plant Management',
+      items: [
+        {
+          id: 'production_control',
           label: 'Production Control',
           icon: Activity,
-          path: '/production',
+          path: '/admin/production',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         },
         {
-          id: 'line_select',
-          label: 'Operator Terminal',
-          icon: Play,
-          path: '/line/select', // Path is absolute to bypass layout prefix if needed, but registry handles it
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']
+          id: 'quality_qc',
+          label: 'Quality Control (QC)',
+          icon: ShieldCheck,
+          path: '/admin/quality',
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         }
       ]
     }

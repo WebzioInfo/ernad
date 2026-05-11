@@ -169,4 +169,31 @@ export class AuthService {
 
     return { success: true, message: `${type} updated successfully` };
   }
+
+  async verifyTerminalPin(userId: string, pin: string) {
+    const [user] = await db.select({ 
+      pinCode: users.pinCode, 
+      name: users.name, 
+      isActive: users.isActive 
+    }).from(users).where(eq(users.id, userId)).limit(1);
+    
+    if (!user) {
+      throw new NotFoundException('Operator not found');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Operator account is inactive');
+    }
+
+    if (!user.pinCode) {
+      throw new UnauthorizedException('Operator does not have a PIN configured');
+    }
+
+    const isMatch = await bcrypt.compare(pin, user.pinCode).catch(() => false);
+    if (!isMatch) {
+      throw new UnauthorizedException('Invalid PIN');
+    }
+
+    return { success: true, operatorName: user.name };
+  }
 }

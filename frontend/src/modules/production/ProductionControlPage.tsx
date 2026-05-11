@@ -96,9 +96,6 @@ export default function ProductionControlPage() {
 }
 
 function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
-  console.log("LINE DATA (COMMANDER):", line);
-  console.log("BATCH DATA:", line.batch);
-
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
     queryFn: async () => (await api.get('/analytics/line-performance', { params: { lineId: line.id } })).data,

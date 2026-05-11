@@ -106,7 +106,7 @@ export class AuthController {
    * Body: { operatorId: string, newPin: string }
    */
   @UseGuards(AuthGuard)
-  @Patch('reset-credential')
+  @Post('reset-credential')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reset user credential (Admin only)' })
   async resetCredential(
@@ -114,5 +114,14 @@ export class AuthController {
     @Body() body: { userId: string; newCredential: string; type: 'PASSWORD' | 'PIN' },
   ) {
     return this.authService.resetCredentialById(req.user.roles, body.userId, body.newCredential, body.type);
+  }
+
+  @UseGuards(AuthGuard)
+  @Post('terminal-verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify operator PIN for shared terminal usage' })
+  async terminalVerify(@Body() body: { userId: string; pin: string }) {
+    return this.authService.verifyTerminalPin(body.userId, body.pin);
   }
 }

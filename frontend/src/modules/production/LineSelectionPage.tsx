@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
@@ -57,10 +57,11 @@ export default function LineSelectionPage() {
   });
 
   // If already has session, redirect
-  if (currentSession) {
-    navigate(`/line/${currentSession.lineId}/${currentSession.station.toLowerCase()}/operator`);
-    return null;
-  }
+  useEffect(() => {
+    if (currentSession && !isLoadingSession) {
+      navigate(`/line/${currentSession.lineId}/${currentSession.station.toLowerCase()}/operator`);
+    }
+  }, [currentSession, isLoadingSession, navigate]);
 
   const isLoading = isLoadingLines || isLoadingSession;
 

@@ -495,7 +495,6 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
-      console.log('--- SAVING USER DATA ---', data);
       const isEdit = !!user;
       const res = isEdit
         ? await api.patch(`/users/${user.id}`, data)

@@ -44,21 +44,26 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // ── Role Check ──
-    let rolePassed = true;
+    // ── Role Check (Supports Prefix Matching e.g. OPERATOR_*) ──
     if (requiredRoles && requiredRoles.length > 0) {
-      rolePassed = requiredRoles.some(r => userRoles.includes(r.toUpperCase()));
+      const rolePassed = requiredRoles.some(reqRole => 
+        userRoles.some(userRole => 
+          userRole === reqRole.toUpperCase() || userRole.startsWith(`${reqRole.toUpperCase()}_`)
+        )
+      );
+      if (!rolePassed) {
+        this.logger.warn(`[RolesGuard] Role Check Failed: User ${user.username} lacks required roles ${JSON.stringify(requiredRoles)}`);
+        throw new ForbiddenException('Your industrial role does not permit access to this resource');
+      }
     }
 
     // ── Permission Check ──
-    let permissionPassed = true;
     if (requiredPermissions && requiredPermissions.length > 0) {
-      permissionPassed = requiredPermissions.every(p => userPermissions.includes(p));
-    }
-
-    if (!rolePassed || !permissionPassed) {
-      this.logger.warn(`[RolesGuard] Access Denied: rolePassed=${rolePassed}, permPassed=${permissionPassed} for user ${user.username}`);
-      throw new ForbiddenException('You do not have sufficient privileges');
+      const permissionPassed = requiredPermissions.every(p => userPermissions.includes(p));
+      if (!permissionPassed) {
+        this.logger.warn(`[RolesGuard] Permission Check Failed: User ${user.username} lacks required permissions ${JSON.stringify(requiredPermissions)}`);
+        throw new ForbiddenException('You do not have the specific privileges required for this operation');
+      }
     }
 
     return true;

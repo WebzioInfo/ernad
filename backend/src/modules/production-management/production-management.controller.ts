@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req, Logger, UseInterceptors, Patch, NotFoundException } from '@nestjs/common';
+import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BatchService } from './services/batch.service';
 import { LineService } from './services/line.service';
@@ -16,10 +17,15 @@ import {
 } from './dto/production-management.dto';
 
 import { ChangeoverService } from './changeover.service';
+import { TerminalService } from './services/terminal.service';
+import { terminals, factories, productionLines } from '../../database/schema';
+import { eq } from 'drizzle-orm';
+import { db } from '../../database/db';
 
 @ApiTags('Production Management')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
+@UseInterceptors(AuditInterceptor)
 @Controller(['production', 'production-batch'])
 export class ProductionManagementController {
   private readonly logger = new Logger(ProductionManagementController.name);
@@ -27,7 +33,8 @@ export class ProductionManagementController {
     private readonly batchService: BatchService,
     private readonly lineService: LineService,
     private readonly lifecycleService: LifecycleService,
-    private readonly changeoverService: ChangeoverService
+    private readonly changeoverService: ChangeoverService,
+    private readonly terminalService: TerminalService
   ) {}
 
   @Post('start')
@@ -106,7 +113,35 @@ export class ProductionManagementController {
     @Body() body: { remarks?: string; endTime?: string; materialReturn?: any }
   ) {
     await this.lifecycleService.closeBatch(batchId, req.user.sub, body.remarks, body.endTime, body.materialReturn);
-    return { success: true, message: 'Batch moved to QC_PENDING.' };
+    return { success: true, message: 'Production session officially CLOSED and LOCKED.' };
+  }
+
+  @Post('batch/:id/request-approval')
+  @Permissions('production:close')
+  async requestApproval(
+    @Param('id') batchId: string,
+    @Req() req: any
+  ) {
+    return await this.lifecycleService.requestApproval(batchId, req.user.sub);
+  }
+
+  @Post('batch/:id/approve')
+  @Permissions('production:close')
+  async approveBatch(
+    @Param('id') batchId: string,
+    @Req() req: any
+  ) {
+    return await this.lifecycleService.approveBatch(batchId, req.user.sub);
+  }
+
+  @Patch('batch/:id/adjust-time')
+  @Permissions('production:close')
+  async adjustTime(
+    @Param('id') batchId: string,
+    @Req() req: any,
+    @Body() body: { startTime?: string, endTime?: string, reason?: string }
+  ) {
+    return await this.lifecycleService.adjustBatchTime(batchId, req.user.sub, body.startTime, body.endTime, body.reason);
   }
 
   @Post('batch/:id/complete-changeover')
@@ -156,5 +191,47 @@ export class ProductionManagementController {
     @Param('type') type: 'qc' | 'packaging' | 'dispatch'
   ) {
     return await this.lifecycleService.getLifecycleLogs(type);
+  }
+
+  // ── INDUSTRIAL TERMINAL ENDPOINTS ──
+
+  @Post('terminal/register')
+  @Permissions('production:close') // Only managers can register devices
+  @ApiOperation({ summary: 'Register a new factory terminal device' })
+  async registerTerminal(@Body() dto: any) {
+    const [factory] = await db.select().from(factories).limit(1);
+    const [terminal] = await db.insert(terminals).values({
+      ...dto,
+      factoryId: factory.id,
+      status: 'ONLINE',
+    }).returning();
+    return terminal;
+  }
+
+  @Get('terminal/:id')
+  @ApiOperation({ summary: 'Get terminal state' })
+  async getTerminal(@Param('id') id: string) {
+    const [terminal] = await db.select({
+      id: terminals.id,
+      code: terminals.code,
+      name: terminals.name,
+      status: terminals.status,
+      lineId: terminals.lineId,
+      department: terminals.department,
+      lineName: productionLines.name,
+    })
+    .from(terminals)
+    .leftJoin(productionLines, eq(terminals.lineId, productionLines.id))
+    .where(eq(terminals.id, id))
+    .limit(1);
+
+    if (!terminal) throw new NotFoundException('Terminal not registered in MES network.');
+    return terminal;
+  }
+
+  @Post('terminal/activate')
+  @ApiOperation({ summary: 'Activate/Heartbeat a terminal' })
+  async activateTerminal(@Body() dto: { code: string; supervisorId: string; shiftId: string }) {
+    return this.terminalService.activateTerminal(dto.code, dto.supervisorId, dto.shiftId);
   }
 }

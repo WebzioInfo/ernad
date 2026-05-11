@@ -34,22 +34,20 @@ export class LifecycleService {
         .for('update');
       
       if (!batch) throw new BadRequestException('Batch not found.');
-      if (!['RUNNING', 'CHANGEOVER'].includes(batch.status)) {
-        throw new BadRequestException(`Invalid transition from ${batch.status} to QC_PENDING.`);
+      if (!['RUNNING', 'CHANGEOVER', 'WAITING_APPROVAL', 'APPROVED', 'COMPLETED'].includes(batch.status)) {
+        throw new BadRequestException(`Cannot close batch in status ${batch.status}.`);
       }
-
-      const closerRoles = await tx.select({ slug: roles.slug })
-        .from(userRoles)
-        .innerJoin(roles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, reqUserId));
 
       const [updatedBatch] = await tx.update(productionBatches)
         .set({ 
-          status: 'QC_PENDING', 
-          endTime: endTime ? new Date(endTime) : new Date(), 
+          status: 'CLOSED', 
+          endTime: endTime ? new Date(endTime) : batch.endTime || new Date(), 
+          closedBy: reqUserId,
+          closedAt: new Date(),
+          isLocked: true,
           updatedBy: reqUserId,
-          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[CLOSE]: ' || ${remarks}` : productionBatches.remarks,
-          materialReturn: materialReturn || null
+          remarks: remarks ? sql`COALESCE(${productionBatches.remarks}, '') || '\n[FINAL_CLOSE]: ' || ${remarks}` : productionBatches.remarks,
+          materialReturn: materialReturn || batch.materialReturn
         })
         .where(eq(productionBatches.id, batchId))
         .returning();
@@ -94,6 +92,48 @@ export class LifecycleService {
     return result;
   }
 
+  async requestApproval(batchId: string, userId: string) {
+    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId));
+    if (!batch) throw new BadRequestException('Batch not found.');
+    
+    return await db.update(productionBatches)
+      .set({ status: 'WAITING_APPROVAL', updatedAt: new Date(), updatedBy: userId })
+      .where(eq(productionBatches.id, batchId))
+      .returning();
+  }
+
+  async approveBatch(batchId: string, userId: string) {
+    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId));
+    if (!batch) throw new BadRequestException('Batch not found.');
+    
+    return await db.update(productionBatches)
+      .set({ status: 'APPROVED', updatedAt: new Date(), updatedBy: userId })
+      .where(eq(productionBatches.id, batchId))
+      .returning();
+  }
+
+  async adjustBatchTime(batchId: string, userId: string, startTime?: string, endTime?: string, reason?: string) {
+    const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId));
+    if (!batch) throw new BadRequestException('Batch not found.');
+
+    const updateData: any = { updatedAt: new Date(), updatedBy: userId };
+    if (startTime) {
+      updateData.adjustedStartTime = new Date(startTime);
+      updateData.adjustedBy = userId;
+    }
+    if (endTime) {
+      updateData.endTime = new Date(endTime);
+    }
+    if (reason) {
+      updateData.remarks = sql`COALESCE(${productionBatches.remarks}, '') || '\n[ADJUSTMENT]: ' || ${reason}`;
+    }
+
+    return await db.update(productionBatches)
+      .set(updateData)
+      .where(eq(productionBatches.id, batchId))
+      .returning();
+  }
+
   async closeShift(factoryId: string, shiftId: string, userId: string) {
     return await db.transaction(async (tx) => {
       // 1. Find all active batches for this shift
@@ -105,12 +145,14 @@ export class LifecycleService {
           sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
         ));
 
-      // 2. Transition them to QC_PENDING
+      // 2. Transition them to WAITING_APPROVAL
       for (const batch of activeBatchesList) {
-        await this.closeBatch(batch.id, userId, 'Shift Auto-Close');
+        await tx.update(productionBatches)
+          .set({ status: 'WAITING_APPROVAL', updatedAt: new Date(), updatedBy: userId })
+          .where(eq(productionBatches.id, batch.id));
       }
 
-      this.logger.log(`Shift ${shiftId} closed. ${activeBatchesList.length} batches transitioned.`);
+      this.logger.log(`Shift ${shiftId} closed. ${activeBatchesList.length} batches transitioned to WAITING_APPROVAL.`);
       return { closedBatches: activeBatchesList.length };
     });
   }

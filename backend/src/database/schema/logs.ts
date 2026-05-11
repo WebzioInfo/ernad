@@ -3,6 +3,7 @@ import { productionBatches, operatorSessions } from './production';
 import { users } from './users';
 import { factories, productionLines, productBrands, products } from './master-data';
 import { shifts } from './biometric';
+import { terminals } from './terminals';
 
 export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
@@ -17,6 +18,7 @@ export const productionLogs = pgTable('production_logs', {
   brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   userId: uuid('user_id').references(() => users.id).notNull(),
+  terminalId: uuid('terminal_id').references(() => terminals.id), // Link to physical tablet
   sessionId: uuid('session_id').references(() => operatorSessions.id),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   station: stationTypeEnum('station').notNull(),
@@ -57,6 +59,7 @@ export const productionLogs = pgTable('production_logs', {
     index('idx_production_logs_request').on(table.requestId),
     index('idx_production_logs_date').on(table.loggedAt),
     index('idx_production_logs_session').on(table.sessionId),
+    index('idx_production_logs_terminal').on(table.terminalId),
   ];
 });
 

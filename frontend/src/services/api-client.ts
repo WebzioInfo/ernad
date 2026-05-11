@@ -3,6 +3,29 @@ import useAuthStore from '../modules/auth/auth.store';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
+// ── INDUSTRIAL SYNC QUEUE (Offline-First) ──
+const SYNC_QUEUE_KEY = 'mes-sync-queue';
+
+const getSyncQueue = (): any[] => {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const addToSyncQueue = (request: any) => {
+  const queue = getSyncQueue();
+  queue.push({
+    id: uuidv4(),
+    ...request,
+    timestamp: new Date().toISOString(),
+    retryCount: 0
+  });
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+  window.dispatchEvent(new Event('mes-sync-update'));
+};
+
 const getBaseURL = () => {
   // 1. Explicit VITE_API_URL from environment (Priority)
   const envUrl = import.meta.env.VITE_API_URL;
@@ -72,8 +95,27 @@ api.interceptors.response.use(
       }
 
       if (isNetworkError) {
-        toast.error('Network Error: The server is unreachable. This may be caused by a CORS block or a down server.', {
-          description: 'Please check your internet connection and verify the backend status.',
+        // ── OFFLINE-FIRST LOGIC: Queue non-GET requests ──
+        if (config && config.method !== 'get' && (config.url?.includes('/telemetry') || config.url?.includes('/downtime'))) {
+          console.warn(`[OFFLINE] Connectivity lost. Queuing ${config.method} request to ${config.url}`);
+          addToSyncQueue({
+            url: config.url,
+            method: config.method,
+            data: config.data,
+            headers: config.headers
+          });
+          
+          toast.warning('Offline Mode Active', {
+            description: 'Your data is being saved locally and will sync when internet returns.',
+            duration: 4000
+          });
+          
+          // Resolve with a mock success so UI doesn't break
+          return Promise.resolve({ data: { status: 'QUEUED_OFFLINE', requestId: config.headers['x-mes-request-id'] }, status: 202 });
+        }
+
+        toast.error('Network Error: The server is unreachable.', {
+          description: 'Please check your internet connection.',
           duration: 5000
         });
       }
@@ -109,16 +151,72 @@ api.interceptors.response.use(
       });
       
       const message = (error.response.data as any)?.message || 'Access Denied: You do not have permission to perform this action.';
-      toast.error(message);
+      toast.error(message, {
+        description: (error.response.data as any)?.errorCode || 'FORBIDDEN'
+      });
     }
 
-    // 4. Handle 5xx Errors
-    if (error.response && error.response.status >= 500) {
-      toast.error('Server Error', {
-        description: 'The manufacturing system encountered an internal error. Our team has been notified.'
+    // 4. Handle 5xx and other general Errors
+    if (error.response && error.response.status >= 400 && error.response.status !== 401 && error.response.status !== 403) {
+      const data = error.response.data as any;
+      const message = data?.message || 'Something went wrong. Please try again later.';
+      const errorCode = data?.errorCode || 'UNKNOWN_ERROR';
+
+      console.error(`[API_ERROR] ${errorCode}: ${message}`, { status: error.response.status, data });
+
+      toast.error(message, {
+        description: `Error Code: ${errorCode}`
       });
     }
 
     return Promise.reject(error);
   }
 );
+
+// ── BACKGROUND SYNC ENGINE ──
+let isSyncing = false;
+const processSyncQueue = async () => {
+  if (isSyncing || !navigator.onLine) return;
+  
+  const queue = getSyncQueue();
+  if (queue.length === 0) return;
+  
+  isSyncing = true;
+  // Process sync queue quietly in production
+  
+  const remaining: any[] = [];
+  
+  for (const item of queue) {
+    try {
+      await api({
+        url: item.url,
+        method: item.method,
+        data: item.data,
+        headers: item.headers,
+        // Prevent recursive interceptor loops
+        ...({ _isSync: true } as any)
+      });
+      // Successfully flushed
+    } catch (err) {
+      console.error(`[SYNC] Failed to flush log: ${item.id}`, err);
+      if (item.retryCount < 10) {
+        remaining.push({ ...item, retryCount: item.retryCount + 1 });
+      }
+    }
+  }
+  
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(remaining));
+  isSyncing = false;
+  window.dispatchEvent(new Event('mes-sync-update'));
+  
+  if (remaining.length === 0) {
+    toast.success('Synchronization Complete', {
+      description: 'All offline production data has been uploaded.'
+    });
+  }
+};
+
+// Auto-sync on interval and online event
+setInterval(processSyncQueue, 15000);
+window.addEventListener('online', processSyncQueue);
+window.addEventListener('load', processSyncQueue);

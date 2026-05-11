@@ -39,7 +39,7 @@ export const syncOfflineLogs = async () => {
   
   if (unsynced.length === 0) return;
 
-  console.log(`Attempting to sync ${unsynced.length} logs...`);
+  // Syncing logs quietly
 
   for (const log of unsynced) {
     try {
@@ -49,7 +49,7 @@ export const syncOfflineLogs = async () => {
       });
       
       await db.offlineLogs.update(log.id!, { synced: 1 });
-      console.log(`Synced log: ${log.requestId}`);
+      // Synced successfully
     } catch (error) {
       console.error(`Failed to sync log ${log.requestId}:`, error);
       break; 

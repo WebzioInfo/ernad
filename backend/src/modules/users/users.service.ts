@@ -431,4 +431,17 @@ export class UsersService {
       avatarUrl: secureUrl 
     };
   }
+
+  async getTerminalOperators() {
+    return db
+      .select({
+        id: users.id,
+        name: users.name,
+        jobTitle: users.jobTitle,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.isActive, true))
+      .orderBy(asc(users.name));
+  }
 }

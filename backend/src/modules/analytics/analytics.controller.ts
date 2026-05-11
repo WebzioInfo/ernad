@@ -4,16 +4,17 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { OeeService } from './services/oee.service';
 
 @ApiTags('Analytics')
 @ApiBearerAuth()
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('analytics')
-
-
-
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly oeeService: OeeService
+  ) {}
 
   @Get('line-performance')
   @Permissions('analytics:view')
@@ -106,5 +107,17 @@ export class AnalyticsController {
   @Permissions('analytics:view')
   async getProductionTimeStats(@Query('batchId') batchId: string) {
     return this.analyticsService.getProductionTimeStats(batchId);
+  }
+
+  @Get('oee/batch')
+  @Permissions('analytics:view')
+  async getBatchOee(@Query('batchId') batchId: string) {
+    return this.oeeService.calculateBatchOee(batchId);
+  }
+
+  @Get('oee/line')
+  @Permissions('analytics:view')
+  async getLineOee(@Query('lineId') lineId: string, @Query('days') days?: number) {
+    return this.oeeService.getLineOee(lineId, days);
   }
 }

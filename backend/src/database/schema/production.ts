@@ -3,7 +3,7 @@ import { users } from './users';
 import { factories, productionLines, productBrands, products } from './master-data';
 import { shifts } from './biometric';
 
-export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'QC_PENDING', 'COMPLETED', 'CLOSED']);
+export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'WAITING_APPROVAL', 'QC_PENDING', 'APPROVED', 'COMPLETED', 'CLOSED']);
 
 export const productionBatches = pgTable('production_batches', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -13,11 +13,21 @@ export const productionBatches = pgTable('production_batches', {
   productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
   shiftId: uuid('shift_id').references(() => shifts.id, { onDelete: 'restrict' }).notNull(),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
+  
+  // Time Accountability
   startTime: timestamp('start_time').defaultNow().notNull(),
   endTime: timestamp('end_time'),
+  adjustedStartTime: timestamp('adjusted_start_time'),
+  adjustedBy: uuid('adjusted_by').references(() => users.id),
+  
   status: batchStatusEnum('status').default('RUNNING').notNull(),
+  isLocked: boolean('is_locked').default(false).notNull(),
+  
   createdBy: uuid('created_by').references(() => users.id),
   updatedBy: uuid('updated_by').references(() => users.id),
+  closedBy: uuid('closed_by').references(() => users.id),
+  closedAt: timestamp('closed_at'),
+  
   remarks: varchar('remarks', { length: 500 }),
   materialReturn: jsonb('material_return'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

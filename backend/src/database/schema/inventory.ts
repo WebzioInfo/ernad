@@ -83,3 +83,26 @@ export const billOfMaterials = pgTable('bill_of_materials', {
   quantityPerUnit: decimal('quantity_per_unit', { precision: 12, scale: 6 }).notNull(), // e.g. 1 Bottle = 1 Preform, 1 Cap, 0.0001 Roll of labels
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+import { productionBatches } from './production';
+import { bigserial, index } from 'drizzle-orm/pg-core';
+
+export const inventoryLedger = pgTable('inventory_ledger', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  stockId: uuid('stock_id').references(() => inventoryStock.id, { onDelete: 'cascade' }).notNull(),
+  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'set null' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  
+  type: varchar('type', { length: 50 }).notNull(), // INWARD, ISSUE, CONSUMPTION, WASTAGE, ADJUSTMENT, RETURN, PRODUCTION_OUTPUT, DISPATCH
+  quantityChange: decimal('quantity_change', { precision: 12, scale: 4 }).notNull(),
+  balanceAfter: decimal('balance_after', { precision: 12, scale: 4 }).notNull(),
+  
+  remarks: varchar('remarks', { length: 255 }),
+  occurredAt: timestamp('occurred_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_ledger_stock').on(table.stockId),
+    index('idx_ledger_batch').on(table.batchId),
+    index('idx_ledger_time').on(table.occurredAt),
+  ];
+});

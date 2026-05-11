@@ -5,6 +5,10 @@ import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
 import { RedisService } from '../../../providers/redis/redis.service';
 import { OperatorSessionService } from '../../operator-session/operator-session.service';
 import { ProcessingService } from './processing.service';
+import { TerminalService } from '../../production-management/services/terminal.service';
+import { db } from '../../../database/db';
+import { productionBatches } from '../../../database/schema';
+import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class IngestionService {
@@ -15,29 +19,45 @@ export class IngestionService {
     private readonly redisService: RedisService,
     private readonly sessionService: OperatorSessionService,
     private readonly processingService: ProcessingService,
+    private readonly terminalService: TerminalService,
   ) {}
 
-  async createLog(userId: string, dto: ProductionTelemetryDto) {
-    if (!dto.batchId || !dto.station || !dto.sessionId) {
-      throw new BadRequestException('Invalid telemetry payload. Session ID and Station are required.');
+  async createLog(authenticatedUserId: string, dto: ProductionTelemetryDto) {
+    if (!dto.batchId || !dto.station) {
+      throw new BadRequestException('Invalid telemetry payload. Batch ID and Station are required.');
     }
 
-    // 1. Validate Session
-    const session = await this.sessionService.getCurrentSession(userId);
-    if (!session || session.id !== dto.sessionId) {
-      throw new BadRequestException('No active session found for this operator or Session ID mismatch.');
+    let finalUserId = authenticatedUserId;
+
+    // 1. HYBRID TERMINAL LOGIC: Quick Attribution
+    if (dto.operatorId && dto.operatorPin) {
+      const operator = await this.terminalService.verifyOperatorForAction(dto.operatorId, dto.operatorPin);
+      finalUserId = operator.id;
+      this.logger.debug(`[HYBRID] Action attributed to Operator: ${operator.name} via Terminal: ${dto.terminalId}`);
+    } else if (dto.sessionId) {
+      // Legacy/Persistent Session Logic
+      const session = await this.sessionService.getCurrentSession(authenticatedUserId);
+      if (!session || session.id !== dto.sessionId) {
+        throw new BadRequestException('No active session found for this operator or Session ID mismatch.');
+      }
+      if (session.station !== dto.station) {
+        throw new BadRequestException(`Operator assigned to ${session.station} but logging for ${dto.station}.`);
+      }
     }
 
-    if (session.station !== dto.station) {
-      throw new BadRequestException(`Operator assigned to ${session.station} but logging for ${dto.station}.`);
+    // 2. Validate Batch Status (Industrial Locking)
+    const [batch] = await db.select({ status: productionBatches.status })
+      .from(productionBatches)
+      .where(eq(productionBatches.id, dto.batchId))
+      .limit(1);
+
+    if (!batch) {
+      throw new BadRequestException('Associated production batch not found.');
     }
 
-    if (session.lineId !== dto.lineId) {
-      throw new BadRequestException('Operator is assigned to a different production line.');
-    }
-
-    if (session.batchId && session.batchId !== dto.batchId) {
-      throw new BadRequestException('Batch mismatch. Please end session and restart for the new batch.');
+    const lockedStatuses = ['WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CLOSED'];
+    if (lockedStatuses.includes(batch.status)) {
+      throw new BadRequestException(`DATA_ENTRY_FROZEN: Batch ${dto.batchId} is in ${batch.status} state and is locked for adjustments.`);
     }
 
     const isServerless = process.env.VERCEL === '1' || process.env.IS_SERVERLESS === 'true';
@@ -49,7 +69,7 @@ export class IngestionService {
       } else {
         this.logger.warn('Redis offline or queue unavailable: Processing telemetry log synchronously (Direct-to-DB)');
       }
-      await this.processingService.handleTelemetryLog(userId, dto);
+      await this.processingService.handleTelemetryLog(finalUserId, dto);
       return {
         status: 'ACCEPTED',
         requestId: dto.requestId,
@@ -59,7 +79,7 @@ export class IngestionService {
 
     try {
       const job = await this.telemetryQueue.add('log-ingestion', {
-        userId,
+        userId: finalUserId,
         dto
       }, {
         attempts: 5,
@@ -78,7 +98,7 @@ export class IngestionService {
       };
     } catch (err) {
       this.logger.error(`Failed to queue job: ${err.message}. Falling back to sync.`);
-      await this.processingService.handleTelemetryLog(userId, dto);
+      await this.processingService.handleTelemetryLog(finalUserId, dto);
       return { status: 'ACCEPTED', requestId: dto.requestId, message: 'Processed synchronously (Queue Error)' };
     }
   }

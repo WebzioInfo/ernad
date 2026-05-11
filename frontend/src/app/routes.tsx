@@ -11,6 +11,8 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 // Optimized Module Loading
 const OperatorPanel = lazy(() => import('../modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('../modules/production/LineSelectionPage'));
+const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
+const TerminalSetup = lazy(() => import('../modules/production/TerminalSetup'));
 
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
@@ -97,6 +99,19 @@ export function AppRoutes() {
           <Route path="select" element={<LineSelectionPage />} />
           <Route path=":id/:station/operator" element={<OperatorPanel />} />
           <Route path=":id/operator" element={<OperatorPanel />} />
+        </Route>
+
+        {/* 4. INDUSTRIAL TERMINAL (Registered Tablets) */}
+        <Route
+          path="/terminal"
+          element={
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+              <Outlet />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<TerminalDashboard />} />
+          <Route path="setup" element={<TerminalSetup />} />
         </Route>
 
         {/* Catch-all */}
