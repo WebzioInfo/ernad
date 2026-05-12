@@ -21,45 +21,46 @@ let cachedApp: any;
 async function bootstrap() {
   if (cachedApp) return cachedApp;
 
+  const startTime = Date.now();
+  console.log('🚀 [STARTUP] NestJS Application Bootstrap Initiated...');
   console.log('[Bootstrap] NODE_ENV:', process.env.NODE_ENV);
-  const app = await NestFactory.create(AppModule);
+  console.log('[Bootstrap] NODE_VERSION:', process.version);
 
-  // ── 1. SECURITY HEADERS (HELMET) ──
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn', 'log', 'debug'],
+  });
+
+  // ── 1. SECURITY & INFRASTRUCTURE ──
+  console.log('🛡️ [STARTUP] Configuring Security (Helmet) & Infrastructure...');
   const helmet = (await import('helmet')).default;
   app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     contentSecurityPolicy: false,
   }));
 
-  // ── 2. INDUSTRIAL CORS CONFIGURATION ──
+  // ── 2. CORS CONFIGURATION ──
+  console.log('🌐 [STARTUP] Configuring Industrial CORS Fail-Safe...');
   const { getCorsConfig } = await import('./common/config/cors.config');
   app.enableCors(getCorsConfig());
 
-  // ── 3. COOKIE PARSING ──
+  // ── 3. MIDDLEWARE & FILTERS ──
+  console.log('🔌 [STARTUP] Registering Global Middleware, Filters & Pipes...');
   app.use(cookieParser());
-
   app.setGlobalPrefix('api', { exclude: ['/'] });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ 
     whitelist: true, 
     transform: true,
     stopAtFirstError: true,
-    exceptionFactory: (errors) => {
-      const result = errors.map((error) => ({
-        property: error.property,
-        message: Object.values(error.constraints || {})[0],
-      }));
-      return new BadRequestException({
-        message: result[0].message,
-        error: 'VALIDATION_ERROR',
-        details: result,
-      });
-    }
   }));
 
   const { AuditInterceptor } = await import('./common/interceptors/audit.interceptor');
   app.useGlobalInterceptors(new AuditInterceptor());
 
+  // ── 4. DATABASE & MODULES INIT ──
+  console.log('🗄️ [STARTUP] Initializing Internal Modules & Database Pools...');
+  // Note: Drizzle and Redis initialize on demand or via their own onModuleInit
+  
   // Swagger (only in non-prod or explicitly enabled)
   if (process.env.NODE_ENV !== 'production') {
     const { SwaggerModule, DocumentBuilder } = await import('@nestjs/swagger');
@@ -70,9 +71,15 @@ async function bootstrap() {
       .build();
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
+    console.log('📚 [STARTUP] Swagger Documentation enabled.');
   }
 
+  console.log('⚡ [STARTUP] Executing app.init()...');
   await app.init();
+  
+  const duration = Date.now() - startTime;
+  console.log(`✅ [STARTUP] NestJS Application READY in ${duration}ms`);
+  
   cachedApp = app;
   return app;
 }
