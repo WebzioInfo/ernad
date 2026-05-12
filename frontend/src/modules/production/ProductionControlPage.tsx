@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useEffect, forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api-client';
 import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProductionControlPage() {
+  const navigate = useNavigate();
   const { filters, setFilters } = useOutletContext<{ filters: any; setFilters: (f: any) => void }>();
 
   const { data: brands } = useQuery({ queryKey: ['brands'], queryFn: async () => (await api.get('/master-data/brands')).data });
