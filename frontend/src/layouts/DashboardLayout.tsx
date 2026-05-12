@@ -68,7 +68,8 @@ export default function DashboardLayout() {
     // If the path is intended for the operator terminal or top-level tools, don't prefix it
     if (path.startsWith('/line') || path.startsWith('/terminal')) return path;
 
-    const base = (user?.role === 'MANAGER') ? '/manager' : '/admin';
+    const userRole = String(user?.role || '').toUpperCase();
+    const base = (userRole === 'MANAGER') ? '/manager' : '/admin';
     return `${base}${path}`;
   };
 

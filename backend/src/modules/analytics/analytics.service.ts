@@ -208,17 +208,22 @@ export class AnalyticsService {
     if (startDate) conditions.push(gte(productionLogs.loggedAt, startDate));
     if (endDate) conditions.push(lte(productionLogs.loggedAt, endDate));
 
-    const timeGroup = sql`date_trunc(${interval}, ${productionLogs.loggedAt})`;
+    try {
+      const timeGroup = sql`date_trunc(${interval}::text, ${productionLogs.loggedAt})`;
 
-    return await db.select({
-      time: timeGroup,
-      totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
-      wastage: sql<number>`SUM(${productionLogs.wastageCount})`,
-    })
-    .from(productionLogs)
-    .where(and(...conditions))
-    .groupBy(timeGroup)
-    .orderBy(timeGroup);
+      return await db.select({
+        time: timeGroup,
+        totalProduction: sql<number>`COALESCE(SUM(${productionLogs.primaryCount}), 0)`,
+        wastage: sql<number>`COALESCE(SUM(${productionLogs.wastageCount}), 0)`,
+      })
+      .from(productionLogs)
+      .where(and(...conditions))
+      .groupBy(timeGroup)
+      .orderBy(timeGroup);
+    } catch (err: any) {
+      this.logger.error(`[AnalyticsService] Failed to fetch historical performance: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 
   async getAggregatedKPIs(startDate: Date, endDate: Date, factoryId?: string) {
@@ -252,68 +257,73 @@ export class AnalyticsService {
   // ── NEW: INDUSTRIAL CONTROL CENTER LOGIC ──
 
   async getFactoryOverview() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-    const [productionToday] = await db.select({
-      blowing: sql<number>`SUM(CASE WHEN station = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
-      filling: sql<number>`SUM(CASE WHEN station = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
-      packing: sql<number>`SUM(CASE WHEN station = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
-      rejection: sql<number>`SUM(${productionLogs.wastageCount})`
-    })
-    .from(productionLogs)
-    .where(gte(productionLogs.loggedAt, today));
+      const [productionToday] = await db.select({
+        blowing: sql<number>`SUM(CASE WHEN station = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        filling: sql<number>`SUM(CASE WHEN station = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        packing: sql<number>`SUM(CASE WHEN station = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        rejection: sql<number>`SUM(${productionLogs.wastageCount})`
+      })
+      .from(productionLogs)
+      .where(gte(productionLogs.loggedAt, today));
 
-    const activeBatches = await db.select({
-      id: productionBatches.id,
-      batchCode: productionBatches.batchCode,
-      product: products.name,
-      line: productionLines.name,
-      status: productionBatches.status,
-      startTime: productionBatches.startTime,
-      totalDowntimeMins: sql<number>`COALESCE((SELECT SUM(duration_minutes) FROM downtime_logs WHERE batch_id = ${productionBatches.id}), 0)`
-    })
-    .from(productionBatches)
-    .leftJoin(products, eq(productionBatches.productId, products.id))
-    .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
-    .where(inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']));
+      const activeBatches = await db.select({
+        id: productionBatches.id,
+        batchCode: productionBatches.batchCode,
+        product: products.name,
+        line: productionLines.name,
+        status: productionBatches.status,
+        startTime: productionBatches.startTime,
+        totalDowntimeMins: sql<number>`COALESCE((SELECT SUM(duration_minutes) FROM downtime_logs WHERE batch_id = ${productionBatches.id}), 0)`
+      })
+      .from(productionBatches)
+      .leftJoin(products, eq(productionBatches.productId, products.id))
+      .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+      .where(inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']));
 
-    const lowStock = await db.select()
-      .from(inventoryStock)
-      .where(sql`${inventoryStock.quantity} <= ${inventoryStock.minimumStock}`)
-      .limit(5);
+      const lowStock = await db.select()
+        .from(inventoryStock)
+        .where(sql`${inventoryStock.quantity} <= ${inventoryStock.minimumStock}`)
+        .limit(5);
 
-    const activeDowntimes = await db.select()
+      const activeDowntimes = await db.select()
+        .from(downtimeLogs)
+        .where(isNull(downtimeLogs.endTime))
+        .limit(5);
+
+      const latestStops = await db.select({
+        id: downtimeLogs.id,
+        batchCode: productionBatches.batchCode,
+        station: downtimeLogs.station,
+        reason: downtimeLogs.reason,
+        duration: downtimeLogs.durationMinutes,
+        startTime: downtimeLogs.startTime
+      })
       .from(downtimeLogs)
-      .where(isNull(downtimeLogs.endTime))
+      .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
+      .orderBy(desc(downtimeLogs.startTime))
       .limit(5);
 
-    const latestStops = await db.select({
-      id: downtimeLogs.id,
-      batchCode: productionBatches.batchCode,
-      station: downtimeLogs.station,
-      reason: downtimeLogs.reason,
-      duration: downtimeLogs.durationMinutes,
-      startTime: downtimeLogs.startTime
-    })
-    .from(downtimeLogs)
-    .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
-    .orderBy(desc(downtimeLogs.startTime))
-    .limit(5);
-
-    return {
-      counters: {
-        blowing: Number(productionToday.blowing || 0),
-        filling: Number(productionToday.filling || 0),
-        packing: Number(productionToday.packing || 0),
-        rejection: Number(productionToday.rejection || 0)
-      },
-      activeBatches,
-      lowStockAlerts: lowStock,
-      activeDowntimes,
-      latestStops,
-      timestamp: new Date()
-    };
+      return {
+        counters: {
+          blowing: Number(productionToday?.blowing || 0),
+          filling: Number(productionToday?.filling || 0),
+          packing: Number(productionToday?.packing || 0),
+          rejection: Number(productionToday?.rejection || 0)
+        },
+        activeBatches,
+        lowStockAlerts: lowStock,
+        activeDowntimes,
+        latestStops,
+        timestamp: new Date()
+      };
+    } catch (err: any) {
+      this.logger.error(`[AnalyticsService] Failed to fetch factory overview: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 
   async getMachineEfficiency() {

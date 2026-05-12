@@ -34,10 +34,11 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    const userRoles = (user.roles || []).map((r: any) => String(r).toUpperCase());
+    const rawRoles = user.roles || (user.role ? [user.role] : []);
+    const userRoles = rawRoles.map((r: any) => String(r).toUpperCase());
     const userPermissions = user.permissions || [];
     
-    this.logger.debug(`[RolesGuard] Path: ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)}`);
+    this.logger.debug(`[RolesGuard] Path: ${request.method} ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)} | Required: ${JSON.stringify(requiredPermissions)}`);
 
     // SUPER_ADMIN bypasses all role/permission checks
     if (userRoles.includes('SUPER_ADMIN')) {

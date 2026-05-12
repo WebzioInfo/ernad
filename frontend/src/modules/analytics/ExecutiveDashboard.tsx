@@ -17,10 +17,9 @@ import { useOutletContext } from 'react-router-dom';
 export default function ExecutiveDashboard() {
   const { user } = useAuthStore();
   const { filters, setFilters } = useOutletContext<{ filters: any, setFilters: (f: any) => void }>();
-  const roles = user?.roles || [user?.role];
-
-  const isSuperAdmin = roles.includes('SUPER_ADMIN');
-  const isManager = roles.includes('MANAGER');
+  const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
+  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
+  const isManager = userRoles.includes('MANAGER');
 
   const renderDashboard = () => {
     if (isSuperAdmin) return <SuperAdminDashboard />;
