@@ -7,7 +7,7 @@ import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
   Gauge, Loader2, X, Users, BarChart2,
   Clock, ArrowLeft, ShieldAlert, Zap, Shield,
-  Settings2, ActivitySquare, History, CheckCircle2
+  Settings2, ActivitySquare, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -276,8 +276,8 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
 
             <div className="space-y-4">
               {batchHistory?.map((batch: any) => (
-                <div 
-                  key={batch.id} 
+                <div
+                  key={batch.id}
                   onClick={() => navigate(`/manager/forensics/${batch.id}`)}
                   className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group cursor-pointer"
                 >
