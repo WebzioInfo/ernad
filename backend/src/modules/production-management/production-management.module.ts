@@ -8,6 +8,7 @@ import { OperatorSessionModule } from '../operator-session/operator-session.modu
 import { BatchService } from './services/batch.service';
 import { LineService } from './services/line.service';
 import { LifecycleService } from './services/lifecycle.service';
+import { TerminalService } from './services/terminal.service';
 
 @Module({
   imports: [EventsModule, OperatorSessionModule],
@@ -17,12 +18,14 @@ import { LifecycleService } from './services/lifecycle.service';
     BatchService,
     LineService,
     LifecycleService,
+    TerminalService,
   ],
   exports: [
     ChangeoverService,
     BatchService,
     LineService,
     LifecycleService,
+    TerminalService,
   ],
 })
 export class ProductionManagementModule {}
