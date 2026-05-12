@@ -41,6 +41,7 @@ export const productionBatches = pgTable('production_batches', {
     index('idx_batches_product').on(table.productId),
     uniqueIndex('idx_batches_code_factory').on(table.batchCode, table.factoryId),
     index('idx_batches_factory').on(table.factoryId),
+    index('idx_batches_deleted').on(table.deletedAt),
   ];
 });
 
@@ -145,5 +146,6 @@ export const downtimeLogs = pgTable('downtime_logs', {
     index('idx_downtime_batch').on(table.batchId),
     index('idx_downtime_line').on(table.lineId),
     index('idx_downtime_active').on(table.batchId, table.endTime),
+    index('idx_downtime_deleted').on(table.deletedAt),
   ];
 });

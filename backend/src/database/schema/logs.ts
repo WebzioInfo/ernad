@@ -67,6 +67,7 @@ export const productionLogs = pgTable('production_logs', {
     index('idx_production_logs_date').on(table.loggedAt),
     index('idx_production_logs_session').on(table.sessionId),
     index('idx_production_logs_terminal').on(table.terminalId),
+    index('idx_production_logs_deleted').on(table.deletedAt),
   ];
 });
 

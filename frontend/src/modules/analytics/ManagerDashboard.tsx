@@ -21,8 +21,7 @@ const ManagerDashboard = memo(() => {
   // 1. Live Factory State
   const { data: factoryLive, refetch: refetchLive, isLoading: loadingLive } = useQuery({
     queryKey: ['factory-live-manager'],
-    queryFn: async () => (await api.get('/analytics/factory/live')).data,
-    refetchInterval: 10000 // Refresh every 10s for managers
+    queryFn: async () => (await api.get('/analytics/factory/live')).data
   });
 
   // 2. Inventory Alerts

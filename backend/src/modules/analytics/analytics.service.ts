@@ -124,14 +124,15 @@ export class AnalyticsService {
     .where(and(
       eq(productionLogs.lineId, lineId),
       eq(productionLogs.station, 'PACKING'),
-      gte(productionLogs.loggedAt, tenMinsAgo)
+      gte(productionLogs.loggedAt, tenMinsAgo),
+      isNull(productionLogs.deletedAt)
     ));
 
     const result = recentLogs[0];
-    if (!result || !result.count) return 0;
+    if (!result || !result.count || !result.minTime || !result.maxTime) return 0;
 
-    const timeDiffMin = (result.maxTime.getTime() - result.minTime.getTime()) / 60000;
-    return timeDiffMin > 0 ? (result.count / timeDiffMin) : 0;
+    const timeDiffMin = (new Date(result.maxTime).getTime() - new Date(result.minTime).getTime()) / 60000;
+    return timeDiffMin > 0 ? (Number(result.count) / timeDiffMin) : 0;
   }
 
   async getMaterialConsumption(batchId: string) {
@@ -201,7 +202,7 @@ export class AnalyticsService {
     endDate?: Date,
     interval: 'hour' | 'day' | 'week' = 'day'
   ) {
-    const conditions = [];
+    const conditions: any[] = [isNull(productionLogs.deletedAt)];
     if (lineId && lineId !== 'all') conditions.push(eq(productionLogs.lineId, lineId));
     if (brandId && brandId !== 'all') conditions.push(eq(productionLogs.brandId, brandId));
     if (productId && productId !== 'all') conditions.push(eq(productionLogs.productId, productId));
@@ -209,7 +210,7 @@ export class AnalyticsService {
     if (endDate) conditions.push(lte(productionLogs.loggedAt, endDate));
 
     try {
-      const timeGroup = sql`date_trunc(${interval}::text, ${productionLogs.loggedAt})`;
+      const timeGroup = sql`date_trunc(${interval}, ${productionLogs.loggedAt})`;
 
       return await db.select({
         time: timeGroup,
@@ -221,7 +222,7 @@ export class AnalyticsService {
       .groupBy(timeGroup)
       .orderBy(timeGroup);
     } catch (err: any) {
-      this.logger.error(`[AnalyticsService] Failed to fetch historical performance: ${err.message}`, err.stack);
+      this.logger.error(`[AnalyticsService] Failed to fetch historical performance: ${err.message}`);
       throw err;
     }
   }
@@ -262,13 +263,13 @@ export class AnalyticsService {
       today.setHours(0, 0, 0, 0);
 
       const [productionToday] = await db.select({
-        blowing: sql<number>`SUM(CASE WHEN station = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
-        filling: sql<number>`SUM(CASE WHEN station = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
-        packing: sql<number>`SUM(CASE WHEN station = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        blowing: sql<number>`SUM(CASE WHEN ${productionLogs.station} = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        filling: sql<number>`SUM(CASE WHEN ${productionLogs.station} = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
+        packing: sql<number>`SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END)`,
         rejection: sql<number>`SUM(${productionLogs.wastageCount})`
       })
       .from(productionLogs)
-      .where(gte(productionLogs.loggedAt, today));
+      .where(and(gte(productionLogs.loggedAt, today), isNull(productionLogs.deletedAt)));
 
       const activeBatches = await db.select({
         id: productionBatches.id,
@@ -277,12 +278,15 @@ export class AnalyticsService {
         line: productionLines.name,
         status: productionBatches.status,
         startTime: productionBatches.startTime,
-        totalDowntimeMins: sql<number>`COALESCE((SELECT SUM(duration_minutes) FROM downtime_logs WHERE batch_id = ${productionBatches.id}), 0)`
+        totalDowntimeMins: sql<number>`COALESCE((SELECT SUM(duration_minutes) FROM downtime_logs WHERE batch_id = ${productionBatches.id} AND deleted_at IS NULL), 0)`
       })
       .from(productionBatches)
       .leftJoin(products, eq(productionBatches.productId, products.id))
       .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
-      .where(inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']));
+      .where(and(
+        inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']),
+        isNull(productionBatches.deletedAt)
+      ));
 
       const lowStock = await db.select()
         .from(inventoryStock)
@@ -291,7 +295,7 @@ export class AnalyticsService {
 
       const activeDowntimes = await db.select()
         .from(downtimeLogs)
-        .where(isNull(downtimeLogs.endTime))
+        .where(and(isNull(downtimeLogs.endTime), isNull(downtimeLogs.deletedAt)))
         .limit(5);
 
       const latestStops = await db.select({
@@ -304,6 +308,7 @@ export class AnalyticsService {
       })
       .from(downtimeLogs)
       .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
+      .where(isNull(downtimeLogs.deletedAt))
       .orderBy(desc(downtimeLogs.startTime))
       .limit(5);
 
@@ -321,7 +326,7 @@ export class AnalyticsService {
         timestamp: new Date()
       };
     } catch (err: any) {
-      this.logger.error(`[AnalyticsService] Failed to fetch factory overview: ${err.message}`, err.stack);
+      this.logger.error(`[AnalyticsService] Failed to fetch factory overview: ${err.message}`);
       throw err;
     }
   }

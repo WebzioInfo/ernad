@@ -197,8 +197,7 @@ const SuperAdminDashboard = memo(() => {
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const { data: factoryLive, refetch: refetchLive } = useQuery({
     queryKey: ['factory-live-overview'],
-    queryFn: async () => (await api.get('/analytics/factory/live')).data,
-    refetchInterval: 5000 // Real-time refresh
+    queryFn: async () => (await api.get('/analytics/factory/live')).data
   });
 
   const { data: efficiency } = useQuery({
