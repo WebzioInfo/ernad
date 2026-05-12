@@ -1,11 +1,9 @@
-const CACHE_NAME = 'eranad-mes-cache-v1';
+const CACHE_NAME = 'eranad-mes-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/favicon.ico',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -14,13 +12,32 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+    })
+  );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Simple network-first strategy
+  // ── STRICT API BYPASS ──
+  // Never intercept or cache API calls in this Industrial MES.
+  if (event.request.url.includes('/api/')) {
+    return;
+  }
+
+  // Cache-first strategy for static assets
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });

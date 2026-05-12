@@ -54,6 +54,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       this.logger.warn(`[CLIENT_FAULT] ${request.method} ${request.url} - ${status} - ${message}`);
     }
 
+    // ── ENTERPRISE CORS FAIL-SAFE ──
+    const origin = request.headers.origin;
+    if (origin) {
+      // In production, we reflect the origin to satisfy withCredentials: true
+      response.setHeader('Access-Control-Allow-Origin', origin);
+      response.setHeader('Access-Control-Allow-Credentials', 'true');
+      response.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+      response.setHeader('Access-Control-Allow-Headers', request.headers['access-control-request-headers'] || 'Content-Type, Authorization, Accept, Origin, X-Requested-With, x-mes-request-id');
+      response.setHeader('Vary', 'Origin');
+    }
+
     // ── PROFESSIONAL API RESPONSE ──
     response.status(status).json({
       success: false,

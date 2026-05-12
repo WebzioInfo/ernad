@@ -82,22 +82,27 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number };
     
-    // 1. Handle Network/CORS/Blocked Errors
+    // 1. Handle Network/CORS/Blocked/Timeout Errors
     if (!error.response) {
+      const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
       const isNetworkError = error.code === 'ERR_NETWORK' || error.message === 'Network Error';
       
       if (import.meta.env.DEV) {
-        console.error(`%c[NETWORK_FAILURE]`, 'color: #ef4444; font-weight: bold;', {
+        console.error(`%c[CONNECTIVITY_FAILURE]`, 'color: #ef4444; font-weight: bold;', {
           message: error.message,
           code: error.code,
+          isTimeout,
           url: config?.url
         });
       }
 
-      if (isNetworkError) {
+      if (isTimeout) {
+        toast.error('Request Timed Out', {
+          description: 'The server is taking too long to respond. Please try again.',
+        });
+      } else if (isNetworkError) {
         // ── OFFLINE-FIRST LOGIC: Queue non-GET requests ──
         if (config && config.method !== 'get' && (config.url?.includes('/telemetry') || config.url?.includes('/downtime'))) {
-          console.warn(`[OFFLINE] Connectivity lost. Queuing ${config.method} request to ${config.url}`);
           addToSyncQueue({
             url: config.url,
             method: config.method,
@@ -105,17 +110,16 @@ api.interceptors.response.use(
             headers: config.headers
           });
           
-          toast.warning('Offline Mode Active', {
-            description: 'Your data is being saved locally and will sync when internet returns.',
+          toast.warning('Offline Sync Active', {
+            description: 'Connectivity lost. Production data is being saved locally and will sync automatically.',
             duration: 4000
           });
           
-          // Resolve with a mock success so UI doesn't break
           return Promise.resolve({ data: { status: 'QUEUED_OFFLINE', requestId: config.headers['x-mes-request-id'] }, status: 202 });
         }
 
-        toast.error('Network Error: The server is unreachable.', {
-          description: 'Please check your internet connection.',
+        toast.error('Network connection issue', {
+          description: 'The server is temporarily unreachable. Please check your connection or try again.',
           duration: 5000
         });
       }
@@ -126,7 +130,6 @@ api.interceptors.response.use(
         if (config._retryCount < 2) {
           config._retryCount++;
           const delay = config._retryCount * 1000;
-          console.warn(`[RETRY] Attempt ${config._retryCount} for ${config.url} in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           return api(config);
         }
@@ -137,35 +140,33 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const isLoginRequest = config?.url?.includes('/auth/login');
       if (!isLoginRequest) {
-        console.warn('[AUTH] 401 Unauthorized. Clearing session.');
         useAuthStore.getState().logout();
-        toast.error('Session expired. Please log in again.');
+        toast.error('Session expired', {
+          description: 'Please log in again to continue.'
+        });
       }
     }
 
     // 3. Handle 403 Forbidden (CORS or Permissions)
     if (error.response?.status === 403) {
-      console.error('[SECURITY] 403 Forbidden rejection.', {
-        url: config?.url,
-        data: error.response.data
-      });
-      
-      const message = (error.response.data as any)?.message || 'Access Denied: You do not have permission to perform this action.';
-      toast.error(message, {
-        description: (error.response.data as any)?.errorCode || 'FORBIDDEN'
+      const message = (error.response.data as any)?.message || 'Access Denied: Restricted resource.';
+      toast.error('Forbidden', {
+        description: message
       });
     }
 
-    // 4. Handle 5xx and other general Errors
-    if (error.response && error.response.status >= 400 && error.response.status !== 401 && error.response.status !== 403) {
+    // 4. Handle 502/503/504 (Server Maintenance/Overload)
+    if (error.response && [502, 503, 504].includes(error.response.status)) {
+      toast.error('Server unavailable', {
+        description: 'The system is currently undergoing maintenance or is overloaded. Please try again in a few minutes.'
+      });
+    } else if (error.response && error.response.status >= 400 && error.response.status !== 401 && error.response.status !== 403) {
       const data = error.response.data as any;
-      const message = data?.message || 'Something went wrong. Please try again later.';
-      const errorCode = data?.errorCode || 'UNKNOWN_ERROR';
-
-      console.error(`[API_ERROR] ${errorCode}: ${message}`, { status: error.response.status, data });
+      const message = data?.message || 'Something went wrong. Please try again.';
+      const errorCode = data?.errorCode || 'SYSTEM_ERROR';
 
       toast.error(message, {
-        description: `Error Code: ${errorCode}`
+        description: `Reference: ${errorCode}`
       });
     }
 
