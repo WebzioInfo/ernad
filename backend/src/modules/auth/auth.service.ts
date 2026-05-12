@@ -12,104 +12,125 @@ export class AuthService {
   constructor(private jwtService: JwtService) {}
 
   async login(identity: string, credential: string, type?: 'PASSWORD' | 'PIN') {
-    const trimmedIdentity = identity.trim();
-    const userResult = await db.select().from(users).where(
-      or(
-        ilike(users.username, trimmedIdentity),
-        ilike(users.email, trimmedIdentity)
-      )
-    );
-    const user = userResult[0];
-
-    if (!user) {
-      this.logger.warn(`Login attempt failed: User not found for identity [${trimmedIdentity}]`);
-      throw new UnauthorizedException('Identity signature not recognized.');
-    }
-
-    let isMatch = false;
-
-    // ─── Intelligent Auto-Detection Logic ───
-    if (type) {
-      // User specified which mode to use
-      if (type === 'PASSWORD') {
-        if (!user.passwordHash) throw new UnauthorizedException('This account requires a PIN access.');
-        isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
-      } else {
-        if (!user.pinCode) throw new UnauthorizedException('This account requires a Password access.');
-        isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
-      }
-    } else {
-      // Automated Mode: Try Password first, then PIN
-      if (user.passwordHash) {
-        isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
-      }
-      
-      if (!isMatch && user.pinCode) {
-        isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
-      }
-    }
-
-    if (!isMatch) {
-      this.logger.warn(`Login attempt failed: Credential mismatch for user [${user.username}]. Provided: ${credential.length} chars. Hash exists: ${!!user.passwordHash}, Pin exists: ${!!user.pinCode}`);
-      throw new UnauthorizedException('Access credential rejected.');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Account deactivated.');
-    }
-
-    // ── Fetch Roles and Permissions (Phase 3 Redesign - Multi-Role Support) ──
-    const userRolesResult = await db.select({
-      id: roles.id,
-      slug: roles.slug,
-      name: roles.name,
-    })
-    .from(roles)
-    .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
-    .where(eq(userRoles.userId, user.id));
-
-    const roleSlugs = userRolesResult.map(r => r.slug);
+    this.logger.log(`[AUTH_TRACE] Login process initiated for: ${identity}`);
     
-    let permissionsSlugs: string[] = [];
-    if (userRolesResult.length > 0) {
-      const perms = await db.select({
-        slug: permissions.slug,
-      })
-      .from(permissions)
-      .innerJoin(rolePermissions, eq(rolePermissions.permissionId, permissions.id))
-      .where(or(...userRolesResult.map(r => eq(rolePermissions.roleId, r.id))));
+    try {
+      const trimmedIdentity = identity.trim();
+      this.logger.debug(`[AUTH_TRACE] 1. Searching for user in database...`);
       
-      permissionsSlugs = Array.from(new Set(perms.map(p => p.slug)));
-    }
+      const userResult = await db.select().from(users).where(
+        or(
+          ilike(users.username, trimmedIdentity),
+          ilike(users.email, trimmedIdentity)
+        )
+      );
+      
+      this.logger.debug(`[AUTH_TRACE] 2. User lookup found ${userResult.length} matches`);
+      const user = userResult[0];
 
-    this.logger.debug(`[AuthService] User ${user.username} logged in with roles: ${roleSlugs} and permissions: ${permissionsSlugs}`);
+      if (!user) {
+        this.logger.warn(`[AUTH_TRACE] Login aborted: Identity not found [${trimmedIdentity}]`);
+        throw new UnauthorizedException('Identity signature not recognized.');
+      }
 
-    const payload = {
-      sub: user.id,
-      username: user.username,
-      role: roleSlugs[0],
-      roles: roleSlugs,
-      permissions: permissionsSlugs,
-      name: user.name,
-      factoryId: user.factoryId,
-    };
+      this.logger.debug(`[AUTH_TRACE] 3. Starting credential verification (bcrypt)...`);
+      let isMatch = false;
 
-    return {
-      access_token: await this.jwtService.signAsync(payload),
-      user: {
-        id: user.id,
-        name: user.name,
+      try {
+        if (type) {
+          if (type === 'PASSWORD') {
+            if (!user.passwordHash) throw new UnauthorizedException('Password access not configured.');
+            isMatch = await bcrypt.compare(credential, user.passwordHash);
+          } else {
+            if (!user.pinCode) throw new UnauthorizedException('PIN access not configured.');
+            isMatch = await bcrypt.compare(credential, user.pinCode);
+          }
+        } else {
+          if (user.passwordHash) {
+            isMatch = await bcrypt.compare(credential, user.passwordHash);
+          }
+          if (!isMatch && user.pinCode) {
+            isMatch = await bcrypt.compare(credential, user.pinCode);
+          }
+        }
+      } catch (bcryptErr: any) {
+        this.logger.error(`[AUTH_TRACE] CRITICAL: Bcrypt module failure: ${bcryptErr.message}`);
+        throw new UnauthorizedException('Security validation failure.');
+      }
+
+      this.logger.debug(`[AUTH_TRACE] 4. Credential verification result: ${isMatch}`);
+
+      if (!isMatch) {
+        this.logger.warn(`[AUTH_TRACE] Login aborted: Invalid credentials for ${user.username}`);
+        throw new UnauthorizedException('Access credential rejected.');
+      }
+
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account deactivated.');
+      }
+
+      this.logger.debug(`[AUTH_TRACE] 5. Compiling RBAC roles and permissions...`);
+
+      // ── RBAC Resolution ──
+      const userRolesResult = await db.select({
+        id: roles.id,
+        slug: roles.slug,
+        name: roles.name,
+      })
+      .from(roles)
+      .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+      .where(eq(userRoles.userId, user.id));
+
+      const roleSlugs = userRolesResult.map(r => r.slug);
+      
+      let permissionsSlugs: string[] = [];
+      if (userRolesResult.length > 0) {
+        const perms = await db.select({
+          slug: permissions.slug,
+        })
+        .from(permissions)
+        .innerJoin(rolePermissions, eq(rolePermissions.permissionId, permissions.id))
+        .where(or(...userRolesResult.map(r => eq(rolePermissions.roleId, r.id))));
+        
+        permissionsSlugs = Array.from(new Set(perms.map(p => p.slug)));
+      }
+
+      this.logger.debug(`[AUTH_TRACE] 6. Generating JWT session token...`);
+
+      const payload = {
+        sub: user.id,
         username: user.username,
-        email: user.email,
         role: roleSlugs[0],
         roles: roleSlugs,
         permissions: permissionsSlugs,
-        jobTitle: user.jobTitle,
-        department: user.department,
-        avatarUrl: user.avatarUrl,
+        name: user.name,
         factoryId: user.factoryId,
-      },
-    };
+      };
+
+      const token = await this.jwtService.signAsync(payload);
+      this.logger.log(`[AUTH_TRACE] 7. Login successful for ${user.username}.`);
+
+      return {
+        access_token: token,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          email: user.email,
+          role: roleSlugs[0],
+          roles: roleSlugs,
+          permissions: permissionsSlugs,
+          jobTitle: user.jobTitle,
+          department: user.department,
+          avatarUrl: user.avatarUrl,
+          factoryId: user.factoryId,
+        },
+      };
+    } catch (err: any) {
+      this.logger.error(`[AUTH_CRITICAL_ERROR] Login process terminated abnormally: ${err.message}`, err.stack);
+      if (err instanceof UnauthorizedException) throw err;
+      throw new UnauthorizedException(`Login failed: ${err.message || 'System error'}`);
+    }
   }
 
   async startOperatorSession(userId: string, lineId: string, shiftId: string) {

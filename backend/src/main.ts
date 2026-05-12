@@ -87,5 +87,8 @@ async function bootstrap() {
   console.log(`Backend is running on: http://localhost:${port}`);
   console.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
-bootstrap();
-// Reload trigger
+bootstrap().catch(err => {
+  console.error('❌ [CRITICAL_BOOTSTRAP_FAILURE] The NestJS application failed to start:', err);
+  if (err.stack) console.error(err.stack);
+  process.exit(1);
+});

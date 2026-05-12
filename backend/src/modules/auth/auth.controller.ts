@@ -10,6 +10,7 @@ import {
   HttpCode,
   Res,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -21,6 +22,7 @@ import { Public } from './public.decorator';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
   constructor(private authService: AuthService) {}
 
   /**
@@ -32,24 +34,31 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate personnel and set HttpOnly session cookie' })
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) response: Response) {
-    if (!body.identity || !body.credential) {
-      throw new UnauthorizedException('Identity signature and access credential are required');
-    }
-    const result = await this.authService.login(body.identity, body.credential, body.type);
-    
-    // Set HttpOnly Cookie
-    response.cookie('ernad_session', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    try {
+      if (!body.identity || !body.credential) {
+        throw new UnauthorizedException('Identity signature and access credential are required');
+      }
+      
+      const result = await this.authService.login(body.identity, body.credential, body.type);
+      
+      // Set HttpOnly Cookie
+      response.cookie('ernad_session', result.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
 
-    return { 
-      user: result.user,
-      access_token: result.access_token,
-      message: 'Login successful'
-    };
+      return { 
+        user: result.user,
+        access_token: result.access_token,
+        message: 'Login successful'
+      };
+    } catch (err: any) {
+      this.logger.error(`[AUTH_CONTROLLER_CRASH] Login lifecycle failed: ${err.message}`);
+      if (err instanceof UnauthorizedException) throw err;
+      throw new UnauthorizedException(err.message || 'Authentication process failed');
+    }
   }
 
   @Public()
