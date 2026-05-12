@@ -65,8 +65,8 @@ export default function DashboardLayout() {
   };
 
   const getModulePath = (path: string) => {
-    // If the path is intended for the operator terminal, don't prefix it
-    if (path.startsWith('/line')) return path;
+    // If the path is intended for the operator terminal or top-level tools, don't prefix it
+    if (path.startsWith('/line') || path.startsWith('/terminal')) return path;
 
     const base = (user?.role === 'MANAGER') ? '/manager' : '/admin';
     return `${base}${path}`;

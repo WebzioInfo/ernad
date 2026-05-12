@@ -50,6 +50,8 @@ export const productionLogs = pgTable('production_logs', {
   
   loggedAt: timestamp('logged_at').notNull(),
   receivedAt: timestamp('received_at').defaultNow().notNull(),
+  updatedBy: uuid('updated_by').references(() => users.id),
+  updatedAt: timestamp('updated_at'),
 }, (table) => {
   return [
     index('idx_production_logs_batch').on(table.batchId),

@@ -61,23 +61,24 @@ const SuperAdminDashboard = memo(() => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-10"
     >
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-2xl">
-              <ShieldCheck className="w-7 h-7" />
+          <h2 className="text-5xl font-black text-slate-900 tracking-tighter flex items-center gap-5 uppercase italic">
+            <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-indigo-900 text-white rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200">
+              <ShieldCheck className="w-9 h-9" />
             </div>
-            Core System Control
+            Executive Control
           </h2>
-          <p className="text-slate-500 font-bold mt-2 ml-1">Enterprise-level infrastructure oversight and security audits.</p>
+          <p className="text-slate-500 font-bold mt-4 ml-1 text-lg">Enterprise infrastructure oversight & tactical synchronization.</p>
         </div>
-        <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-slate-100 shadow-sm">
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            API: Online
+        <div className="flex items-center gap-4 bg-white/80 backdrop-blur-xl p-3 rounded-[2.5rem] border border-slate-100 shadow-xl">
+          <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            Core API: ONLINE
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
-            DB: Hardened
+          <div className="flex items-center gap-2 px-5 py-2.5 bg-indigo-50 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-indigo-100/50">
+            <ShieldCheck className="w-3 h-3" />
+            System: Hardened
           </div>
         </div>
       </header>

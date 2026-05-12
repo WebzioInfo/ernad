@@ -275,7 +275,7 @@ export class AnalyticsService {
     })
     .from(productionBatches)
     .leftJoin(products, eq(productionBatches.productId, products.id))
-    .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id)) // Fixed: Should join on id, not name
+    .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
     .where(inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']));
 
     const lowStock = await db.select()

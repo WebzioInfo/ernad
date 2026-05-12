@@ -1,5 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
+import { eq, sql, and, inArray, isNull, desc } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   productionLogs,
   batchTotals,
@@ -7,9 +9,9 @@ import {
   inventoryStock,
   inventoryTransactions,
   productionBatches,
-  downtimeLogs
+  downtimeLogs,
+  users
 } from '../../../database/schema';
-import { eq, sql, and, inArray, isNull } from 'drizzle-orm';
 import { billOfMaterials } from '../../../database/schema';
 import { ProductionTelemetryDto } from '../dto/production-telemetry.dto';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -363,13 +365,83 @@ export class ProcessingService {
     return map[station];
   }
 
-  async getLogHistory(batchId: string, station: string, limit = 20) {
-    return await db.select()
-      .from(productionLogs)
-      .where(
-        sql`${productionLogs.batchId} = ${batchId} AND ${productionLogs.station} = ${station}`
+  async getLogHistory(batchId: string, station: string, limit = 50) {
+    const updatedByUsers = alias(users, 'updatedByUsers');
+
+    return await db.select({
+      id: productionLogs.id,
+      primaryCount: productionLogs.primaryCount,
+      wastageCount: productionLogs.wastageCount,
+      eventType: productionLogs.eventType,
+      remarks: productionLogs.remarks,
+      loggedAt: productionLogs.loggedAt,
+      userName: users.name,
+      updatedByName: updatedByUsers.name,
+      updatedAt: productionLogs.updatedAt,
+    })
+    .from(productionLogs)
+    .leftJoin(users, eq(productionLogs.userId, users.id))
+    .leftJoin(updatedByUsers, eq(productionLogs.updatedBy, updatedByUsers.id))
+    .where(
+      and(
+        eq(productionLogs.batchId, batchId),
+        eq(productionLogs.station, station as any)
       )
-      .orderBy(sql`${productionLogs.loggedAt} DESC`)
-      .limit(limit);
+    )
+    .orderBy(desc(productionLogs.loggedAt))
+    .limit(limit);
+  }
+
+  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string }) {
+    const [existing] = await db.select().from(productionLogs).where(eq(productionLogs.id, logId)).limit(1);
+    if (!existing) throw new BadRequestException('Production log not found.');
+
+    // Validate Batch Status (Don't allow editing completed/closed batches)
+    await this.validateBatchStatus(db, existing.batchId);
+
+    const [updated] = await db.update(productionLogs)
+      .set({
+        ...(dto.primaryCount !== undefined && { primaryCount: dto.primaryCount }),
+        ...(dto.wastageCount !== undefined && { wastageCount: dto.wastageCount }),
+        ...(dto.remarks !== undefined && { remarks: dto.remarks }),
+        updatedBy: userId,
+        updatedAt: new Date()
+      })
+      .where(eq(productionLogs.id, logId))
+      .returning();
+
+    // Recalculate Batch Totals if counts changed
+    if (dto.primaryCount !== undefined || dto.wastageCount !== undefined) {
+       await this.recalculateBatchTotals(existing.batchId);
+    }
+
+    return updated;
+  }
+
+  private async recalculateBatchTotals(batchId: string) {
+    const logs = await db.select().from(productionLogs).where(eq(productionLogs.batchId, batchId));
+    
+    const totals = {
+      blowingTotal: 0,
+      fillingTotal: 0,
+      labelingTotal: 0,
+      packingTotal: 0,
+      scrapTotal: 0
+    };
+
+    logs.forEach(log => {
+      if (log.station === 'BLOWING') totals.blowingTotal += log.primaryCount;
+      if (log.station === 'FILLING') totals.fillingTotal += log.primaryCount;
+      if (log.station === 'LABELING') totals.labelingTotal += log.primaryCount;
+      if (log.station === 'PACKING') totals.packingTotal += log.primaryCount;
+      totals.scrapTotal += log.wastageCount;
+    });
+
+    await db.update(batchTotals)
+      .set({
+        ...totals,
+        updatedAt: new Date()
+      })
+      .where(eq(batchTotals.batchId, batchId));
   }
 }

@@ -45,6 +45,17 @@ export class ReportsController {
     });
   }
 
+  @Get('batches')
+  @Permissions('reports:view')
+  @ApiOperation({ summary: 'Get list of production batches' })
+  async getProductionBatches(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string
+  ) {
+    this.validateDates(startDate, endDate);
+    return this.reportsService.getProductionBatches({ startDate, endDate });
+  }
+
   @Get('batch/:id')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get immutable batch dossier' })

@@ -59,7 +59,18 @@ export class RolesGuard implements CanActivate {
 
     // ── Permission Check ──
     if (requiredPermissions && requiredPermissions.length > 0) {
-      const permissionPassed = requiredPermissions.every(p => userPermissions.includes(p));
+      const permissionPassed = requiredPermissions.every(p => {
+        // [HARDENED] Manager Role implicit permissions for oversight
+        if (userRoles.includes('MANAGER')) {
+          const managerPermissions = ['analytics:view', 'reports:view', 'inventory:view', 'telemetry:log', 'production:start'];
+          if (managerPermissions.includes(p)) {
+            return true;
+          }
+        }
+        
+        return userPermissions.includes(p);
+      });
+
       if (!permissionPassed) {
         this.logger.warn(`[RolesGuard] Permission Check Failed: User ${user.username} lacks required permissions ${JSON.stringify(requiredPermissions)}`);
         throw new ForbiddenException('You do not have the specific privileges required for this operation');

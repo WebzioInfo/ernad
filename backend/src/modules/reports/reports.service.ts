@@ -57,6 +57,36 @@ export class ReportsService {
     }
   }
 
+  async getProductionBatches(filters: { startDate: string; endDate: string }) {
+    try {
+      return await db.select({
+        id: productionBatches.id,
+        batchCode: productionBatches.batchCode,
+        status: productionBatches.status,
+        startTime: productionBatches.startTime,
+        endTime: productionBatches.endTime,
+        lineName: productionLines.name,
+        productName: products.name,
+        brandName: productBrands.name,
+        blowingTotal: batchTotals.blowingTotal,
+        fillingTotal: batchTotals.fillingTotal,
+        labelingTotal: batchTotals.labelingTotal,
+        packingTotal: batchTotals.packingTotal,
+        scrapTotal: batchTotals.scrapTotal,
+      })
+      .from(productionBatches)
+      .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+      .innerJoin(products, eq(productionBatches.productId, products.id))
+      .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+      .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
+      .where(between(sql`date(${productionBatches.startTime})`, filters.startDate, filters.endDate))
+      .orderBy(desc(productionBatches.startTime));
+    } catch (error: any) {
+      this.logger.error(`[GET_PRODUCTION_BATCHES_FAILED] ${error.message}`);
+      throw error;
+    }
+  }
+
   // ─── BATCH DOSSIER ───
 
   async getBatchDossier(batchId: string) {
