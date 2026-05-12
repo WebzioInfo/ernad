@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  History, User, Clock, AlertTriangle, CheckCircle2, 
-  Search, Filter, ArrowLeft, Download, Shield,
+import {
+  History, User, Clock, AlertTriangle, CheckCircle2,
+  Search, ArrowLeft, Download, Shield,
   Database, Zap, Beaker, ClipboardList, Edit3, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '../../app/api/api-client';
 import { format } from 'date-fns';
+import { api } from '@/services/api-client';
 
 export default function BatchForensicsDashboard() {
   const { batchId } = useParams();
@@ -60,7 +60,7 @@ export default function BatchForensicsDashboard() {
         <p className="text-slate-500 mb-6 max-w-md mx-auto">
           {forensics?.error || "The requested industrial record could not be reconstructed for forensic analysis."}
         </p>
-        <button 
+        <button
           onClick={() => navigate(-1)}
           className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 mx-auto"
         >
@@ -77,7 +77,7 @@ export default function BatchForensicsDashboard() {
       {/* Forensic Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
           >
@@ -86,11 +86,10 @@ export default function BatchForensicsDashboard() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-3xl font-black text-slate-900 tracking-tight">Investigative Audit</h1>
-              <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                batch.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+              <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${batch.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                 batch.status === 'RUNNING' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 animate-pulse' :
-                'bg-slate-50 text-slate-600 border-slate-200'
-              }`}>
+                  'bg-slate-50 text-slate-600 border-slate-200'
+                }`}>
                 {batch.status}
               </div>
             </div>
@@ -147,9 +146,8 @@ export default function BatchForensicsDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 py-6 border-b-2 transition-all font-bold text-sm relative ${
-                  activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
-                }`}
+                className={`flex items-center gap-2 py-6 border-b-2 transition-all font-bold text-sm relative ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
@@ -162,9 +160,9 @@ export default function BatchForensicsDashboard() {
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input 
-                type="text" 
-                placeholder="Search events..." 
+              <input
+                type="text"
+                placeholder="Search events..."
                 className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-100 transition-all"
               />
             </div>
@@ -190,7 +188,7 @@ export default function BatchForensicsDashboard() {
                 </div>
 
                 <div className="divide-y divide-slate-50 border border-slate-100 rounded-2xl overflow-hidden">
-                  {timeline.map((entry: any, i: number) => (
+                  {timeline.map((entry: any) => (
                     <div key={entry.id} className={`p-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${entry.isDeleted ? 'bg-rose-50/30' : ''}`}>
                       <div className="flex items-center gap-4">
                         <div className={`p-2 rounded-lg ${entry.isDeleted ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'}`}>
@@ -222,13 +220,13 @@ export default function BatchForensicsDashboard() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 ml-8">
-                          <button 
+                          <button
                             className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-200"
                             title="Forensic Diff Viewer"
                           >
                             <History className="w-4 h-4" />
                           </button>
-                          <button 
+                          <button
                             onClick={() => {
                               setSelectedEntry(entry);
                               setCorrectionPrimary(entry.primaryCount);
@@ -249,14 +247,14 @@ export default function BatchForensicsDashboard() {
                 <AnimatePresence>
                   {selectedEntry && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={() => setSelectedEntry(null)}
                         className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
                       />
-                      <motion.div 
+                      <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -265,7 +263,7 @@ export default function BatchForensicsDashboard() {
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                           <Shield className="w-40 h-40" />
                         </div>
-                        
+
                         <h2 className="text-2xl font-black text-slate-900 mb-2">Forensic Correction</h2>
                         <p className="text-slate-500 text-sm font-bold mb-8 uppercase tracking-widest">Record #{selectedEntry.id}</p>
 
@@ -273,8 +271,8 @@ export default function BatchForensicsDashboard() {
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Primary Count</label>
-                              <input 
-                                type="number" 
+                              <input
+                                type="number"
                                 value={correctionPrimary}
                                 onChange={(e) => setCorrectionPrimary(Number(e.target.value))}
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-100 outline-none"
@@ -282,8 +280,8 @@ export default function BatchForensicsDashboard() {
                             </div>
                             <div>
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Wastage Count</label>
-                              <input 
-                                type="number" 
+                              <input
+                                type="number"
                                 value={correctionWastage}
                                 onChange={(e) => setCorrectionWastage(Number(e.target.value))}
                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-indigo-100 outline-none"
@@ -293,7 +291,7 @@ export default function BatchForensicsDashboard() {
 
                           <div>
                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Reason for Audit</label>
-                            <textarea 
+                            <textarea
                               value={correctionReason}
                               onChange={(e) => setCorrectionReason(e.target.value)}
                               placeholder="e.g. Operator typo in case count, verified via manual tally."
@@ -302,20 +300,20 @@ export default function BatchForensicsDashboard() {
                           </div>
 
                           <div className="flex items-center gap-3 pt-4">
-                            <button 
+                            <button
                               onClick={() => setSelectedEntry(null)}
                               className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black hover:bg-slate-200 transition-all uppercase tracking-widest text-xs"
                             >
                               Cancel
                             </button>
-                            <button 
+                            <button
                               onClick={() => deleteMutation.mutate(correctionReason)}
                               className="p-4 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-100 transition-all"
                               title="Forensic Record Removal"
                             >
                               <Trash2 className="w-6 h-6" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => correctMutation.mutate({ primaryCount: correctionPrimary, wastageCount: correctionWastage, reason: correctionReason })}
                               disabled={!correctionReason || correctMutation.isPending}
                               className="flex-[2] px-6 py-4 bg-indigo-600 text-white rounded-2xl font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 uppercase tracking-widest text-xs disabled:opacity-50"
@@ -352,7 +350,7 @@ export default function BatchForensicsDashboard() {
                       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Shield className="w-12 h-12" />
                       </div>
-                      
+
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-900 font-black text-xs shadow-sm">
@@ -395,7 +393,7 @@ export default function BatchForensicsDashboard() {
                       )}
                     </div>
                   ))}
-                  
+
                   {auditTrail.length === 0 && (
                     <div className="p-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
                       <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4 opacity-50" />
