@@ -44,8 +44,9 @@ export default function ExecutiveDashboard() {
 // ─── SUPER ADMIN: THE CORE ARCHITECT VIEW ───
 const SuperAdminDashboard = memo(() => {
   const { data: auditLogs } = useQuery({ queryKey: ['audit-logs-summary'], queryFn: async () => (await api.get('/users/audit-logs')).data });
-  const { data: salesKpis } = useQuery({
+  const { data: salesKpis, isError: isSalesError, isLoading: isSalesLoading, refetch: refetchSales } = useQuery({
     queryKey: ['sales-summary-global'],
+    retry: 1,
     queryFn: async () => (await api.get('/reports/sales', {
       params: {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -76,14 +77,14 @@ const SuperAdminDashboard = memo(() => {
             API: Online
           </div>
           <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest">
-            DB: 12ms
+            DB: Hardened
           </div>
         </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <StatusCard label="System Integrity" value="OPTIMAL" subLabel="No threats detected" icon={ShieldCheck} color="emerald" delay={0.1} />
-        <StatusCard label="Database Health" value="99.9%" subLabel="Transactional Lock: 0" icon={Database} color="indigo" delay={0.2} />
+        <StatusCard label="Database Health" value="STABLE" subLabel="Optimized pooling" icon={Database} color="indigo" delay={0.2} />
         <StatusCard label="Cloud Resources" value="42%" subLabel="Storage usage" icon={HardDrive} color="blue" delay={0.3} />
         <StatusCard label="Compute Load" value="18%" subLabel="Worker node status" icon={Cpu} color="amber" delay={0.4} />
       </div>
@@ -129,7 +130,7 @@ const SuperAdminDashboard = memo(() => {
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
-          className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-10 border border-slate-100 shadow-xl relative overflow-hidden group"
+          className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-10 border border-slate-100 shadow-xl relative overflow-hidden group min-h-[400px]"
         >
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-transparent opacity-50" />
           <div className="flex justify-between items-center mb-8 relative z-10">
@@ -137,34 +138,55 @@ const SuperAdminDashboard = memo(() => {
             <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">30D Matrix</div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 relative z-10">
-            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">${(Number(salesKpis?.summary?.totalRevenue || 0) / 1000).toFixed(1)}k</p>
+          {isSalesError ? (
+            <div className="relative z-10 flex flex-col items-center justify-center py-20 text-center">
+              <AlertTriangle className="w-12 h-12 text-rose-500 mb-4" />
+              <p className="text-slate-900 font-black mb-2">Metrics Unavailable</p>
+              <p className="text-slate-500 text-xs mb-6 max-w-[200px]">The analytics engine encountered a synchronization issue.</p>
+              <button 
+                onClick={() => refetchSales()}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
+              >
+                Retry Sync
+              </button>
             </div>
-            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg Ticket</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">${Math.round(salesKpis?.summary?.avgOrderValue || 0)}</p>
+          ) : isSalesLoading ? (
+            <div className="relative z-10 flex flex-col items-center justify-center py-20 text-center animate-pulse">
+              <RefreshCw className="w-12 h-12 text-indigo-400 mb-4 animate-spin" />
+              <p className="text-slate-400 font-black text-xs uppercase tracking-widest">Synthesizing Data...</p>
             </div>
-            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Orders</p>
-              <p className="text-3xl font-black text-slate-900 tracking-tighter">{salesKpis?.summary?.orderCount || 0}</p>
-            </div>
-            <div className="p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white">
-              <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Top SKU</p>
-              <p className="text-xl font-black truncate">{salesKpis?.topProducts?.[0]?.productName || 'N/A'}</p>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-6 relative z-10">
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
+                  <p className="text-3xl font-black text-slate-900 tracking-tighter">${(Number(salesKpis?.summary?.totalRevenue || 0) / 1000).toFixed(1)}k</p>
+                </div>
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg Ticket</p>
+                  <p className="text-3xl font-black text-slate-900 tracking-tighter">${Math.round(salesKpis?.summary?.avgOrderValue || 0)}</p>
+                </div>
+                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Orders</p>
+                  <p className="text-3xl font-black text-slate-900 tracking-tighter">{salesKpis?.summary?.orderCount || 0}</p>
+                </div>
+                <div className="p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white">
+                  <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Top SKU</p>
+                  <p className="text-xl font-black truncate">{salesKpis?.topProducts?.[0]?.productName || 'N/A'}</p>
+                </div>
+              </div>
 
-          <div className="mt-8 pt-8 border-t border-slate-100 relative z-10">
-            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
-              <span>Revenue Goal</span>
-              <span className="text-indigo-600">72%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-indigo-500 w-[72%]" />
-            </div>
-          </div>
+              <div className="mt-8 pt-8 border-t border-slate-100 relative z-10">
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
+                  <span>Revenue Goal</span>
+                  <span className="text-indigo-600">72%</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 w-[72%]" />
+                </div>
+              </div>
+            </>
+          )}
         </motion.div>
       </div>
     </motion.div>

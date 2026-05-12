@@ -2,7 +2,7 @@ import { ReportsService } from './reports.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { Controller, Get, Query, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Param, BadRequestException, Logger } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Enterprise Reporting')
@@ -10,7 +10,21 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('reports')
 export class ReportsController {
+  private readonly logger = new Logger(ReportsController.name);
+
   constructor(private readonly reportsService: ReportsService) { }
+
+  private validateDates(start: string, end: string) {
+    if (!start || !end) {
+      throw new BadRequestException('Start date and End date are required parameters.');
+    }
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD or ISO strings.');
+    }
+    return { startDate: s, endDate: e };
+  }
 
   @Get('production')
   @Permissions('reports:view')
@@ -22,9 +36,9 @@ export class ReportsController {
     @Query('brandId') brandId?: string,
     @Query('productId') productId?: string
   ) {
+    const dates = this.validateDates(startDate, endDate);
     return this.reportsService.getProductionReport({
-      startDate: new Date(startDate),
-      endDate: new Date(endDate),
+      ...dates,
       lineId,
       brandId,
       productId
@@ -45,10 +59,9 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string
   ) {
-    return this.reportsService.getSalesReport({
-      startDate: new Date(startDate),
-      endDate: new Date(endDate)
-    });
+    this.logger.log(`[SALES_REPORT] Request for range: ${startDate} - ${endDate}`);
+    const dates = this.validateDates(startDate, endDate);
+    return this.reportsService.getSalesReport(dates);
   }
 
   @Get('attendance')
@@ -58,6 +71,7 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string
   ) {
+    this.validateDates(startDate, endDate);
     return this.reportsService.getAttendanceReport({ startDate, endDate });
   }
 }

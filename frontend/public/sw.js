@@ -1,4 +1,13 @@
-const CACHE_NAME = 'eranad-mes-cache-v2';
+const CACHE_NAME = 'eranad-mes-cache-v3';
+
+// ── INITIAL EVALUATION FIX ──
+// Ensure message listener is registered immediately to satisfy Chrome requirements.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
