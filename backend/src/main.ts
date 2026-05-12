@@ -54,9 +54,6 @@ async function bootstrap() {
     stopAtFirstError: true,
   }));
 
-  const { AuditInterceptor } = await import('./common/interceptors/audit.interceptor');
-  app.useGlobalInterceptors(new AuditInterceptor());
-
   // ── 4. DATABASE & MODULES INIT ──
   console.log('🗄️ [STARTUP] Initializing Internal Modules & Database Pools...');
   // Note: Drizzle and Redis initialize on demand or via their own onModuleInit

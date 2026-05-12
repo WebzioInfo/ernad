@@ -1,7 +1,8 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthGuard } from './modules/auth/auth.guard';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ProductionTelemetryModule } from './modules/production-telemetry/production-telemetry.module';
 import { ProductionManagementModule } from './modules/production-management/production-management.module';
@@ -66,6 +67,10 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: AuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditInterceptor,
     },
   ],
 })

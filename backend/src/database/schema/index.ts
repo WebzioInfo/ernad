@@ -10,3 +10,4 @@ export * from './terminals';
 export * from './notes';
 export * from './biometric';
 export * from './sales';
+export * from './qc';

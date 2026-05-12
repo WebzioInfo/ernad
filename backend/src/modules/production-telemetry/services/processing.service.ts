@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { AuditService } from '../../observability/audit.service';
 import { db } from '../../../database/db';
 import { eq, sql, and, inArray, isNull, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
