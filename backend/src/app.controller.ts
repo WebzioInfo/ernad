@@ -2,12 +2,14 @@ import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { db } from './database/db';
 import { sql } from 'drizzle-orm';
+import { Public } from './modules/auth/public.decorator';
 
 @ApiExcludeController()
 @Controller()
 export class AppController {
   private readonly logger = new Logger('HealthCheck');
 
+  @Public()
   @Get()
   root() {
     return {
@@ -18,6 +20,7 @@ export class AppController {
     };
   }
 
+  @Public()
   @Get('health')
   async getHealth() {
     try {
