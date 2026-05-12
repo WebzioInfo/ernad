@@ -32,6 +32,9 @@ export const productionBatches = pgTable('production_batches', {
   materialReturn: jsonb('material_return'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: uuid('deleted_by').references(() => users.id),
+  deletedReason: varchar('deleted_reason', { length: 500 }),
 }, (table) => {
   return [
     index('idx_batches_line_status').on(table.lineId, table.status),
@@ -134,6 +137,9 @@ export const downtimeLogs = pgTable('downtime_logs', {
   remarks: varchar('remarks', { length: 500 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: uuid('deleted_by').references(() => users.id),
+  deletedReason: varchar('deleted_reason', { length: 500 }),
 }, (table) => {
   return [
     index('idx_downtime_batch').on(table.batchId),

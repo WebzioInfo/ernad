@@ -9,6 +9,7 @@ import {
   factories 
 } from '../../database/schema';
 import { eq, sql, desc } from 'drizzle-orm';
+import { AuditService } from '../observability/audit.service';
 
 @Injectable()
 export class InventoryService {
@@ -20,7 +21,7 @@ export class InventoryService {
     return results[0].id;
   }
 
-  constructor() {}
+  constructor(private readonly auditService: AuditService) {}
 
   async getInventory() {
     // Join with categories for better UI
@@ -117,6 +118,23 @@ export class InventoryService {
       }).returning();
 
       this.logger.log(`Stock Movement [${dto.type}]: ${stock.itemName} | ${currentQty} -> ${newQty}`);
+      
+      await this.auditService.logAction({
+        userId: dto.performedBy,
+        action: `STOCK_${dto.type}`,
+        entityType: 'inventory_stock',
+        entityId: dto.stockId,
+        category: 'INVENTORY',
+        payload: {
+          itemName: stock.itemName,
+          quantity: dto.quantity,
+          movement: isDeduction ? 'DEDUCTION' : 'INFLOW',
+          balanceBefore: currentQty,
+          balanceAfter: newQty,
+          remarks: dto.remarks
+        }
+      });
+
       return { stock: { ...stock, quantity: String(newQty) }, transaction };
     });
   }

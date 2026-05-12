@@ -30,6 +30,9 @@ export const labTests = pgTable('lab_tests', {
   remarks: varchar('remarks', { length: 500 }),
   testedAt: timestamp('tested_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: uuid('deleted_by').references(() => users.id),
+  deletedReason: varchar('deleted_reason', { length: 500 }),
 }, (table) => {
   return [
     index('idx_lab_batch').on(table.batchId),

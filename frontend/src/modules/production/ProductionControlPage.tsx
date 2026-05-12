@@ -6,7 +6,7 @@ import { api } from '../../services/api-client';
 import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
   Gauge, Loader2, X, Users, BarChart2,
-  Clock, ArrowLeft, ShieldAlert, Zap,
+  Clock, ArrowLeft, ShieldAlert, Zap, Shield,
   Settings2, ActivitySquare, History, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -276,19 +276,28 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
 
             <div className="space-y-4">
               {batchHistory?.map((batch: any) => (
-                <div key={batch.id} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group">
+                <div 
+                  key={batch.id} 
+                  onClick={() => navigate(`/manager/forensics/${batch.id}`)}
+                  className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group cursor-pointer"
+                >
                   <div className="flex items-center gap-6">
                     <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:bg-indigo-50 transition-colors">
-                      <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+                      <Shield className="w-5 h-5 text-indigo-500" />
                     </div>
                     <div>
                       <p className="text-sm font-black text-slate-900 leading-none">{batch.batchCode}</p>
                       <p className="text-[10px] font-bold text-slate-400 mt-1">{batch.productName} • {new Date(batch.startTime).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-black text-slate-900 leading-none">{batch.totalProduction || 0} PCS</p>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 block">{batch.status}</span>
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-xs font-black text-slate-900 leading-none">{batch.totalProduction || 0} PCS</p>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 block">{batch.status}</span>
+                    </div>
+                    <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-600">
+                      <History className="w-5 h-5" />
+                    </div>
                   </div>
                 </div>
               ))}

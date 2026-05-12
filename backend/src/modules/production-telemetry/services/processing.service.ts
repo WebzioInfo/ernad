@@ -30,6 +30,7 @@ export class ProcessingService {
     private readonly shiftService: ShiftService,
     private readonly redisService: RedisService,
     private readonly sessionService: OperatorSessionService,
+    private readonly auditService: AuditService,
   ) { }
 
   async handleTelemetryLog(userId: string, dto: ProductionTelemetryDto) {
@@ -385,7 +386,8 @@ export class ProcessingService {
     .where(
       and(
         eq(productionLogs.batchId, batchId),
-        eq(productionLogs.station, station as any)
+        eq(productionLogs.station, station as any),
+        isNull(productionLogs.deletedAt)
       )
     )
     .orderBy(desc(productionLogs.loggedAt))
@@ -410,16 +412,29 @@ export class ProcessingService {
       .where(eq(productionLogs.id, logId))
       .returning();
 
-    // Recalculate Batch Totals if counts changed
     if (dto.primaryCount !== undefined || dto.wastageCount !== undefined) {
        await this.recalculateBatchTotals(existing.batchId);
     }
+
+    await this.auditService.logCorrection(
+      userId,
+      'production_logs',
+      String(logId),
+      existing,
+      updated,
+      dto.remarks || 'Manual Correction'
+    );
 
     return updated;
   }
 
   private async recalculateBatchTotals(batchId: string) {
-    const logs = await db.select().from(productionLogs).where(eq(productionLogs.batchId, batchId));
+    const logs = await db.select().from(productionLogs).where(
+      and(
+        eq(productionLogs.batchId, batchId),
+        isNull(productionLogs.deletedAt)
+      )
+    );
     
     const totals = {
       blowingTotal: 0,

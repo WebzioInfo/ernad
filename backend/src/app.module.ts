@@ -26,6 +26,7 @@ import { DataLifecycleModule } from './modules/data-lifecycle/data-lifecycle.mod
 import { NotesModule } from './modules/notes/notes.module';
 import { BiometricModule } from './modules/biometric/biometric.module';
 import { TallyModule } from './modules/tally/tally.module';
+import { ObservabilityModule } from './modules/observability/observability.module';
 
 import { AppController } from './app.controller';
 
@@ -34,6 +35,7 @@ import { AppController } from './app.controller';
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,
     QueueModule,
+    ObservabilityModule,
     AuthModule, 
     UsersModule, 
     FactoryConfigModule, 

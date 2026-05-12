@@ -52,6 +52,11 @@ export const productionLogs = pgTable('production_logs', {
   receivedAt: timestamp('received_at').defaultNow().notNull(),
   updatedBy: uuid('updated_by').references(() => users.id),
   updatedAt: timestamp('updated_at'),
+  
+  // Forensic Auditability (Phase 8 Hardening)
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: uuid('deleted_by').references(() => users.id),
+  deletedReason: varchar('deleted_reason', { length: 500 }),
 }, (table) => {
   return [
     index('idx_production_logs_batch').on(table.batchId),
@@ -107,6 +112,8 @@ export const auditLogs = pgTable('audit_logs', {
   action: varchar('action', { length: 255 }).notNull(),
   entityType: varchar('entity_type', { length: 100 }),
   entityId: varchar('entity_id', { length: 100 }),
+  category: varchar('category', { length: 50 }).notNull().default('GENERAL'), // AUTH, PRODUCTION, TELEMETRY, INVENTORY, QC, SALES, SECURITY
+  requestId: uuid('request_id'), // For cross-referencing with production_logs
   payload: jsonb('payload'),
   occurredAt: timestamp('occurred_at').defaultNow().notNull(),
 });

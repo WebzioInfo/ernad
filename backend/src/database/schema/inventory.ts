@@ -99,6 +99,9 @@ export const inventoryLedger = pgTable('inventory_ledger', {
   
   remarks: varchar('remarks', { length: 255 }),
   occurredAt: timestamp('occurred_at').defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at'),
+  deletedBy: uuid('deleted_by').references(() => users.id),
+  deletedReason: varchar('deleted_reason', { length: 500 }),
 }, (table) => {
   return [
     index('idx_ledger_stock').on(table.stockId),

@@ -12,6 +12,11 @@ export const productionConfig: ModuleConfig = {
       path: 'production',
       element: lazy(() => import('./ProductionControlPage')),
       allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+    },
+    {
+      path: 'forensics/:batchId',
+      element: lazy(() => import('./BatchForensicsDashboard')),
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
