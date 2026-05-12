@@ -409,14 +409,83 @@ export default function BatchForensicsDashboard() {
 
             {/* Other tabs stubs for now */}
             {activeTab === 'inventory' && (
-              <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
-                Material Reconciliation View Coming Soon
-              </div>
+              <motion.div
+                key="inventory"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {materialUsage.map((material: any) => (
+                    <div key={material.id} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-all">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center">
+                            <Database className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900">{material.itemName}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{material.sku}</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                          {material.type}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-black text-slate-900">{material.quantityChange}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{material.unit || 'UNITS'}</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 mt-4 italic">Ref: {material.remarks || 'Standard production usage'}</p>
+                    </div>
+                  ))}
+                </div>
+                {materialUsage.length === 0 && (
+                  <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
+                    No material movements attributed to this batch.
+                  </div>
+                )}
+              </motion.div>
             )}
+
             {activeTab === 'qc' && (
-              <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
-                Quality DNA Profile Coming Soon
-              </div>
+              <motion.div
+                key="qc"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="space-y-6"
+              >
+                <div className="space-y-4">
+                  {qcRecords.map((qc: any) => (
+                    <div key={qc.id} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm flex items-center justify-between">
+                      <div className="flex items-center gap-6">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${qc.result === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                          <Beaker className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-slate-900">Quality Check - {qc.checkType}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inspector: {qc.userName || 'System Auto-QC'}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">•</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(qc.checkedAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${qc.result === 'PASS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-rose-500 text-white shadow-lg shadow-rose-100'}`}>
+                          {qc.result}
+                        </span>
+                        <p className="text-[10px] font-bold text-slate-400 max-w-[200px] text-right truncate">{qc.remarks}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {qcRecords.length === 0 && (
+                    <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
+                      No quality inspections recorded for this batch.
+                    </div>
+                  )}
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
