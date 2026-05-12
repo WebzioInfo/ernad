@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ProductionControlPage() {
-  const navigate = useNavigate();
   const { filters, setFilters } = useOutletContext<{ filters: any; setFilters: (f: any) => void }>();
 
   const { data: brands } = useQuery({ queryKey: ['brands'], queryFn: async () => (await api.get('/master-data/brands')).data });
@@ -97,6 +96,7 @@ export default function ProductionControlPage() {
 }
 
 function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
+  const navigate = useNavigate();
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
     queryFn: async () => (await api.get('/analytics/line-performance', { params: { lineId: line.id } })).data,
