@@ -17,7 +17,7 @@ interface ActivityFeedProps {
   isLoading?: boolean;
 }
 
-export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, isLoading }) => {
+export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history }) => {
   return (
     <div className="flex flex-col h-full">
       <div className="px-8 py-5 border-b border-gray-200/60 flex items-center justify-between bg-white/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">

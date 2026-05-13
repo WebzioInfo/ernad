@@ -5,7 +5,7 @@
  * No endpoint strings appear here – only service calls.
  */
 
-import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { v4 as uuidv4 } from 'uuid';
 import {
   ProductionService,
@@ -18,7 +18,6 @@ import {
   BiometricService,
   NotesService,
   NotificationService,
-  ReportService,
   type StartBatchPayload,
   type CloseBatchPayload,
   type TelemetryLogPayload,

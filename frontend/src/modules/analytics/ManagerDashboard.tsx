@@ -7,7 +7,7 @@ import {
   Package, AlertTriangle,
   Users, Activity, Clock,
   Layers, RefreshCw, LayoutDashboard,
-  Play, Monitor, BarChart3,
+  Play, BarChart3,
   History, ShieldCheck, Gauge,
   ChevronRight, ArrowUpRight
 } from 'lucide-react';

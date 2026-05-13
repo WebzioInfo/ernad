@@ -1,23 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import {
   Cpu, ArrowRight, Loader2,
   Activity, ShieldCheck, LogOut,
-  Wind, PackageOpen, Zap, Box, ArrowLeft,
-  User
+  Wind, PackageOpen, Zap, Box, ArrowLeft
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { toast } from 'sonner';
 import { ENDPOINTS } from '../../constants/endpoints';
 import { cn } from '../../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LineSelectionPage() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
-  const location = useLocation();
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState<'line' | 'station'>('line');
@@ -55,7 +52,7 @@ export default function LineSelectionPage() {
   useEffect(() => {
     // Only auto-navigate if the user IS an operator. Managers might want to select a different line.
     const isOperator = user?.roles?.some((r: any) => r.toUpperCase() === 'OPERATOR') || user?.role?.toUpperCase() === 'OPERATOR';
-    
+
     if (currentSession && !isLoadingSession && isOperator) {
       navigate(`/operator/workspace/${currentSession.lineId}/${currentSession.station.toLowerCase()}`, { replace: true });
     }
@@ -83,7 +80,7 @@ export default function LineSelectionPage() {
       <div className="fixed inset-0 pointer-events-none opacity-[0.05]"
         style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
       />
-      
+
       <div className="max-w-6xl mx-auto relative z-10">
         <header className="flex justify-between items-center mb-20">
           <div>
@@ -99,7 +96,7 @@ export default function LineSelectionPage() {
               <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest">{user?.roles?.[0]?.replace('_', ' ')}</p>
             </div>
             <button onClick={() => logout()} className="p-4 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-2xl transition-all border border-slate-100">
-               <LogOut className="w-5 h-5" />
+              <LogOut className="w-5 h-5" />
             </button>
           </div>
         </header>
@@ -109,8 +106,8 @@ export default function LineSelectionPage() {
             {lines?.map((line: any) => (
               <button
                 key={line.id}
-                onClick={() => { 
-                  setSelectedLine(line); 
+                onClick={() => {
+                  setSelectedLine(line);
                   setStep('station');
                   // Pre-invalidate to ensure fresh data for next step
                   queryClient.invalidateQueries({ queryKey: ['line', line.id] });
@@ -132,7 +129,7 @@ export default function LineSelectionPage() {
                   </div>
                   <ArrowRight className="w-6 h-6 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
                 </div>
-                
+
                 <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-[100px] opacity-0 group-hover:opacity-40 transition-opacity duration-700" />
               </button>
             ))}
@@ -162,8 +159,8 @@ export default function LineSelectionPage() {
                     key={station.id}
                     className={cn(
                       "group p-10 rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[340px]",
-                      occupant 
-                        ? (isMySession ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100') 
+                      occupant
+                        ? (isMySession ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100')
                         : 'bg-white border-slate-200'
                     )}
                   >
@@ -189,8 +186,8 @@ export default function LineSelectionPage() {
                     <button
                       onClick={() => {
                         setSelectedStation(station.id);
-                        startSessionMutation.mutate({ 
-                          lineId: selectedLine.id, 
+                        startSessionMutation.mutate({
+                          lineId: selectedLine.id,
                           station: station.id,
                           force: occupant && !isMySession // Only force if it's someone else
                         });
@@ -199,9 +196,9 @@ export default function LineSelectionPage() {
                       className={cn(
                         "mt-auto w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 shadow-sm",
                         occupant
-                          ? (isMySession 
-                              ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100' 
-                              : 'bg-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white')
+                          ? (isMySession
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
+                            : 'bg-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white')
                           : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
                       )}
                     >

@@ -34,11 +34,8 @@ export default function UserManagementPage() {
   const callerRoles = currentUser?.roles || [];
   const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
   const isAdmin      = callerRoles.includes('ADMIN');
-  const isManager    = callerRoles.includes('MANAGER');
-
   // Only ADMIN and SUPER_ADMIN can create/manage users
   const canAddUser    = isAdmin || isSuperAdmin;
-  const canManageUser = isAdmin || isSuperAdmin;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');

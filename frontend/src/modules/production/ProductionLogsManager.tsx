@@ -2,11 +2,9 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Database, Search, Filter, RefreshCw, 
-  ChevronRight, Edit3, Trash2, Shield,
-  Calendar, User, Box, Activity,
-  AlertCircle, CheckCircle2, History,
-  Plus, ArrowUpDown, MoreHorizontal,
+  Database, Search, RefreshCw,
+  Edit3, Trash2, Shield,
+  Box, AlertCircle,
   X, Save
 } from 'lucide-react';
 import { api } from '../../services/api-client';
@@ -61,7 +59,6 @@ export default function ProductionLogsManager() {
   const [editingLog, setEditingLog] = useState<any>(null);
   const [voidingLog, setVoidingLog] = useState<any>(null);
   const [voidReason, setVoidReason] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
 
   // --- DATA FETCHING ---
   const { data: logs, isLoading: loadingLogs, refetch } = useQuery({
@@ -109,22 +106,11 @@ export default function ProductionLogsManager() {
     }
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return await api.post(`${ENDPOINTS.TELEMETRY.LOGS}/manual`, data);
-    },
-    onSuccess: () => {
-      toast.success('Manual Log Recorded', { description: 'New production entry created via administrative override.' });
-      setIsCreating(false);
-      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
-    }
-  });
-
   // --- UI LOGIC ---
   const filteredLogs = useMemo(() => {
     if (!logs) return [];
     if (!search) return logs;
-    return logs.filter((l: any) => 
+    return logs.filter((l: any) =>
       l.userName?.toLowerCase().includes(search.toLowerCase()) ||
       l.remarks?.toLowerCase().includes(search.toLowerCase()) ||
       String(l.id).includes(search)
@@ -136,7 +122,7 @@ export default function ProductionLogsManager() {
       <TechnicalBackground />
 
       <main className="relative z-10 p-8 lg:p-12 space-y-8 max-w-[1800px] mx-auto">
-        
+
         {/* --- HEADER --- */}
         <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
           <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
@@ -157,12 +143,6 @@ export default function ProductionLogsManager() {
           </motion.div>
 
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsCreating(true)}
-              className="flex items-center gap-3 px-8 py-4 bg-white/5 border border-white/10 text-white rounded-2xl hover:bg-white/10 transition-all font-black uppercase tracking-widest text-[10px]"
-            >
-              <Plus className="w-4 h-4" /> Manual Recovery Entry
-            </button>
             <button
               onClick={() => refetch()}
               className="p-4 bg-indigo-600/10 text-indigo-500 border border-indigo-500/20 rounded-2xl hover:bg-indigo-600/20 transition-all group"
@@ -243,7 +223,7 @@ export default function ProductionLogsManager() {
                 "w-10 h-6 rounded-full p-1 transition-all",
                 filters.isDeleted ? "bg-rose-600" : "bg-white/10"
               )}
-              onClick={() => setFilters({ ...filters, isDeleted: !filters.isDeleted })}
+                onClick={() => setFilters({ ...filters, isDeleted: !filters.isDeleted })}
               >
                 <div className={cn(
                   "w-4 h-4 bg-white rounded-full transition-all",
@@ -320,13 +300,13 @@ export default function ProductionLogsManager() {
                       <td className="px-8 py-6">
                         {!log.deletedAt && (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
+                            <button
                               onClick={() => setEditingLog(log)}
                               className="p-2 bg-white/5 hover:bg-indigo-600/20 text-slate-400 hover:text-indigo-400 border border-white/10 rounded-lg transition-all"
                             >
                               <Edit3 size={14} />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setVoidingLog(log)}
                               className="p-2 bg-white/5 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-white/10 rounded-lg transition-all"
                             >
@@ -359,7 +339,7 @@ export default function ProductionLogsManager() {
       <AnimatePresence>
         {editingLog && (
           <div className="fixed inset-0 z-[100] flex items-center justify-end p-6">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setEditingLog(null)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -392,8 +372,8 @@ export default function ProductionLogsManager() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Primary Yield Correction</label>
                   <div className="relative">
                     <Box className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={20} />
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       name="primaryCount"
                       defaultValue={editingLog.primaryCount}
                       className="w-full bg-black/40 border-2 border-white/5 rounded-2xl py-5 pl-14 pr-6 text-2xl font-mono font-black text-white outline-none focus:border-indigo-500/50 transition-all"
@@ -405,8 +385,8 @@ export default function ProductionLogsManager() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Wastage / Reject Adjustment</label>
                   <div className="relative">
                     <AlertCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-rose-500/50" size={20} />
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       name="wastageCount"
                       defaultValue={editingLog.wastageCount}
                       className="w-full bg-black/40 border-2 border-white/5 rounded-2xl py-5 pl-14 pr-6 text-2xl font-mono font-black text-rose-500 outline-none focus:border-rose-500/30 transition-all"
@@ -416,7 +396,7 @@ export default function ProductionLogsManager() {
 
                 <div className="space-y-4">
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Audit Remark (Required)</label>
-                  <textarea 
+                  <textarea
                     name="remarks"
                     required
                     placeholder="Provide justification for this data correction..."
@@ -435,7 +415,7 @@ export default function ProductionLogsManager() {
                   </div>
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   disabled={updateMutation.isPending}
                   className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-900/40 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
@@ -457,9 +437,9 @@ export default function ProductionLogsManager() {
               </div>
               <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4">Void Production Entry?</h2>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8 px-4 leading-relaxed">You are about to invalidate Log #{voidingLog.id}. This action is irreversible and will subtract all counts from batch totals.</p>
-              
-              <input 
-                type="text" 
+
+              <input
+                type="text"
                 placeholder="Reason for voiding..."
                 value={voidReason}
                 onChange={(e) => setVoidReason(e.target.value)}
@@ -468,7 +448,7 @@ export default function ProductionLogsManager() {
 
               <div className="grid grid-cols-2 gap-4">
                 <button onClick={() => setVoidingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
-                <button 
+                <button
                   onClick={() => voidMutation.mutate({ id: voidingLog.id, reason: voidReason })}
                   disabled={!voidReason || voidMutation.isPending}
                   className="py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"

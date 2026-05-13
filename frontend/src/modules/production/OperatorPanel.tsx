@@ -71,12 +71,12 @@ export default function OperatorPanel() {
   const [tdsValue, setTdsValue] = useState(0);
   const [inkUsage, setInkUsage] = useState(0);
   const [solventUsage, setSolventUsage] = useState(0);
-  const [testResult, setTestResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
+  const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
 
-  const [eventType, setEventType] = useState('NORMAL_PRODUCTION');
+  const [eventType] = useState('NORMAL_PRODUCTION');
   const [remarks, setRemarks] = useState('');
-  const [fromTime, setFromTime] = useState('');
-  const [toTime, setToTime] = useState('');
+  const [fromTime] = useState('');
+  const [toTime] = useState('');
 
   // Enterprise & Inventory State
   const [selectedStockId, setSelectedStockId] = useState<string>('');
@@ -98,7 +98,7 @@ export default function OperatorPanel() {
     enabled: !!currentStation.category
   });
 
-  const { data: activeEvents, refetch: refetchActiveEvents } = useQuery({
+  const { data: activeEvents } = useQuery({
     queryKey: ['active-downtime-events', activeBatch?.batch?.id],
     queryFn: async () => {
       if (!activeBatch?.batch?.id) return [];
@@ -120,7 +120,7 @@ export default function OperatorPanel() {
     }
   });
 
-  const { data: line, isLoading: isLoadingLine } = useQuery({
+  const { data: line } = useQuery({
     queryKey: ['line', lineId],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINE(lineId!))).data,
     enabled: !!lineId,

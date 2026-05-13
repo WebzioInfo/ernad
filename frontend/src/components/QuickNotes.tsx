@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { StickyNote, X, Plus, Trash2, Save, FileText, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '../lib/utils';
 
 interface Note {
   id: string;
@@ -45,7 +44,7 @@ export default function QuickNotes() {
   };
 
   const updateNote = (id: string, content: string, title: string) => {
-    const updated = notes.map(n => 
+    const updated = notes.map(n =>
       n.id === id ? { ...n, content, title, timestamp: new Date().toLocaleString() } : n
     );
     saveNotes(updated);
@@ -112,19 +111,19 @@ export default function QuickNotes() {
               {/* Body */}
               <div className="flex-1 overflow-hidden flex flex-col">
                 {activeNote ? (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="flex-1 flex flex-col p-8 space-y-6"
                   >
                     <div className="flex items-center justify-between">
-                      <button 
+                      <button
                         onClick={() => setActiveNote(null)}
                         className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 hover:translate-x-[-4px] transition-transform"
                       >
                         <ChevronRight className="w-3 h-3 rotate-180" /> Back to list
                       </button>
-                      <button 
+                      <button
                         onClick={() => deleteNote(activeNote.id)}
                         className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"
                       >
@@ -132,7 +131,7 @@ export default function QuickNotes() {
                       </button>
                     </div>
 
-                    <input 
+                    <input
                       type="text"
                       value={activeNote.title}
                       onChange={(e) => {

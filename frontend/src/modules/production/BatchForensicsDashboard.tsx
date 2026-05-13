@@ -93,17 +93,15 @@ export default function BatchForensicsDashboard() {
   // Safe destructuring — every section defaults to [] / {} to prevent crashes
   const {
     batch,
-    timeline        = [],
-    auditTrail      = [],
-    materialUsage   = [],
-    qcRecords       = [],
-    telemetry       = [],
-    accountability  = [],
-    salesMapping    = [],
+    timeline = [],
+    auditTrail = [],
+    materialUsage = [],
+    qcRecords = [],
+    telemetry = [],
+    accountability = [],
+    salesMapping = [],
     inventoryVariance = [],
-    downtimes       = [],
-    operatorHistory = [],
-    metadata        = {},
+    metadata = {},
   } = forensics ?? {};
 
   const sections = (metadata as any)?.sectionsAvailable ?? {};
@@ -639,7 +637,7 @@ export default function BatchForensicsDashboard() {
                           <div>
                             {/* inventoryLedger has no itemName – stockId is the reference */}
                             <p className="text-sm font-black text-slate-900">
-                              {material.stockId ? `Stock: ${String(material.stockId).slice(0,8)}…` : 'Material Movement'}
+                              {material.stockId ? `Stock: ${String(material.stockId).slice(0, 8)}…` : 'Material Movement'}
                             </p>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                               {new Date(material.occurredAt).toLocaleString()}

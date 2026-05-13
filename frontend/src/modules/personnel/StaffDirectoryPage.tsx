@@ -6,8 +6,6 @@ import {
   ShieldCheck, Loader2, MoreHorizontal
 } from 'lucide-react';
 import { ENDPOINTS } from '../../constants/endpoints';
-import useAuthStore from '../auth/auth.store';
-import { PRIVILEGED_ROLE_SLUGS } from './UserManagementPage';
 
 interface Staff {
   id: string;
@@ -22,7 +20,6 @@ interface Staff {
 
 export default function StaffDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { user: currentUser } = useAuthStore();
   
   const { data: staffData, isLoading } = useQuery({
     queryKey: ['staff-directory', searchTerm],

@@ -1,11 +1,6 @@
 import React from 'react';
-import { 
-  Monitor, Clock, User, LogOut, 
-  Settings, AlertCircle, Activity,
-  ChevronRight, Layout, Power
-} from 'lucide-react';
+import { LogOut, Layout, Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 
 interface OperatorHeaderProps {
   lineName: string;

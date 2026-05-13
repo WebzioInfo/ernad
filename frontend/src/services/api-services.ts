@@ -20,7 +20,6 @@ import type {
   BatchTotal,
   InventoryStock,
   InventoryLedger,
-  InventoryTransaction,
   PackagingConfiguration,
   MaterialCategory,
   WarehouseLocation,
@@ -30,19 +29,12 @@ import type {
   Product,
   Shift,
   User,
-  Factory,
   AuditLog,
-  Notification,
   BiometricDevice,
   DailyAttendance,
   MonthlyAttendanceSummary,
   Note,
-  Terminal,
-  LeaveRequest,
-  PurchaseOrder,
-  GoodsReceipt,
-  Customer,
-  SalesOrder,
+  Terminal
 } from '../types/database.types';
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Target, TrendingUp, AlertCircle, Activity, Clock } from 'lucide-react';
+import { Target, TrendingUp, AlertCircle, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MetricProps {
