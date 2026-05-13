@@ -13,16 +13,19 @@ import {
   UploadedFile,
   BadRequestException,
   Req,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { Public } from '../auth/public.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { GetUsersQueryDto } from './dto/get-users-query.dto';
 
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -37,19 +40,12 @@ export class UsersController {
    */
   @Get()
   @Permissions('users:view')
-  @ApiOperation({ summary: 'Get all operators (Admin/Manager)' })
-  getAllOperators() {
-    return this.usersService.getAllOperators();
-  }
-
-  /**
-   * GET /api/users/terminal-list
-   * Accessible by any authenticated operator to switch profiles
-   */
-  @Get('terminal-list')
-  @ApiOperation({ summary: 'Get basic operator list for shared terminals' })
-  getTerminalOperators() {
-    return this.usersService.getTerminalOperators();
+  @ApiOperation({ summary: 'Get all operators scoped to caller role' })
+  @ApiQuery({ type: GetUsersQueryDto })
+  getAllOperators(@Req() req: any, @Query() query: GetUsersQueryDto) {
+    const callerId = req.user.id;
+    const callerRoles: string[] = req.user?.roles || (req.user?.role ? [req.user.role] : []);
+    return this.usersService.getAllOperators(callerId, callerRoles, query);
   }
 
   /**
@@ -59,8 +55,9 @@ export class UsersController {
   @Get('audit-logs')
   @Permissions('users:manage')
   @ApiOperation({ summary: 'Get system audit logs (Admin only)' })
-  getAuditLogs() {
-    return this.usersService.getAuditLogs();
+  getAuditLogs(@Req() req: any) {
+    const roles = req.user?.roles || [];
+    return this.usersService.getAuditLogs(roles);
   }
 
   /**
@@ -70,8 +67,10 @@ export class UsersController {
   @Get(':id')
   @Permissions('users:view')
   @ApiOperation({ summary: 'Get operator by ID (Admin/Manager)' })
-  getOperatorById(@Param('id') id: string) {
-    return this.usersService.getOperatorById(id);
+  getOperatorById(@Req() req: any, @Param('id') id: string) {
+    const callerId = req.user.id;
+    const roles = req.user?.roles || [];
+    return this.usersService.getOperatorById(id, callerId, roles);
   }
 
   /**
@@ -95,19 +94,19 @@ export class UsersController {
   @ApiOperation({ summary: 'Update operator details (Admin only)' })
   updateOperator(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateUserDto) {
     console.log(`[UsersController] PATCH user ${id} with DTO:`, dto);
-    return this.usersService.updateOperator(req.user.roles || [], id, dto);
+    const callerId = req.user.id;
+    const roles = req.user?.roles || [];
+    return this.usersService.updateOperator(callerId, roles, id, dto);
   }
 
   /**
    * PATCH /api/users/:id/toggle-active
    * Admin only — Toggle active/inactive status
    */
-  @Patch(':id/toggle-active')
-  @Permissions('users:manage')
-
-  @ApiOperation({ summary: 'Toggle operator active status (Admin only)' })
-  toggleActive(@Param('id') id: string) {
-    return this.usersService.toggleActive(id);
+  toggleActive(@Req() req: any, @Param('id') id: string) {
+    const callerId = req.user.id;
+    const roles = req.user?.roles || [];
+    return this.usersService.toggleActive(id, callerId, roles);
   }
 
   /**
@@ -163,7 +162,8 @@ export class UsersController {
   @Get(':id/audit-logs')
   @Permissions('users:view')
   @ApiOperation({ summary: 'Get user-specific audit logs' })
-  getUserAuditLogs(@Param('id') id: string) {
-    return this.usersService.getUserAuditLogs(id);
+  getUserAuditLogs(@Req() req: any, @Param('id') id: string) {
+    const roles = req.user?.roles || [];
+    return this.usersService.getUserAuditLogs(id, roles);
   }
 }

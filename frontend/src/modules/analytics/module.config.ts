@@ -21,19 +21,25 @@ export const analyticsConfig: ModuleConfig = {
   ],
   sidebarGroups: [
     {
-      id: 'dashboards',
-      label: 'Insights',
+      id: 'overview',
+      label: 'Overview',
       items: [
         {
           id: 'overview',
-          label: 'Overview',
+          label: 'Dashboard',
           icon: Globe,
-          path: '/overview', // Will be prefixed by layout path
+          path: '/overview',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-        },
+        }
+      ]
+    },
+    {
+      id: 'production',
+      label: 'Production',
+      items: [
         {
           id: 'analytics',
-          label: 'Analytics',
+          label: 'Efficiency',
           icon: BarChart3,
           path: '/analytics',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']

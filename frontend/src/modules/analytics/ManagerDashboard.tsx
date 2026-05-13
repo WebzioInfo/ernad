@@ -1,324 +1,345 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
+import { ENDPOINTS } from '../../constants/endpoints';
 import { motion } from 'framer-motion';
 import {
   Package, AlertTriangle,
   Users, Activity, Clock,
-  ClipboardList, TrendingUp,
-  Gauge, Layers, RefreshCw
+  Layers, RefreshCw, LayoutDashboard,
+  Play, Monitor, BarChart3,
+  History, ShieldCheck, Gauge,
+  ChevronRight, ArrowUpRight
 } from 'lucide-react';
-import {
-  XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, BarChart, Bar
-} from 'recharts';
-import { StatusCard } from './components/DashboardCards';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { cn } from '../../lib/utils';
+import useAuthStore from '../auth/auth.store';
 
 const ManagerDashboard = memo(() => {
-  const { filters } = useOutletContext<{ filters: any }>();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const roleBase = user?.role?.toLowerCase() === 'manager' ? '/manager' : '/admin';
 
-  // 1. Live Factory State
-  const { data: factoryLive, refetch: refetchLive, isLoading: loadingLive } = useQuery({
+  // Parallel Fetching with Independent Error Handling
+  const factoryQuery = useQuery({
     queryKey: ['factory-live-manager'],
-    queryFn: async () => (await api.get('/analytics/factory/live')).data
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,
+    refetchInterval: 30000,
+    retry: 1
   });
 
-  // 2. Inventory Alerts
-  const { data: inventory } = useQuery({
-    queryKey: ['inventory-alerts'],
-    queryFn: async () => (await api.get('/inventory')).data
+  const machineQuery = useQuery({
+    queryKey: ['machine-efficiency'],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_EFFICIENCY)).data,
+    retry: 1,
+    staleTime: 60000
   });
 
-  const isLive = filters.timeRange === 'live';
+  const avgEfficiency = useMemo(() => {
+    if (!machineQuery.data || machineQuery.data.length === 0) return 0;
+    const sum = machineQuery.data.reduce((acc: number, m: any) => acc + (m.efficiency || 0), 0);
+    return Math.round(sum / machineQuery.data.length);
+  }, [machineQuery.data]);
 
-  const getDates = () => {
-    const end = new Date();
-    const start = new Date();
-    if (filters.timeRange === 'today') start.setHours(0, 0, 0, 0);
-    else if (filters.timeRange === 'week') start.setDate(start.getDate() - 7);
-    else if (filters.timeRange === 'month') start.setDate(start.getDate() - 30);
-    return { start, end };
-  };
-
-  const { start, end } = getDates();
-
-  const { data: historicalData } = useQuery({
-    queryKey: ['manager-historical', filters.timeRange],
-    queryFn: async () => {
-      if (isLive) return [];
-      const res = await api.get('/analytics/historical', {
-        params: {
-          startDate: start.toISOString(),
-          endDate: end.toISOString(),
-          interval: filters.timeRange === 'today' ? 'hour' : 'day'
-        }
-      });
-      return res.data.map((d: any) => ({
-        name: filters.timeRange === 'today' ? new Date(d.time).getHours() + ':00' : new Date(d.time).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-        value: Number(d.totalProduction)
-      }));
-    },
-    enabled: !isLive
-  });
+  const alerts = useMemo(() => {
+    const list = [];
+    if (factoryQuery.data?.activeDowntimes?.length > 0) {
+      list.push({ type: 'DOWNTIME', count: factoryQuery.data.activeDowntimes.length, label: 'Active Stops', color: 'rose' });
+    }
+    if (factoryQuery.data?.lowStockAlerts?.length > 0) {
+      list.push({ type: 'STOCK', count: factoryQuery.data.lowStockAlerts.length, label: 'Low Stock', color: 'amber' });
+    }
+    return list;
+  }, [factoryQuery.data]);
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4 uppercase italic">
-            <div className="w-12 h-12 bg-amber-500 text-white rounded-2xl flex items-center justify-center shadow-2xl shadow-amber-200">
-              <ClipboardList className="w-7 h-7" />
-            </div>
-            Tactical Management
-          </h2>
-          <p className="text-slate-500 font-bold mt-2 ml-1 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live shop-floor oversight & material reconciliation.
-          </p>
-        </div>
-        <button
-          onClick={() => refetchLive()}
-          className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm active:scale-95 group"
-        >
-          <RefreshCw className={`w-4 h-4 ${loadingLive ? 'animate-spin text-indigo-500' : ''}`} />
-          Sync Factory Data
-        </button>
-      </header>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <StatusCard
-          label="Current Output"
-          value={factoryLive?.counters?.packing?.toLocaleString() || '0'}
-          subLabel="Units Packed Today"
-          icon={Activity}
-          color="indigo"
-          delay={0.1}
-        />
-        <StatusCard
-          label="Active Batches"
-          value={factoryLive?.activeBatches?.length || '0'}
-          subLabel="Across All Lines"
-          icon={Layers}
-          color="amber"
-          delay={0.2}
-        />
-        <StatusCard
-          label="Global Yield"
-          value={factoryLive?.counters?.blowing > 0 ? ((factoryLive?.counters?.packing / factoryLive?.counters?.blowing) * 100).toFixed(1) + '%' : '100%'}
-          subLabel="Efficiency Score"
-          icon={Gauge}
-          color="emerald"
-          delay={0.3}
-        />
-        <StatusCard
-          label="Rejections"
-          value={factoryLive?.counters?.rejection?.toLocaleString() || '0'}
-          subLabel="Quality Failures"
-          icon={AlertTriangle}
-          color="rose"
-          delay={0.4}
-        />
+      {/* ─── 1. HERO SUMMARY SECTION ─── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <CompactKPICard label="Active Lines" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.summary?.activeLinesCount || 0)} icon={Activity} color="indigo" />
+        <CompactKPICard label="Running Batches" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.activeBatches?.length || 0)} icon={Layers} color="blue" />
+        <CompactKPICard label="Machine OEE" value={machineQuery.isLoading ? '...' : `${avgEfficiency}%`} icon={Gauge} color="emerald" sub="Avg" isAlert={machineQuery.isError} />
+        <CompactKPICard label="Units Packed" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.counters?.packing?.toLocaleString() || 0)} icon={Package} color="slate" />
+        <CompactKPICard label="System Alerts" value={factoryQuery.isLoading ? '...' : alerts.reduce((a, b) => a + b.count, 0)} icon={AlertTriangle} color="rose" isAlert={alerts.length > 0 || factoryQuery.isError} />
+        <CompactKPICard label="Staff Active" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.summary?.activeOperatorsCount || 0)} icon={Users} color="cyan" />
+        <CompactKPICard label="Downtime Today" value={factoryQuery.isLoading ? '...' : `${factoryQuery.data?.summary?.totalDowntimeToday || 0}m`} icon={Clock} color="amber" />
       </div>
 
-      <div className="grid grid-cols-12 gap-10">
-        <div className="col-span-12 lg:col-span-8 space-y-10">
-          {/* Active Batches Section */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5 }}
-            className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-sm relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-amber-500/10 transition-all duration-1000" />
-            <div className="flex justify-between items-center mb-8 relative z-10">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                <Clock className="w-6 h-6 text-amber-500" />
-                Active Batch Progress
-              </h3>
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-100">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                Factory Live
-              </div>
+      <div className="grid grid-cols-12 gap-8">
+
+        {/* Left Column: Actions & Pipeline */}
+        <div className="col-span-12 lg:col-span-8 space-y-8">
+
+          {/* ─── 2. QUICK ACTION ZONE ─── */}
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Strategic Interventions</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <ActionTile icon={LayoutDashboard} label="Production Floor" path={`${roleBase}/production`} color="indigo" />
+              <ActionTile icon={Play} label="Start New Batch" path={`${roleBase}/production?action=start`} color="emerald" />
+              <ActionTile icon={BarChart3} label="OEE Analytics" path={`${roleBase}/analytics`} color="violet" />
+              <ActionTile icon={Package} label="Inventory Status" path={`${roleBase}/inventory`} color="amber" />
+              <ActionTile icon={ShieldCheck} label="Quality Control" path={`${roleBase}/quality`} color="rose" />
+              <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
+              <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/users`} color="cyan" />
+            </div>
+          </section>
+
+          {/* ─── 4. LIVE FACTORY SNAPSHOT ─── */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Active Production Snapshot</h3>
+              <button onClick={() => navigate(`${roleBase}/production`)} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1">
+                Full Control View <ArrowUpRight className="w-3 h-3" />
+              </button>
             </div>
 
-            <div className="space-y-6 relative z-10">
-              {!factoryLive?.activeBatches?.length && (
-                <div className="py-20 text-center bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
-                  <Package className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                  <p className="text-slate-400 font-bold italic">No batches currently active on the floor.</p>
+            <div className="space-y-3 min-h-[100px] relative">
+              {factoryQuery.isLoading ? (
+                <div className="py-20 flex flex-col items-center justify-center bg-slate-50/30 rounded-[2.5rem] border border-slate-100">
+                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Polling Factory Stream...</p>
                 </div>
-              )}
-              {factoryLive?.activeBatches?.map((batch: any, i: number) => {
-                const efficiency = 90 + Math.random() * 8; // Simulation for now
-                const progress = 40 + Math.random() * 50;
-
-                return (
-                  <motion.div
+              ) : factoryQuery.isError ? (
+                <div className="py-20 flex flex-col items-center justify-center bg-rose-50/30 rounded-[2.5rem] border border-rose-100">
+                  <AlertTriangle className="w-8 h-8 text-rose-500 mb-4" />
+                  <p className="text-rose-600 text-[10px] font-black uppercase tracking-widest">Connectivity Error</p>
+                  <button onClick={() => factoryQuery.refetch()} className="mt-4 px-4 py-2 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-rose-900/20">Retry Sync</button>
+                </div>
+              ) : !factoryQuery.data?.activeBatches?.length ? (
+                <div className="py-16 text-center bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
+                  <Package className="w-10 h-10 text-slate-200 mx-auto mb-4" />
+                  <p className="text-slate-400 font-bold italic text-sm">Factory currently on standby.</p>
+                </div>
+              ) : (
+                factoryQuery.data.activeBatches.map((batch: any, i: number) => (
+                  <PipelineCard
                     key={batch.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 + (i * 0.1) }}
-                    className="p-8 bg-slate-50/80 backdrop-blur-sm rounded-[2rem] border border-slate-100 hover:bg-white hover:shadow-2xl hover:shadow-slate-200/50 transition-all group"
-                  >
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-6">
-                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center font-black text-xl text-indigo-600 shadow-sm border border-slate-100 group-hover:scale-110 transition-transform">
-                          {batch.line?.split(' ')[1] || '1'}
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{batch.batchCode}</p>
-                          <p className="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{batch.product}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Efficiency</p>
-                        <p className="text-2xl font-black text-emerald-600 tracking-tighter">{efficiency.toFixed(1)}%</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        <span>Throughput Progress</span>
-                        <span>{Math.round(progress)}%</span>
-                      </div>
-                      <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progress}%` }}
-                          transition={{ duration: 1.5, ease: "easeOut" }}
-                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.4)]"
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-
-          {/* Historical Trends */}
-          <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-all duration-700" />
-            <div className="flex justify-between items-center mb-10 relative z-10">
-              <h3 className="text-2xl font-black flex items-center gap-3 tracking-tight">
-                <TrendingUp className="w-6 h-6 text-indigo-400" />
-                Throughput Velocity
-              </h3>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trend Synthesis</span>
-              </div>
-            </div>
-            <div className="h-[300px] w-full relative z-10">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={isLive ? [] : historicalData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', backgroundColor: '#1e293b', color: '#fff' }}
-                    cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                    batch={batch}
+                    machines={machineQuery.data}
+                    i={i}
+                    machineError={machineQuery.isError}
+                    isLoading={machineQuery.isLoading}
                   />
-                  <Bar dataKey="value" fill="#6366f1" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-              {isLive && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm rounded-3xl border border-white/5">
-                  <p className="text-slate-400 font-bold italic">Historical view disabled in Live Mode.</p>
-                </div>
+                ))
               )}
             </div>
-          </div>
+          </section>
         </div>
 
-        <div className="col-span-12 lg:col-span-4 space-y-10">
-          {/* Inventory Risk Rail */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="bg-white border border-slate-100 rounded-[3rem] p-10 shadow-sm relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:scale-110 transition-transform duration-700">
-              <Package className="w-32 h-32 text-indigo-600" />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 mb-2 relative z-10 flex items-center gap-3">
-              <Package className="w-5 h-5 text-indigo-500" />
-              Material Watch
-            </h3>
-            <p className="text-slate-500 font-bold text-sm mb-8 relative z-10 leading-relaxed">Active monitoring of raw material stocks and procurement requirements.</p>
+        {/* Right Column: Alerts & Sync */}
+        <div className="col-span-12 lg:col-span-4 space-y-8">
 
-            <div className="space-y-4 relative z-10">
-              {inventory?.filter((m: any) => Number(m.quantity) <= Number(m.minimumStock)).slice(0, 4).map((item: any, i: number) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.8 + (i * 0.1) }}
-                  className="p-5 bg-slate-50 border border-slate-100 rounded-2xl shadow-sm hover:border-amber-200 hover:bg-white transition-all cursor-pointer group/item"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-[10px] font-black uppercase text-amber-500 tracking-widest">{item.categoryName}</p>
-                    <div className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded-md text-[8px] font-black">CRITICAL</div>
-                  </div>
-                  <p className="text-sm font-black text-slate-800 group-hover/item:text-indigo-600 transition-colors">{item.itemName}</p>
-                  <div className="flex justify-between items-center mt-4 text-[10px] font-black uppercase tracking-widest">
-                    <span className="text-slate-400">Current: <span className="text-slate-900">{item.quantity} {item.unit}</span></span>
-                    <span className="text-slate-400">Min: <span className="text-slate-900">{item.minimumStock}</span></span>
-                  </div>
-                  <div className="mt-3 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-rose-500 rounded-full"
-                      style={{ width: `${Math.max(10, (Number(item.quantity) / Number(item.minimumStock)) * 100)}%` }}
-                    />
-                  </div>
-                </motion.div>
-              ))}
-              {!inventory?.some((m: any) => Number(m.quantity) <= Number(m.minimumStock)) && (
-                <div className="py-12 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                  <p className="text-slate-400 text-xs font-bold italic">Stock levels optimal.</p>
+          {/* ─── 3. ALERTS PANEL ─── */}
+          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 h-full flex flex-col min-h-[400px]">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-rose-500" />
+                Critical Alerts
+              </h3>
+              <button
+                onClick={() => factoryQuery.refetch()}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  factoryQuery.isFetching ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                )}
+              >
+                <RefreshCw className={cn("w-4 h-4", factoryQuery.isFetching && "animate-spin")} />
+              </button>
+            </div>
+
+            <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
+              {factoryQuery.isLoading ? (
+                <div className="flex flex-col items-center justify-center h-48 animate-pulse">
+                  <div className="w-full h-12 bg-slate-50 rounded-2xl mb-4" />
+                  <div className="w-full h-12 bg-slate-50 rounded-2xl" />
                 </div>
-              )}
-            </div>
-            <button className="w-full mt-10 py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 shadow-xl transition-all active:scale-95">
-              Generate Inventory Report
-            </button>
-          </motion.div>
+              ) : (alerts.length === 0 && !factoryQuery.isError) ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center px-6">
+                  <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-4">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <p className="text-slate-400 text-xs font-bold leading-relaxed uppercase tracking-widest">
+                    Operational Integrity Optimal
+                  </p>
+                </div>
+              ) : factoryQuery.isError ? (
+                <div className="text-center py-10">
+                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Alert Sync Failed</p>
+                </div>
+              ) : null}
 
-          {/* Manager Actions */}
-          <div className="bg-indigo-600 rounded-[3rem] p-10 text-white shadow-2xl shadow-indigo-200">
-            <h3 className="text-xl font-black mb-4">Direct Intervention</h3>
-            <p className="text-indigo-100 text-sm font-bold mb-8 leading-relaxed">Authorized override for batch correction, downtime categorization and floor staffing.</p>
-            <div className="space-y-4">
-              <button className="w-full py-4 bg-white/10 border border-white/20 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
-                Staffing Roster
-              </button>
-              <button className="w-full py-4 bg-white text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all shadow-xl">
-                Recalculate Batch Metrics
-              </button>
-            </div>
-          </div>
+              {factoryQuery.data?.activeDowntimes?.map((stop: any) => (
+                <AlertItem
+                  key={stop.id}
+                  type="DOWNTIME"
+                  title={`Stop: ${stop.reason?.replace('_', ' ')}`}
+                  sub={`${stop.line} • ${stop.station}`}
+                />
+              ))}
 
-          {/* Attendance Overview */}
-          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
-            <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center gap-3">
-              <Users className="w-5 h-5 text-indigo-500" />
-              Team Status
-            </h3>
-            <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100">
-              <div className="flex-1">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Attendance Score</p>
-                <p className="text-3xl font-black text-slate-900 tabular-nums tracking-tighter">92%</p>
-              </div>
-              <div className="w-16 h-16 rounded-full border-4 border-indigo-100 border-t-indigo-600 flex items-center justify-center font-black text-xs">
-                +4%
+              {factoryQuery.data?.lowStockAlerts?.map((item: any) => (
+                <AlertItem
+                  key={item.id}
+                  type="STOCK"
+                  title={`Low Stock: ${item.itemName}`}
+                  sub={`${item.quantity} ${item.unit} left`}
+                />
+              ))}
+            </div>
+
+            <div className="mt-10 pt-10 border-t border-slate-50">
+              <div className="p-6 bg-slate-900 rounded-3xl text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
+                  <Activity className="w-16 h-16" />
+                </div>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Shift Performance</p>
+                <p className="text-sm font-bold leading-relaxed text-slate-300">
+                  The morning shift has achieved <span className="text-emerald-400">104% of target</span>. No critical staff shortages reported.
+                </p>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>
   );
 });
+
+// ─── HELPER COMPONENTS ───
+
+const CompactKPICard = ({ label, value, icon: Icon, color, sub, isAlert }: any) => {
+  const colorMap: Record<string, string> = {
+    indigo: 'bg-indigo-50 text-indigo-600',
+    blue: 'bg-blue-50 text-blue-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    slate: 'bg-slate-50 text-slate-600',
+    rose: 'bg-rose-50 text-rose-600',
+    cyan: 'bg-cyan-50 text-cyan-600',
+    amber: 'bg-amber-50 text-amber-600',
+  };
+
+  const alertClasses = 'bg-rose-500 text-white';
+  const normalClasses = colorMap[color] || 'bg-slate-50 text-slate-600';
+
+  return (
+    <div className={cn(
+      "bg-white rounded-2xl p-4 border shadow-sm transition-all hover:shadow-md",
+      isAlert ? "border-rose-200 bg-rose-50/30" : "border-slate-100"
+    )}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className={cn(
+          "w-7 h-7 rounded-lg flex items-center justify-center",
+          isAlert ? alertClasses : normalClasses
+        )}>
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest truncate">{label}</p>
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <h4 className={cn("text-xl font-black tracking-tight", isAlert ? "text-rose-600" : "text-slate-900")}>
+          {value}
+        </h4>
+        {sub && <span className="text-[8px] font-bold text-slate-400 uppercase">{sub}</span>}
+      </div>
+    </div>
+  );
+};
+
+const ActionTile = ({ icon: Icon, label, path, color }: any) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(path)}
+      className="flex flex-col items-center gap-3 p-5 bg-white border border-slate-100 rounded-3xl hover:border-indigo-200 hover:shadow-lg transition-all group active:scale-95"
+    >
+      <div className={cn(
+        "w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm",
+        `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white`
+      )}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest text-center leading-tight">
+        {label}
+      </span>
+    </button>
+  );
+};
+
+const PipelineCard = ({ batch, machines, i, machineError, isLoading }: any) => {
+  const navigate = useNavigate();
+  const machine = machines?.find((m: any) => m.name === batch.line);
+  const efficiency = machine?.efficiency || 0;
+  const progress = batch.progress || 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 * i }}
+      onClick={() => {
+        const { user } = useAuthStore.getState();
+        const roleBase = user?.role?.toLowerCase() === 'manager' ? '/manager' : '/admin';
+        navigate(`${roleBase}/reports/batch/${batch.id}`);
+      }}
+      className="p-5 bg-white rounded-2xl border border-slate-100 flex items-center justify-between gap-6 group hover:shadow-xl hover:shadow-slate-200/40 transition-all cursor-pointer"
+    >
+      <div className="flex items-center gap-5 min-w-[200px]">
+        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-lg text-slate-400 border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">
+          {batch.line?.split(' ')[1] || '1'}
+        </div>
+        <div>
+          <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">{batch.batchCode}</p>
+          <h4 className="text-sm font-black text-slate-900 truncate group-hover:text-indigo-600 transition-colors">{batch.product}</h4>
+        </div>
+      </div>
+
+      <div className="flex-1 hidden sm:block max-w-[200px]">
+        <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">
+          <span>Progress</span>
+          <span>{Math.round(progress)}%</span>
+        </div>
+        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            className="h-full bg-indigo-500 rounded-full"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-6">
+        <div className="text-right">
+          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">OEE</p>
+          <p className={cn(
+            "text-sm font-black tracking-tighter",
+            machineError ? "text-rose-400" : "text-emerald-600"
+          )}>
+            {isLoading ? '...' : (machineError ? 'ERR' : `${efficiency.toFixed(0)}%`)}
+          </p>
+        </div>
+        <div className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black uppercase tracking-widest">
+          {batch.status}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const AlertItem = ({ type, title, sub }: any) => (
+  <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-50 rounded-2xl hover:bg-white hover:border-slate-200 transition-all group cursor-pointer">
+    <div className={cn(
+      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+      type === 'DOWNTIME' ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
+    )}>
+      {type === 'DOWNTIME' ? <Activity className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-[10px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase truncate">{title}</p>
+      <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">{sub}</p>
+    </div>
+    <ChevronRight className="w-3 h-3 text-slate-300 group-hover:translate-x-1 transition-transform" />
+  </div>
+);
 
 export default ManagerDashboard;

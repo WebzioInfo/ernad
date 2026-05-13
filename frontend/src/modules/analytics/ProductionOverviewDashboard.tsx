@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api-client';
+import { ENDPOINTS } from '../../constants/endpoints';
 import { 
   Zap, Package, CheckCircle2, AlertTriangle
 } from 'lucide-react';
@@ -24,7 +25,7 @@ export default function ProductionOverviewDashboard() {
     queryKey: ['factory-summary', filters],
     queryFn: async () => {
       try {
-        const res = await api.get('/analytics/line-performance', {
+        const res = await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, {
           params: {
             lineId: filters.lineId,
             brandId: filters.brandId !== 'all' ? filters.brandId : undefined,

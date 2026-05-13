@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, forwardRef } from 'react';
+import { useState, memo, useCallback, useEffect, forwardRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -11,19 +11,156 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ENDPOINTS } from '../../constants/endpoints';
+
+const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shifts, idx = 0 }: any, ref: any) => {
+  const queryClient = useQueryClient();
+  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
+
+  // Form State
+  const [selectedShift, setSelectedShift] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState('');
+  const [batchCode, setBatchCode] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
+
+  const startMutation = useMutation({
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.START_BATCH, {
+      lineId: line.id,
+      shiftId: selectedShift,
+      brandId: selectedBrand,
+      productId: selectedProduct,
+      batchCode: batchCode || undefined,
+      remarks,
+      startTime: new Date(startTime).toISOString()
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+      setIsStartModalOpen(false);
+      toast.success('Production started successfully');
+    }
+  });
+
+  const completeChangeoverMutation = useMutation({
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.COMPLETE_CHANGEOVER(line.batch?.id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
+      toast.success('Changeover completed. Production is now LIVE.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to complete changeover')
+  });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.1 }}
+      className="bg-white/80 backdrop-blur-xl rounded-[3.5rem] p-10 border border-white shadow-2xl hover:shadow-indigo-100/50 transition-all group relative overflow-hidden"
+    >
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+
+      <div className="flex justify-between items-start mb-10 relative z-10">
+        <div onClick={onFocus} className="flex items-center gap-6 cursor-pointer">
+          <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl group-hover:bg-indigo-600 transition-all duration-500">
+            <Settings2 className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{line.name}</h3>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${line.status === 'RUNNING' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' :
+                line.status === 'CHANGEOVER' ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' :
+                  line.status === 'MAINTENANCE' ? 'bg-rose-500' :
+                    'bg-slate-300'
+                } ${['RUNNING', 'CHANGEOVER'].includes(line.status) ? 'animate-pulse' : ''}`} />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                {line.status}
+              </span>
+            </div>
+          </div>
+        </div>
+        <button className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 transition-all">
+          <MoreVertical className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6 mb-10 relative z-10">
+        <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Efficiency Index</p>
+          <p className="text-xl font-black text-slate-900 leading-none flex items-center gap-2">
+            {line.status === 'RUNNING' ? '84.2%' : '0.0%'}
+            <Activity className="w-4 h-4 text-emerald-500" />
+          </p>
+        </div>
+        <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Batch</p>
+          <p className="text-xl font-black text-slate-900 truncate leading-none">{line?.batch?.batchCode || 'STBY-NODE'}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-4 relative z-10">
+        <button onClick={onFocus} className="flex-[2] py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 hover:bg-indigo-600 shadow-xl shadow-slate-200">
+          Enter Commander <ArrowLeft className="w-4 h-4 rotate-180" />
+        </button>
+        {line.status === 'IDLE' && (
+          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100">
+            <Play className="w-4 h-4 fill-white" /> Start
+          </button>
+        )}
+        {line.status === 'CHANGEOVER' && (
+          <button 
+            onClick={() => completeChangeoverMutation.mutate()} 
+            disabled={completeChangeoverMutation.isPending}
+            className="flex-1 py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-100"
+          >
+            {completeChangeoverMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-white" />} 
+            Finish Changeover
+          </button>
+        )}
+      </div>
+
+      {isStartModalOpen && (
+        <Modal full onClose={() => setIsStartModalOpen(false)}>
+          <div className="bg-slate-50/50 p-12 rounded-[3rem] border border-slate-100 shadow-inner">
+            <StartProductionForm
+              shifts={shifts}
+              brands={brands}
+              products={products}
+              selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+              selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+              selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+              batchCode={batchCode} setBatchCode={setBatchCode}
+              startTime={startTime} setStartTime={setStartTime}
+              remarks={remarks} setRemarks={setRemarks}
+              onSubmit={() => startMutation.mutate()}
+              isPending={startMutation.isPending}
+            />
+          </div>
+        </Modal>
+      )}
+    </motion.div>
+  );
+}));
 
 export default function ProductionControlPage() {
   const { filters, setFilters } = useOutletContext<{ filters: any; setFilters: (f: any) => void }>();
 
-  const { data: brands } = useQuery({ queryKey: ['brands'], queryFn: async () => (await api.get('/master-data/brands')).data });
-  const { data: products } = useQuery({ queryKey: ['products'], queryFn: async () => (await api.get('/master-data/products')).data });
-  const { data: shifts } = useQuery({ queryKey: ['shifts'], queryFn: async () => (await api.get('/master-data/shifts')).data });
+  const { data: brands } = useQuery({ queryKey: ['brands'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data });
+  const { data: products } = useQuery({ queryKey: ['products'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data });
+  const { data: shifts } = useQuery({ queryKey: ['shifts'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data });
 
   const { data: lines, isLoading } = useQuery({
     queryKey: ['production-lines'],
-    queryFn: async () => (await api.get('/master-data/lines')).data,
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data,
     refetchInterval: 15000,
   });
+
+  const { data: operatorsData } = useQuery({
+    queryKey: ['operators'],
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.LIST, { params: { role: 'operator' } })).data
+  });
+  const operators = operatorsData?.data || [];
 
   const handleBack = useCallback(() => setFilters({ lineId: 'all' }), [setFilters]);
   const handleFocus = useCallback((id: string) => setFilters({ lineId: id }), [setFilters]);
@@ -48,6 +185,7 @@ export default function ProductionControlPage() {
         brands={brands}
         products={products}
         shifts={shifts}
+        operators={operators}
       />
     );
   }
@@ -95,17 +233,17 @@ export default function ProductionControlPage() {
   );
 }
 
-function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
+function ProductionCommander({ line, onBack, brands, products, shifts, operators }: any) {
   const navigate = useNavigate();
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
-    queryFn: async () => (await api.get('/analytics/line-performance', { params: { lineId: line.id } })).data,
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, { params: { lineId: line.id } })).data,
     refetchInterval: 5000
   });
 
   const { data: batchHistory } = useQuery({
     queryKey: ['line-batch-history', line.id],
-    queryFn: async () => (await api.get(`/production/batches`, { params: { lineId: line.id, status: 'COMPLETED,CLOSED,QC_PENDING' } })).data,
+    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES, { params: { lineId: line.id, status: 'COMPLETED,CLOSED,QC_PENDING' } })).data,
   });
 
   return (
@@ -315,7 +453,7 @@ function ProductionCommander({ line, onBack, brands, products, shifts }: any) {
           <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
             <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Station Control</h3>
             <div className="space-y-4">
-              <LineControlButtons line={line} brands={brands} products={products} shifts={shifts} />
+              <LineControlButtons line={line} brands={brands} products={products} shifts={shifts} operators={operators} />
             </div>
           </div>
 
@@ -364,12 +502,14 @@ const TelemetryCard = memo(({ label, value, icon: Icon, color, sub, delay = 0 }:
   );
 });
 
-function LineControlButtons({ line, brands, products, shifts }: any) {
+function LineControlButtons({ line, brands, products, shifts, operators }: any) {
   const queryClient = useQueryClient();
   const [selectedShift, setSelectedShift] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [batchCode, setBatchCode] = useState('');
+  const [targetQuantity, setTargetQuantity] = useState<number>(5000);
+  const [selectedOperators, setSelectedOperators] = useState<string[]>([]);
   const [remarks, setRemarks] = useState('');
   const [stopRemarks, setStopRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
@@ -385,14 +525,16 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
   };
 
   const startMutation = useMutation({
-    mutationFn: () => api.post(`/production/start`, {
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.START_BATCH, {
       lineId: line.id,
       shiftId: selectedShift,
       brandId: selectedBrand,
       productId: selectedProduct,
       batchCode: batchCode || undefined,
       remarks,
-      startTime: new Date(startTime).toISOString()
+      startTime: new Date(startTime).toISOString(),
+      targetQuantity,
+      operatorIds: selectedOperators
     }),
     onSuccess: () => {
       invalidate();
@@ -406,7 +548,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
         toast.error('No active batch found to close');
         throw new Error('No active batch ID');
       }
-      return api.put(`/production/${line.batch.id}/close`, {
+      return api.patch(ENDPOINTS.PRODUCTION.CLOSE_BATCH(line.batch.id), {
         remarks: stopRemarks,
         endTime: new Date(stopEndTime).toISOString(),
         materialReturn: materialReturns
@@ -424,7 +566,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
   });
 
   const changeoverMutation = useMutation({
-    mutationFn: () => api.post(`/production/line/${line.id}/changeover`, {
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.LINE_CHANGEOVER(line.id), {
       productId: changeoverProduct,
       batchId: line.batch?.id
     }),
@@ -435,15 +577,40 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
     }
   });
 
+  const completeChangeoverMutation = useMutation({
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.COMPLETE_CHANGEOVER(line.batch?.id)),
+    onSuccess: () => {
+      invalidate();
+      toast.success('Changeover completed. Line is now RUNNING.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Failed to complete changeover')
+  });
+
+  const [reopenReason, setReopenReason] = useState('');
+  const [reopenModalOpen, setReopenModalOpen] = useState(false);
+  const reopenMutation = useMutation({
+    mutationFn: () => api.post(ENDPOINTS.PRODUCTION.REOPEN_BATCH(line.batch?.id), { reason: reopenReason }),
+    onSuccess: () => {
+      invalidate();
+      setReopenModalOpen(false);
+      setReopenReason('');
+      toast.success('Batch successfully REOPENED. Production line is now ACTIVE.');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Reopen failed')
+  });
+
   if (line.status === 'IDLE') {
     return (
       <StartProductionForm
         shifts={shifts}
         brands={brands}
         products={products}
+        operators={operators}
         selectedShift={selectedShift} setSelectedShift={setSelectedShift}
         selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
         selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+        selectedOperators={selectedOperators} setSelectedOperators={setSelectedOperators}
+        targetQuantity={targetQuantity} setTargetQuantity={setTargetQuantity}
         batchCode={batchCode} setBatchCode={setBatchCode}
         startTime={startTime} setStartTime={setStartTime}
         remarks={remarks} setRemarks={setRemarks}
@@ -454,21 +621,75 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <button
-        onClick={() => setStopConfirmOpen(true)}
-        disabled={!line.batch || stopMutation.isPending}
-        className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group disabled:opacity-50"
-      >
-        {stopMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
-        <span className="text-[10px] font-black uppercase tracking-widest">
-          {stopMutation.isPending ? 'Closing...' : 'End Batch'}
-        </span>
-      </button>
-      <button onClick={() => setChangeoverModalOpen(true)} className="flex flex-col items-center gap-3 p-8 bg-amber-500 text-white rounded-[2.5rem] hover:bg-amber-600 transition-all group">
-        <RefreshCcw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
-        <span className="text-[10px] font-black uppercase tracking-widest">Changeover</span>
-      </button>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        {line.status === 'CHANGEOVER' ? (
+          <button
+            onClick={() => completeChangeoverMutation.mutate()}
+            disabled={completeChangeoverMutation.isPending}
+            className="col-span-2 flex flex-col items-center gap-3 p-8 bg-emerald-600 text-white rounded-[2.5rem] hover:bg-emerald-700 transition-all group shadow-xl shadow-emerald-900/20"
+          >
+            {completeChangeoverMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Play className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
+            <span className="text-[10px] font-black uppercase tracking-widest">Complete Changeover & Start</span>
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => setStopConfirmOpen(true)}
+              disabled={!line.batch || stopMutation.isPending}
+              className="flex flex-col items-center gap-3 p-8 bg-slate-900 text-white rounded-[2.5rem] hover:bg-black transition-all group disabled:opacity-50"
+            >
+              {stopMutation.isPending ? <Loader2 className="w-6 h-6 animate-spin" /> : <Square className="w-6 h-6 fill-white group-hover:scale-110 transition-transform" />}
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                {stopMutation.isPending ? 'Closing...' : 'End Batch'}
+              </span>
+            </button>
+            <button onClick={() => setChangeoverModalOpen(true)} className="flex flex-col items-center gap-3 p-8 bg-amber-500 text-white rounded-[2.5rem] hover:bg-amber-600 transition-all group">
+              <RefreshCcw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Changeover</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      {['QC_PENDING', 'COMPLETED', 'CLOSED'].includes(line.batch?.status) && (
+        <button
+          onClick={() => setReopenModalOpen(true)}
+          className="w-full py-5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-100 transition-all flex items-center justify-center gap-3"
+        >
+          <RefreshCcw className="w-4 h-4" /> Reopen Session for Correction
+        </button>
+      )}
+
+      {reopenModalOpen && (
+        <Modal onClose={() => setReopenModalOpen(false)}>
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+              <RefreshCcw className="w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Reactivate Session?</h3>
+            <p className="text-slate-500 font-medium mt-2 leading-relaxed">This will move the batch status back to RUNNING and reactivate line telemetry tracking. Mandatory audit reason required.</p>
+          </div>
+
+          <textarea
+            value={reopenReason}
+            onChange={(e) => setReopenReason(e.target.value)}
+            placeholder="Reason for reopening (e.g. Correction required for last pallet count)..."
+            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-32 resize-none mb-8"
+          />
+
+          <div className="flex gap-4">
+            <button onClick={() => setReopenModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Abort</button>
+            <button
+              onClick={() => reopenMutation.mutate()}
+              disabled={!reopenReason || reopenMutation.isPending}
+              className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 disabled:opacity-50"
+            >
+              {reopenMutation.isPending ? 'Processing...' : 'Authorize Reopen'}
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {stopConfirmOpen && (
         <Modal onClose={() => setStopConfirmOpen(false)}>
@@ -552,244 +773,123 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
 }
 
 function StartProductionForm({
-  shifts, brands, products,
-  selectedShift, setSelectedShift,
-  selectedBrand, setSelectedBrand,
-  selectedProduct, setSelectedProduct,
-  batchCode, setBatchCode,
-  startTime, setStartTime,
-  remarks, setRemarks,
-  onSubmit, isPending
-}: any) {
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
-        <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-          <option value="">Select Shift</option>
-          {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
+    shifts, brands, products, operators,
+    selectedShift, setSelectedShift,
+    selectedBrand, setSelectedBrand,
+    selectedProduct, setSelectedProduct,
+    selectedOperators, setSelectedOperators,
+    targetQuantity, setTargetQuantity,
+    batchCode, setBatchCode,
+    startTime, setStartTime,
+    remarks, setRemarks,
+    onSubmit, isPending
+  }: any) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
+            <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+              <option value="">Select Shift</option>
+              {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Target Quantity (PCS)</label>
+            <input type="number" value={targetQuantity} onChange={(e) => setTargetQuantity(Number(e.target.value))} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand</label>
+            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+              <option value="">Select Brand</option>
+              {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Product</label>
+            <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+              <option value="">Select Product</option>
+              {products?.filter((p: any) => p.brandId === selectedBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+        </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand</label>
-          <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-            <option value="">Select Brand</option>
-            {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Product</label>
-          <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-            <option value="">Select Product</option>
-            {products?.filter((p: any) => p.brandId === selectedBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Auto-gen if empty)</label>
-        <input
-          type="text"
-          placeholder="e.g. NB-20260505-001"
-          value={batchCode}
-          onChange={(e) => setBatchCode(e.target.value)}
-          className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>
-        <input
-          type="datetime-local"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700"
-        />
-      </div>
-
-      <textarea
-        value={remarks}
-        onChange={(e) => setRemarks(e.target.value)}
-        placeholder="Shift remarks (optional)..."
-        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-20 resize-none"
-      />
-      <button
-        onClick={onSubmit}
-        disabled={!selectedProduct || !selectedShift || isPending}
-        className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50"
-      >
-        {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
-        Commit Production Start
-      </button>
-    </div>
-  );
-}
-
-const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shifts, idx = 0 }: any, ref: any) => {
-  const queryClient = useQueryClient();
-  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
-
-  // Form State
-  const [selectedShift, setSelectedShift] = useState('');
-  const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [batchCode, setBatchCode] = useState('');
-  const [remarks, setRemarks] = useState('');
-  const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
-
-  const startMutation = useMutation({
-    mutationFn: () => api.post(`/production/start`, {
-      lineId: line.id,
-      shiftId: selectedShift,
-      brandId: selectedBrand,
-      productId: selectedProduct,
-      batchCode: batchCode || undefined,
-      remarks,
-      startTime: new Date(startTime).toISOString()
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['production-lines'] });
-      setIsStartModalOpen(false);
-      toast.success('Production started successfully');
-    }
-  });
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: idx * 0.1 }}
-      className="bg-white/80 backdrop-blur-xl rounded-[3.5rem] p-10 border border-white shadow-2xl hover:shadow-indigo-100/50 transition-all group relative overflow-hidden"
-    >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-
-      <div className="flex justify-between items-start mb-10 relative z-10">
-        <div onClick={onFocus} className="flex items-center gap-6 cursor-pointer">
-          <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl group-hover:bg-indigo-600 transition-all duration-500">
-            <Settings2 className="w-8 h-8" />
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Operator Assignment</label>
+          <div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-h-[60px]">
+            {operators?.map((op: any) => (
+              <button key={op.id} onClick={() => { setSelectedOperators((prev: string[]) => prev.includes(op.id) ? prev.filter((id: string) => id !== op.id) : [...prev, op.id]); }}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${selectedOperators?.includes(op.id) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                {op.name}
+              </button>
+            ))}
+            {(!operators || operators.length === 0) && <span className="text-slate-300 text-[10px] italic">Loading personnel...</span>}
           </div>
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">{line.name}</h3>
-            <div className="flex items-center gap-2 mt-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${line.status === 'RUNNING' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' :
-                line.status === 'CHANGEOVER' ? 'bg-amber-500 shadow-[0_0_10px_#f59e0b]' :
-                  line.status === 'MAINTENANCE' ? 'bg-rose-500' :
-                    'bg-slate-300'
-                } ${['RUNNING', 'CHANGEOVER'].includes(line.status) ? 'animate-pulse' : ''}`} />
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                {line.status}
-              </span>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number</label>
+            <input type="text" placeholder="EB-2026-XXXX" value={batchCode} onChange={(e) => setBatchCode(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>
+            <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
+          </div>
+        </div>
+        <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Shift remarks (optional)..." className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-20 resize-none" />
+        <button onClick={onSubmit} disabled={!selectedProduct || !selectedShift || isPending} className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50">
+          {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
+          Commit Production Start
+        </button>
+      </div>
+    );
+  }
+
+  function Modal({ children, onClose, full = false }: { children: ReactNode, onClose: () => void, full?: boolean }) {
+    useEffect(() => {
+      const scrollContainer = document.getElementById('main-scroll-container');
+      document.body.style.overflow = 'hidden';
+      if (scrollContainer) scrollContainer.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+        if (scrollContainer) scrollContainer.style.overflow = '';
+      };
+    }, []);
+
+    const content = full ? (
+      <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-6 animate-in fade-in duration-500">
+        <div className="bg-white rounded-[4rem] w-full max-w-6xl max-h-full flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.3)] relative animate-in zoom-in-95 duration-500 overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20" />
+          <header className="flex justify-between items-center p-12 md:p-16 border-b border-slate-50 bg-white relative z-10 shrink-0">
+            <div className="flex items-center gap-8">
+              <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl">
+                <ActivitySquare className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">Line Command Center</h2>
+                <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px] mt-3">Production Intelligence / System Init</p>
+              </div>
             </div>
+            <button onClick={onClose} className="w-16 h-16 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 text-slate-400 rounded-[2rem] flex items-center justify-center transition-all group">
+              <X className="w-8 h-8 group-hover:rotate-90 transition-transform duration-500" />
+            </button>
+          </header>
+          <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="max-w-4xl mx-auto w-full">{children}</div>
           </div>
         </div>
-        <button className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 transition-all">
-          <MoreVertical className="w-5 h-5" />
-        </button>
       </div>
-
-      <div className="grid grid-cols-2 gap-6 mb-10 relative z-10">
-        <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Efficiency Index</p>
-          <p className="text-xl font-black text-slate-900 leading-none flex items-center gap-2">
-            {line.status === 'RUNNING' ? '84.2%' : '0.0%'}
-            <Activity className="w-4 h-4 text-emerald-500" />
-          </p>
-        </div>
-        <div className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex flex-col justify-center">
-          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Batch</p>
-          <p className="text-xl font-black text-slate-900 truncate leading-none">{line?.batch?.batchCode || 'STBY-NODE'}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-4 relative z-10">
-        <button onClick={onFocus} className="flex-[2] py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 hover:bg-indigo-600 shadow-xl shadow-slate-200">
-          Enter Commander <ArrowLeft className="w-4 h-4 rotate-180" />
-        </button>
-        {line.status === 'IDLE' && (
-          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100">
-            <Play className="w-4 h-4 fill-white" /> Start
+    ) : (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="bg-white rounded-[3rem] p-12 max-w-xl w-full shadow-2xl relative animate-in zoom-in-95 duration-300">
+          <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all">
+            <X className="w-6 h-6" />
           </button>
-        )}
-      </div>
-
-      {isStartModalOpen && (
-        <Modal full onClose={() => setIsStartModalOpen(false)}>
-          <div className="bg-slate-50/50 p-12 rounded-[3rem] border border-slate-100 shadow-inner">
-            <StartProductionForm
-              shifts={shifts}
-              brands={brands}
-              products={products}
-              selectedShift={selectedShift} setSelectedShift={setSelectedShift}
-              selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
-              selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
-              batchCode={batchCode} setBatchCode={setBatchCode}
-              startTime={startTime} setStartTime={setStartTime}
-              remarks={remarks} setRemarks={setRemarks}
-              onSubmit={() => startMutation.mutate()}
-              isPending={startMutation.isPending}
-            />
-          </div>
-        </Modal>
-      )}
-    </motion.div>
-  );
-}));
-
-function Modal({ children, onClose, full = false }: { children: React.ReactNode, onClose: () => void, full?: boolean }) {
-  useEffect(() => {
-    const scrollContainer = document.getElementById('main-scroll-container');
-
-    // Lock scroll
-    document.body.style.overflow = 'hidden';
-    if (scrollContainer) scrollContainer.style.overflow = 'hidden';
-
-    return () => {
-      // Unlock scroll
-      document.body.style.overflow = '';
-      if (scrollContainer) scrollContainer.style.overflow = '';
-    };
-  }, []);
-
-  const content = full ? (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-8 md:p-6 animate-in fade-in duration-500">
-      <div className="bg-white rounded-[4rem] w-full max-w-6xl max-h-full flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.3)] relative animate-in zoom-in-95 duration-500 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 z-20" />
-
-        <header className="flex justify-between items-center p-12 md:p-16 border-b border-slate-50 bg-white relative z-10 shrink-0">
-          <div className="flex items-center gap-8">
-            <div className="w-16 h-16 bg-slate-900 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl">
-              <ActivitySquare className="w-8 h-8" />
-            </div>
-            <div>
-              <h2 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">Line Command Center</h2>
-              <p className="text-slate-400 font-black uppercase tracking-[0.3em] text-[10px] mt-3">Production Intelligence / System Init</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-16 h-16 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 text-slate-400 rounded-[2rem] flex items-center justify-center transition-all group">
-            <X className="w-8 h-8 group-hover:rotate-90 transition-transform duration-500" />
-          </button>
-        </header>
-
-        <div className="p-0 overflow-y-auto flex-1 custom-scrollbar">
-          <div className="max-w-4xl mx-auto w-full">
-            {children}
-          </div>
+          {children}
         </div>
       </div>
-    </div>
-  ) : (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white rounded-[3rem] p-12 max-w-xl w-full shadow-2xl relative animate-in zoom-in-95 duration-300">
-        <button onClick={onClose} className="absolute top-8 right-8 p-3 hover:bg-slate-100 rounded-2xl text-slate-400 transition-all">
-          <X className="w-6 h-6" />
-        </button>
-        {children}
-      </div>
-    </div>
-  );
+    );
 
-  return createPortal(content, document.body);
-}
+    return createPortal(content, document.body);
+  }

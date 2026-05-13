@@ -4,17 +4,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   History, User, Clock, AlertTriangle, CheckCircle2,
   Search, ArrowLeft, Download, Shield,
-  Database, Zap, Beaker, ClipboardList, Edit3, Trash2
+  Database, Zap, Beaker, ClipboardList, Edit3, Trash2,
+  Activity, Users, Package, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import {
+  XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, AreaChart, Area
+} from 'recharts';
 import { api } from '@/services/api-client';
 
 export default function BatchForensicsDashboard() {
   const { batchId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'timeline' | 'audit' | 'inventory' | 'qc'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'telemetry' | 'accountability' | 'downtime' | 'inventory' | 'qc' | 'sales' | 'audit' | 'insights'>('timeline');
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [correctionReason, setCorrectionReason] = useState('');
   const [correctionPrimary, setCorrectionPrimary] = useState(0);
@@ -23,6 +28,7 @@ export default function BatchForensicsDashboard() {
   const { data: forensics, isLoading, error } = useQuery({
     queryKey: ['batch-forensics', batchId],
     queryFn: async () => (await api.get(`/forensics/batch/${batchId}`)).data,
+    retry: false,
   });
 
   const correctMutation = useMutation({
@@ -52,25 +58,55 @@ export default function BatchForensicsDashboard() {
     </div>
   );
 
-  if (error || forensics?.error) return (
+  // Hard 500 / network error — batch not found at all
+  if (error && !forensics) return (
     <div className="p-12 text-center">
       <div className="bg-rose-50 border border-rose-100 p-8 rounded-3xl inline-block">
         <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-4" />
-        <h2 className="text-xl font-black text-slate-900 mb-2">Investigation Aborted</h2>
+        <h2 className="text-xl font-black text-slate-900 mb-2">Record Not Found</h2>
         <p className="text-slate-500 mb-6 max-w-md mx-auto">
-          {forensics?.error || "The requested industrial record could not be reconstructed for forensic analysis."}
+          The requested batch could not be located in the industrial database.
         </p>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 mx-auto"
-        >
+        <button onClick={() => navigate(-1)}
+          className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 mx-auto">
           <ArrowLeft className="w-4 h-4" /> Back to Records
         </button>
       </div>
     </div>
   );
 
-  const { batch, timeline, auditTrail, materialUsage, qcRecords } = forensics;
+  // Batch-not-found returned by backend
+  if (forensics?.error) return (
+    <div className="p-12 text-center">
+      <div className="bg-amber-50 border border-amber-100 p-8 rounded-3xl inline-block">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+        <h2 className="text-xl font-black text-slate-900 mb-2">Batch Not Found</h2>
+        <p className="text-slate-500 mb-6 max-w-md mx-auto">{forensics.error}</p>
+        <button onClick={() => navigate(-1)}
+          className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all flex items-center gap-2 mx-auto">
+          <ArrowLeft className="w-4 h-4" /> Back to Records
+        </button>
+      </div>
+    </div>
+  );
+
+  // Safe destructuring — every section defaults to [] / {} to prevent crashes
+  const {
+    batch,
+    timeline        = [],
+    auditTrail      = [],
+    materialUsage   = [],
+    qcRecords       = [],
+    telemetry       = [],
+    accountability  = [],
+    salesMapping    = [],
+    inventoryVariance = [],
+    downtimes       = [],
+    operatorHistory = [],
+    metadata        = {},
+  } = forensics ?? {};
+
+  const sections = (metadata as any)?.sectionsAvailable ?? {};
 
   return (
     <div className="space-y-8">
@@ -139,9 +175,14 @@ export default function BatchForensicsDashboard() {
           <div className="flex items-center gap-8">
             {[
               { id: 'timeline', label: 'Production Ledger', icon: History },
-              { id: 'audit', label: 'Change History', icon: Shield },
+              { id: 'telemetry', label: 'Telemetry', icon: Activity },
+              { id: 'accountability', label: 'Accountability', icon: Users },
+              { id: 'downtime', label: 'Downtime Log', icon: AlertTriangle },
               { id: 'inventory', label: 'Material DNA', icon: Database },
-              { id: 'qc', label: 'Quality Parameters', icon: Beaker }
+              { id: 'qc', label: 'Quality Parameters', icon: Beaker },
+              { id: 'sales', label: 'Sales Traceability', icon: Package },
+              { id: 'insights', label: 'Anomaly & Variance', icon: Layers },
+              { id: 'audit', label: 'Change History', icon: Shield },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -405,7 +446,181 @@ export default function BatchForensicsDashboard() {
               </motion.div>
             )}
 
-            {/* Other tabs stubs for now */}
+            {activeTab === 'telemetry' && (
+              <motion.div key="telemetry" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
+                  <h3 className="text-xl font-black mb-8 flex items-center gap-3">
+                    <Activity className="w-6 h-6 text-indigo-400" />
+                    Throughput Velocity (Hourly)
+                  </h3>
+                  <div className="h-[400px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={telemetry}>
+                        <defs>
+                          <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                        <XAxis
+                          dataKey="time"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#64748b', fontSize: 10 }}
+                          tickFormatter={(t) => format(new Date(t), 'HH:mm')}
+                        />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '1rem', border: 'none', backgroundColor: '#1e293b', color: '#fff' }}
+                        />
+                        <Area type="monotone" dataKey="count" stroke="#6366f1" fillOpacity={1} fill="url(#colorCount)" strokeWidth={3} />
+                        <Area type="monotone" dataKey="wastage" stroke="#f43f5e" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'accountability' && (
+              <motion.div key="accountability" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {accountability.map((acc: any, i: number) => (
+                  <div key={i} className="p-8 bg-white border border-slate-100 rounded-3xl shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all">
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-xl text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                        {acc.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-lg font-black text-slate-900">{acc.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{acc.username}</p>
+                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-2 flex items-center gap-2">
+                          <Clock className="w-3 h-3" /> Last Active: {format(new Date(acc.lastActive), 'HH:mm')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-slate-900">{acc.totalEntries}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Logs Recorded</p>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+
+            {activeTab === 'downtime' && (
+              <motion.div key="downtime" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                {forensics.downtimes.map((dt: any) => (
+                  <div key={dt.id} className="p-6 bg-rose-50/30 border border-rose-100 rounded-3xl flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="w-12 h-12 bg-rose-500 text-white rounded-xl flex items-center justify-center">
+                        <AlertTriangle className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">{dt.reason} at {dt.station}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {format(new Date(dt.startTime), 'HH:mm')} - {dt.endTime ? format(new Date(dt.endTime), 'HH:mm') : 'ACTIVE'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-black text-rose-600">{dt.durationMinutes || 0}m</p>
+                      <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest">Duration</p>
+                    </div>
+                  </div>
+                ))}
+                {forensics.downtimes.length === 0 && (
+                  <div className="p-12 text-center text-emerald-500 font-bold uppercase tracking-widest text-xs bg-emerald-50/50 rounded-[2rem] border border-dashed border-emerald-100">
+                    Maximum Availability: 0m Downtime Recorded.
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'sales' && (
+              <motion.div key="sales" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                {salesMapping?.map((s: any, i: number) => (
+                  <div key={i} className="p-8 bg-white border border-slate-100 rounded-3xl shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center">
+                        <Package className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-black text-slate-900">{s.orderNumber}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.customer || 'Direct Dispatch'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-10">
+                      <div className="text-center">
+                        <p className="text-xl font-black text-slate-900">{s.quantity}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Reserved Qty</p>
+                      </div>
+                      <span className="px-4 py-1.5 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+                        {s.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {(!salesMapping || salesMapping.length === 0) && (
+                  <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
+                    Batch units not yet attributed to specific sales orders.
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {activeTab === 'insights' && (
+              <motion.div key="insights" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {inventoryVariance?.map((v: any, i: number) => (
+                    <div key={i} className="p-8 bg-white border border-slate-100 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
+                      <div className="flex justify-between items-start mb-6">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{v.item}</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{v.unit}</p>
+                        </div>
+                        <div className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${Math.abs(v.variancePct) > 5 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                          {v.variancePct > 0 ? '+' : ''}{v.variancePct}% Variance
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="p-4 bg-slate-50 rounded-2xl">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Theoretical</p>
+                          <p className="text-lg font-black text-slate-900">{v.theoretical.toFixed(2)}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 rounded-2xl">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Actual</p>
+                          <p className="text-lg font-black text-slate-900">{v.actual.toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[9px] font-black uppercase text-slate-500">
+                          <span>Efficiency Alignment</span>
+                          <span className={v.variance > 0 ? 'text-rose-500' : 'text-emerald-500'}>
+                            {v.variance > 0 ? 'Wastage Detected' : 'Optimal Usage'}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${v.variance > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                            style={{ width: `${Math.min(100, (v.actual / v.theoretical) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!inventoryVariance || inventoryVariance.length === 0) && (
+                    <div className="col-span-2 p-20 text-center bg-slate-50 rounded-[3rem] border border-dashed">
+                      <Layers className="w-16 h-16 text-slate-200 mx-auto mb-4" />
+                      <p className="text-slate-400 font-bold italic uppercase tracking-widest text-xs">BOM configuration missing or no usage recorded.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
             {activeTab === 'inventory' && (
               <motion.div
                 key="inventory"
@@ -414,16 +629,21 @@ export default function BatchForensicsDashboard() {
                 className="space-y-6"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {materialUsage.map((material: any) => (
-                    <div key={material.id} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-all">
+                  {materialUsage.map((material: any, idx: number) => (
+                    <div key={material.id ?? idx} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm hover:shadow-md transition-all">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-slate-900 text-white rounded-xl flex items-center justify-center">
                             <Database className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{material.itemName}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{material.sku}</p>
+                            {/* inventoryLedger has no itemName – stockId is the reference */}
+                            <p className="text-sm font-black text-slate-900">
+                              {material.stockId ? `Stock: ${String(material.stockId).slice(0,8)}…` : 'Material Movement'}
+                            </p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                              {new Date(material.occurredAt).toLocaleString()}
+                            </p>
                           </div>
                         </div>
                         <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
@@ -432,19 +652,24 @@ export default function BatchForensicsDashboard() {
                       </div>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl font-black text-slate-900">{material.quantityChange}</span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{material.unit || 'UNITS'}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">UNITS</span>
                       </div>
-                      <p className="text-[10px] font-bold text-slate-400 mt-4 italic">Ref: {material.remarks || 'Standard production usage'}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-4 italic">
+                        Balance after: {material.balanceAfter} — {material.remarks || 'Production deduction'}
+                      </p>
                     </div>
                   ))}
                 </div>
                 {materialUsage.length === 0 && (
                   <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
-                    No material movements attributed to this batch.
+                    {sections.materialUsage === false
+                      ? 'No inventory ledger entries linked to this batch.'
+                      : 'No material movements attributed to this batch.'}
                   </div>
                 )}
               </motion.div>
             )}
+
 
             {activeTab === 'qc' && (
               <motion.div

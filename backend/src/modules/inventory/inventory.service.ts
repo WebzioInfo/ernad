@@ -8,8 +8,8 @@ import {
   packagingConfigurations,
   factories 
 } from '../../database/schema';
-import { eq, sql, desc } from 'drizzle-orm';
-import { AuditService } from '../observability/audit.service';
+import { eq, sql, desc, ilike } from 'drizzle-orm';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class InventoryService {
@@ -39,6 +39,21 @@ export class InventoryService {
     .leftJoin(materialCategories, eq(inventoryStock.categoryId, materialCategories.id))
     .leftJoin(warehouseLocations, eq(inventoryStock.warehouseId, warehouseLocations.id))
     .orderBy(inventoryStock.itemName);
+  }
+
+  async getStockByCategory(categoryName: string) {
+    return await db.select({
+      id: inventoryStock.id,
+      itemName: inventoryStock.itemName,
+      sku: inventoryStock.sku,
+      unit: inventoryStock.unit,
+      quantity: inventoryStock.quantity,
+      categoryId: inventoryStock.categoryId,
+      categoryName: materialCategories.name,
+    })
+    .from(inventoryStock)
+    .innerJoin(materialCategories, eq(inventoryStock.categoryId, materialCategories.id))
+    .where(ilike(materialCategories.name, categoryName));
   }
 
   async getMaterialLedger(stockId: string) {
@@ -147,5 +162,23 @@ export class InventoryService {
       quantity: dto.quantity || '0',
     }).returning();
     return item;
+  }
+
+  async createCategory(dto: { name: string; description?: string }) {
+    const [category] = await db.insert(materialCategories).values({
+      ...dto,
+      createdAt: new Date(),
+    }).returning();
+    return category;
+  }
+
+  async createWarehouse(dto: { name: string; type: string }) {
+    const factoryId = await this.getFactoryContext();
+    const [warehouse] = await db.insert(warehouseLocations).values({
+      ...dto,
+      factoryId,
+      createdAt: new Date(),
+    }).returning();
+    return warehouse;
   }
 }

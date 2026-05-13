@@ -10,6 +10,7 @@ import {
   Filter, XCircle, Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ENDPOINTS } from '../../constants/endpoints';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import useAuthStore from '../auth/auth.store';
 
@@ -29,11 +30,15 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const { user } = useAuthStore();
-  const roles = user?.roles || [];
-  const isAdmin = roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
-  const isManager = roles.includes('MANAGER');
-  const canAddUser = isAdmin && !isManager; 
+  const { user: currentUser } = useAuthStore();
+  const callerRoles = currentUser?.roles || [];
+  const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
+  const isAdmin      = callerRoles.includes('ADMIN');
+  const isManager    = callerRoles.includes('MANAGER');
+
+  // Only ADMIN and SUPER_ADMIN can create/manage users
+  const canAddUser    = isAdmin || isSuperAdmin;
+  const canManageUser = isAdmin || isSuperAdmin;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -45,13 +50,23 @@ export default function UserManagementPage() {
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: users, isLoading } = useQuery<User[]>({
-    queryKey: ['users'],
-    queryFn: async () => (await api.get('/users')).data
+  const { data: usersData, isLoading } = useQuery({
+    queryKey: ['users', searchTerm, roleFilter, deptFilter, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (roleFilter !== 'ALL') params.append('role', roleFilter);
+      if (deptFilter !== 'ALL') params.append('department', deptFilter);
+      if (statusFilter !== 'ALL') params.append('isActive', statusFilter === 'ACTIVE' ? 'true' : 'false');
+      
+      return (await api.get(`${ENDPOINTS.USERS.LIST}?${params.toString()}`)).data;
+    }
   });
 
+  const users = (usersData?.data || []) as User[];
+
   const toggleActiveMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/users/${id}/toggle-active`),
+    mutationFn: (id: string) => api.patch(ENDPOINTS.USERS.TOGGLE_ACTIVE(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('User status updated');
@@ -63,7 +78,7 @@ export default function UserManagementPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    mutationFn: (id: string) => api.delete(ENDPOINTS.USERS.UPDATE(id)), // DELETE uses the same base path
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setDeleteConfirmation({ isOpen: false, userId: '', userName: '' });
@@ -81,21 +96,11 @@ export default function UserManagementPage() {
     userName: ''
   });
 
-  const departments = Array.from(new Set(users?.map(u => u.department).filter(Boolean))) as string[];
+  const departments = Array.from(new Set(users.map(u => u.department).filter(Boolean))) as string[];
 
-  const filteredUsers = users?.filter(u => {
-    const matchesSearch = !searchTerm ||
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.roles.some(r => r.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesRole = roleFilter === 'ALL' || u.roles.includes(roleFilter);
-    const matchesDept = deptFilter === 'ALL' || u.department === deptFilter;
-    const matchesStatus = statusFilter === 'ALL' ||
-      (statusFilter === 'ACTIVE' ? u.isActive : !u.isActive);
-
-    return matchesSearch && matchesRole && matchesDept && matchesStatus;
-  });
+  // ── No more client-side filtering ──────────────────────────────────
+  // The backend now handles all hierarchical scoping, search, and role filters.
+  const filteredUsers = users;
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -164,7 +169,16 @@ export default function UserManagementPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           {[
-            { value: roleFilter, setter: setRoleFilter, options: [{ slug: 'ALL', label: 'All Roles' }, ...AVAILABLE_ROLES.map(r => ({ slug: r.slug, label: r.label }))] },
+            // Role filter: managers only see operational roles in dropdown
+            {
+              value: roleFilter,
+              setter: setRoleFilter,
+              options: [
+                { slug: 'ALL', label: 'All Roles' },
+                ...(isSuperAdmin ? ALL_ROLES : isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES)
+                  .map(r => ({ slug: r.slug, label: r.label })),
+              ],
+            },
             { value: deptFilter, setter: setDeptFilter, options: [{ slug: 'ALL', label: 'All Departments' }, ...departments.map(d => ({ slug: d, label: d }))] },
             { value: statusFilter, setter: setStatusFilter, options: [{ slug: 'ALL', label: 'All Status' }, { slug: 'ACTIVE', label: 'Active' }, { slug: 'SUSPENDED', label: 'Blocked' }] }
           ].map((filter, i) => (
@@ -340,7 +354,8 @@ function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
 function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void }) {
   const { data: logs } = useQuery({
     queryKey: ['user-audit-logs', user.id],
-    queryFn: async () => (await api.get(`/users/${user.id}/audit-logs`)).data
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.USER_AUDIT_LOGS(user.id))).data,
+    retry: false
   });
 
   return (
@@ -451,20 +466,56 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { 
   );
 }
 
-const AVAILABLE_ROLES = [
+// ── Role definitions ─────────────────────────────────────────────────────────
+
+/** Exact slugs that are platform-privileged. Used for deny-list filtering. */
+export const PRIVILEGED_ROLE_SLUGS = [
+  'SUPER_ADMIN',
+  'SUPERADMIN',
+  'ADMIN',
+  'SYSTEM_ADMIN',
+  'ROOT',
+  'OWNER',
+] as const;
+
+/** Roles only SUPER_ADMIN sees in the form and filters */
+const PRIVILEGED_ROLES_UI = [
   { slug: 'SUPER_ADMIN', label: 'Super Admin', color: 'purple' },
-  { slug: 'ADMIN', label: 'Administrator', color: 'indigo' },
-  { slug: 'MANAGER', label: 'Plant Manager', color: 'amber' },
-  { slug: 'OPERATOR', label: 'General Operator', color: 'emerald' },
-  { slug: 'OPERATOR_BLOWING', label: 'Blowing Op.', color: 'emerald' },
-  { slug: 'OPERATOR_FILLING', label: 'Filling Op.', color: 'emerald' },
-  { slug: 'OPERATOR_LABELING', label: 'Labeling Op.', color: 'emerald' },
-  { slug: 'OPERATOR_PACKING', label: 'Packing Op.', color: 'emerald' },
+  { slug: 'ADMIN',       label: 'Administrator', color: 'indigo' },
 ];
 
+/** Operational roles — visible to all management levels */
+export const OPERATIONAL_ROLES = [
+  { slug: 'MANAGER',          label: 'Plant Manager',  color: 'amber' },
+  { slug: 'OPERATOR',         label: 'General Operator', color: 'emerald' },
+  { slug: 'OPERATOR_BLOWING', label: 'Blowing Op.',    color: 'emerald' },
+  { slug: 'OPERATOR_FILLING', label: 'Filling Op.',    color: 'emerald' },
+  { slug: 'OPERATOR_LABELING',label: 'Labeling Op.',   color: 'emerald' },
+  { slug: 'OPERATOR_PACKING', label: 'Packing Op.',    color: 'emerald' },
+];
 
+/** Roles visible to ADMIN (no SUPER_ADMIN) */
+export const ADMIN_VISIBLE_ROLES = [
+  { slug: 'ADMIN', label: 'Administrator', color: 'indigo' },
+  ...OPERATIONAL_ROLES,
+];
 
+/** Full list for SUPER_ADMIN */
+export const ALL_ROLES = [
+  ...PRIVILEGED_ROLES_UI,
+  ...OPERATIONAL_ROLES,
+];
+
+/** @deprecated Use OPERATIONAL_ROLES / ALL_ROLES based on caller role */
 function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) {
+  const { user: currentUser } = useAuthStore();
+  const isSuperAdmin = currentUser?.roles.includes('SUPER_ADMIN');
+  const isAdmin = currentUser?.roles.includes('ADMIN');
+
+  const allowedRoles = isSuperAdmin 
+    ? ALL_ROLES 
+    : (isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES);
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     username: user?.username || '',
@@ -482,7 +533,7 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
 
   const { data: lines } = useQuery({
     queryKey: ['production-lines'],
-    queryFn: async () => (await api.get('/master-data/lines')).data
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -497,15 +548,15 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
     mutationFn: async (data: any) => {
       const isEdit = !!user;
       const res = isEdit
-        ? await api.patch(`/users/${user.id}`, data)
-        : await api.post('/users', data);
+        ? await api.patch(ENDPOINTS.USERS.UPDATE(user.id), data)
+        : await api.post(ENDPOINTS.USERS.CREATE, data);
 
       const savedUser = res.data;
 
       if (selectedFile) {
         const fileData = new FormData();
         fileData.append('file', selectedFile);
-        await api.post(`/users/${savedUser.id}/avatar`, fileData, {
+        await api.post(ENDPOINTS.USERS.AVATAR(savedUser.id), fileData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       }
@@ -604,7 +655,7 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
           <div className="space-y-4">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">System Access Roles</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {AVAILABLE_ROLES.map(role => (
+              {allowedRoles.map(role => (
                 <button
                   key={role.slug}
                   type="button"
@@ -633,7 +684,19 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
 
           <div className="space-y-3">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">{user ? 'Security PIN (Optional)' : 'Security PIN (Required)'}</label>
-            <input required={!user} type="password" placeholder="••••" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-indigo-50 transition-all" value={formData.pin} onChange={(e) => setFormData({ ...formData, pin: e.target.value })} />
+            <input 
+              required={!user} 
+              type="password" 
+              placeholder="••••" 
+              maxLength={4}
+              className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-indigo-50 transition-all" 
+              value={formData.pin} 
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setFormData({ ...formData, pin: val });
+              }} 
+            />
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Must be exactly 4 digits</p>
           </div>
 
           {/* Line Assignment (Only for Operators) */}

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 import {
   FileText, Download, Filter,
   Calendar, Layers, Tag, ChevronRight,
@@ -9,11 +11,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BatchDossierModal } from '../components/BatchDossierModal';
 
 export default function ProductionReportsPage() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'summaries' | 'batches'>('summaries');
-  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({
     start: format(new Date().setDate(new Date().getDate() - 7), 'yyyy-MM-dd'),
     end: format(new Date(), 'yyyy-MM-dd')
@@ -22,7 +23,7 @@ export default function ProductionReportsPage() {
   const { data: reportData, isLoading: loadingSummaries } = useQuery({
     queryKey: ['production-report', dateRange],
     queryFn: async () => {
-      const res = await api.get('/reports/production', {
+      const res = await api.get(ENDPOINTS.REPORTS.PRODUCTION, {
         params: { startDate: dateRange.start, endDate: dateRange.end }
       });
       return res.data;
@@ -33,7 +34,7 @@ export default function ProductionReportsPage() {
   const { data: batchesData, isLoading: loadingBatches } = useQuery({
     queryKey: ['production-batches', dateRange],
     queryFn: async () => {
-      const res = await api.get('/reports/batches', {
+      const res = await api.get(ENDPOINTS.REPORTS.BATCHES, {
         params: { startDate: dateRange.start, endDate: dateRange.end }
       });
       return res.data;
@@ -256,7 +257,7 @@ export default function ProductionReportsPage() {
                     <td className="px-10 py-8">
                       <div className="flex justify-center">
                         <button
-                          onClick={() => setSelectedBatchId(batch.id)}
+                          onClick={() => navigate(`/manager/reports/batch/${batch.id}`)}
                           className="p-4 bg-slate-50 text-slate-400 rounded-2xl hover:bg-indigo-600 hover:text-white hover:shadow-xl hover:shadow-indigo-200 transition-all active:scale-90"
                         >
                           <ChevronRight className="w-5 h-5" />
@@ -271,14 +272,6 @@ export default function ProductionReportsPage() {
         )}
       </div>
 
-      <AnimatePresence>
-        {selectedBatchId && (
-          <BatchDossierModal
-            batchId={selectedBatchId}
-            onClose={() => setSelectedBatchId(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

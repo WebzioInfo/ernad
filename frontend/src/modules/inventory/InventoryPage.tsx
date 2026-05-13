@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ENDPOINTS } from '../../constants/endpoints';
 import { api } from '../../services/api-client';
 import {
   Plus, Package, Droplet, RefreshCcw,
@@ -26,22 +27,22 @@ export default function InventoryPage() {
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
-    queryFn: async () => (await api.get('/inventory')).data,
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LIST)).data,
     refetchInterval: 10000
   });
 
   const { data: categoriesData } = useQuery({
     queryKey: ['inventory-categories'],
-    queryFn: async () => (await api.get('/inventory/categories')).data,
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.CATEGORIES)).data,
   });
 
   const { data: warehousesData } = useQuery({
     queryKey: ['inventory-warehouses'],
-    queryFn: async () => (await api.get('/inventory/warehouses')).data,
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.WAREHOUSES)).data,
   });
 
   const updateStockMutation = useMutation({
-    mutationFn: (data: any) => api.post('/inventory/stock', data),
+    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.STOCK, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       if (viewingLedger) queryClient.invalidateQueries({ queryKey: ['ledger', viewingLedger.id] });
@@ -51,7 +52,7 @@ export default function InventoryPage() {
   });
 
   const createMaterialMutation = useMutation({
-    mutationFn: (data: any) => api.post('/inventory/items', data),
+    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.ITEMS, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       toast.success('Enterprise Stock Item Created');
@@ -310,7 +311,7 @@ export default function InventoryPage() {
 function LedgerModal({ material, onClose }: any) {
   const { data: ledger, isLoading } = useQuery({
     queryKey: ['ledger', material.id],
-    queryFn: async () => (await api.get(`/inventory/${material.id}/ledger`)).data
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LEDGER(material.id))).data
   });
 
   return (
@@ -510,7 +511,7 @@ function CreateMaterialModal({ categories, warehouses, onClose, onSubmit, isPend
 
 function InventoryConfigView({ categories, warehouses, queryClient }: any) {
   const createCategoryMutation = useMutation({
-    mutationFn: (data: any) => api.post('/inventory/categories', data),
+    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.CATEGORIES, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
       toast.success('Material Category Created');
@@ -518,7 +519,7 @@ function InventoryConfigView({ categories, warehouses, queryClient }: any) {
   });
 
   const createWarehouseMutation = useMutation({
-    mutationFn: (data: any) => api.post('/inventory/warehouses', data),
+    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.WAREHOUSES, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-warehouses'] });
       toast.success('Warehouse Location Registered');

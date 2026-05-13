@@ -6,7 +6,7 @@ import {
   downtimeLogs, 
   products 
 } from '../../../database/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 
 export interface OeeMetrics {
   availability: number;
@@ -87,19 +87,69 @@ export class OeeService {
   }
 
   async getLineOee(lineId: string, days = 1): Promise<any> {
-    // Aggregation logic for line-wise OEE trends
-    const recentBatches = await db.select({ id: productionBatches.id })
-      .from(productionBatches)
-      .where(and(
-        eq(productionBatches.lineId, lineId),
-        sql`${productionBatches.createdAt} >= NOW() - INTERVAL '${days} day'`
-      ));
+    // 1. Fetch all recent batches + totals + product target in one query
+    const batchDataList = await db.select({
+      batch: productionBatches,
+      product: products,
+      totals: batchTotals
+    })
+    .from(productionBatches)
+    .innerJoin(products, eq(productionBatches.productId, products.id))
+    .leftJoin(batchTotals, eq(batchTotals.batchId, productionBatches.id))
+    .where(and(
+      eq(productionBatches.lineId, lineId),
+      sql`${productionBatches.createdAt} >= NOW() - INTERVAL '${days} day'`
+    ));
 
-    if (recentBatches.length === 0) return null;
+    if (batchDataList.length === 0) return null;
 
-    const metrics = await Promise.all(recentBatches.map(b => this.calculateBatchOee(b.id)));
-    
-    // Average metrics
+    const batchIds = batchDataList.map(b => b.batch.id);
+
+    // 2. Fetch all related downtimes in a second query
+    const allDowntimes = await db.select({
+      batchId: downtimeLogs.batchId,
+      duration: downtimeLogs.durationMinutes
+    })
+    .from(downtimeLogs)
+    .where(inArray(downtimeLogs.batchId, batchIds));
+
+    // Group downtimes by batch
+    const downtimeMap = allDowntimes.reduce((acc, curr) => {
+      acc[curr.batchId] = (acc[curr.batchId] || 0) + (curr.duration || 0);
+      return acc;
+    }, {} as Record<string, number>);
+
+    // 3. Compute OEE for each batch in memory
+    const metrics = batchDataList.map(data => {
+      const { batch, product, totals } = data;
+      
+      const startTime = new Date(batch.adjustedStartTime || batch.startTime);
+      const endTime = batch.endTime ? new Date(batch.endTime) : new Date();
+      const plannedTimeMinutes = Math.max(1, (endTime.getTime() - startTime.getTime()) / (1000 * 60));
+      
+      const totalDowntime = downtimeMap[batch.id] || 0;
+      const operatingTime = Math.max(0, plannedTimeMinutes - totalDowntime);
+      
+      const availability = plannedTimeMinutes > 0 ? operatingTime / plannedTimeMinutes : 0;
+      
+      const totalProduced = totals?.blowingTotal || 0;
+      const idealOutput = operatingTime * product.targetBPM;
+      const performance = (operatingTime > 0 && idealOutput > 0) ? totalProduced / idealOutput : 0;
+      
+      const goodProduced = totals?.packingTotal || 0;
+      const quality = totalProduced > 0 ? goodProduced / totalProduced : 0;
+      
+      const oee = availability * performance * quality;
+      
+      return {
+        availability: availability * 100,
+        performance: Math.min(1, performance) * 100,
+        quality: quality * 100,
+        oee: oee * 100
+      };
+    });
+
+    // 4. Average metrics
     const avg = metrics.reduce((acc, m) => ({
       oee: acc.oee + m.oee,
       availability: acc.availability + m.availability,

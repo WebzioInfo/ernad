@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
+import { ENDPOINTS } from '../../constants/endpoints';
 import { 
   Clock, RefreshCw, CheckCircle2, AlertCircle, User, Loader2
 } from 'lucide-react';
@@ -20,11 +21,11 @@ export default function AttendanceRecordsPage() {
   const queryClient = useQueryClient();
   const { data: records, isLoading } = useQuery<AttendanceRecord[]>({
     queryKey: ['attendance'],
-    queryFn: async () => (await api.get('/attendance/all')).data
+    queryFn: async () => (await api.get(ENDPOINTS.ATTENDANCE.LIST)).data
   });
 
   const syncMutation = useMutation({
-    mutationFn: () => api.post('/attendance/sync'),
+    mutationFn: () => api.post(ENDPOINTS.ATTENDANCE.SYNC),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
       toast.success('Attendance records synchronized');

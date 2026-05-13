@@ -36,11 +36,11 @@ export default function RequireAuth({ children, allowedRoles, requiredPermission
   }
 
   if (!rolePassed || !permissionPassed) {
-    const isOperator = userRoles.some((r: string) => r.includes('OPERATOR'));
     const isManager = userRoles.includes('MANAGER');
+    const isOperator = userRoles.some((r: string) => r.includes('OPERATOR'));
     
-    if (isOperator) return <Navigate to="/line/select" replace />;
     if (isManager) return <Navigate to="/manager/overview" replace />;
+    if (isOperator) return <Navigate to="/operator/select" replace />;
     
     return <Navigate to="/admin/overview" replace />;
   }

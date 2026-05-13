@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ENDPOINTS } from '../../constants/endpoints';
 
 interface AuditLog {
   id: number;
@@ -28,8 +29,9 @@ export default function AuditLogsPage() {
 
   const { data: logs, isLoading } = useQuery<AuditLog[]>({
     queryKey: ['audit-logs'],
-    queryFn: async () => (await api.get('/users/audit-logs')).data,
-    refetchInterval: 10000 
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,
+    refetchInterval: 10000,
+    retry: false
   });
 
   const getSeverity = (log: AuditLog) => {

@@ -11,8 +11,9 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 // Optimized Module Loading
 const OperatorPanel = lazy(() => import('../modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('../modules/production/LineSelectionPage'));
+const StationSelectionPage = lazy(() => import('../modules/production/StationSelectionPage'));
 const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
-const TerminalSetup = lazy(() => import('../modules/production/TerminalSetup'));
+
 
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
@@ -86,11 +87,26 @@ export function AppRoutes() {
           <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
         </Route>
 
-        {/* 3. OPERATOR (All Operator Roles) */}
+        {/* 3. OPERATOR PORTAL (Authenticated via Login) */}
+        <Route
+          path="/operator"
+          element={
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+              <Outlet />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Navigate to="/operator/select" replace />} />
+          <Route path="select" element={<LineSelectionPage />} />
+          <Route path="select/:id" element={<StationSelectionPage />} />
+          <Route path="workspace/:id/:station" element={<OperatorPanel />} />
+        </Route>
+
+        {/* 4. SHARED TERMINAL (Public/Kiosk Access) */}
         <Route
           path="/line"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
               <Outlet />
             </RequireAuth>
           }
@@ -101,17 +117,16 @@ export function AppRoutes() {
           <Route path=":id/operator" element={<OperatorPanel />} />
         </Route>
 
-        {/* 4. INDUSTRIAL TERMINAL (Registered Tablets) */}
+        {/* 5. INDUSTRIAL TERMINAL (Registered Tablets) */}
         <Route
           path="/terminal"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
               <Outlet />
             </RequireAuth>
           }
         >
           <Route index element={<TerminalDashboard />} />
-          <Route path="setup" element={<TerminalSetup />} />
         </Route>
 
         {/* Catch-all */}

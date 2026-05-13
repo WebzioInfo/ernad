@@ -4,13 +4,38 @@ import {
   productionLogs, productionBatches, batchTotals, 
   salesOrders, salesOrderItems, customers,
   products, productBrands, productionLines, shifts,
-  dailyAttendance, users
+  dailyAttendance, users, roles, userRoles
 } from '../../database/schema';
-import { eq, and, sql, gte, lte, desc, between } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
 
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
+
+  private static readonly PRIVILEGED_ROLES = [
+    'SUPER_ADMIN',
+    'SUPERADMIN',
+    'ADMIN',
+    'SYSTEM_ADMIN',
+    'ROOT',
+    'OWNER',
+  ];
+
+  private async getExcludedUserIds() {
+    const privilegedRoles = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(inArray(roles.slug, ReportsService.PRIVILEGED_ROLES));
+    
+    if (privilegedRoles.length === 0) return [];
+    
+    const privilegedUserRoles = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(inArray(userRoles.roleId, privilegedRoles.map(r => r.id)));
+    
+    return privilegedUserRoles.map(pur => pur.userId);
+  }
 
   // ─── PRODUCTION REPORTS ───
 
@@ -89,9 +114,12 @@ export class ReportsService {
 
   // ─── BATCH DOSSIER ───
 
-  async getBatchDossier(batchId: string) {
+  async getBatchDossier(batchId: string, callerRoles: string[] = []) {
     try {
-      const [batchData] = await db.select({
+      const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
+      const isAdmin = callerRoles.includes('ADMIN');
+
+      let query = db.select({
         batch: productionBatches,
         line: productionLines,
         product: products,
@@ -103,9 +131,29 @@ export class ReportsService {
       .innerJoin(products, eq(productionBatches.productId, products.id))
       .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
       .leftJoin(users, eq(productionBatches.createdBy, users.id))
-      .where(eq(productionBatches.id, batchId));
+      .$dynamic();
+
+      if (!isSuperAdmin && !isAdmin) {
+        const excludedIds = await this.getExcludedUserIds();
+        if (excludedIds.length > 0) {
+          // If the creator is privileged, we hide their name by making the join result null
+          // However, drizzle's leftJoin with select fields doesn't easily support case-when for the whole join.
+          // For simplicity, we can filter the result post-query or use a more complex select.
+          // Let's use a simpler approach: if the creator is in excludedIds, we set their name to 'System' or 'Hidden' in the result mapping.
+        }
+      }
+
+      const [batchData] = await query.where(eq(productionBatches.id, batchId));
 
       if (!batchData) return null;
+
+      // Filter privileged names post-query for safety
+      if (!isSuperAdmin && !isAdmin) {
+        const excludedIds = await this.getExcludedUserIds();
+        if (excludedIds.includes(batchData.batch.createdBy)) {
+          batchData.creator = 'SYSTEM';
+        }
+      }
 
       const [totals] = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batchId));
       
@@ -136,7 +184,7 @@ export class ReportsService {
 
   // ─── SALES REPORTS ───
 
-  async getSalesReport(filters: { startDate: Date; endDate: Date; factoryId?: string }) {
+  async getSalesReport(filters: { startDate: Date; endDate: Date; factoryId?: string }, callerRoles: string[] = []) {
     try {
       this.logger.log(`[SALES_REPORT] Aggregating range: ${filters.startDate.toISOString()} - ${filters.endDate.toISOString()}`);
       
@@ -186,8 +234,20 @@ export class ReportsService {
 
   // ─── ATTENDANCE REPORTS ───
 
-  async getAttendanceReport(filters: { startDate: string; endDate: string }) {
+  async getAttendanceReport(filters: { startDate: string; endDate: string }, callerRoles: string[] = []) {
     try {
+      const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
+      const isAdmin = callerRoles.includes('ADMIN');
+
+      const conditions = [between(dailyAttendance.date, filters.startDate, filters.endDate)];
+      
+      if (!isSuperAdmin && !isAdmin) {
+        const excludedIds = await this.getExcludedUserIds();
+        if (excludedIds.length > 0) {
+          conditions.push(notInArray(dailyAttendance.userId, excludedIds));
+        }
+      }
+
       return await db.select({
         userName: users.name,
         department: users.department,
@@ -200,7 +260,7 @@ export class ReportsService {
       })
       .from(dailyAttendance)
       .innerJoin(users, eq(dailyAttendance.userId, users.id))
-      .where(between(dailyAttendance.date, filters.startDate, filters.endDate))
+      .where(and(...conditions))
       .orderBy(desc(dailyAttendance.date), users.name);
     } catch (error: any) {
       this.logger.error(`[ATTENDANCE_REPORT_FAILED] ${error.message}`);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Menu, X, LogOut, Command
 } from 'lucide-react';
@@ -10,6 +10,8 @@ import CommandPalette from '../components/common/CommandPalette';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { usePWA } from '../hooks/usePWA';
+import { cn } from '@/lib/utils';
+import QuickNotes from '../components/QuickNotes';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
@@ -55,7 +57,41 @@ export default function DashboardLayout() {
     navigate('/login');
   };
 
-  const sidebarGroups = moduleRegistry.getAllSidebarGroups();
+  const rawGroups = moduleRegistry.getAllSidebarGroups();
+
+  // Unified Grouping Logic: Merges items with the same Group ID across modules
+  const sidebarGroups = useMemo(() => {
+    const merged: Record<string, any> = {};
+
+    rawGroups.forEach(group => {
+      if (!merged[group.id]) {
+        merged[group.id] = { ...group, items: [...group.items] };
+      } else {
+        // Merge items and avoid duplicates by ID
+        const existingIds = new Set(merged[group.id].items.map((i: any) => i.id));
+        group.items.forEach(item => {
+          if (!existingIds.has(item.id)) {
+            merged[group.id].items.push(item);
+          }
+        });
+      }
+    });
+
+    // Define canonical order for groups
+    const userRole = String(user?.role || '').toUpperCase();
+    const order = userRole === 'MANAGER' 
+      ? ['overview', 'production', 'quality', 'inventory', 'team', 'reports']
+      : ['overview', 'production', 'team', 'inventory', 'quality', 'reports', 'system'];
+      
+    return Object.values(merged).sort((a, b) => {
+      const idxA = order.indexOf(a.id);
+      const idxB = order.indexOf(b.id);
+      if (idxA === -1 && idxB === -1) return 0;
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+  }, [rawGroups]);
 
   const filterByRole = (allowedRoles?: string[]) => {
     if (!allowedRoles || allowedRoles.length === 0) return true;
@@ -65,9 +101,9 @@ export default function DashboardLayout() {
   };
 
   const getModulePath = (path: string) => {
-    // If the path is intended for the operator terminal or top-level tools, don't prefix it
-    if (path.startsWith('/line') || path.startsWith('/terminal')) return path;
-
+    // Only /line or /operator (operator workflows) should stay top-level/external
+    if (path.startsWith('/line') || path.startsWith('/operator')) return path;
+    
     const userRole = String(user?.role || '').toUpperCase();
     const base = (userRole === 'MANAGER') ? '/manager' : '/admin';
     return `${base}${path}`;
@@ -94,58 +130,77 @@ export default function DashboardLayout() {
           )}
         </div>
 
-        <nav className="flex-1 px-4 py-8 space-y-8 overflow-y-auto no-scrollbar">
-          {sidebarGroups.filter(g => filterByRole(g.allowedRoles)).map((group) => (
-            <div key={group.id} className="space-y-3">
-              {isSidebarOpen && (
-                <h3 className="px-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                  {group.label}
-                </h3>
-              )}
-              <div className="space-y-1">
-                {group.items.filter(i => filterByRole(i.allowedRoles)).map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                    >
-                      <NavLink
-                        to={getModulePath(item.path)}
-                        className={({ isActive }) => `
-                          w-full flex items-center py-4 rounded-2xl transition-all duration-300 group relative
-                          ${isSidebarOpen ? 'px-5' : 'justify-center'}
-                          ${isActive
-                            ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40 translate-x-1'
-                            : 'text-slate-400 hover:bg-white/5 hover:text-white'}
-                        `}
+        <nav className="flex-1 px-4 py-8 space-y-7 overflow-y-auto no-scrollbar scroll-smooth">
+          {sidebarGroups.filter(g => filterByRole(g.allowedRoles)).map((group) => {
+            const userRole = String(user?.role || '').toUpperCase();
+            const filteredItems = group.items.filter((i: any) => {
+              const roleAllowed = filterByRole(i.allowedRoles);
+              if (userRole === 'MANAGER' && i.isComingSoon) return false;
+              return roleAllowed;
+            });
+            if (filteredItems.length === 0) return null;
+
+            return (
+              <div key={group.id} className="space-y-2">
+                {isSidebarOpen && (
+                  <h3 className="px-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.25em] mb-3">
+                    {group.label}
+                  </h3>
+                )}
+                <div className="space-y-1">
+                  {filteredItems.map((item: any, idx: number) => {
+                    const Icon = item.icon;
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.03 }}
                       >
-                        {({ isActive }) => (
-                          <>
-                            <Icon className={`w-5 h-5 flex-shrink-0 transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-125'}`} />
-                            {isSidebarOpen && (
-                              <span className="ml-4 font-bold text-sm tracking-tight truncate flex-1">{item.label}</span>
-                            )}
-                            {item.isComingSoon && isSidebarOpen && (
-                              <span className="ml-auto text-[8px] font-black bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md uppercase tracking-tighter">Soon</span>
-                            )}
-                            {isActive && (
-                              <motion.div
-                                layoutId="active-pill"
-                                className="absolute left-0 w-1 h-8 bg-white rounded-r-full"
-                              />
-                            )}
-                          </>
-                        )}
-                      </NavLink>
-                    </motion.div>
-                  );
-                })}
+                        <NavLink
+                          to={getModulePath(item.path)}
+                          className={({ isActive }) => `
+                            w-full flex items-center py-3.5 rounded-2xl transition-all duration-300 group relative
+                            ${isSidebarOpen ? 'px-5' : 'justify-center'}
+                            ${isActive
+                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
+                              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}
+                          `}
+                        >
+                          {({ isActive }) => (
+                            <>
+                              <Icon className={cn(
+                                "w-5 h-5 flex-shrink-0 transition-all duration-300",
+                                isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-indigo-400"
+                              )} />
+                              {isSidebarOpen && (
+                                <span className={cn(
+                                  "ml-4 font-bold text-[13px] tracking-tight truncate flex-1",
+                                  isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                                )}>
+                                  {item.label}
+                                </span>
+                              )}
+                              {item.isComingSoon && isSidebarOpen && (
+                                <span className="ml-auto text-[7px] font-black bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md uppercase tracking-tighter border border-white/5">Soon</span>
+                              )}
+                              {isActive && (
+                                <motion.div
+                                  layoutId="active-indicator"
+                                  className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full shadow-[0_0_10px_white]"
+                                />
+                              )}
+                            </>
+                          )}
+                        </NavLink>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+                {isSidebarOpen && <div className="h-px bg-white/5 mx-4 mt-6 opacity-50" />}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         <div className="p-4 bg-slate-950/30 space-y-2">
@@ -181,7 +236,9 @@ export default function DashboardLayout() {
               {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">Executive Control</h1>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">
+                {user?.role === 'MANAGER' ? 'Operations Center' : 'Executive Control'}
+              </h1>
               <div className="flex items-center gap-3 mt-1">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
@@ -243,6 +300,7 @@ export default function DashboardLayout() {
             </AnimatePresence>
           </div>
         </div>
+        <QuickNotes />
       </main>
     </div>
   );

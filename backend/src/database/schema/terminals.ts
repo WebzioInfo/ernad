@@ -4,6 +4,7 @@ import { users } from './users';
 
 export const terminalTypeEnum = pgEnum('terminal_type', ['PRODUCTION', 'QC', 'MAINTENANCE', 'SUPERVISOR', 'KIOSK']);
 export const terminalStatusEnum = pgEnum('terminal_status', ['OFFLINE', 'ONLINE', 'MAINTENANCE', 'LOCKED']);
+export const terminalTrustModeEnum = pgEnum('terminal_trust_mode', ['STRICT_KIOSK', 'FLEXIBLE_AUTH', 'TEMPORARY_SESSION', 'MOBILE_OPERATOR']);
 
 export const terminals = pgTable('terminals', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -15,7 +16,10 @@ export const terminals = pgTable('terminals', {
   lineId: uuid('line_id').references(() => productionLines.id), // Can be null for mobile supervisor tablets
   department: varchar('department', { length: 50 }), // BLOWING, FILLING, etc.
   
-  macAddress: varchar('mac_address', { length: 50 }), // For hardware verification
+  deviceId: varchar('device_id', { length: 255 }), // Browser-generated UUID or secure token
+  trustMode: terminalTrustModeEnum('trust_mode').default('STRICT_KIOSK').notNull(),
+  
+  macAddress: varchar('mac_address', { length: 50 }), // @deprecated - Use deviceId
   ipAddress: varchar('ip_address', { length: 50 }),
   
   status: terminalStatusEnum('status').default('OFFLINE').notNull(),

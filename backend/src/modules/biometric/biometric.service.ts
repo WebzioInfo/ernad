@@ -1,12 +1,14 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { db } from '../../database/db';
-import { 
-  biometricDevices, 
-  biometricAttendanceLogs, 
+import {
+  biometricDevices,
+  biometricAttendanceLogs,
   dailyAttendance,
   users,
   shifts,
-  employeeShiftAssignments
+  employeeShiftAssignments,
+  userRoles,
+  roles
 } from '../../database/schema';
 import { eq, and, sql, desc, inArray, lte, or, isNull } from 'drizzle-orm';
 import * as crypto from 'crypto';
@@ -17,7 +19,7 @@ import { format, startOfDay, endOfDay, differenceInHours, parse, addDays } from 
 export class BiometricService {
   private readonly logger = new Logger(BiometricService.name);
 
-  constructor(private readonly connectionService: BiometricConnectionService) {}
+  constructor(private readonly connectionService: BiometricConnectionService) { }
 
   // --- Device Management ---
   async getDevices() {
@@ -43,9 +45,9 @@ export class BiometricService {
     if (!device) throw new NotFoundException('Device not found');
 
     const isAlive = await this.connectionService.pingDevice(device.ipAddress, device.port);
-    
-    await db.update(biometricDevices).set({ 
-      status: isAlive ? 'ONLINE' : 'OFFLINE', 
+
+    await db.update(biometricDevices).set({
+      status: isAlive ? 'ONLINE' : 'OFFLINE',
       lastConnectedAt: isAlive ? new Date() : undefined,
       updatedAt: new Date()
     }).where(eq(biometricDevices.id, deviceId));
@@ -80,12 +82,12 @@ export class BiometricService {
     try {
       this.logger.log(`[BIOMETRIC_SYNC] Starting sync for ${device.name} (${device.ipAddress})`);
       const rawLogs = await this.connectionService.fetchAttendances(device.ipAddress, device.port);
-      
+
       if (!rawLogs || !rawLogs.length) {
-        await db.update(biometricDevices).set({ 
-          lastSyncAt: new Date(), 
-          status: 'ONLINE', 
-          updatedAt: new Date() 
+        await db.update(biometricDevices).set({
+          lastSyncAt: new Date(),
+          status: 'ONLINE',
+          updatedAt: new Date()
         }).where(eq(biometricDevices.id, deviceId));
         return { success: true, imported: 0, skipped: 0 };
       }
@@ -125,10 +127,10 @@ export class BiometricService {
         }
       }
 
-      await db.update(biometricDevices).set({ 
-        lastSyncAt: new Date(), 
-        status: 'ONLINE', 
-        updatedAt: new Date() 
+      await db.update(biometricDevices).set({
+        lastSyncAt: new Date(),
+        status: 'ONLINE',
+        updatedAt: new Date()
       }).where(eq(biometricDevices.id, deviceId));
 
       if (affectedDeviceUserIds.size > 0) {
@@ -147,7 +149,7 @@ export class BiometricService {
   async syncAllDevices() {
     const activeDevices = await db.select().from(biometricDevices).where(eq(biometricDevices.isActive, true));
     const results = [];
-    
+
     for (const device of activeDevices) {
       try {
         const res = await this.syncLogs(device.id);
@@ -196,7 +198,7 @@ export class BiometricService {
         const sorted = times.sort((a, b) => a.getTime() - b.getTime());
         const firstIn = sorted[0];
         const lastOut = sorted.length > 1 ? sorted[sorted.length - 1] : null;
-        
+
         let workedHours = lastOut ? (lastOut.getTime() - firstIn.getTime()) / (1000 * 60 * 60) : 0;
         let lateMinutes = 0;
         let overtimeMinutes = 0;
@@ -206,7 +208,7 @@ export class BiometricService {
           const shiftStart = parse(`${date} ${userShift.startTime}`, 'yyyy-MM-dd HH:mm:ss', new Date());
           const shiftEnd = parse(`${date} ${userShift.endTime}`, 'yyyy-MM-dd HH:mm:ss', new Date());
           const graceThreshold = new Date(shiftStart.getTime() + userShift.graceMinutes * 60000);
-          
+
           if (firstIn > graceThreshold) {
             lateMinutes = Math.max(0, Math.round((firstIn.getTime() - shiftStart.getTime()) / 60000));
             status = 'LATE';
@@ -252,18 +254,54 @@ export class BiometricService {
   }
 
   // --- Admin Queries ---
-  async mapUser(deviceUserId: string, userId: string) {
+  async mapUser(deviceUserId: string, userId: string, actorRoles: string[] = []) {
+    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
+    const isAdmin = actorRoles.includes('ADMIN');
+    const isManager = actorRoles.includes('MANAGER');
+
+    // Hierarchy Check
+    if (!isSuperAdmin && !isAdmin) {
+      const targetUserResult = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (targetUserResult[0]) {
+        const targetRolesResult = await db.select({ slug: roles.slug })
+          .from(roles)
+          .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+          .where(eq(userRoles.userId, userId));
+        const targetRoles = targetRolesResult.map(r => r.slug);
+
+        if (isManager) {
+          const isPrivileged = targetRoles.some(r => ['ADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(r));
+          if (isPrivileged) throw new ForbiddenException('Managers cannot modify administrative identity mappings');
+        }
+      }
+    }
+
     await db.update(users).set({ username: deviceUserId }).where(eq(users.id, userId));
     await this.processAttendanceForLogs([deviceUserId]);
     return { success: true };
   }
 
-  async getLogs(page = 1, limit = 50) {
+  async getLogs(page = 1, limit = 50, callerRoles: string[] = []) {
+    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
+    const isAdmin = callerRoles.includes('ADMIN');
     const offset = (page - 1) * limit;
+
+    let exclusionClause = sql`1=1`;
+    if (!isSuperAdmin && !isAdmin) {
+      // Exclude users who have privileged roles
+      exclusionClause = sql`u.id NOT IN (
+        SELECT ur.user_id 
+        FROM user_roles ur 
+        JOIN roles r ON ur.role_id = r.id 
+        WHERE r.slug IN ('SUPER_ADMIN', 'ADMIN', 'SYSTEM_ADMIN', 'ROOT', 'OWNER')
+      )`;
+    }
+
     return await db.execute(sql`
       SELECT l.*, u.name as "employeeName", u.username as "employeeCode"
       FROM ${biometricAttendanceLogs} l 
       LEFT JOIN ${users} u ON l.device_user_id = u.username
+      WHERE ${exclusionClause}
       ORDER BY l.punch_time DESC 
       LIMIT ${limit} OFFSET ${offset}
     `);
@@ -280,14 +318,27 @@ export class BiometricService {
     `);
   }
 
-  async getTodayAttendance() {
+  async getTodayAttendance(callerRoles: string[] = []) {
+    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
+    const isAdmin = callerRoles.includes('ADMIN');
     const today = format(new Date(), 'yyyy-MM-dd');
+
+    let exclusionClause = sql`1=1`;
+    if (!isSuperAdmin && !isAdmin) {
+      exclusionClause = sql`u.id NOT IN (
+        SELECT ur.user_id 
+        FROM user_roles ur 
+        JOIN roles r ON ur.role_id = r.id 
+        WHERE r.slug IN ('SUPER_ADMIN', 'ADMIN', 'SYSTEM_ADMIN', 'ROOT', 'OWNER')
+      )`;
+    }
+
     return await db.execute(sql`
       SELECT a.*, u.name as "userName", u.username as "userCode", s.name as "shiftName"
       FROM ${dailyAttendance} a 
       JOIN ${users} u ON a.user_id = u.id 
       LEFT JOIN ${shifts} s ON a.shift_id = s.id
-      WHERE a.date = ${today}
+      WHERE a.date = ${today} AND ${exclusionClause}
     `);
   }
 }

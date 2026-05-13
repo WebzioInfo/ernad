@@ -44,7 +44,26 @@ export class ProductionEventsService {
   }
 
   async emitNotification(notification: any) {
+    // RED TEAM FIX: Sanitize notification payload for different channels
+    const privilegedKeywords = ['ADMIN', 'SUPER', 'PASSWORD', 'PIN', 'SECRET'];
+    
+    const sanitize = (notif: any) => {
+      let msg = notif.message;
+      let title = notif.title;
+      
+      privilegedKeywords.forEach(kw => {
+        const regex = new RegExp(kw, 'gi');
+        msg = msg.replace(regex, '***');
+        title = title.replace(regex, '***');
+      });
+      
+      return { ...notif, title, message: msg };
+    };
+
+    // Managers get full info (assuming they are allowed to see each other's alerts)
     await this.realtimeService.emit('managers', 'NEW_NOTIFICATION', notification);
-    await this.realtimeService.emit('operators', 'NEW_NOTIFICATION', notification);
+    
+    // Operators get sanitized info
+    await this.realtimeService.emit('operators', 'NEW_NOTIFICATION', sanitize(notification));
   }
 }

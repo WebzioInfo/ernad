@@ -1,4 +1,4 @@
-import { Controller, Get, Post, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Post, UseGuards, Param, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AttendanceService } from './attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -15,8 +15,9 @@ export class AttendanceController {
   @Get('all')
   @Permissions('attendance:view')
   @ApiOperation({ summary: 'Get all attendance logs' })
-  async getAllAttendance() {
-    return await this.attendanceService.getAllAttendance();
+  async getAllAttendance(@Req() req: any) {
+    const roles = req.user?.roles || [];
+    return await this.attendanceService.getAllAttendance(roles);
   }
 
   @Post('sync')
@@ -28,7 +29,8 @@ export class AttendanceController {
 
   @Get('operator/:id')
   @Permissions('attendance:view')
-  async getOperatorAttendance(@Param('id') id: string) {
-    return await this.attendanceService.getOperatorAttendance(id);
+  async getOperatorAttendance(@Req() req: any, @Param('id') id: string) {
+    const roles = req.user?.roles || [];
+    return await this.attendanceService.getOperatorAttendance(id, roles);
   }
 }

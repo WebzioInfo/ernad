@@ -18,13 +18,30 @@ export class BiometricConnectionService implements OnModuleDestroy {
   }
 
   /**
+   * Helper to wrap a promise with a hard timeout
+   */
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`[TIMEOUT_${timeoutMs}ms] ${errorMessage}`));
+      }, timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
+  }
+
+  /**
    * Connects to a biometric device.
    * Caches the connection instance for performance.
    */
   async connect(ip: string, port: number = 4370): Promise<any> {
     if (this.activeConnections.has(ip)) {
       try {
-        // Test if existing connection is still alive
         const instance = this.activeConnections.get(ip);
         return instance;
       } catch (e) {
@@ -32,17 +49,32 @@ export class BiometricConnectionService implements OnModuleDestroy {
       }
     }
 
-    try {
-      this.logger.log(`[BIOMETRIC_CONNECTING] Attempting TCP link to ${ip}:${port}...`);
-      const zkInstance = new ZKLib(ip, port, 10000, 4000); // 10s TCP timeout, 4s command timeout
-      await zkInstance.createSocket();
-      this.activeConnections.set(ip, zkInstance);
-      this.logger.log(`[BIOMETRIC_CONNECTED] Successfully established link to ${ip}:${port}`);
-      return zkInstance;
-    } catch (error) {
-      this.logger.error(`[BIOMETRIC_CONNECTION_FAILED] Device at ${ip} unreachable: ${error.message}`);
-      throw new Error(`Connection timeout: Device at ${ip} is likely offline.`);
+    const maxRetries = 3;
+    let lastError = null;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        this.logger.log(`[BIOMETRIC_CONNECTING] Attempt ${i + 1} to ${ip}:${port}...`);
+        const zkInstance = new ZKLib(ip, port, 10000, 4000);
+        
+        await this.withTimeout(
+          zkInstance.createSocket(),
+          8000,
+          `Device at ${ip} failed to establish TCP link within 8s.`
+        );
+
+        this.activeConnections.set(ip, zkInstance);
+        this.logger.log(`[BIOMETRIC_CONNECTED] Successfully established link to ${ip}:${port}`);
+        return zkInstance;
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(`[BIOMETRIC_RETRY] Attempt ${i + 1} failed for ${ip}: ${error.message}`);
+        await new Promise(res => setTimeout(res, 2000 * (i + 1))); // Backoff
+      }
     }
+
+    this.logger.error(`[BIOMETRIC_CONNECTION_FAILED] All ${maxRetries} attempts failed for ${ip}: ${lastError.message}`);
+    throw new Error(`Connection failed: Device at ${ip} is likely offline or network blocked.`);
   }
 
   async disconnect(ip: string) {
@@ -62,11 +94,17 @@ export class BiometricConnectionService implements OnModuleDestroy {
    * Pings the device to check health without pulling logs.
    */
   async pingDevice(ip: string, port: number = 4370): Promise<boolean> {
+    let zkInstance;
     try {
-      const zkInstance = await this.connect(ip, port);
-      await zkInstance.getTime(); // Lightweight command to verify connectivity
+      zkInstance = await this.connect(ip, port);
+      await this.withTimeout(
+        zkInstance.getTime(),
+        5000,
+        `Device at ${ip} failed to respond to ping (getTime) within 5s.`
+      );
       return true;
     } catch (err) {
+      this.logger.warn(`[BIOMETRIC_PING_FAILED] ${ip}: ${err.message}`);
       return false;
     }
   }
@@ -76,19 +114,28 @@ export class BiometricConnectionService implements OnModuleDestroy {
    */
   async fetchAttendances(ip: string, port: number = 4370): Promise<any[]> {
     let zkInstance;
+    let fetchError = null;
     try {
       zkInstance = await this.connect(ip, port);
       this.logger.log(`[BIOMETRIC_SYNC_STARTED] Pulling attendance ledger from ${ip}...`);
       
-      const logs = await zkInstance.getAttendances();
-      const attendanceData = logs.data || [];
-      
+      const logsData = (await this.withTimeout(
+        zkInstance.getAttendances(),
+        15000, // 15s max for full log fetch
+        `Device at ${ip} timed out while fetching attendance logs.`
+      )) as any;
+
+      const attendanceData = logsData?.data || [];
       this.logger.log(`[BIOMETRIC_SYNC_SUCCESS] Retrieved ${attendanceData.length} records from ${ip}`);
       return attendanceData;
-    } catch (error) {
+    } catch (error: any) {
+      fetchError = error;
       this.logger.error(`[BIOMETRIC_SYNC_FAILED] Critical error syncing with ${ip}: ${error.message}`);
-      this.activeConnections.delete(ip); // Wipe stale connection
       return [];
+    } finally {
+      if (fetchError) {
+        this.activeConnections.delete(ip);
+      }
     }
   }
 
@@ -99,10 +146,15 @@ export class BiometricConnectionService implements OnModuleDestroy {
   async clearDeviceLogs(ip: string, port: number = 4370) {
      try {
        const zkInstance = await this.connect(ip, port);
-       await zkInstance.clearAttendanceLog();
+       await this.withTimeout(
+         zkInstance.clearAttendanceLog(),
+         10000,
+         `Device at ${ip} failed to clear logs within 10s.`
+       );
        this.logger.warn(`[BIOMETRIC_MEMORY_CLEARED] Attendance logs wiped on device ${ip}`);
      } catch (err) {
        this.logger.error(`Failed to clear logs on ${ip}: ${err.message}`);
      }
   }
 }
+

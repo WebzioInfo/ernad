@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Patch, Query, ParseIntPipe, HttpStatus, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Patch, Query, ParseIntPipe, HttpStatus, HttpCode, Req, UnauthorizedException } from '@nestjs/common';
 import { BiometricService } from './biometric.service';
 import { PayrollAttendanceService } from './payroll-attendance.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { Public } from '../auth/public.decorator';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { CreateShiftDto, AssignShiftDto } from './dto/shift.dto';
@@ -58,9 +59,53 @@ export class BiometricController {
   @Post('devices/sync-all')
   @HttpCode(HttpStatus.OK)
   @Permissions('attendance:manage')
-  @ApiOperation({ summary: 'Trigger sync for all active devices' })
-  async syncAll() {
-    return await this.biometricService.syncAllDevices();
+  @ApiOperation({ summary: 'Trigger manual log synchronization for all active devices' })
+  async triggerSyncAll() {
+    const devices = await this.biometricService.getDevices();
+    const activeDevices = devices.filter(d => d.isActive);
+    const results = [];
+    for (const device of activeDevices) {
+      try {
+        const res = await this.biometricService.syncLogs(device.id);
+        results.push({ device: device.name, status: 'success', ...res });
+      } catch (err: any) {
+        results.push({ device: device.name, status: 'error', error: err.message });
+      }
+    }
+    return results;
+  }
+
+  // ── SERVERLESS CRON WEBHOOK (VERCEL COMPATIBILITY) ──
+  @Public()
+  @Post('cron/sync')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Serverless Cron trigger for Biometric Sync (Secured by CRON_SECRET)' })
+  async serverlessCronSync(@Body() body: any, @Req() req: any) {
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+    
+    if (!cronSecret) {
+      throw new UnauthorizedException('CRON_SECRET is not configured on the server.');
+    }
+    
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      throw new UnauthorizedException('Invalid Cron Secret');
+    }
+
+    const devices = await this.biometricService.getDevices();
+    const activeDevices = devices.filter(d => d.isActive);
+    let totalImported = 0;
+    
+    for (const device of activeDevices) {
+      try {
+        const res = await this.biometricService.syncLogs(device.id);
+        totalImported += res.imported;
+      } catch (err: any) {
+        console.error(`[CRON] Device ${device.name} sync failed:`, err.message);
+      }
+    }
+    
+    return { success: true, importedLogs: totalImported };
   }
 
   @Get('logs')
@@ -69,10 +114,12 @@ export class BiometricController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getLogs(
+    @Req() req: any,
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 50,
   ) {
-    return await this.biometricService.getLogs(page, limit);
+    const roles = req.user?.roles || [];
+    return await this.biometricService.getLogs(page, limit, roles);
   }
 
   @Get('unmapped')
@@ -85,15 +132,17 @@ export class BiometricController {
   @Get('attendance/today')
   @Permissions('attendance:view')
   @ApiOperation({ summary: 'Get processed attendance for the current date' })
-  async getTodayAttendance() {
-    return await this.biometricService.getTodayAttendance();
+  async getTodayAttendance(@Req() req: any) {
+    const roles = req.user?.roles || [];
+    return await this.biometricService.getTodayAttendance(roles);
   }
 
   @Post('map-user')
   @Permissions('attendance:manage')
   @ApiOperation({ summary: 'Map a biometric device user ID to an ERP user' })
-  async mapUser(@Body() body: { deviceUserId: string; userId: string }) {
-    return await this.biometricService.mapUser(body.deviceUserId, body.userId);
+  async mapUser(@Req() req: any, @Body() body: { deviceUserId: string; userId: string }) {
+    const actorRoles = req.user?.roles || [];
+    return await this.biometricService.mapUser(body.deviceUserId, body.userId, actorRoles);
   }
 
   @Get('shifts')

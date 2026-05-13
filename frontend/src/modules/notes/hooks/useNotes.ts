@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api as apiClient } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 
 export interface Note {
   id: string;
@@ -22,7 +23,7 @@ export const useNotes = (filters: any = {}) => {
   return useQuery({
     queryKey: ['notes', filters],
     queryFn: async () => {
-      const { data } = await apiClient.get('/notes', { params: filters });
+      const { data } = await apiClient.get(ENDPOINTS.NOTES.LIST, { params: filters });
       return data as Note[];
     },
   });
@@ -32,7 +33,7 @@ export const useCreateNote = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (note: any) => {
-      const { data } = await apiClient.post('/notes', note);
+      const { data } = await apiClient.post(ENDPOINTS.NOTES.CREATE, note);
       return data;
     },
     onSuccess: () => {
@@ -45,7 +46,7 @@ export const useUpdateNote = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...note }: any) => {
-      const { data } = await apiClient.patch(`/notes/${id}`, note);
+      const { data } = await apiClient.patch(ENDPOINTS.NOTES.UPDATE(id), note);
       return data;
     },
     onSuccess: () => {
@@ -58,7 +59,7 @@ export const useDeleteNote = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/notes/${id}`);
+      await apiClient.delete(ENDPOINTS.NOTES.DELETE(id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] });

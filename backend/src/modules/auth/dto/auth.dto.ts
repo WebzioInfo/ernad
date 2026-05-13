@@ -56,3 +56,31 @@ export class ResetCredentialDto {
   type: 'PASSWORD' | 'PIN';
 }
 
+export class TerminalLoginDto {
+  @ApiProperty({ description: 'Operator UUID' })
+  @IsString()
+  @IsNotEmpty()
+  operatorId: string;
+
+  @ApiProperty({ description: 'Operator PIN' })
+  @IsString()
+  @IsNotEmpty()
+  pin: string;
+
+  @ApiProperty({ description: 'Production Line UUID' })
+  @IsString()
+  @IsNotEmpty()
+  lineId: string;
+
+  @ApiProperty({ description: 'Station Name (BLOWING, FILLING, etc.)' })
+  @IsString()
+  @IsNotEmpty()
+  station: string;
+
+  @ApiProperty({ description: 'Terminal ID (Optional for flexible auth)' })
+  @IsString()
+  @IsOptional()
+  terminalId?: string;
+}
+
+

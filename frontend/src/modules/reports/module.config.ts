@@ -22,30 +22,41 @@ export const reportsConfig: ModuleConfig = {
       path: 'reports/attendance',
       element: lazy(() => import('./pages/AttendanceReportsPage')),
       allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+    },
+    {
+      path: 'reports/batch/:id',
+      element: lazy(() => import('./pages/BatchForensicsPage')),
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
     {
-      id: 'reports_group',
-      label: 'Reporting Suite',
+      id: 'reports',
+      label: 'Reports',
       items: [
         {
           id: 'prod_reports',
-          label: 'Production Ledger',
+          label: 'Reports',
           icon: FileText,
           path: '/reports/production',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         },
         {
           id: 'sales_reports',
-          label: 'Sales Analytics',
+          label: 'Sales',
           icon: BarChart4,
           path: '/reports/sales',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-        },
+        }
+      ]
+    },
+    {
+      id: 'team',
+      label: 'Team',
+      items: [
         {
           id: 'attendance_reports',
-          label: 'Staff Attendance',
+          label: 'Attendance',
           icon: ClipboardList,
           path: '/reports/attendance',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN'],

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import useAuthStore from '../modules/auth/auth.store';
 import { api } from '../services/api-client';
+import { ENDPOINTS } from '../constants/endpoints';
 
 const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID;
 let isOneSignalInitialized = false;
@@ -61,7 +62,7 @@ export function usePushNotifications() {
           // ── Step 2: Register push subscription token in our DB ──
           const subId = OneSignal?.User?.PushSubscription?.id;
           if (subId) {
-            await api.post('/notifications/tokens', {
+            await api.post(ENDPOINTS.NOTIFICATIONS.TOKENS, {
               userId: currentUser.id,
               token: subId,
               platform: 'web',

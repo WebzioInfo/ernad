@@ -1,55 +1,52 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
+import useAuthStore from '../auth/auth.store';
 import {
-  PackageOpen, LogOut, Wind, Box,
-  Loader2, Zap,
+  Loader2,
   AlertTriangle,
-  Sparkles,
-  History as HistoryIcon,
-  Database,
   Layers,
-  Activity,
-  CheckCircle2,
-  Clock,
-  LayoutDashboard
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
 import { IndustrialNumericInput } from '../../components/ui/industrial-numeric-input';
-import { ProductionSummaryCards } from './components/ProductionSummaryCards';
-import { cn } from '../../lib/utils';
 import { TerminalLogin } from './components/TerminalLogin';
+import { ENDPOINTS } from '../../constants/endpoints';
+
+// New Atomic Components
+import { OperatorHeader } from './components/OperatorHeader';
+import { StationWorkspace } from './components/StationWorkspace';
+import { ActivityFeed } from './components/ActivityFeed';
 
 export default function OperatorPanel() {
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   const stations = [
     {
-      id: 'BLOWING', title: 'Blowing Station', icon: Wind, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20',
-      materials: ['Preforms'], category: 'Preforms'
+      id: 'BLOWING', title: 'Blowing Station', materials: ['Preforms'], category: 'Preforms'
     },
     {
-      id: 'FILLING', title: 'Filling Station', icon: PackageOpen, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20',
-      materials: ['Caps'], category: 'Caps'
+      id: 'FILLING', title: 'Filling Station', materials: ['Caps'], category: 'Caps'
     },
     {
-      id: 'LABELING', title: 'Labeling Station', icon: Zap, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20',
-      materials: ['Labels'], category: 'Labels'
+      id: 'LABELING', title: 'Labeling Station', materials: ['Labels'], category: 'Labels'
     },
     {
-      id: 'PACKING', title: 'Packing Station', icon: Box, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20',
-      materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls'
+      id: 'PACKING', title: 'Packing Station', materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls'
     },
   ];
 
   const { data: session, isLoading: isLoadingSession } = useQuery({
     queryKey: ['current-operator-session'],
-    queryFn: async () => (await api.get('/operator/session/current')).data,
+    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.CURRENT)).data,
+    retry: 1,
+    refetchOnWindowFocus: false
   });
 
   const currentStationId = urlStation?.toUpperCase() || session?.station || 'FILLING';
@@ -57,73 +54,129 @@ export default function OperatorPanel() {
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // SHARED TERMINAL STATE
   const [activeOperator, setActiveOperator] = useState<any>(null);
 
-  // Entry State
+  // Unified Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
-  const [wastageCount, setWastageCount] = useState(0);
   const [rejectionCount, setRejectionCount] = useState(0);
+  const [secondaryPackagingCount, setSecondaryPackagingCount] = useState(0); // Bag/Box Count
+
+  // Station Specific States
+  const [preformUsage, setPreformUsage] = useState(0);
+  const [capUsage, setCapUsage] = useState(0);
+  const [labelUsage, setLabelUsage] = useState(0);
+  const [shrinkUsage, setShrinkUsage] = useState(0);
+  const [casesProduced, setCasesProduced] = useState(0);
+  const [phValue, setPhValue] = useState(0);
+  const [tdsValue, setTdsValue] = useState(0);
+  const [inkUsage, setInkUsage] = useState(0);
+  const [solventUsage, setSolventUsage] = useState(0);
+  const [testResult, setTestResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
+
   const [eventType, setEventType] = useState('NORMAL_PRODUCTION');
   const [remarks, setRemarks] = useState('');
+  const [fromTime, setFromTime] = useState('');
+  const [toTime, setToTime] = useState('');
 
-  // Enterprise State
-  const [selectedStock, setSelectedStock] = useState<string>('');
-  const [boxCount, setBoxCount] = useState(0);
+  // Enterprise & Inventory State
+  const [selectedStockId, setSelectedStockId] = useState<string>('');
   const [packingConfigId, setPackingConfigId] = useState<string>('');
-  const [shrinkWeight, setShrinkWeight] = useState(0);
-  const [shrinkRejection, setShrinkRejection] = useState(0);
 
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-
-  // Refs for keyboard navigation
-  const primaryInputRef = useRef<HTMLInputElement>(null);
-  const rejectionInputRef = useRef<HTMLInputElement>(null);
-  const wasteInputRef = useRef<HTMLInputElement>(null);
-
-  const endSessionMutation = useMutation({
-    mutationFn: () => api.post('/operator/session/end'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
-      navigate('/line/select');
-    }
-  });
-
-  const { data: line } = useQuery({
-    queryKey: ['line', lineId],
-    queryFn: async () => (await api.get(`/master-data/lines/${lineId}`)).data,
-    enabled: !!lineId
-  });
-
-  const { data: inventory } = useQuery({
-    queryKey: ['operator-inventory', currentStationId],
-    queryFn: async () => (await api.get('/inventory')).data
-  });
-
-  // 2. Fetch Active Production Batch for this Line
   const { data: batchData, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['active-batch', lineId],
-    queryFn: async () => (await api.get(`/production-batch/active/${lineId}`)).data,
+    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(lineId!))).data,
     enabled: !!lineId,
-    refetchInterval: 10000 
+    refetchInterval: 15000,
+    retry: 1
   });
 
   const activeBatch = batchData;
+
+  const { data: inventory } = useQuery({
+    queryKey: ['station-inventory', currentStationId],
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.STOCK_BY_CATEGORY(currentStation.category || 'Raw Materials'))).data,
+    enabled: !!currentStation.category
+  });
+
+  const { data: activeEvents, refetch: refetchActiveEvents } = useQuery({
+    queryKey: ['active-downtime-events', activeBatch?.batch?.id],
+    queryFn: async () => {
+      if (!activeBatch?.batch?.id) return [];
+      return (await api.get(ENDPOINTS.TELEMETRY.ACTIVE_EVENTS(activeBatch.batch.id))).data;
+    },
+    enabled: !!activeBatch?.batch?.id,
+    refetchInterval: 30000
+  });
+
+  const endSessionMutation = useMutation({
+    mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
+      if (location.pathname.startsWith('/operator')) {
+        navigate('/operator/select');
+      } else {
+        navigate('/line/select');
+      }
+    }
+  });
+
+  const { data: line, isLoading: isLoadingLine } = useQuery({
+    queryKey: ['line', lineId],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINE(lineId!))).data,
+    enabled: !!lineId,
+    retry: 1
+  });
 
   const { data: packingConfigs } = useQuery({
     queryKey: ['packing-configs', activeBatch?.batch?.productId],
     queryFn: async () => {
       if (!activeBatch?.batch?.productId) return [];
-      return (await api.get(`/inventory/packaging/${activeBatch.batch.productId}`)).data;
+      return (await api.get(ENDPOINTS.INVENTORY.PACKAGING(activeBatch.batch.productId))).data;
     },
     enabled: !!activeBatch?.batch?.productId
   });
 
+  const { data: history, refetch: refetchHistory } = useQuery({
+    queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
+    queryFn: async () => {
+      if (!activeBatch?.batch?.id) return [];
+      return (await api.get(ENDPOINTS.TELEMETRY.HISTORY(activeBatch.batch.id, currentStation.id))).data;
+    },
+    enabled: !!activeBatch?.batch?.id,
+  });
+
   useEffect(() => {
-    if (!isLoadingSession && !session) navigate('/line/select');
-  }, [session, isLoadingSession, navigate]);
+    if (location.pathname.startsWith('/operator/workspace') && user && !activeOperator) {
+      setActiveOperator(user);
+    }
+  }, [location, user, activeOperator]);
+
+  // Heartbeat to keep session active
+  useEffect(() => {
+    if (!session) return;
+    const interval = setInterval(async () => {
+      try {
+        await api.post(ENDPOINTS.OPERATOR_SESSIONS.HEARTBEAT);
+      } catch (err) {
+        console.warn('[SESSION_HEARTBEAT_FAILED]', err);
+      }
+    }, 60000); // 1 minute
+    return () => clearInterval(interval);
+  }, [session]);
+
+  useEffect(() => {
+    if (!isLoadingSession && !session) {
+      if (location.pathname.includes('/workspace')) {
+        toast.error('Session ended or taken over by another device.');
+      }
+
+      if (location.pathname.startsWith('/operator')) {
+        navigate('/operator/select');
+      } else {
+        navigate('/line/select');
+      }
+    }
+  }, [session, isLoadingSession, navigate, location]);
 
   useEffect(() => {
     if (!isLoadingBatch && !isLoadingSession) {
@@ -131,416 +184,228 @@ export default function OperatorPanel() {
     }
   }, [isLoadingBatch, isLoadingSession]);
 
-  const { data: history, refetch: refetchHistory } = useQuery({
-    queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
-    queryFn: async () => {
-      if (!activeBatch?.batch?.id) return [];
-      return (await api.get(`/telemetry/history/${activeBatch.batch.id}/${currentStation.id}`)).data;
-    },
-    enabled: !!activeBatch?.batch?.id,
-  });
-
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
-    if (!activeBatch?.batch && !session?.batchId) {
-      return toast.error('No active batch found.');
-    }
-
-    if (activeBatch?.batch?.status === 'QC_PENDING' || activeBatch?.batch?.status === 'COMPLETED') {
-      return toast.error(`Production is FROZEN for Batch ${activeBatch?.batch?.batchCode}. Status: ${activeBatch?.batch?.status}`);
-    }
-
+    if (!activeBatch?.batch && !session?.batchId) return toast.error('No active batch found.');
     if (isSubmitting) return;
 
-    // Fast Validations
-    if (type === 'COUNT' && primaryCount === 0) return toast.error('Enter production count');
-    if (type === 'WASTE' && wastageCount === 0) return toast.error('Enter wastage count');
-
-    // Industrial Rule: Material Source must be selected for Production Stations
-    if ((type === 'ALL' || type === 'COUNT') && !selectedStock && currentStation.id !== 'PACKING') {
-      return toast.error('MATERIAL_BATCH_REQUIRED: Select the current material batch (Preform/Cap/Label) being used.');
+    if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
+    if ((type === 'ALL' || type === 'COUNT') && !selectedStockId && currentStation.id !== 'PACKING' && currentStation.id !== 'QC') {
+      return toast.error('MATERIAL_BATCH_REQUIRED: Select stock batch.');
     }
 
     const currentBatch = activeBatch?.batch;
-    const logEntry = {
+    const logEntry: any = {
       requestId: uuidv4(),
       batchId: currentBatch?.id || session?.batchId,
-      sessionId: session.id,
+      sessionId: session?.id,
       lineId: lineId!,
       brandId: currentBatch?.brandId || session?.brandId,
       productId: currentBatch?.productId || session?.productId,
       shiftId: currentBatch?.shiftId || session?.shiftId,
-      userId: activeOperator.id, // THE REAL OPERATOR LOGGING THE DATA
+      operatorId: activeOperator.id,
+      operatorPin: activeOperator.currentPin,
       station: currentStation.id,
       primaryCount: Math.floor(primaryCount),
-      wastageCount: Math.floor(wastageCount),
+      wastageCount: Math.floor(rejectionCount), // Rejection and wastage consolidated
+      secondaryPackagingCount: Math.floor(secondaryPackagingCount),
       eventType: type === 'EVENT' ? eventType : 'NORMAL_PRODUCTION',
       isRework: false,
-      selectedStockId: selectedStock,
-
-      // Enterprise Extensions
-      capUsage: currentStation.id === 'FILLING' ? primaryCount : 0,
-      capRejection: currentStation.id === 'FILLING' ? rejectionCount : 0,
-      preformUsage: currentStation.id === 'BLOWING' ? primaryCount : 0,
-      preformRejection: currentStation.id === 'BLOWING' ? rejectionCount : 0,
-      bopRollUsage: currentStation.id === 'LABELING' ? primaryCount : 0,
-      bopRejection: currentStation.id === 'LABELING' ? rejectionCount : 0,
-      shrinkWeightUsed: currentStation.id === 'PACKING' ? shrinkWeight : 0,
-      shrinkWeightRejected: currentStation.id === 'PACKING' ? shrinkRejection : 0,
-      casesProduced: currentStation.id === 'PACKING' ? Math.floor(primaryCount / (packingConfigs?.find((c: any) => c.id === packingConfigId)?.bottlesPerCase || 1)) : 0,
-      packingTypeId: packingConfigId,
-      finishedGoodsProduced: currentStation.id === 'PACKING' ? primaryCount : 0,
-      boxCount: boxCount,
+      selectedStockId,
       remarks: type === 'EVENT' ? remarks : '',
+      fromTime: type === 'EVENT' ? fromTime : undefined,
+      toTime: type === 'EVENT' ? toTime : undefined,
       loggedAt: new Date().toISOString()
     };
 
+    if (currentStation.id === 'BLOWING') {
+      // For Blowing, we purchase in KGs but produce in COUNT.
+      // We track 'preformsUsed' as the count of preforms consumed.
+      logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
+    } else if (currentStation.id === 'FILLING') {
+      logEntry.capUsage = capUsage || primaryCount;
+    } else if (currentStation.id === 'LABELING') {
+      logEntry.bopRollUsage = labelUsage || primaryCount;
+      logEntry.inkUsage = inkUsage;
+      logEntry.solventUsage = solventUsage;
+    } else if (currentStation.id === 'PACKING') {
+      logEntry.shrinkWeightUsed = shrinkUsage;
+      logEntry.finishedGoodsProduced = primaryCount;
+      logEntry.casesProduced = casesProduced;
+      logEntry.packingTypeId = packingConfigId;
+    } else if (currentStation.id === 'QC') {
+      logEntry.phValue = phValue;
+      logEntry.tdsValue = tdsValue;
+      logEntry.testResult = testResult;
+    }
+
     try {
       setIsSubmitting(true);
-      await api.post('/telemetry', logEntry);
-      toast.success('Telemetry logged successfully');
+      await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
+      toast.success('Log Successfully Transmitted');
+
       refetchHistory();
+      queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
-      // Reset logic
-      setPrimaryCount(0);
-      setWastageCount(0);
-      setRejectionCount(0);
-      setBoxCount(0);
-      setShrinkWeight(0);
-      setShrinkRejection(0);
-      if (type === 'EVENT') {
-        setEventType('NORMAL_PRODUCTION');
-        setRemarks('');
-      }
-
-      // INDUSTRIAL HARDENING: Ensure focus returns to primary input for rapid entry
-      setTimeout(() => {
-        primaryInputRef.current?.focus();
-        primaryInputRef.current?.select();
-      }, 50);
-
-      // After logging, we can either stay or return to selection
-      // For shared tablets, usually we stay for multiple entries of the SAME operator
-      // or we can add a 'Submit & Switch' button later.
-      
+      setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
+      setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage(0);
+      setCasesProduced(0); setPhValue(0); setTdsValue(0);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'An industrial error occurred. Please retry.');
-    } finally {
-      setIsSubmitting(false);
-    }
+      toast.error('Failed to transmit log. Node error.');
+    } finally { setIsSubmitting(false); }
   };
 
-  const stats = {
-    target: activeBatch?.batch?.targetQuantity || 0,
-    actual: activeBatch?.batch?.actualQuantity || 0,
-    rejectionRate: ((rejectionCount / (primaryCount || 1)) * 100).toFixed(1),
-    eta: '2h 15m'
-  };
+  if (!activeOperator) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="max-w-xl w-full">
+          <TerminalLogin
+            lineId={lineId!}
+            lineName={line?.name}
+            station={currentStationId}
+            onSuccess={(op: any) => setActiveOperator(op)}
+            onClose={() => navigate('/operator/select')}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-6">
+        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Initializing OS...</p>
+      </div>
+    );
+  }
+
+  const machineStatus = (activeEvents?.length > 0) ? 'ERROR' : (activeBatch?.batch?.status === 'RUNNING' ? 'RUNNING' : 'IDLE');
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-white font-sans selection:bg-indigo-500/30">
-      {/* Modern Header */}
-      <header className="px-10 py-6 border-b border-white/5 flex justify-between items-center bg-black/40 backdrop-blur-3xl sticky top-0 z-50">
-        <div className="flex items-center gap-10">
-          <div className="flex items-center gap-6">
-            <div className={`p-4 rounded-2xl ${currentStation.bg} border ${currentStation.border} shadow-2xl`}>
-              <currentStation.icon className={`w-8 h-8 ${currentStation.color}`} />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-black text-white uppercase tracking-tight">Line {line?.name || lineId}</h1>
-                <div className="h-4 w-px bg-white/10" />
-                <span className={`text-sm font-bold ${currentStation.color} uppercase tracking-widest`}>{currentStation.title}</span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <Activity className="w-3 h-3 text-emerald-500 animate-pulse" />
-                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">
-                  Live Terminal • <span className="text-slate-300">{session?.startTime ? formatDistanceToNow(new Date(session.startTime)) : '...'}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col overflow-hidden">
+      <OperatorHeader
+        lineName={line?.name || 'Line'}
+        stationName={currentStation.title}
+        operatorName={activeOperator?.name || 'Operator'}
+        batchCode={activeBatch?.batch?.batchCode}
+        productName={activeBatch?.productName}
+        machineStatus={machineStatus}
+        onLogout={() => endSessionMutation.mutate()}
+        onDowntime={() => toast.info('Downtime Modal: Coming Soon')}
+      />
 
-        <div className="flex items-center gap-12">
-          <div className="text-right hidden md:block">
-            <span className="text-[9px] font-black text-slate-600 uppercase tracking-[0.2em] block mb-0.5">Active Station</span>
-            <p className="text-sm font-black text-white">{currentStation.title}</p>
-          </div>
-          
-          {activeOperator && (
-            <button
-              onClick={() => setActiveOperator(null)}
-              className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-all active:scale-95 group"
-            >
-              <LogOut className="w-4 h-4 text-slate-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Switch Operator</span>
-            </button>
-          )}
+      <StationWorkspace
+        title={currentStation.title}
+        description="Production Data Processing Node"
+        sidebar={<ActivityFeed history={history || []} />}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Main Action Card */}
+          <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-sm space-y-10">
+            <div className="space-y-6">
+              <IndustrialNumericInput
+                label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production Unit'} Count`}
+                value={primaryCount}
+                onChange={setPrimaryCount}
+                suffix="Units"
+              />
 
-          <button
-            onClick={() => endSessionMutation.mutate()}
-            className="px-6 py-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3 hover:bg-rose-500 hover:text-white transition-all active:scale-95 group"
-          >
-            <LayoutDashboard className="w-4 h-4 text-rose-400 group-hover:text-white" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Exit Terminal</span>
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 p-10 max-w-[1600px] mx-auto w-full grid grid-cols-12 gap-10">
-        {!activeOperator ? (
-          <div className="col-span-12 h-full flex flex-col">
-            <TerminalLogin 
-              lineId={lineId!}
-              lineName={line?.name} 
-              onSuccess={(op: any) => setActiveOperator(op)} 
-              onClose={() => navigate('/admin/production')}
-            />
-          </div>
-        ) : loading ? (
-          <div className="col-span-12 h-96 flex items-center justify-center">
-            <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
-          </div>
-        ) : (
-          <>
-            {/* Top Stats Section */}
-            <div className="col-span-12">
-              <ProductionSummaryCards stats={stats} />
-            </div>
-
-            {/* Left Column: Data Entry Forms (8 cols) */}
-            <div className="col-span-8 flex flex-col gap-8">
-              {/* Main Production Form */}
-              <section className="bg-white/5 border border-white/10 rounded-[3rem] p-10 relative overflow-hidden shadow-2xl">
-                <div className="flex items-center justify-between mb-10">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
-                      <LayoutDashboard className="w-5 h-5 text-indigo-400" />
-                    </div>
-                    <h2 className="text-xl font-black uppercase tracking-tight">Production Entry</h2>
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="px-4 py-2 bg-white/5 rounded-full border border-white/5 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                      Batch: {activeBatch?.batch?.batchCode}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-8">
-                  {/* Production Input */}
-                  <div className="col-span-1 space-y-6">
-                    <IndustrialNumericInput
-                      ref={primaryInputRef}
-                      label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production'} Count`}
-                      value={primaryCount}
-                      onChange={setPrimaryCount}
-                      placeholder="Enter quantity..."
-                      onKeyDown={(e) => e.key === 'Enter' && rejectionInputRef.current?.focus()}
-                      autoFocus
-                    />
-
-                    <IndustrialNumericInput
-                      ref={rejectionInputRef}
-                      label="Rejection / QC Fail"
-                      value={rejectionCount}
-                      onChange={setRejectionCount}
-                      placeholder="Enter rejections..."
-                      className="opacity-80 focus-within:opacity-100 transition-opacity"
-                      onKeyDown={(e) => e.key === 'Enter' && wasteInputRef.current?.focus()}
-                    />
-                  </div>
-
-                  {/* Secondary Inputs & Stock */}
-                  <div className="col-span-1 space-y-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Material Source Batch</label>
-                      <div className="relative">
-                        <Database className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                        <select
-                          value={selectedStock}
-                          onChange={(e) => setSelectedStock(e.target.value)}
-                          className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl pl-12 pr-4 text-sm font-bold text-white appearance-none outline-none focus:border-indigo-500/50 transition-all"
-                        >
-                          <option value="">Select Stock Item...</option>
-                          {inventory?.map((item: any) => (
-                            <option key={item.id} value={item.id}>{item.itemName} ({item.quantity} {item.unit})</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {currentStation.id === 'PACKING' && (
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Packaging Config</label>
-                        <div className="relative">
-                          <Layers className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                          <select
-                            value={packingConfigId}
-                            onChange={(e) => setPackingConfigId(e.target.value)}
-                            className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl pl-12 pr-4 text-sm font-bold text-white appearance-none outline-none focus:border-indigo-500/50 transition-all"
-                          >
-                            <option value="">Standard Pack...</option>
-                            {packingConfigs?.map((config: any) => (
-                              <option key={config.id} value={config.id}>{config.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-
-                    <IndustrialNumericInput
-                      ref={wasteInputRef}
-                      label="Process Wastage"
-                      value={wastageCount}
-                      onChange={setWastageCount}
-                      placeholder="Enter wastage..."
-                      suffix={currentStation.id === 'PACKING' ? 'KG' : 'PCS'}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-12 pt-8 border-t border-white/5 flex gap-4">
-                  <button
-                    onClick={() => handleSaveTelemetry('ALL')}
-                    disabled={isSubmitting}
-                    className="flex-1 h-16 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-xl shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
-                  >
-                    {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                    Log Full Telemetry
-                  </button>
-                  <button
-                    onClick={() => { setPrimaryCount(0); setRejectionCount(0); setWastageCount(0); }}
-                    className="px-8 h-16 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-                  >
-                    Clear Form
-                  </button>
-                </div>
-              </section>
-
-              {/* Event / Downtime Logger */}
-              <section className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                    <Activity className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <h3 className="text-sm font-black uppercase tracking-widest">Process Event Logger</h3>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  {['NORMAL_PRODUCTION', 'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'MATERIAL_SHORTAGE', 'LOW_SPEED', 'DOWNTIME_PAUSE'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setEventType(type)}
-                      className={cn(
-                        "py-3 px-4 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all",
-                        eventType === type ? "bg-amber-500 border-amber-400 text-black" : "bg-white/5 border-white/5 text-slate-500 hover:text-white"
-                      )}
-                    >
-                      {type.replace('_', ' ')}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex gap-4">
-                  <textarea
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    placeholder="Enter downtime reason or technical remarks..."
-                    className="flex-1 bg-black/40 border border-white/10 rounded-2xl p-4 text-xs font-bold text-slate-300 resize-none outline-none focus:border-amber-500/50 min-h-[80px]"
+              <div className="grid grid-cols-2 gap-6">
+                <IndustrialNumericInput
+                  label="Rejects / Waste"
+                  value={rejectionCount}
+                  onChange={setRejectionCount}
+                  suffix="Units"
+                />
+                {currentStation.id === 'BLOWING' ? (
+                  <IndustrialNumericInput
+                    label="Preforms Used"
+                    value={preformUsage}
+                    onChange={setPreformUsage}
+                    suffix="Pcs"
                   />
-                  <button
-                    onClick={() => handleSaveTelemetry('EVENT')}
-                    className="w-48 bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-black border border-amber-500/20 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex flex-col items-center justify-center gap-2"
-                  >
-                    <AlertTriangle className="w-5 h-5" />
-                    Log Event
-                  </button>
-                </div>
-              </section>
-            </div>
-
-            {/* Right Column: History Feed (4 cols) */}
-            <div className="col-span-4 flex flex-col gap-6">
-              <div className="bg-white/5 border border-white/10 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl h-[calc(100vh-320px)]">
-                <div className="px-8 py-6 border-b border-white/5 bg-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <HistoryIcon className="w-4 h-4 text-slate-500" />
-                    <h3 className="text-xs font-black uppercase tracking-widest">Live Activity Feed</h3>
-                  </div>
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                  <AnimatePresence mode='popLayout'>
-                    {!history || history.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center opacity-20">
-                        <HistoryIcon className="w-12 h-12 mb-4" />
-                        <p className="text-[10px] font-black uppercase tracking-widest">No logs recorded</p>
-                      </div>
-                    ) : (
-                      history.map((log: any) => (
-                        <motion.div
-                          layout
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          key={log.id || log.requestId}
-                          className="p-5 bg-white/5 border border-white/5 rounded-2xl hover:border-indigo-500/30 transition-all group"
-                        >
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className={cn(
-                                "w-2 h-2 rounded-full",
-                                log.eventType === 'NORMAL_PRODUCTION' ? "bg-emerald-500" : "bg-rose-500"
-                              )} />
-                              <span className="text-sm font-black text-white">+{log.primaryCount}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px] font-bold text-slate-500">
-                              <Clock className="w-3 h-3" />
-                              {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                            <span className="text-slate-500">{log.eventType.replace('_', ' ')}</span>
-                            {log.wastageCount > 0 && <span className="text-rose-500">Waste: {log.wastageCount}</span>}
-                          </div>
-                        </motion.div>
-                      ))
-                    )}
-                  </AnimatePresence>
-                </div>
+                ) : (
+                  <IndustrialNumericInput
+                    label="Bags / Boxes Completed"
+                    value={secondaryPackagingCount}
+                    onChange={setSecondaryPackagingCount}
+                    suffix="Units"
+                  />
+                )}
               </div>
 
-              {/* Mini Machine Status Card */}
-              <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-3xl p-6 flex items-center justify-between">
-                <div>
-                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Telemetry Status</p>
-                  <p className="text-xs font-bold text-white">Encrypted & Synchronized</p>
+              {currentStation.id === 'LABELING' && (
+                <div className="grid grid-cols-2 gap-6">
+                  <IndustrialNumericInput label="Ink (g)" value={inkUsage} onChange={setInkUsage} />
+                  <IndustrialNumericInput label="Solvent (g)" value={solventUsage} onChange={setSolventUsage} />
                 </div>
-                <Sparkles className="w-6 h-6 text-indigo-500" />
-              </div>
+              )}
             </div>
-          </>
-        )}
-      </main>
 
-      {/* Industrial Footer Action Bar */}
-      <footer className="px-10 py-6 bg-black border-t border-white/5 flex justify-between items-center sticky bottom-0 z-50">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Uplink Stable</span>
+            <button
+              onClick={() => handleSaveTelemetry('ALL')}
+              disabled={isSubmitting}
+              className="w-full h-20 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
+              Commit to Ledger
+            </button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-indigo-500" />
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">MES Core v4.0</span>
+
+          {/* Secondary Control Card */}
+          <div className="space-y-8">
+            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6">Process Logistics</h3>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Material Source Batch</label>
+                  <select
+                    value={selectedStockId}
+                    onChange={(e) => setSelectedStockId(e.target.value)}
+                    className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                  >
+                    <option value="">Select Stock Batch...</option>
+                    {inventory?.map((item: any) => (
+                      <option key={item.id} value={item.id}>
+                        {item.itemName} ({item.quantity} {item.unit}) • {item.quantity} Bags/Items
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {currentStation.id === 'PACKING' && (
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Packing Config</label>
+                    <select
+                      value={packingConfigId}
+                      onChange={(e) => setPackingConfigId(e.target.value)}
+                      className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                    >
+                      <option value="">Select Config...</option>
+                      {packingConfigs?.map((config: any) => (
+                        <option key={config.id} value={config.id}>{config.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] p-8">
+              <div className="flex items-center gap-3 mb-4">
+                <AlertTriangle className="text-amber-600" size={18} />
+                <h4 className="text-xs font-black text-amber-900 uppercase tracking-widest">Anomaly Signature</h4>
+              </div>
+              <textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Describe machine event or stop reason..."
+                className="w-full h-32 bg-white border border-amber-200 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-amber-900/30 outline-none focus:border-amber-500/50 transition-all resize-none"
+              />
+            </div>
           </div>
         </div>
-
-        <p className="text-[10px] text-slate-700 font-black uppercase tracking-[0.5em] pr-2">
-          ERNAD INTELLIGENT MANUFACTURING
-        </p>
-      </footer>
+      </StationWorkspace>
     </div>
   );
 }

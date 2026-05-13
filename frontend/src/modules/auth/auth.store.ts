@@ -1,23 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'MANAGER' | 'OPERATOR_BLOWING' | 'OPERATOR_FILLING' | 'OPERATOR_LABELING' | 'OPERATOR_PACKING' | 'OPERATOR' | string;
-
-interface User {
-  id: string;
-  name: string;
-  role: UserRole;
-  roles: string[];
-  permissions: string[];
-  avatarUrl?: string;
-}
+import type { AuthUser } from '../../types/database.types';
 
 interface AuthState {
   token: string | null;
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   isInitialized: boolean;
-  setAuth: (token: string, user: User) => void;
+  setAuth: (token: string, user: AuthUser) => void;
   logout: () => void;
   setInitialized: (val: boolean) => void;
 }

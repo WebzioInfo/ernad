@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 import { 
   ClipboardList, User, Download, 
   Calendar, CheckCircle2, AlertCircle, 
@@ -17,7 +18,7 @@ export default function AttendanceReportsPage() {
   const { data: attendanceData, isLoading } = useQuery({
     queryKey: ['attendance-report', dateRange],
     queryFn: async () => {
-      const res = await api.get('/reports/attendance', {
+      const res = await api.get(ENDPOINTS.REPORTS.ATTENDANCE, {
         params: { startDate: dateRange.start, endDate: dateRange.end }
       });
       return res.data;

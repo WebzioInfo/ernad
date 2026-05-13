@@ -34,6 +34,27 @@ export class InventoryController {
     return await this.inventoryService.getCategories();
   }
 
+  @Get('stock/category/:category')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
+  @ApiOperation({ summary: 'Get stock items by category name' })
+  async getStockByCategory(@Param('category') category: string) {
+    return await this.inventoryService.getStockByCategory(category);
+  }
+
+  @Post('categories')
+  @Permissions('settings:manage')
+  @ApiOperation({ summary: 'Create a new material category' })
+  async createCategory(@Body() dto: { name: string; description?: string }) {
+    return await this.inventoryService.createCategory(dto);
+  }
+
+  @Post('warehouses')
+  @Permissions('settings:manage')
+  @ApiOperation({ summary: 'Create a new warehouse location' })
+  async createWarehouse(@Body() dto: { name: string; type: string }) {
+    return await this.inventoryService.createWarehouse(dto);
+  }
+
   @Get('packaging/:productId')
   @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get packaging configurations for a product' })

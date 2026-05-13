@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useUnmappedLogs, useBiometricMapping } from '../hooks/useBiometric';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 import {
   Table,
   TableBody,
@@ -39,15 +40,18 @@ const UnmappedLogsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch users for mapping
-  const { data: users } = useQuery({
-    queryKey: ['users'],
-    queryFn: async () => (await api.get('/users')).data
+  const { data: usersData } = useQuery({
+    queryKey: ['users', searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      params.append('limit', '10');
+      return (await api.get(`${ENDPOINTS.USERS.LIST}?${params.toString()}`)).data;
+    }
   });
+  const users = (usersData?.data || []) as any[];
 
-  const filteredUsers = users?.filter((u: any) =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.username.toLowerCase().includes(searchTerm.toLowerCase())
-  ).slice(0, 5); // Limit for UI performance
+  const filteredUsers = users;
 
   const handleMap = async (userId: string) => {
     if (!selectedDeviceUser) return;

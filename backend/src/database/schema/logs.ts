@@ -4,8 +4,9 @@ import { users } from './users';
 import { factories, productionLines, productBrands, products } from './master-data';
 import { shifts } from './biometric';
 import { terminals } from './terminals';
+import { qcStatusEnum } from './qc';
 
-export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING']);
+export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
 
 // The Ledger of all production activity (Enterprise Standard)
@@ -42,11 +43,20 @@ export const productionLogs = pgTable('production_logs', {
   bopRejection: decimal('bop_rejection', { precision: 8, scale: 2 }).default('0'),
   shrinkWeightUsed: decimal('shrink_weight_used', { precision: 8, scale: 2 }).default('0'),
   shrinkWeightRejected: decimal('shrink_weight_rejected', { precision: 8, scale: 2 }).default('0'),
+  inkUsage: decimal('ink_usage', { precision: 8, scale: 2 }).default('0'),
+  solventUsage: decimal('solvent_usage', { precision: 8, scale: 2 }).default('0'),
+  labelUsage: integer('label_usage').default(0), // Normalized from bopRollUsage
   casesProduced: integer('cases_produced').default(0),
   packingTypeId: uuid('packing_type_id'), // Relates to packaging_configurations
   finishedGoodsProduced: integer('finished_goods_produced').default(0),
   materialCost: decimal('material_cost', { precision: 12, scale: 2 }).default('0'),
   boxCount: integer('box_count').default(0),
+  secondaryPackagingCount: integer('secondary_packaging_count').default(0).notNull(), // New: Tracking bags/boxes explicitly
+
+  // QC Parameters (Laboratory Telemetry)
+  phValue: decimal('ph_value', { precision: 4, scale: 2 }),
+  tdsValue: decimal('tds_value', { precision: 6, scale: 2 }),
+  testResult: qcStatusEnum('test_result'),
   
   loggedAt: timestamp('logged_at').notNull(),
   receivedAt: timestamp('received_at').defaultNow().notNull(),
@@ -99,6 +109,8 @@ export const batchTotals = pgTable('batch_totals', {
   preformTotal: integer('preform_total').default(0).notNull(),
   bopRollTotal: decimal('bop_roll_total', { precision: 10, scale: 2 }).default('0').notNull(),
   shrinkWeightTotal: decimal('shrink_weight_total', { precision: 10, scale: 2 }).default('0').notNull(),
+  inkTotal: decimal('ink_total', { precision: 10, scale: 2 }).default('0').notNull(),
+  solventTotal: decimal('solvent_total', { precision: 10, scale: 2 }).default('0').notNull(),
   finishedGoodsTotal: integer('finished_goods_total').default(0).notNull(),
   casesTotal: integer('cases_total').default(0).notNull(),
   
@@ -128,6 +140,10 @@ export const notifications = pgTable('notifications', {
   severity: varchar('severity', { length: 20 }).default('INFO'), // INFO, WARNING, CRITICAL
   isRead: boolean('is_read').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_notifications_unread').on(table.isRead, table.createdAt),
+  ];
 });
 
 export const deviceTokens = pgTable('device_tokens', {

@@ -14,17 +14,18 @@ import {
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { ENDPOINTS } from '../../constants/endpoints';
 
 export default function FactoryControlCenter() {
   const queryClient = useQueryClient();
 
   const { data: batches } = useQuery({
     queryKey: ['all-production-batches'],
-    queryFn: async () => (await api.get('/production-batch/batches')).data
+    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES)).data
   });
 
   const approveMutation = useMutation({
-    mutationFn: (batchId: string) => api.post(`/production-batch/batch/${batchId}/approve`),
+    mutationFn: (batchId: string) => api.post(ENDPOINTS.PRODUCTION.APPROVE_BATCH(batchId)),
     onSuccess: () => {
       toast.success('Batch approved successfully');
       queryClient.invalidateQueries({ queryKey: ['all-production-batches'] });
@@ -32,7 +33,7 @@ export default function FactoryControlCenter() {
   });
 
   const closeMutation = useMutation({
-    mutationFn: (batchId: string) => api.put(`/production-batch/${batchId}/close`, { remarks: 'Standard Industrial Closure' }),
+    mutationFn: (batchId: string) => api.patch(ENDPOINTS.PRODUCTION.CLOSE_BATCH(batchId), { remarks: 'Standard Industrial Closure' }),
     onSuccess: () => {
       toast.success('Batch CLOSED and LOCKED for history');
       queryClient.invalidateQueries({ queryKey: ['all-production-batches'] });

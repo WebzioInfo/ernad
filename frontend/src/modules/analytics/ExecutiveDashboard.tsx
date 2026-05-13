@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
+import { ENDPOINTS } from '../../constants/endpoints';
 import useAuthStore from '../../modules/auth/auth.store';
 import {
   Activity, TrendingUp,
@@ -42,11 +43,15 @@ export default function ExecutiveDashboard() {
 
 // ─── SUPER ADMIN: THE CORE ARCHITECT VIEW ───
 const SuperAdminDashboard = memo(() => {
-  const { data: auditLogs } = useQuery({ queryKey: ['audit-logs-summary'], queryFn: async () => (await api.get('/users/audit-logs')).data });
+  const { data: auditLogs } = useQuery({ 
+    queryKey: ['audit-logs-summary'], 
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,
+    retry: false
+  });
   const { data: salesKpis, isError: isSalesError, isLoading: isSalesLoading, refetch: refetchSales } = useQuery({
     queryKey: ['sales-summary-global'],
     retry: 1,
-    queryFn: async () => (await api.get('/reports/sales', {
+    queryFn: async () => (await api.get(ENDPOINTS.REPORTS.SALES, {
       params: {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         endDate: new Date().toISOString()
@@ -197,17 +202,17 @@ const SuperAdminDashboard = memo(() => {
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const { data: factoryLive, refetch: refetchLive } = useQuery({
     queryKey: ['factory-live-overview'],
-    queryFn: async () => (await api.get('/analytics/factory/live')).data
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data
   });
 
   const { data: efficiency } = useQuery({
     queryKey: ['machine-efficiency'],
-    queryFn: async () => (await api.get('/analytics/factory/efficiency')).data
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_EFFICIENCY)).data
   });
 
   const { data: salesSummary } = useQuery({
     queryKey: ['tally-sales-summary'],
-    queryFn: async () => (await api.get('/tally/summary')).data
+    queryFn: async () => (await api.get(ENDPOINTS.TALLY.SUMMARY)).data
   });
 
   const isLive = filters.timeRange === 'live';

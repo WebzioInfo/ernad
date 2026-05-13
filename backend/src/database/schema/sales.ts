@@ -1,6 +1,7 @@
 import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum } from 'drizzle-orm/pg-core';
 import { products, factories } from './master-data';
 import { users } from './users';
+import { productionBatches } from './production';
 
 export const orderStatusEnum = pgEnum('order_status', ['DRAFT', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']);
 export const paymentStatusEnum = pgEnum('payment_status', ['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
@@ -44,6 +45,7 @@ export const salesOrderItems = pgTable('sales_order_items', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderId: uuid('order_id').references(() => salesOrders.id, { onDelete: 'cascade' }).notNull(),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
+  batchId: uuid('batch_id').references(() => productionBatches.id), // Link to production
   quantity: integer('quantity').notNull(),
   unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).notNull(),
   totalPrice: decimal('total_price', { precision: 15, scale: 2 }).notNull(),

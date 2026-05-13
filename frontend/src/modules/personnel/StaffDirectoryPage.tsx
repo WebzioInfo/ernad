@@ -5,6 +5,9 @@ import {
   Users, Search, Filter, Mail, 
   ShieldCheck, Loader2, MoreHorizontal
 } from 'lucide-react';
+import { ENDPOINTS } from '../../constants/endpoints';
+import useAuthStore from '../auth/auth.store';
+import { PRIVILEGED_ROLE_SLUGS } from './UserManagementPage';
 
 interface Staff {
   id: string;
@@ -19,17 +22,20 @@ interface Staff {
 
 export default function StaffDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const { user: currentUser } = useAuthStore();
   
-  const { data: staff, isLoading } = useQuery<Staff[]>({
-    queryKey: ['staff-directory'],
-    queryFn: async () => (await api.get('/users')).data // Reusing users endpoint as staff directory
+  const { data: staffData, isLoading } = useQuery({
+    queryKey: ['staff-directory', searchTerm],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      return (await api.get(`${ENDPOINTS.USERS.LIST}?${params.toString()}`)).data;
+    }
   });
 
-  const filteredStaff = staff?.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.jobTitle?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const staff = (staffData?.data || []) as Staff[];
+
+  const filteredStaff = staff; // Already filtered by backend
 
   if (isLoading) return (
     <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-4">

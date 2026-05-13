@@ -4,14 +4,14 @@ import { ModuleConfig } from '../../app/registry/types';
 
 export const personnelConfig: ModuleConfig = {
   id: 'personnel',
-  name: 'Personnel',
+  name: 'Workforce',
   category: 'ADMINISTRATION',
   order: 50,
   routes: [
     {
       path: 'users',
       element: lazy(() => import('./UserManagementPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
     },
     {
       path: 'staffs',
@@ -26,26 +26,32 @@ export const personnelConfig: ModuleConfig = {
   ],
   sidebarGroups: [
     {
-      id: 'personnel_mgmt',
-      label: 'Personnel',
+      id: 'team',
+      label: 'Team',
       items: [
         {
           id: 'users',
-          label: 'Users',
+          label: 'System Access',
           icon: Users,
           path: '/users',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
         },
         {
           id: 'staffs',
-          label: 'Staff Directory',
+          label: 'Operators',
           icon: UserCog,
           path: '/staffs',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-        },
+        }
+      ]
+    },
+    {
+      id: 'reports',
+      label: 'Reports',
+      items: [
         {
           id: 'audit',
-          label: 'Audit Logs',
+          label: 'History',
           icon: History,
           path: '/audit',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']

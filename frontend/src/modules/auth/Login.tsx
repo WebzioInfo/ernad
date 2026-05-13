@@ -6,6 +6,7 @@ import {
 import { api } from '../../services/api-client';
 import useAuthStore from './auth.store';
 import { toast } from 'sonner';
+import { ENDPOINTS } from '../../constants/endpoints';
 import Watermark from '../../components/Watermark';
 
 export default function Login() {
@@ -35,7 +36,7 @@ export default function Login() {
       const trimmedIdentity = identity.trim();
       const detectedType = credential.length <= 6 && /^\d+$/.test(credential) ? 'PIN' : 'PASSWORD';
       
-      const res = await api.post('/auth/login', { 
+      const res = await api.post(ENDPOINTS.AUTH.LOGIN, { 
         identity: trimmedIdentity, 
         credential,
         type: detectedType
@@ -46,7 +47,7 @@ export default function Login() {
       const role = res.data.user.role;
       if (role === 'SUPER_ADMIN' || role === 'ADMIN') navigate('/admin');
       else if (role === 'MANAGER') navigate('/manager');
-      else if (role.includes('OPERATOR')) navigate('/line/select');
+      else if (role.includes('OPERATOR')) navigate('/operator/select');
       else navigate('/admin'); // Fallback
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Access Denied: Invalid Identity or Credential');

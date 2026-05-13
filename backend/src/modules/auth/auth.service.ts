@@ -1,15 +1,19 @@
-import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { db } from '../../database/db';
-import { users, operatorSessions, roles, permissions, rolePermissions, userRoles } from '../../database/schema';
+import { users, operatorSessions, roles, permissions, rolePermissions, userRoles, terminals } from '../../database/schema';
 import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
+import { OperatorSessionsService } from '../operator-sessions/operator-sessions.service';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private sessionService: OperatorSessionsService
+  ) {}
 
   async login(identity: string, credential: string, type?: 'PASSWORD' | 'PIN') {
     this.logger.log(`[AUTH_TRACE] Login process initiated for: ${identity}`);
@@ -174,10 +178,30 @@ export class AuthService {
   }
 
   async resetCredentialById(adminRoles: string[], userId: string, newCredential: string, type: 'PASSWORD' | 'PIN') {
-    const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'];
-    const hasAccess = adminRoles?.some(r => allowedRoles.includes(r));
-    
-    if (!hasAccess) {
+    const isSuperAdmin = adminRoles.includes('SUPER_ADMIN');
+    const isAdmin = adminRoles.includes('ADMIN');
+    const isManager = adminRoles.includes('MANAGER');
+
+    const targetUser = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!targetUser[0]) throw new NotFoundException('User not found');
+
+    // Hierarchy Check
+    const targetRolesResult = await db.select({ slug: roles.slug })
+      .from(roles)
+      .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+      .where(eq(userRoles.userId, userId));
+    const targetRoles = targetRolesResult.map(r => r.slug);
+
+    if (isManager) {
+      const isPrivileged = targetRoles.some(r => ['ADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(r));
+      if (isPrivileged) throw new ForbiddenException('Managers cannot reset administrative credentials');
+    }
+
+    if (isAdmin && !isSuperAdmin) {
+      if (targetRoles.includes('SUPER_ADMIN')) throw new ForbiddenException('Admins cannot reset SuperAdmin credentials');
+    }
+
+    if (!isSuperAdmin && !isAdmin && !isManager) {
       throw new ForbiddenException('Unauthorized to reset credentials');
     }
 
@@ -217,4 +241,104 @@ export class AuthService {
 
     return { success: true, operatorName: user.name };
   }
+
+  async terminalLogin(operatorId: string, pin: string, lineId: string, station: string, terminalId?: string) {
+    this.logger.log(`[TERMINAL_AUTH] Login attempt for Operator: ${operatorId} at Station: ${station} (Terminal: ${terminalId})`);
+
+    // 1. UUID Validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validate = (id: string | undefined, name: string) => {
+      if (!id) throw new BadRequestException(`${name} is required.`);
+      if (!uuidRegex.test(id)) {
+        throw new BadRequestException(`Invalid ${name} format. Must be a valid UUID.`);
+      }
+    };
+
+    validate(operatorId, 'operatorId');
+    validate(lineId, 'lineId');
+    if (terminalId) validate(terminalId, 'terminalId');
+
+    // 2. Verify PIN and Get User
+    const [user] = await db.select().from(users).where(eq(users.id, operatorId)).limit(1);
+    
+    if (!user) {
+      this.logger.warn(`[TERMINAL_AUTH] Login failed: Operator ${operatorId} not found.`);
+      throw new NotFoundException('Operator profile not found.');
+    }
+
+    if (!user.isActive) {
+      this.logger.warn(`[TERMINAL_AUTH] Login failed: Operator ${user.username} is inactive.`);
+      throw new UnauthorizedException('Operator account is deactivated.');
+    }
+
+    const isMatch = await bcrypt.compare(pin, user.pinCode).catch(() => false);
+    if (!isMatch) {
+      this.logger.warn(`[TERMINAL_AUTH] Login failed: Invalid PIN for ${user.username}`);
+      throw new UnauthorizedException('Invalid security PIN.');
+    }
+
+    // 5. RBAC Enforcement: Strict Exact-Match Operator Check
+    const userRolesResult = await db.select({
+      slug: roles.slug,
+    })
+    .from(roles)
+    .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, user.id));
+
+    const roleSlugs = userRolesResult.map(r => r.slug);
+    
+    // Explicit list of authorized operator roles (No substring matching)
+    const allowedOperatorRoles = [
+      'OPERATOR', 
+      'OPERATOR_BLOWING', 
+      'OPERATOR_FILLING', 
+      'OPERATOR_LABELING', 
+      'OPERATOR_PACKING',
+      'SUPER_ADMIN', // Keep emergency override
+      'ADMIN'        // Keep emergency override
+    ];
+
+    const isOperator = roleSlugs.some(r => allowedOperatorRoles.includes(r));
+    
+    if (!isOperator) {
+      this.logger.error(`[RBAC_VIOLATION] Unauthorized terminal access attempt by role: ${roleSlugs.join(', ')}`);
+      throw new ForbiddenException('Your role does not permit operator terminal access.');
+    }
+
+    // 6. Start Session
+    try {
+      const session = await this.sessionService.startSession(operatorId, lineId, station, undefined, true, terminalId);
+
+      // 7. Generate Token with Dynamic Roles
+      const payload = {
+        sub: user.id,
+        username: user.username,
+        role: roleSlugs[0] || 'OPERATOR', // Fallback for safety, but real roles are passed below
+        roles: roleSlugs,
+        name: user.name,
+        factoryId: user.factoryId,
+        sessionId: session.id,
+        deviceId: undefined
+      };
+
+      const token = await this.jwtService.signAsync(payload);
+      this.logger.log(`[TERMINAL_AUTH] Session granted: ${session.id} for operator ${user.username}`);
+
+      return {
+        success: true,
+        access_token: token,
+        operator: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: 'OPERATOR',
+        },
+        session
+      };
+    } catch (err: any) {
+      this.logger.error(`[TERMINAL_AUTH_ERR] Session creation failed: ${err.message}`);
+      throw err;
+    }
+  }
 }
+

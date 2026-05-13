@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api-client';
-import { 
+import { ENDPOINTS } from '../../constants/endpoints';
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area
 } from 'recharts';
-import { 
-  TrendingUp, Activity, AlertCircle, 
-  ArrowUpRight, ArrowDownRight, Zap 
+import {
+  TrendingUp, Activity, AlertCircle,
+  ArrowUpRight, ArrowDownRight, Zap
 } from 'lucide-react';
 
 export default function EfficiencyDashboardPage() {
@@ -17,7 +18,7 @@ export default function EfficiencyDashboardPage() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['line-performance', filters],
     queryFn: async () => {
-      const res = await api.get('/analytics/line-performance', {
+      const res = await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, {
         params: {
           lineId: filters.lineId,
           brandId: filters.brandId !== 'all' ? filters.brandId : undefined,
@@ -27,13 +28,13 @@ export default function EfficiencyDashboardPage() {
       return res.data;
     },
     enabled: !!filters.lineId && filters.lineId !== 'all' && isLive,
-    refetchInterval: 5000 
+    refetchInterval: 5000
   });
 
   const getDates = () => {
     const end = new Date();
     const start = new Date();
-    if (filters.timeRange === 'today') start.setHours(0,0,0,0);
+    if (filters.timeRange === 'today') start.setHours(0, 0, 0, 0);
     else if (filters.timeRange === 'week') start.setDate(start.getDate() - 7);
     else if (filters.timeRange === 'month') start.setDate(start.getDate() - 30);
     return { start, end };
@@ -44,9 +45,9 @@ export default function EfficiencyDashboardPage() {
   const { data: historicalKPIs } = useQuery({
     queryKey: ['line-kpis', filters],
     queryFn: async () => {
-      const res = await api.get('/analytics/kpis', {
-        params: { 
-          startDate: start.toISOString(), 
+      const res = await api.get(ENDPOINTS.ANALYTICS.KPIS, {
+        params: {
+          startDate: start.toISOString(),
           endDate: end.toISOString(),
           lineId: filters.lineId
         }
@@ -59,9 +60,9 @@ export default function EfficiencyDashboardPage() {
   const { data: historicalTrend } = useQuery({
     queryKey: ['line-historical-trend', filters],
     queryFn: async () => {
-      const res = await api.get('/analytics/historical', {
-        params: { 
-          startDate: start.toISOString(), 
+      const res = await api.get(ENDPOINTS.ANALYTICS.HISTORICAL, {
+        params: {
+          startDate: start.toISOString(),
           endDate: end.toISOString(),
           lineId: filters.lineId,
           interval: filters.timeRange === 'today' ? 'hour' : 'day'
@@ -105,33 +106,33 @@ export default function EfficiencyDashboardPage() {
     <div className="space-y-6">
       {/* Top Metrics */}
       <div className="grid grid-cols-4 gap-6">
-        <MetricCard 
-          label="Overall Efficiency (OEE)" 
-          value={`${displayKPIs.oee}%`} 
-          trend={isLive ? "+2.4%" : "Avg"} 
+        <MetricCard
+          label="Overall Efficiency (OEE)"
+          value={`${displayKPIs.oee}%`}
+          trend={isLive ? "+2.4%" : "Avg"}
           isPositive={true}
           icon={Activity}
           color="blue"
         />
-        <MetricCard 
-          label={isLive ? "Current Throughput" : "Total Throughput"} 
-          value={isLive ? displayKPIs.throughput : (Number(displayKPIs.throughput) / 1000).toFixed(1) + 'k'} 
-          trend={isLive ? "-5%" : "Total"} 
+        <MetricCard
+          label={isLive ? "Current Throughput" : "Total Throughput"}
+          value={isLive ? displayKPIs.throughput : (Number(displayKPIs.throughput) / 1000).toFixed(1) + 'k'}
+          trend={isLive ? "-5%" : "Total"}
           isPositive={isLive ? false : true}
           icon={TrendingUp}
           color="emerald"
         />
-        <MetricCard 
-          label="Operational Status" 
-          value={displayKPIs.bottleneck} 
+        <MetricCard
+          label="Operational Status"
+          value={displayKPIs.bottleneck}
           icon={Zap}
           color="amber"
           isWarning={isLive}
         />
-        <MetricCard 
-          label="Quality Yield" 
-          value={displayKPIs.quality} 
-          trend={isLive ? "+0.1%" : "Avg"} 
+        <MetricCard
+          label="Quality Yield"
+          value={displayKPIs.quality}
+          trend={isLive ? "+0.1%" : "Avg"}
           isPositive={true}
           icon={AlertCircle}
           color="indigo"
@@ -148,15 +149,15 @@ export default function EfficiencyDashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={isLive ? (stats?.stats || []) : historicalTrend}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey={isLive ? "station" : "time"} 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                <XAxis
+                  dataKey={isLive ? "station" : "time"}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }}
                 />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
-                <Tooltip 
-                   contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                <Tooltip
+                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
                 <Bar dataKey={isLive ? "throughput" : "val"} fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
               </BarChart>
@@ -180,8 +181,8 @@ export default function EfficiencyDashboardPage() {
               ] : historicalTrend}>
                 <defs>
                   <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -202,12 +203,11 @@ function MetricCard({ label, value, trend, isPositive, icon: Icon, color, isWarn
   return (
     <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start mb-4">
-        <div className={`p-3 rounded-2xl ${
-          color === 'blue' ? 'bg-blue-50 text-blue-600' : 
-          color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-          color === 'amber' ? 'bg-amber-50 text-amber-600' :
-          'bg-indigo-50 text-indigo-600'
-        }`}>
+        <div className={`p-3 rounded-2xl ${color === 'blue' ? 'bg-blue-50 text-blue-600' :
+            color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
+              color === 'amber' ? 'bg-amber-50 text-amber-600' :
+                'bg-indigo-50 text-indigo-600'
+          }`}>
           <Icon className="w-5 h-5" />
         </div>
         {trend && (

@@ -1,7 +1,9 @@
 import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { factories, productionLines, productBrands, products } from './master-data';
+import { terminals } from './terminals';
 import { shifts } from './biometric';
+import { eq } from 'drizzle-orm';
 
 export const batchStatusEnum = pgEnum('batch_status', ['PLANNING', 'RUNNING', 'CHANGEOVER', 'WAITING_APPROVAL', 'QC_PENDING', 'APPROVED', 'COMPLETED', 'CLOSED']);
 
@@ -13,6 +15,7 @@ export const productionBatches = pgTable('production_batches', {
   productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
   shiftId: uuid('shift_id').references(() => shifts.id, { onDelete: 'restrict' }).notNull(),
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
+  targetQuantity: integer('target_quantity'),
   
   // Time Accountability
   startTime: timestamp('start_time').defaultNow().notNull(),
@@ -111,6 +114,7 @@ export const operatorSessions = pgTable('operator_sessions', {
   factoryId: uuid('factory_id').references(() => factories.id), // Consolidated from sessions.ts
   startTime: timestamp('start_time').defaultNow().notNull(),
   endTime: timestamp('end_time'),
+  terminalId: uuid('terminal_id').references(() => terminals.id), // Tablet ID for audit
   isActive: boolean('is_active').default(true).notNull(),
   endedBy: uuid('ended_by').references(() => users.id),
   endReason: varchar('end_reason', { length: 100 }), // manual, timeout, forced, batch_closed
@@ -122,6 +126,8 @@ export const operatorSessions = pgTable('operator_sessions', {
     index('idx_operator_sessions_user').on(table.userId, table.isActive),
     index('idx_operator_sessions_line').on(table.lineId, table.isActive),
     index('idx_operator_sessions_batch').on(table.batchId),
+    index('idx_operator_sessions_terminal').on(table.terminalId),
+    uniqueIndex('idx_operator_sessions_unique_active').on(table.userId).where(eq(table.isActive, true)),
   ];
 });
 
@@ -146,6 +152,7 @@ export const downtimeLogs = pgTable('downtime_logs', {
     index('idx_downtime_batch').on(table.batchId),
     index('idx_downtime_line').on(table.lineId),
     index('idx_downtime_active').on(table.batchId, table.endTime),
+    index('idx_downtime_time').on(table.startTime), // New: Critical for analytics performance
     index('idx_downtime_deleted').on(table.deletedAt),
   ];
 });

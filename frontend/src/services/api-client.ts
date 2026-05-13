@@ -29,15 +29,15 @@ const addToSyncQueue = (request: any) => {
 const getBaseURL = () => {
   // 1. Explicit VITE_API_URL from environment (Priority)
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) return envUrl;
+  if (envUrl) return envUrl.endsWith('/') ? envUrl : `${envUrl}/`;
   
   // 2. Automatic detection for Localhost
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:4000/api';
+    return 'http://localhost:4000/api/';
   }
   
-  // 3. Fallback to relative path (assuming same domain deployment)
-  return '/api';
+  // 3. Fallback to relative path (standard production structure)
+  return '/api/';
 };
 
 export const api = axios.create({
@@ -97,9 +97,15 @@ api.interceptors.response.use(
       }
 
       if (isTimeout) {
-        toast.error('Request Timed Out', {
-          description: 'The server is taking too long to respond. Please try again.',
-        });
+        // Skip global toast for high-frequency polling analytics to prevent "toast spam"
+        const isBackgroundPoll = config?.url?.includes('/analytics/factory/live') || 
+                                config?.url?.includes('/analytics/factory/efficiency');
+        
+        if (!isBackgroundPoll) {
+          toast.error('Network Latency Detected', {
+            description: 'The operation is taking longer than expected. We are still trying in the background.',
+          });
+        }
       } else if (isNetworkError) {
         // ── OFFLINE-FIRST LOGIC: Queue non-GET requests ──
         if (config && config.method !== 'get' && (config.url?.includes('/telemetry') || config.url?.includes('/downtime'))) {
@@ -165,9 +171,15 @@ api.interceptors.response.use(
       const message = data?.message || 'Something went wrong. Please try again.';
       const errorCode = data?.errorCode || 'SYSTEM_ERROR';
 
-      toast.error(message, {
-        description: `Reference: ${errorCode}`
-      });
+      // Suppress 404 toasts for specific background queries that handle nulls gracefully
+      const isBackgroundPoll = config?.url?.includes('/analytics/factory/live') || 
+                              config?.url?.includes('/production/active-batch');
+
+      if (!(error.response.status === 404 && isBackgroundPoll)) {
+        toast.error(message, {
+          description: `Reference: ${errorCode}`
+        });
+      }
     }
 
     return Promise.reject(error);

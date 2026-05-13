@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
+import { ENDPOINTS } from '../../constants/endpoints';
 import {
   Settings, Tags, Box, Factory, Clock,
   Plus, Trash2, Loader2
@@ -17,12 +18,12 @@ type Shift = { id: string; name: string; startTime: string; endTime: string };
 
 const BrandsTab = () => {
   const queryClient = useQueryClient();
-  const { data: brands, isLoading } = useQuery<Brand[]>({ queryKey: ['brands'], queryFn: async () => (await api.get('/master-data/brands')).data });
+  const { data: brands, isLoading } = useQuery<Brand[]>({ queryKey: ['brands'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data });
   const [isAdding, setIsAdding] = useState(false);
   const [newBrand, setNewBrand] = useState({ name: '', description: '' });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => await api.post('/master-data/brands', data),
+    mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.BRANDS, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brands'] });
       toast.success('Brand added successfully');
@@ -103,14 +104,14 @@ const BrandsTab = () => {
 
 const ProductsTab = () => {
   const queryClient = useQueryClient();
-  const { data: products, isLoading: isLoadingProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: async () => (await api.get('/master-data/products')).data });
-  const { data: brands, isLoading: isLoadingBrands } = useQuery<Brand[]>({ queryKey: ['brands'], queryFn: async () => (await api.get('/master-data/brands')).data });
+  const { data: products, isLoading: isLoadingProducts } = useQuery<Product[]>({ queryKey: ['products'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data });
+  const { data: brands, isLoading: isLoadingBrands } = useQuery<Brand[]>({ queryKey: ['brands'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data });
   
   const [isAdding, setIsAdding] = useState(false);
   const [newProduct, setNewProduct] = useState({ name: '', brandId: '', sku: '', targetWeight: 0, targetSpeed: 0, unit: 'BOTTLES' });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => await api.post('/master-data/products', data),
+    mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.PRODUCTS, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Product added successfully');
@@ -222,12 +223,12 @@ const ProductsTab = () => {
 
 const LinesTab = () => {
   const queryClient = useQueryClient();
-  const { data: lines, isLoading } = useQuery<Line[]>({ queryKey: ['lines'], queryFn: async () => (await api.get('/master-data/lines')).data });
+  const { data: lines, isLoading } = useQuery<Line[]>({ queryKey: ['lines'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data });
   const [isAdding, setIsAdding] = useState(false);
   const [newLine, setNewLine] = useState({ id: '', name: '' });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => await api.post('/master-data/lines', data),
+    mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.LINES, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lines'] });
       toast.success('Line added successfully');
@@ -238,7 +239,7 @@ const LinesTab = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => await api.delete(`/master-data/lines/${id}`),
+    mutationFn: async (id: string) => await api.delete(ENDPOINTS.MASTER_DATA.LINE(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lines'] });
       toast.success('Line deleted successfully');
@@ -331,12 +332,12 @@ const LinesTab = () => {
 
 const ShiftsTab = () => {
   const queryClient = useQueryClient();
-  const { data: shifts, isLoading } = useQuery<Shift[]>({ queryKey: ['shifts'], queryFn: async () => (await api.get('/master-data/shifts')).data });
+  const { data: shifts, isLoading } = useQuery<Shift[]>({ queryKey: ['shifts'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data });
   const [isAdding, setIsAdding] = useState(false);
   const [newShift, setNewShift] = useState({ name: '', startTime: '08:00', endTime: '16:00' });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => await api.post('/master-data/shifts', data),
+    mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.SHIFTS, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success('Shift added successfully');
@@ -347,7 +348,7 @@ const ShiftsTab = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => await api.delete(`/master-data/shifts/${id}`),
+    mutationFn: async (id: string) => await api.delete(ENDPOINTS.MASTER_DATA.SHIFT(id)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shifts'] });
       toast.success('Shift deleted successfully');

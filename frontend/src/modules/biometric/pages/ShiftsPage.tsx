@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { biometricService } from '../services/biometric.service';
 import { api } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +46,11 @@ const ShiftsPage: React.FC = () => {
     queryFn: async () => (await biometricService.getShifts()).data
   });
 
-  const { data: users } = useQuery({
+  const { data: usersData } = useQuery({
     queryKey: ['users'],
-    queryFn: async () => (await api.get('/users')).data
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.LIST)).data
   });
+  const users = (usersData?.data || []) as any[];
 
   // Mutations
   const createShiftMutation = useMutation({

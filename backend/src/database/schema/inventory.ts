@@ -109,3 +109,18 @@ export const inventoryLedger = pgTable('inventory_ledger', {
     index('idx_ledger_time').on(table.occurredAt),
   ];
 });
+export const stockTransfers = pgTable('stock_transfers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  fromWarehouseId: uuid('from_warehouse_id').references(() => warehouseLocations.id).notNull(),
+  toWarehouseId: uuid('to_warehouse_id').references(() => warehouseLocations.id).notNull(),
+  stockId: uuid('stock_id').references(() => inventoryStock.id).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 4 }).notNull(),
+  status: varchar('status', { length: 50 }).default('PENDING').notNull(), // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
+  transferredBy: uuid('transferred_by').references(() => users.id),
+  receivedBy: uuid('received_by').references(() => users.id),
+  transferredAt: timestamp('transferred_at').defaultNow().notNull(),
+  receivedAt: timestamp('received_at'),
+  remarks: text('remarks'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});

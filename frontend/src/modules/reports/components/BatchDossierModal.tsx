@@ -102,7 +102,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                 </div>
                 <div className="w-1 h-1 bg-slate-300 rounded-full" />
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <Clock className="w-3 h-3" /> {format(new Date(metadata?.batch?.startTime), 'MMM dd, HH:mm')}
+                  <Clock className="w-3 h-3" /> {metadata?.batch?.startTime ? format(new Date(metadata.batch.startTime), 'MMM dd, HH:mm') : 'N/A'}
                 </div>
               </div>
             </div>

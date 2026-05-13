@@ -18,7 +18,7 @@ export default function SmartRedirect() {
   }
 
   if (isOperator) {
-    return <Navigate to="/line/select" replace />;
+    return <Navigate to="/operator/select" replace />;
   }
 
   // Default for Admin/SuperAdmin

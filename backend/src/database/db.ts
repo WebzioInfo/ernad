@@ -15,7 +15,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const client = postgres(env.DATABASE_URL, { 
     prepare: false,
     ssl: isProduction ? { rejectUnauthorized: false } : (process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false),
-    max: isProduction ? 10 : 1, // Limit connections in serverless to prevent pool exhaustion
+    max: isProduction ? 10 : 5, // Prevent single-query blockage in dev
     idle_timeout: 20,
     connect_timeout: 10,
 });

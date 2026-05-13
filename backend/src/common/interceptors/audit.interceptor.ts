@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { AuditService } from '../../modules/observability/audit.service';
+import { AuditService } from '../../modules/audit/audit.service';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {

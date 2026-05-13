@@ -1,15 +1,19 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { SalesModule } from './modules/sales/sales.module';
+import { ProcurementModule } from './modules/procurement/procurement.module';
+import { WarehousingModule } from './modules/warehousing/warehousing.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthGuard } from './modules/auth/auth.guard';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
-import { ProductionTelemetryModule } from './modules/production-telemetry/production-telemetry.module';
-import { ProductionManagementModule } from './modules/production-management/production-management.module';
+import { TelemetryModule } from './modules/telemetry/telemetry.module';
+import { ProductionModule } from './modules/production/production.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { FactoryConfigModule } from './modules/factory-config/factory-config.module';
+import { MasterDataModule } from './modules/master-data/master-data.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './providers/mail/mail.module';
@@ -22,12 +26,12 @@ import { ConfigModule } from '@nestjs/config';
 import { QueueModule } from './providers/queue/queue.module';
 import { RedisModule } from './providers/redis/redis.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
-import { OperatorSessionModule } from './modules/operator-session/operator-session.module';
-import { DataLifecycleModule } from './modules/data-lifecycle/data-lifecycle.module';
+import { OperatorSessionsModule } from './modules/operator-sessions/operator-sessions.module';
+import { SystemModule } from './modules/system/system.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { BiometricModule } from './modules/biometric/biometric.module';
 import { TallyModule } from './modules/tally/tally.module';
-import { ObservabilityModule } from './modules/observability/observability.module';
+import { ForensicsModule } from './modules/forensics/forensics.module';
 
 import { AppController } from './app.controller';
 
@@ -36,10 +40,10 @@ import { AppController } from './app.controller';
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,
     QueueModule,
-    ObservabilityModule,
+    ForensicsModule,
     AuthModule, 
     UsersModule, 
-    FactoryConfigModule, 
+    MasterDataModule, 
     AnalyticsModule, 
     HealthModule, 
     MailModule, 
@@ -48,15 +52,19 @@ import { AppController } from './app.controller';
     NotificationsModule, 
     OneSignalModule, 
     AttendanceModule,
-    ProductionTelemetryModule,
-    ProductionManagementModule,
+    TelemetryModule,
+    ProductionModule,
     InventoryModule,
-    OperatorSessionModule,
-    DataLifecycleModule,
+    OperatorSessionsModule,
+    SystemModule,
     NotesModule,
     BiometricModule,
     TallyModule,
     ReportsModule,
+    SalesModule,
+    ProcurementModule,
+    WarehousingModule,
+    AuditModule,
     ScheduleModule.forRoot(),
   ],
 

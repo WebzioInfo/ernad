@@ -10,13 +10,14 @@ import {
   Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ENDPOINTS } from '../../../constants/endpoints';
 
 
 export function BatchTrackingView() {
   const { data: batches, isLoading } = useQuery({
     queryKey: ['production-batches'],
     queryFn: async () => {
-      const res = await api.get('/production/batches');
+      const res = await api.get(ENDPOINTS.PRODUCTION.BATCHES);
       return res.data;
     },
   });
@@ -80,7 +81,7 @@ export function QualityCheckView() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['qc-logs'],
     queryFn: async () => {
-      const res = await api.get('/production/logs/qc');
+      const res = await api.get(ENDPOINTS.PRODUCTION.LOGS('qc'));
       return res.data;
     },
   });
@@ -113,7 +114,7 @@ export function PackagingView() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['packaging-logs'],
     queryFn: async () => {
-      const res = await api.get('/production/logs/packaging');
+      const res = await api.get(ENDPOINTS.PRODUCTION.LOGS('packaging'));
       return res.data;
     },
   });
@@ -145,7 +146,7 @@ export function DispatchView() {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['dispatch-logs'],
     queryFn: async () => {
-      const res = await api.get('/production/logs/dispatch');
+      const res = await api.get(ENDPOINTS.PRODUCTION.LOGS('dispatch'));
       return res.data;
     },
   });

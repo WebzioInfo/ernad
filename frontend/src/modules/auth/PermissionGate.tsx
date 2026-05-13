@@ -1,36 +1,45 @@
 import React from 'react';
 import useAuthStore from './auth.store';
+import { hasPermission, hasRole, isSuperAdmin, type PermissionSlug } from '../../lib/permissions';
 
 interface PermissionGateProps {
   children: React.ReactNode;
+  /** Role slugs (prefix-matched – OPERATOR matches OPERATOR_BLOWING etc.) */
   allowedRoles?: string[];
-  permissions?: string[];
+  /** Permission slugs e.g. 'production:start' */
+  permissions?: PermissionSlug[];
+  /** Require ALL permissions (default: any) */
+  requireAll?: boolean;
   fallback?: React.ReactNode;
 }
 
-export default function PermissionGate({ 
-  children, 
+export default function PermissionGate({
+  children,
   allowedRoles,
   permissions,
-  fallback = null 
+  requireAll = false,
+  fallback = null,
 }: PermissionGateProps) {
-  const user = useAuthStore((state: any) => state.user);
+  const user = useAuthStore((state) => state.user);
 
   if (!user) return <>{fallback}</>;
-  
-  // Super Admin God Mode bypass
-  const isSuperAdmin = user.role === 'SUPER_ADMIN' || user.roles?.includes('SUPER_ADMIN');
-  if (isSuperAdmin) return <>{children}</>;
 
-  // Check Permissions (Primary)
+  // SUPER_ADMIN bypasses everything (mirrors roles.guard.ts line 53)
+  if (isSuperAdmin(user)) return <>{children}</>;
+
+  // Permission check
   if (permissions && permissions.length > 0) {
-    const hasPermission = permissions.some(p => user.permissions?.includes(p));
-    if (hasPermission) return <>{children}</>;
+    const check = requireAll
+      ? permissions.every(p => hasPermission(user, p))
+      : permissions.some(p => hasPermission(user, p));
+    if (check) return <>{children}</>;
+    // If permissions were specified and failed, don't fall through to role check
+    if (!allowedRoles || allowedRoles.length === 0) return <>{fallback}</>;
   }
 
-  // Check Roles (Legacy/Fallback)
-  if (allowedRoles && allowedRoles.includes(user.role)) {
-    return <>{children}</>;
+  // Role check (prefix-matching, mirrors guard line 59-67)
+  if (allowedRoles && allowedRoles.length > 0) {
+    if (hasRole(user, ...allowedRoles)) return <>{children}</>;
   }
 
   return <>{fallback}</>;

@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsBoolean, MinLength, IsArray } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsEnum, IsBoolean, MinLength, IsArray, IsNotEmpty, Length } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUserDto {
@@ -31,7 +31,8 @@ export class CreateUserDto {
 
   @ApiProperty({ example: '1234' })
   @IsString()
-  @MinLength(4)
+  @IsNotEmpty()
+  @Length(4, 4, { message: 'PIN must be exactly 4 digits' })
   pin: string;
 
   @ApiPropertyOptional({ example: ['OPERATOR'] })

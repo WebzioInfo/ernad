@@ -124,13 +124,4 @@ export class AuthController {
   ) {
     return this.authService.resetCredentialById(req.user.roles, body.userId, body.newCredential, body.type);
   }
-
-  @UseGuards(AuthGuard)
-  @Post('terminal-verify')
-  @HttpCode(HttpStatus.OK)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Verify operator PIN for shared terminal usage' })
-  async terminalVerify(@Body() body: { userId: string; pin: string }) {
-    return this.authService.verifyTerminalPin(body.userId, body.pin);
-  }
 }

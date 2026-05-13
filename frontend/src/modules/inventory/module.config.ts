@@ -16,12 +16,12 @@ export const inventoryConfig: ModuleConfig = {
   ],
   sidebarGroups: [
     {
-      id: 'inventory_group',
-      label: 'Supply Chain',
+      id: 'inventory',
+      label: 'Inventory',
       items: [
         {
           id: 'inventory',
-          label: 'Inventory Control',
+          label: 'Materials',
           icon: Package,
           path: '/inventory',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']

@@ -21,7 +21,7 @@ export const biometricConfig: ModuleConfig = {
         {
           path: 'devices',
           element: lazy(() => import('./pages/DevicesPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
         },
         {
           path: 'logs',
@@ -48,12 +48,12 @@ export const biometricConfig: ModuleConfig = {
   ],
   sidebarGroups: [
     {
-      id: 'biometric_group',
-      label: 'Attendance',
+      id: 'team',
+      label: 'Team',
       items: [
         {
           id: 'attendance',
-          label: 'Daily Attendance',
+          label: 'Attendance',
           icon: ClipboardCheck,
           path: '/attendance',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
@@ -61,11 +61,17 @@ export const biometricConfig: ModuleConfig = {
         },
         {
           id: 'biometric',
-          label: 'Biometric Devices',
+          label: 'Biometric',
           icon: Fingerprint,
           path: '/biometric',
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-        },
+        }
+      ]
+    },
+    {
+      id: 'reports',
+      label: 'Reports',
+      items: [
         {
           id: 'attendance_reports',
           label: 'Attendance Reports',

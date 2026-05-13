@@ -11,3 +11,4 @@ export * from './notes';
 export * from './biometric';
 export * from './sales';
 export * from './qc';
+export * from './procurement';

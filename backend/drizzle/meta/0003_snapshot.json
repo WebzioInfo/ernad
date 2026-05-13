@@ -5676,7 +5676,9 @@
         "PLANNING",
         "RUNNING",
         "CHANGEOVER",
+        "WAITING_APPROVAL",
         "QC_PENDING",
+        "APPROVED",
         "COMPLETED",
         "CLOSED"
       ]
@@ -5702,7 +5704,8 @@
         "BLOWING",
         "FILLING",
         "LABELING",
-        "PACKING"
+        "PACKING",
+        "QC"
       ]
     },
     "public.note_priority": {
@@ -5750,6 +5753,71 @@
         "PARTIAL",
         "PAID",
         "REFUNDED"
+      ]
+    },
+    "public.terminal_type": {
+      "name": "terminal_type",
+      "schema": "public",
+      "values": [
+        "PRODUCTION",
+        "QC",
+        "MAINTENANCE",
+        "SUPERVISOR",
+        "KIOSK"
+      ]
+    },
+    "public.terminal_status": {
+      "name": "terminal_status",
+      "schema": "public",
+      "values": [
+        "OFFLINE",
+        "ONLINE",
+        "MAINTENANCE",
+        "LOCKED"
+      ]
+    },
+    "public.terminal_trust_mode": {
+      "name": "terminal_trust_mode",
+      "schema": "public",
+      "values": [
+        "STRICT_KIOSK",
+        "FLEXIBLE_AUTH",
+        "TEMPORARY_SESSION",
+        "MOBILE_OPERATOR"
+      ]
+    },
+    "public.qc_status": {
+      "name": "qc_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "PASSED",
+        "FAILED",
+        "ON_HOLD",
+        "RELEASED"
+      ]
+    },
+    "public.po_status": {
+      "name": "po_status",
+      "schema": "public",
+      "values": [
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "APPROVED",
+        "SENT",
+        "PARTIALLY_RECEIVED",
+        "RECEIVED",
+        "CANCELLED",
+        "CLOSED"
+      ]
+    },
+    "public.grn_status": {
+      "name": "grn_status",
+      "schema": "public",
+      "values": [
+        "DRAFT",
+        "COMPLETED",
+        "CANCELLED"
       ]
     }
   },

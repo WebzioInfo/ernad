@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api-client';
+import { ENDPOINTS } from '../constants/endpoints';
 import { io } from 'socket.io-client';
 import Pusher from 'pusher-js';
 
@@ -16,7 +17,7 @@ export default function NotificationBell() {
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {
-      const res = await api.get('/notifications/unread');
+      const res = await api.get(ENDPOINTS.NOTIFICATIONS.UNREAD);
       return res.data;
     },
     refetchInterval: 30000,
@@ -24,7 +25,7 @@ export default function NotificationBell() {
 
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
-      await api.post(`/notifications/${id}/read`);
+      await api.post(ENDPOINTS.NOTIFICATIONS.MARK_READ(id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });

@@ -2,7 +2,7 @@ import { ReportsService } from './reports.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { Controller, Get, Query, UseGuards, Param, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Param, BadRequestException, Logger, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @ApiTags('Enterprise Reporting')
@@ -56,33 +56,36 @@ export class ReportsController {
     return this.reportsService.getProductionBatches({ startDate, endDate });
   }
 
-  @Get('batch/:id')
-  @Permissions('reports:view')
   @ApiOperation({ summary: 'Get immutable batch dossier' })
-  async getBatchDossier(@Param('id') id: string) {
-    return this.reportsService.getBatchDossier(id);
+  async getBatchDossier(@Req() req: any, @Param('id') id: string) {
+    const roles = req.user?.roles || [];
+    return this.reportsService.getBatchDossier(id, roles);
   }
 
   @Get('sales')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get sales and revenue analytics' })
   async getSalesReport(
+    @Req() req: any,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string
   ) {
     this.logger.log(`[SALES_REPORT] Request for range: ${startDate} - ${endDate}`);
     const dates = this.validateDates(startDate, endDate);
-    return this.reportsService.getSalesReport(dates);
+    const roles = req.user?.roles || [];
+    return this.reportsService.getSalesReport(dates, roles);
   }
 
   @Get('attendance')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get detailed attendance report' })
   async getAttendanceReport(
+    @Req() req: any,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string
   ) {
     this.validateDates(startDate, endDate);
-    return this.reportsService.getAttendanceReport({ startDate, endDate });
+    const roles = req.user?.roles || [];
+    return this.reportsService.getAttendanceReport({ startDate, endDate }, roles);
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
 import { notifications, deviceTokens, users, roles, userRoles } from '../../database/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, desc } from 'drizzle-orm';
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { OneSignalService } from '../../integrations/onesignal.service';
 
@@ -98,10 +98,19 @@ export class NotificationsService {
   }
 
   async getUnreadNotifications() {
-    return await db.select()
-      .from(notifications)
-      .where(eq(notifications.isRead, false))
-      .orderBy(notifications.createdAt);
+    try {
+      // ── Optimization: Limit to last 50, newest first, and use index ──
+      const results = await db.select()
+        .from(notifications)
+        .where(eq(notifications.isRead, false))
+        .orderBy(desc(notifications.createdAt))
+        .limit(50);
+        
+      return results;
+    } catch (err: any) {
+      this.logger.error(`[NotificationsService] Failed to fetch unread: ${err.message}`);
+      return []; // Graceful fallback
+    }
   }
 
   async markAsRead(id: string) {

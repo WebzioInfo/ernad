@@ -10,6 +10,15 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -63,7 +72,18 @@ export class RolesGuard implements CanActivate {
       const permissionPassed = requiredPermissions.every(p => {
         // [HARDENED] Manager Role implicit permissions for oversight
         if (userRoles.includes('MANAGER')) {
-          const managerPermissions = ['analytics:view', 'reports:view', 'inventory:view', 'telemetry:log', 'production:start'];
+          const managerPermissions = [
+            'analytics:view', 
+            'reports:view', 
+            'inventory:view', 
+            'inventory:edit',
+            'telemetry:log', 
+            'production:start', 
+            'production:close',
+            'forensics:view',
+            'forensics:edit',
+            'attendance:view'
+          ];
           if (managerPermissions.includes(p)) {
             return true;
           }

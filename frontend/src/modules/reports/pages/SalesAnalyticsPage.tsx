@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
+import { ENDPOINTS } from '../../../constants/endpoints';
 import { 
   BarChart4, TrendingUp, Users, Package, 
   ArrowUpRight, ArrowDownRight, CreditCard,
@@ -22,7 +23,7 @@ export default function SalesAnalyticsPage() {
   const { data: salesData, isLoading } = useQuery({
     queryKey: ['sales-report', dateRange],
     queryFn: async () => {
-      const res = await api.get('/reports/sales', {
+      const res = await api.get(ENDPOINTS.REPORTS.SALES, {
         params: { startDate: dateRange.start, endDate: dateRange.end }
       });
       return res.data;
