@@ -100,21 +100,33 @@ const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shif
       </div>
 
       <div className="flex gap-4 relative z-10">
-        <button onClick={onFocus} className="flex-[2] py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 hover:bg-indigo-600 shadow-xl shadow-slate-200">
-          Enter Commander <ArrowLeft className="w-4 h-4 rotate-180" />
+        <button 
+          onClick={onFocus} 
+          className="flex-[2] py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 hover:bg-indigo-600 shadow-xl shadow-slate-900/10 active:scale-[0.98] group"
+        >
+          Enter Commander <ArrowLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
         </button>
+
         {line.status === 'IDLE' && (
-          <button onClick={() => setIsStartModalOpen(true)} className="flex-1 py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100">
-            <Play className="w-4 h-4 fill-white" /> Start
+          <button 
+            onClick={() => setIsStartModalOpen(true)} 
+            className="flex-1 py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 active:scale-[0.98] group"
+          >
+            <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" /> Start
           </button>
         )}
+
         {line.status === 'CHANGEOVER' && (
           <button 
-            onClick={() => completeChangeoverMutation.mutate()} 
-            disabled={completeChangeoverMutation.isPending}
-            className="flex-1 py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-100"
+            onClick={() => line.batch?.id && completeChangeoverMutation.mutate()} 
+            disabled={completeChangeoverMutation.isPending || !line.batch?.id}
+            className="flex-1 py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 hover:bg-emerald-500 disabled:opacity-50 disabled:grayscale active:scale-[0.98] group"
           >
-            {completeChangeoverMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-white" />} 
+            {completeChangeoverMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" />
+            )} 
             Finish Changeover
           </button>
         )}

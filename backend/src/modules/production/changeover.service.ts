@@ -59,14 +59,31 @@ export class ChangeoverService {
         .where(and(eq(changeoverLogs.batchId, batchId), isNull(changeoverLogs.endTime)))
         .limit(1);
       
-      if (!log) throw new BadRequestException('No active changeover found.');
+      if (!log) {
+        this.logger.error(`No active changeover log found for batch ${batchId}`);
+        throw new BadRequestException('No active changeover found for this batch.');
+      }
 
+      // Mark changeover as completed
       await tx.update(changeoverLogs).set({ endTime: new Date() }).where(eq(changeoverLogs.id, log.id));
-      await tx.update(productionBatches).set({ status: 'CLOSED', endTime: new Date() }).where(eq(productionBatches.id, batchId));
+
+      // Close the previous batch
+      await tx.update(productionBatches)
+        .set({ status: 'CLOSED', endTime: new Date() })
+        .where(eq(productionBatches.id, batchId));
 
       const [oldBatch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
+      if (!oldBatch) {
+        throw new BadRequestException('Source batch records corrupted or missing.');
+      }
+
+      if (!log.toProductId) {
+        throw new BadRequestException('Target product for changeover was not specified.');
+      }
+
       const batchCode = await this.batchService.generateBatchCode(tx);
 
+      // Create the new batch (Transitioned from changeover)
       const [newBatch] = await tx.insert(productionBatches).values({
         batchCode,
         factoryId,
@@ -80,6 +97,11 @@ export class ChangeoverService {
         remarks: `Auto-started after changeover from batch ${batchId}`,
       }).returning();
 
+      if (!newBatch) {
+        throw new Error('Failed to create new batch record during transition.');
+      }
+
+      // Initialize totals for the new batch
       await tx.insert(batchTotals).values({
         batchId: newBatch.id,
         factoryId,
@@ -99,11 +121,18 @@ export class ChangeoverService {
         casesTotal: 0,
       });
 
+      // Atomically carry over active operator sessions to the new batch context
       await tx.update(operatorSessions)
         .set({ batchId: newBatch.id })
-        .where(and(eq(operatorSessions.lineId, log.lineId), eq(operatorSessions.isActive, true)));
+        .where(and(
+          eq(operatorSessions.lineId, log.lineId), 
+          eq(operatorSessions.isActive, true)
+        ));
 
-      await tx.update(productionLines).set({ status: 'RUNNING' }).where(eq(productionLines.id, log.lineId));
+      // Resume line operations
+      await tx.update(productionLines)
+        .set({ status: 'RUNNING' })
+        .where(eq(productionLines.id, log.lineId));
 
       return newBatch;
     });

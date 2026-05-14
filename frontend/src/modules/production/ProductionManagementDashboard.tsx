@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { ENDPOINTS } from '../../constants/endpoints';
+import useAuthStore from '../auth/auth.store';
 
 // --- COMPONENTS ---
 
@@ -72,6 +73,9 @@ const KPICard = ({ label, value, subValue, icon: Icon, color, trend, delay = 0 }
 
 export default function ProductionManagementDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const basePath = user?.role === 'MANAGER' ? '/manager' : '/admin';
+
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterLine, setFilterLine] = useState('ALL');
@@ -165,15 +169,15 @@ export default function ProductionManagementDashboard() {
             </div>
 
             <button
-              onClick={() => navigate('/admin/production')}
-              className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/40 font-black uppercase tracking-widest text-[10px] active:scale-95"
+              onClick={() => navigate(`${basePath}/production`)}
+              className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/20 font-black uppercase tracking-widest text-[10px] active:scale-95 group"
             >
-              <Play className="w-4 h-4 fill-white" /> Start New Batch
+              <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" /> Start New Batch
             </button>
 
             <button
               onClick={() => { }}
-              className="p-4 bg-slate-50 text-slate-400 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-all group active:scale-95"
+              className="p-4 bg-white text-slate-400 border border-slate-200 rounded-2xl hover:bg-slate-50 hover:text-indigo-600 transition-all group active:scale-95 shadow-sm"
             >
               <RefreshCw className="group-hover:rotate-180 transition-transform duration-700" size={20} />
             </button>
