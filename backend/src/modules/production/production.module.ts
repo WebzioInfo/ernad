@@ -7,6 +7,7 @@ import { LineService } from './services/line.service';
 import { LifecycleService } from './services/lifecycle.service';
 import { ChangeoverService } from './changeover.service';
 import { TerminalService } from './services/terminal.service';
+import { VerificationService } from './services/verification.service';
 
 import { EventsModule } from '../../realtime/events.module';
 
@@ -22,14 +23,16 @@ import { UsersModule } from '../users/users.module';
     LineService, 
     LifecycleService, 
     ChangeoverService, 
-    TerminalService
+    TerminalService,
+    VerificationService
   ],
   exports: [
     BatchService, 
     LineService, 
     LifecycleService, 
     ChangeoverService, 
-    TerminalService
+    TerminalService,
+    VerificationService
   ],
 })
 export class ProductionModule {}

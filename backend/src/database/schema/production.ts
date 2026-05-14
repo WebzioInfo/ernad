@@ -68,6 +68,8 @@ export const changeoverLogs = pgTable('changeover_logs', {
   endTime: timestamp('end_time'),
   leftoverMaterials: jsonb('leftover_materials').notNull(),
   wastedMaterials: jsonb('wasted_materials').notNull(),
+  reason: varchar('reason', { length: 100 }), // SKU_CHANGE, PACK_SIZE_CHANGE, etc.
+  notes: varchar('notes', { length: 500 }),
   createdBy: uuid('created_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (table) => {

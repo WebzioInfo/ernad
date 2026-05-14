@@ -11,6 +11,16 @@ import useAuthStore from '../../modules/auth/auth.store';
 import { toast } from 'sonner';
 import { ENDPOINTS } from '../../constants/endpoints';
 import { cn } from '../../lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
 
 export default function LineSelectionPage() {
   const { user, logout } = useAuthStore();
@@ -20,6 +30,9 @@ export default function LineSelectionPage() {
   const [step, setStep] = useState<'line' | 'station'>('line');
   const [selectedLine, setSelectedLine] = useState<any>(null);
   const [selectedStation, setSelectedStation] = useState<string | null>(null);
+  const [showSupervisorModal, setShowSupervisorModal] = useState(false);
+  const [supervisorPin, setSupervisorPin] = useState('');
+  const [takeoverPayload, setTakeoverPayload] = useState<any>(null);
 
   const { data: currentSession, isLoading: isLoadingSession } = useQuery({
     queryKey: ['current-operator-session'],
@@ -38,14 +51,26 @@ export default function LineSelectionPage() {
   });
 
   const startSessionMutation = useMutation({
-    mutationFn: (data: { lineId: string, station: string, force?: boolean }) => api.post(ENDPOINTS.OPERATOR_SESSIONS.START, data),
+    mutationFn: (data: { lineId: string, station: string, force?: boolean, supervisorPin?: string }) => api.post(ENDPOINTS.OPERATOR_SESSIONS.START, data),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
+      setShowSupervisorModal(false);
+      setSupervisorPin('');
       navigate(`/operator/workspace/${res.data.lineId}/${res.data.station.toLowerCase()}`);
     },
     onError: (err: any) => {
-      const message = err.response?.data?.message || 'Failed to start session';
-      toast.error(message);
+      const errorData = err.response?.data;
+      if (errorData?.code === 'SUPERVISOR_OVERRIDE_REQUIRED') {
+        setTakeoverPayload({ 
+          lineId: selectedLine?.id, 
+          station: selectedStation,
+          ownerId: errorData.ownerId 
+        });
+        setShowSupervisorModal(true);
+      } else {
+        const message = errorData?.message || 'Failed to start session';
+        toast.error(message);
+      }
     }
   });
 
@@ -124,8 +149,22 @@ export default function LineSelectionPage() {
 
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Active Grid</span>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full animate-pulse",
+                      line.status === 'RUNNING' ? 'bg-emerald-500' :
+                      line.status === 'IDLE' ? 'bg-slate-400' :
+                      line.status === 'BREAKDOWN' ? 'bg-rose-500' :
+                      'bg-amber-500'
+                    )} />
+                    <span className={cn(
+                      "text-[10px] font-black uppercase tracking-widest",
+                      line.status === 'RUNNING' ? 'text-emerald-600' :
+                      line.status === 'IDLE' ? 'text-slate-500' :
+                      line.status === 'BREAKDOWN' ? 'text-rose-600' :
+                      'text-amber-600'
+                    )}>
+                      {line.status || 'IDLE'}
+                    </span>
                   </div>
                   <ArrowRight className="w-6 h-6 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
                 </div>
@@ -213,10 +252,58 @@ export default function LineSelectionPage() {
         )}
       </div>
 
-      <footer className="fixed bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 px-8 py-4 bg-white/80 backdrop-blur-xl border border-slate-200 rounded-full shadow-lg">
-        <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Project Ernad • Industrial MES Grid v2.5</span>
-      </footer>
+
+      <Dialog open={showSupervisorModal} onOpenChange={setShowSupervisorModal}>
+        <DialogContent className="sm:max-w-md bg-white rounded-[2rem] border-none shadow-2xl p-8">
+          <DialogHeader className="space-y-4">
+            <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100">
+              <ShieldCheck className="w-8 h-8 text-rose-600" />
+            </div>
+            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none">Supervisor <span className="text-rose-600">Override</span> Required</DialogTitle>
+            <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              This production line is currently active. A supervisor must authorize the takeover with their 4-digit security PIN.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Security Authorization PIN</label>
+            <Input
+              type="password"
+              maxLength={4}
+              value={supervisorPin}
+              onChange={(e) => setSupervisorPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="h-20 text-center text-4xl font-black tracking-[0.5em] bg-slate-50 border-slate-100 rounded-2xl focus:ring-rose-500 focus:border-rose-500 transition-all"
+              placeholder="••••"
+            />
+          </div>
+          <DialogFooter className="sm:justify-start gap-4">
+            <Button
+              type="button"
+              className="flex-1 h-14 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-rose-200 transition-all active:scale-95"
+              onClick={() => {
+                if (supervisorPin.length === 4) {
+                  startSessionMutation.mutate({
+                    ...takeoverPayload,
+                    supervisorPin
+                  });
+                } else {
+                  toast.error('PIN must be 4 digits');
+                }
+              }}
+              disabled={startSessionMutation.isPending}
+            >
+              {startSessionMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Authorize Takeover'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-14 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-2xl transition-all"
+              onClick={() => setShowSupervisorModal(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

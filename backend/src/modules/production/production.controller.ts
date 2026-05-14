@@ -18,6 +18,7 @@ import {
 
 import { ChangeoverService } from './changeover.service';
 import { TerminalService } from './services/terminal.service';
+import { VerificationService } from './services/verification.service';
 import { terminals, factories, productionLines } from '../../database/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '../../database/db';
@@ -34,7 +35,8 @@ export class ProductionController {
     private readonly lineService: LineService,
     private readonly lifecycleService: LifecycleService,
     private readonly changeoverService: ChangeoverService,
-    private readonly terminalService: TerminalService
+    private readonly terminalService: TerminalService,
+    private readonly verificationService: VerificationService
   ) {}
 
   @Post('batches/start')
@@ -124,9 +126,9 @@ export class ProductionController {
   async initiateChangeover(
     @Param('id') lineId: string, 
     @Req() req: any,
-    @Body() dto: { batchId: string; productId: string }
+    @Body() dto: { batchId: string; productId: string; reason?: string; notes?: string }
   ) {
-    return await this.changeoverService.initiateChangeover(dto.batchId, dto.productId, req.user.sub);
+    return await this.changeoverService.initiateChangeover(dto.batchId, dto.productId, req.user.sub, { reason: dto.reason, notes: dto.notes });
   }
 
   @Patch('batches/:id/close')
@@ -208,5 +210,38 @@ export class ProductionController {
     @Param('type') type: 'qc' | 'packaging' | 'dispatch'
   ) {
     return await this.lifecycleService.getLifecycleLogs(type);
+  }
+
+  @Post('logs/:id/verify')
+  @Permissions('production:close')
+  @ApiOperation({ summary: 'Verify a production log' })
+  async verifyLog(
+    @Param('id') logId: string,
+    @Req() req: any,
+    @Body() body: { remarks?: string }
+  ) {
+    return await this.verificationService.verifyLog(Number(logId), req.user.sub, body.remarks);
+  }
+
+  @Post('logs/:id/reject')
+  @Permissions('production:close')
+  @ApiOperation({ summary: 'Reject a production log' })
+  async rejectLog(
+    @Param('id') logId: string,
+    @Req() req: any,
+    @Body() body: { reason: string }
+  ) {
+    return await this.verificationService.rejectLog(Number(logId), req.user.sub, body.reason);
+  }
+
+  @Post('logs/:id/correct')
+  @Permissions('production:close')
+  @ApiOperation({ summary: 'Correct a production log' })
+  async correctLog(
+    @Param('id') logId: string,
+    @Req() req: any,
+    @Body() body: { newData: any, reason: string }
+  ) {
+    return await this.verificationService.correctLog(Number(logId), req.user.sub, body.newData, body.reason);
   }
 }

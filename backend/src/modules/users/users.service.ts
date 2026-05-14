@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { db } from '../../database/db';
 import { users, roles, userRoles, auditLogs, userLines } from '../../database/schema';
-import { eq, ilike, asc, sql, or, desc, inArray, notInArray } from 'drizzle-orm';
+import { eq, ilike, asc, sql, or, desc, inArray, notInArray, and } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../providers/mail/mail.service';
 import { MediaService } from '../../providers/media/media.service';
@@ -683,5 +683,36 @@ export class UsersService {
       this.logger.error(`[CONNECTIVITY_FAILURE] Failed to fetch operators: ${error.message}`);
       return [];
     }
+  }
+
+  async verifySupervisorPin(pin: string) {
+    if (!pin || pin.length !== 4) return null;
+
+    // Find users with Supervisor or Manager or Admin roles
+    const supervisorRoles = await db.select({ id: roles.id })
+      .from(roles)
+      .where(inArray(roles.slug, ['SUPERVISOR', 'MANAGER', 'ADMIN', 'SUPER_ADMIN']));
+    
+    if (supervisorRoles.length === 0) return null;
+
+    const supervisors = await db.select({
+      id: users.id,
+      pinCode: users.pinCode,
+      name: users.name
+    })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .where(and(
+      eq(users.isActive, true),
+      inArray(userRoles.roleId, supervisorRoles.map(r => r.id))
+    ));
+
+    for (const supervisor of supervisors) {
+      if (supervisor.pinCode && await bcrypt.compare(pin, supervisor.pinCode)) {
+        return supervisor;
+      }
+    }
+
+    return null;
   }
 }

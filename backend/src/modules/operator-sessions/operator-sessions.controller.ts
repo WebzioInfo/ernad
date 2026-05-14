@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Version } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Version, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OperatorSessionsService } from './operator-sessions.service';
+import { UsersService } from '../users/users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -12,18 +13,33 @@ import { Public } from '../auth/public.decorator';
 @Controller('operator-sessions')
 @UseGuards(AuthGuard, RolesGuard)
 export class OperatorSessionsController {
-  constructor(private readonly sessionService: OperatorSessionsService) {}
+  constructor(
+    private readonly sessionService: OperatorSessionsService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('start')
   @Roles('OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING', 'SUPER_ADMIN', 'ADMIN')
   @ApiOperation({ summary: 'Start a new operator session' })
-  async startSession(@Req() req: any, @Body() dto: StartSessionDto & { force?: boolean }) {
+  async startSession(@Req() req: any, @Body() dto: StartSessionDto & { force?: boolean, supervisorPin?: string }) {
+    let supervisorId: string | undefined;
+
+    if (dto.supervisorPin) {
+      const supervisor = await this.usersService.verifySupervisorPin(dto.supervisorPin);
+      if (!supervisor) {
+        throw new ForbiddenException('Invalid Supervisor PIN');
+      }
+      supervisorId = supervisor.id;
+    }
+
     return await this.sessionService.startSession(
       req.user.sub,
       dto.lineId,
       dto.station,
       dto.shiftId,
-      dto.force
+      dto.force,
+      undefined, // terminalId
+      supervisorId
     );
   }
 

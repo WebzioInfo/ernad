@@ -4,6 +4,7 @@ import { changeoverLogs, productionBatches, productionLines, factories, batchTot
 import { eq, and, isNull } from 'drizzle-orm';
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { BatchService } from './services/batch.service';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class ChangeoverService {
@@ -11,7 +12,8 @@ export class ChangeoverService {
 
   constructor(
     private eventsService: ProductionEventsService,
-    private batchService: BatchService
+    private batchService: BatchService,
+    private audit: AuditService
   ) {}
 
   private async getFactoryContext(factoryId?: string): Promise<string> {
@@ -21,7 +23,7 @@ export class ChangeoverService {
     return factory.id;
   }
 
-  async initiateChangeover(batchId: string, toProductId: string, userId: string) {
+  async initiateChangeover(batchId: string, toProductId: string, userId: string, extra?: { reason?: string, notes?: string }) {
     const result = await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
       if (!batch) throw new BadRequestException('Batch not found');
@@ -38,6 +40,8 @@ export class ChangeoverService {
         startTime: new Date(),
         leftoverMaterials: {},
         wastedMaterials: {},
+        reason: (arguments as any)[3]?.reason || 'SKU_CHANGE',
+        notes: (arguments as any)[3]?.notes || null,
         createdBy: userId
       }).returning();
       return res[0];
@@ -128,5 +132,31 @@ export class ChangeoverService {
       message: 'Changeover finished successfully.',
       durationMinutes
     };
+  }
+
+  async updateChangeover(logId: string, userId: string, data: { startTime?: Date, endTime?: Date, reason?: string, notes?: string }, auditReason: string) {
+    return await db.transaction(async (tx) => {
+      const [oldLog] = await tx.select().from(changeoverLogs).where(eq(changeoverLogs.id, logId)).limit(1);
+      if (!oldLog) throw new BadRequestException('Changeover log not found');
+
+      const [updated] = await tx.update(changeoverLogs)
+        .set({
+          ...data,
+          // If we update times, we might need to recalculate durations in analytics
+        })
+        .where(eq(changeoverLogs.id, logId))
+        .returning();
+
+      await this.audit.logCorrection(
+        userId,
+        'changeover_logs',
+        logId,
+        oldLog,
+        updated,
+        auditReason
+      );
+
+      return updated;
+    });
   }
 }

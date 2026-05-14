@@ -8,6 +8,7 @@ import { qcStatusEnum } from './qc';
 
 export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
+export const logStatusEnum = pgEnum('log_status', ['DRAFT', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'CORRECTED', 'OVERRIDDEN']);
 
 // The Ledger of all production activity (Enterprise Standard)
 export const productionLogs = pgTable('production_logs', {
@@ -32,7 +33,13 @@ export const productionLogs = pgTable('production_logs', {
   // Event System (Phase 7)
   eventType: eventTypeEnum('event_type').default('NORMAL_PRODUCTION').notNull(),
   isRework: boolean('is_rework').default(false).notNull(), // New: Handle rework logic
+  status: logStatusEnum('status').default('SUBMITTED').notNull(),
   remarks: varchar('remarks', { length: 500 }),
+  
+  // Verification Context
+  verifiedBy: uuid('verified_by').references(() => users.id),
+  verifiedAt: timestamp('verified_at'),
+  verificationReason: varchar('verification_reason', { length: 500 }),
 
   // Material Consumption Analytics (Enterprise Upgrade)
   capUsage: integer('cap_usage').default(0),
@@ -78,6 +85,7 @@ export const productionLogs = pgTable('production_logs', {
     index('idx_production_logs_session').on(table.sessionId),
     index('idx_production_logs_terminal').on(table.terminalId),
     index('idx_production_logs_deleted').on(table.deletedAt),
+    index('idx_production_logs_status').on(table.status),
   ];
 });
 

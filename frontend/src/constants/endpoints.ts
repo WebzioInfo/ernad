@@ -45,6 +45,9 @@ export const ENDPOINTS = {
     LINE_CHANGEOVER: (id: string) => `production/lines/${id}/changeover`,
     TOGGLE_MAINTENANCE: (id: string) => `production/lines/${id}/toggle-maintenance`,
     LOGS: (type: string) => `production/logs/${type}`,
+    LOGS_VERIFY: 'production/logs/:id/verify',
+    LOGS_REJECT: 'production/logs/:id/reject',
+    LOGS_CORRECT: 'production/logs/:id/correct',
   },
   TELEMETRY: {
     LOGS: 'telemetry/logs',

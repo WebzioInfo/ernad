@@ -18,90 +18,71 @@ export class OperatorSessionsService {
     return terminal;
   }
 
-  async startSession(userId: string, lineId: string, station: string, shiftId?: string, force = false, terminalId?: string) {
-    this.logger.log(`[SESSION_TRACE] Attempting to start session for User: ${userId}, Line: ${lineId}, Station: ${station}`);
+  async startSession(userId: string, lineId: string, station: string, shiftId?: string, force = false, terminalId?: string, supervisorId?: string) {
+    this.logger.log(`[SESSION_TRACE] Attempting to start session. User: ${userId}, Line: ${lineId}, Station: ${station}, Force: ${force}`);
 
-    // Validate UUIDs to prevent PG type errors
+    // Validate UUIDs
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId) || !uuidRegex.test(lineId)) {
-      this.logger.error(`[SESSION_INVALID_ID] Invalid UUID provided. User: ${userId}, Line: ${lineId}`);
-      throw new BadRequestException('Invalid User ID or Line ID format. Must be a valid UUID.');
+      throw new BadRequestException('Invalid User ID or Line ID format.');
     }
 
-    try {
-      // 1. Check if operator already has an active session
-      const [existing] = await db.select().from(operatorSessions)
-        .where(and(
-          eq(operatorSessions.userId, userId),
-          eq(operatorSessions.isActive, true)
-        ))
+    return await db.transaction(async (tx) => {
+      // 1. Get Line State
+      const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+      if (!line) throw new BadRequestException('Line not found');
+
+      // 2. Ownership Governance
+      // If line is NOT idle and has an owner, check if current user is the owner
+      if (line.status !== 'IDLE' && line.currentOperatorId && line.currentOperatorId !== userId) {
+        if (!supervisorId && !force) {
+          this.logger.warn(`[SESSION_BLOCK] Line ${line.name} is owned by another operator.`);
+          throw new ConflictException({
+            message: 'Supervisor Authorization Required',
+            code: 'SUPERVISOR_OVERRIDE_REQUIRED',
+            ownerId: line.currentOperatorId
+          });
+        }
+        
+        if (supervisorId) {
+          this.logger.log(`[SESSION_OVERRIDE] Supervisor ${supervisorId} authorizing takeover of line ${line.name}`);
+          // Close previous owner's session if it exists
+          const [prevSession] = await tx.select().from(operatorSessions)
+            .where(and(eq(operatorSessions.lineId, lineId), eq(operatorSessions.isActive, true)))
+            .limit(1);
+          
+          if (prevSession) {
+            await tx.update(operatorSessions)
+              .set({ isActive: false, endTime: new Date(), endedBy: supervisorId, endReason: 'supervisor_takeover' })
+              .where(eq(operatorSessions.id, prevSession.id));
+          }
+        }
+      }
+
+      // 3. Close operator's other active sessions (can't be in two places at once)
+      const [existing] = await tx.select().from(operatorSessions)
+        .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)))
         .limit(1);
 
       if (existing) {
-        // CASE 1: Same Line & Same Station => Seamless Resume
         if (existing.lineId === lineId && existing.station === station) {
-          this.logger.log(`[SESSION_RESUME] Operator ${userId} resuming existing session on line ${lineId}, station ${station}`);
-          return existing;
+          return existing; // Seamless resume
         }
-
-        // CASE 2: Different Line/Station => Requires Force/Takeover
-        if (!force) {
-          const [line] = await db.select({ name: productionLines.name }).from(productionLines).where(eq(productionLines.id, existing.lineId)).limit(1);
-          this.logger.warn(`[SESSION_CONFLICT] Operator ${userId} already has an active session on line ${line?.name || existing.lineId}`);
-          throw new ConflictException(`You already have an active session on ${line?.name || 'another line'} (${existing.station}). Close it or use Force Takeover to switch.`);
-        } else {
-          this.logger.log(`[SESSION_FORCE] Closing existing session for operator ${userId} to switch context.`);
-          await this.endSession(userId, userId, 'forced_switch');
-        }
+        await tx.update(operatorSessions)
+          .set({ isActive: false, endTime: new Date(), endedBy: userId, endReason: 'switched_station' })
+          .where(eq(operatorSessions.id, existing.id));
       }
 
-      // 2. Check if station is occupied by someone else
-      const [occupied] = await db.select({
-        userId: operatorSessions.userId,
-        userName: usersTable.name
-      })
-        .from(operatorSessions)
-        .leftJoin(usersTable, eq(operatorSessions.userId, usersTable.id))
-        .where(and(
-          eq(operatorSessions.lineId, lineId),
-          eq(operatorSessions.station, station),
-          eq(operatorSessions.isActive, true),
-          ne(operatorSessions.userId, userId)
-        ))
+      // 4. Bind to active batch
+      const [activeBatch] = await tx.select().from(productionBatches)
+        .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
         .limit(1);
 
-      if (occupied) {
-        const occupantName = occupied.userName || 'Another operator';
-        if (!force) {
-          this.logger.warn(`[SESSION_CONFLICT] Station ${station} on line ${lineId} is occupied by ${occupantName}`);
-          throw new ConflictException(`This station is currently occupied by ${occupantName}.`);
-        } else {
-          this.logger.log(`[SESSION_FORCE] Displacing operator ${occupied.userId} (${occupantName}) from station ${station}`);
-          await this.endSession(occupied.userId, userId, 'displaced_by_takeover');
-        }
-      }
+      // 5. Determine Factory
+      const factoryId = activeBatch?.factoryId || (await tx.select({ f: usersTable.factoryId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1))[0]?.f;
 
-      // 3. Bind to active batch if exists
-      const [activeBatch] = await db.select().from(productionBatches)
-        .where(and(
-          eq(productionBatches.lineId, lineId),
-          eq(productionBatches.status, 'RUNNING')
-        ))
-        .limit(1);
-
-      // 4. Capture Factory Context (Fallback to user's home factory)
-      let factoryId = activeBatch?.factoryId;
-      if (!factoryId) {
-        const [user] = await db.select({ factoryId: usersTable.factoryId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-        factoryId = user?.factoryId;
-      }
-
-      if (!factoryId) {
-        throw new BadRequestException('Cannot determine factory context for session.');
-      }
-
-      // 5. Create new session
-      const [session] = await db.insert(operatorSessions).values({
+      // 6. Create Session
+      const [session] = await tx.insert(operatorSessions).values({
         userId,
         lineId,
         station,
@@ -113,57 +94,58 @@ export class OperatorSessionsService {
         startTime: new Date()
       }).returning();
 
-      this.logger.log(`[SESSION_SUCCESS] Session ${session.id} started successfully.`);
+      // 7. Update Line Ownership & Status
+      await tx.update(productionLines)
+        .set({
+          currentOperatorId: userId,
+          currentSessionId: session.id,
+          sessionStartedAt: new Date(),
+          status: line.status === 'IDLE' ? 'RUNNING' : line.status, // Auto-start if idle
+          updatedAt: new Date()
+        })
+        .where(eq(productionLines.id, lineId));
 
-      // 6. Cache in Redis (Fast Validation)
-      if (this.redis.getAvailability()) {
-        await this.redis.set(`operator_session:${userId}`, JSON.stringify(session), 'EX', 3600 * 12).catch(e => {
-           this.logger.warn(`[SESSION_REDIS_ERR] Failed to cache session: ${e.message}`);
-        });
-      }
-
-      return session;
-    } catch (error: any) {
-      if (error instanceof ConflictException || error instanceof BadRequestException) throw error;
+      this.logger.log(`[SESSION_SUCCESS] Session ${session.id} started. Operator ${userId} owns line ${lineId}`);
       
-      // PostgreSQL Unique Constraint Violation (Code 23505)
-      if (error.code === '23505') {
-        this.logger.warn(`[SESSION_DB_CONFLICT] Duplicate active session detected for User: ${userId}`);
-        throw new ConflictException('Operator already has an active session.');
-      }
-
-      this.logger.error(`[SESSION_CRITICAL_FAILURE] Failed to start session: ${error.message}`, error.stack);
-      throw new Error(`Session initialization failed: ${error.message}`);
-    }
+      return session;
+    });
   }
 
 
   async endSession(userId: string, endedBy?: string, reason = 'manual') {
-    const [active] = await db.select().from(operatorSessions)
-      .where(and(
-        eq(operatorSessions.userId, userId),
-        eq(operatorSessions.isActive, true)
-      ))
-      .limit(1);
+    return await db.transaction(async (tx) => {
+      const [active] = await tx.select().from(operatorSessions)
+        .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)))
+        .limit(1);
 
-    if (!active) return null;
+      if (!active) return null;
 
-    const [session] = await db.update(operatorSessions)
-      .set({ 
-        isActive: false, 
-        endTime: new Date(),
-        endedBy: endedBy || userId,
-        endReason: reason
-      })
-      .where(eq(operatorSessions.id, active.id))
-      .returning();
+      const [session] = await tx.update(operatorSessions)
+        .set({ isActive: false, endTime: new Date(), endedBy: endedBy || userId, endReason: reason })
+        .where(eq(operatorSessions.id, active.id))
+        .returning();
 
-    // Invalidate Cache
-    if (this.redis.getAvailability()) {
-      this.redis.del(`operator_session:${userId}`).catch(() => {});
-    }
+      // Check if this was the "primary" owner of the line
+      const [line] = await tx.select().from(productionLines).where(eq(productionLines.currentSessionId, active.id)).limit(1);
+      if (line) {
+        await tx.update(productionLines)
+          .set({ 
+            currentOperatorId: null, 
+            currentSessionId: null, 
+            sessionStartedAt: null,
+            // If the session ended, we might want to keep the status as is, 
+            // but factory logic says if owner leaves, maybe it stays RUNNING but un-owned
+          })
+          .where(eq(productionLines.id, line.id));
+      }
 
-    return session;
+      // Invalidate Cache
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${userId}`).catch(() => {});
+      }
+
+      return session;
+    });
   }
 
   async getCurrentSession(userId: string) {

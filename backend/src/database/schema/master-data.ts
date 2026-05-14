@@ -1,4 +1,5 @@
-import { pgTable, uuid, varchar, timestamp, integer, decimal, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer, decimal, uniqueIndex, index } from 'drizzle-orm/pg-core';
+import { users } from './users';
 
 export const factories = pgTable('factories', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -15,13 +16,21 @@ export const productionLines = pgTable('production_lines', {
   factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   description: varchar('description', { length: 255 }),
-  status: varchar('status', { length: 50 }).default('IDLE').notNull(), // IDLE, RUNNING, CHANGEOVER, MAINTENANCE
+  status: varchar('status', { length: 50 }).default('IDLE').notNull(), // IDLE, RUNNING, CHANGEOVER, BREAKDOWN, MAINTENANCE, QUALITY_HOLD, SHIFT_CLOSED
   currentEfficiency: decimal('current_efficiency', { precision: 5, scale: 2 }).default('0'),
+  
+  // Dynamic Ownership (Factory Reality)
+  currentOperatorId: uuid('current_operator_id').references(() => users.id),
+  currentSessionId: uuid('current_session_id'), // Reference to operator_sessions.id (no circular reference to avoid issues)
+  sessionStartedAt: timestamp('session_started_at'),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => {
   return [
     uniqueIndex('idx_lines_name_factory').on(table.name, table.factoryId),
+    index('idx_lines_status').on(table.status),
+    index('idx_lines_operator').on(table.currentOperatorId),
   ];
 });
 

@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database, Search, RefreshCw,
-  Edit3, Trash2, Shield,
+  Edit3, Shield,
   Box, AlertCircle,
-  X, Save
+  X, Save, ShieldCheck
 } from 'lucide-react';
+import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
 import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
@@ -47,6 +48,7 @@ const Badge = ({ children, variant = 'default' }: any) => {
 
 export default function ProductionLogsManager() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [filters, setFilters] = useState<any>({
     lineId: '',
     station: '',
@@ -57,8 +59,10 @@ export default function ProductionLogsManager() {
   });
   const [search, setSearch] = useState('');
   const [editingLog, setEditingLog] = useState<any>(null);
-  const [voidingLog, setVoidingLog] = useState<any>(null);
-  const [voidReason, setVoidReason] = useState('');
+  const [verifyingLog, setVerifyingLog] = useState<any>(null);
+  const [rejectingLog, setRejectingLog] = useState<any>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [verificationRemarks, setVerificationRemarks] = useState('');
 
   // --- DATA FETCHING ---
   const { data: logs, isLoading: loadingLogs, refetch } = useQuery({
@@ -83,25 +87,37 @@ export default function ProductionLogsManager() {
   });
 
   // --- MUTATIONS ---
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: any) => {
-      return await api.patch(`${ENDPOINTS.TELEMETRY.LOGS}/${id}`, data);
+  const verifyMutation = useMutation({
+    mutationFn: async ({ id, remarks }: any) => {
+      return await api.post(`${ENDPOINTS.PRODUCTION.LOGS_VERIFY.replace(':id', id)}`, { remarks });
     },
     onSuccess: () => {
-      toast.success('Production Log Corrected', { description: 'Audit trail updated and batch totals reconciled.' });
-      setEditingLog(null);
+      toast.success('Log Verified');
+      setVerifyingLog(null);
+      setVerificationRemarks('');
       queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
     }
   });
 
-  const voidMutation = useMutation({
+  const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: any) => {
-      return await api.delete(`${ENDPOINTS.TELEMETRY.LOGS}/${id}`, { data: { reason } });
+      return await api.post(`${ENDPOINTS.PRODUCTION.LOGS_REJECT.replace(':id', id)}`, { reason });
     },
     onSuccess: () => {
-      toast.success('Log Voided Successfully', { description: 'The entry has been invalidated and totals adjusted.' });
-      setVoidingLog(null);
-      setVoidReason('');
+      toast.success('Log Rejected');
+      setRejectingLog(null);
+      setRejectionReason('');
+      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+    }
+  });
+
+  const correctMutation = useMutation({
+    mutationFn: async ({ id, data, reason }: any) => {
+      return await api.post(`${ENDPOINTS.PRODUCTION.LOGS_CORRECT.replace(':id', id)}`, { newData: data, reason });
+    },
+    onSuccess: () => {
+      toast.success('Log Corrected');
+      setEditingLog(null);
       queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
     }
   });
@@ -243,11 +259,12 @@ export default function ProductionLogsManager() {
                 <tr className="bg-white/[0.02] border-b border-white/[0.05]">
                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Index / ID</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Production Context</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Primary Count</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Wastage</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Recorded By</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Timestamp</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Primary Count</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Wastage</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Recorded By</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Timestamp</th>
+                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.03]">
@@ -283,11 +300,21 @@ export default function ProductionLogsManager() {
                           <p className="text-[10px] font-bold text-slate-600 mt-1 italic truncate max-w-[200px]">{log.remarks}</p>
                         )}
                       </td>
-                      <td className="px-8 py-6 text-right">
+                      <td className="px-8 py-6">
                         <p className="text-sm font-black text-white font-mono">{log.primaryCount.toLocaleString()}</p>
                       </td>
-                      <td className="px-8 py-6 text-right">
+                      <td className="px-8 py-6">
                         <p className="text-sm font-black text-rose-500 font-mono">{log.wastageCount.toLocaleString()}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <Badge variant={
+                          log.status === 'VERIFIED' ? 'success' :
+                          log.status === 'REJECTED' ? 'danger' :
+                          log.status === 'CORRECTED' ? 'warning' :
+                          'indigo'
+                        }>
+                          {log.status || 'SUBMITTED'}
+                        </Badge>
                       </td>
                       <td className="px-8 py-6">
                         <p className="text-xs font-black text-slate-300 uppercase">{log.userName || 'SYSTEM'}</p>
@@ -300,17 +327,29 @@ export default function ProductionLogsManager() {
                       <td className="px-8 py-6">
                         {!log.deletedAt && (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {log.status !== 'VERIFIED' && log.userId !== user?.id && (
+                              <button
+                                onClick={() => setVerifyingLog(log)}
+                                className="p-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 rounded-lg transition-all"
+                                title="Verify Log"
+                              >
+                                <ShieldCheck size={14} />
+                              </button>
+                            )}
+                            {log.status === 'SUBMITTED' && log.userId !== user?.id && (
+                              <button
+                                onClick={() => setRejectingLog(log)}
+                                className="p-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 border border-rose-500/20 rounded-lg transition-all"
+                                title="Reject Log"
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={() => setEditingLog(log)}
                               className="p-2 bg-white/5 hover:bg-indigo-600/20 text-slate-400 hover:text-indigo-400 border border-white/10 rounded-lg transition-all"
                             >
                               <Edit3 size={14} />
-                            </button>
-                            <button
-                              onClick={() => setVoidingLog(log)}
-                              className="p-2 bg-white/5 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-white/10 rounded-lg transition-all"
-                            >
-                              <Trash2 size={14} />
                             </button>
                           </div>
                         )}
@@ -359,13 +398,14 @@ export default function ProductionLogsManager() {
               <form className="space-y-8" onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
-                updateMutation.mutate({
+                correctMutation.mutate({
                   id: editingLog.id,
                   data: {
                     primaryCount: Number(formData.get('primaryCount')),
                     wastageCount: Number(formData.get('wastageCount')),
                     remarks: formData.get('remarks')
-                  }
+                  },
+                  reason: formData.get('remarks')
                 });
               }}>
                 <div className="space-y-4">
@@ -417,10 +457,10 @@ export default function ProductionLogsManager() {
 
                 <button
                   type="submit"
-                  disabled={updateMutation.isPending}
+                  disabled={correctMutation.isPending}
                   className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-900/40 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
-                  {updateMutation.isPending ? <RefreshCw className="animate-spin" /> : <Save size={18} />}
+                  {correctMutation.isPending ? <RefreshCw className="animate-spin" /> : <Save size={18} />}
                   Commit Correction
                 </button>
               </form>
@@ -428,32 +468,58 @@ export default function ProductionLogsManager() {
           </div>
         )}
 
-        {voidingLog && (
+        {verifyingLog && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0c14] border border-white/10 rounded-[3rem] p-10 shadow-2xl text-center">
-              <div className="w-20 h-20 bg-rose-600/20 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
-                <AlertCircle size={40} />
-              </div>
-              <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4">Void Production Entry?</h2>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-8 px-4 leading-relaxed">You are about to invalidate Log #{voidingLog.id}. This action is irreversible and will subtract all counts from batch totals.</p>
-
-              <input
-                type="text"
-                placeholder="Reason for voiding..."
-                value={voidReason}
-                onChange={(e) => setVoidReason(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold text-white outline-none focus:border-rose-500/50 transition-all mb-8"
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setVerifyingLog(null)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0c14] border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+              <ShieldCheck className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
+              <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter text-center mb-4">Verify Production Log</h2>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-center mb-8 px-4">Authorizing entry #{verifyingLog.id} for final batch totals.</p>
+              
+              <textarea
+                placeholder="Verification remarks (optional)..."
+                value={verificationRemarks}
+                onChange={(e) => setVerificationRemarks(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold text-white outline-none focus:border-emerald-500/50 transition-all mb-8 min-h-[100px]"
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setVoidingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
+                <button onClick={() => setVerifyingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
                 <button
-                  onClick={() => voidMutation.mutate({ id: voidingLog.id, reason: voidReason })}
-                  disabled={!voidReason || voidMutation.isPending}
+                  onClick={() => verifyMutation.mutate({ id: verifyingLog.id, remarks: verificationRemarks })}
+                  disabled={verifyMutation.isPending}
+                  className="py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px]"
+                >
+                  Confirm Verify
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {rejectingLog && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setRejectingLog(null)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0c14] border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+              <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-6" />
+              <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter text-center mb-4">Reject Production Log</h2>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-center mb-8 px-4">Log #{rejectingLog.id} will be marked as invalid. Reason required.</p>
+              
+              <textarea
+                placeholder="Reason for rejection (required)..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold text-white outline-none focus:border-rose-500/50 transition-all mb-8 min-h-[100px]"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <button onClick={() => setRejectingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
+                <button
+                  onClick={() => rejectMutation.mutate({ id: rejectingLog.id, reason: rejectionReason })}
+                  disabled={!rejectionReason || rejectMutation.isPending}
                   className="py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
                 >
-                  Void Entry
+                  Confirm Reject
                 </button>
               </div>
             </motion.div>
