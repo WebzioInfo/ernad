@@ -10,6 +10,7 @@ import {
   inventoryStock,
   inventoryTransactions,
   productionBatches,
+  productionLines,
   downtimeLogs,
   users
 } from '../../../database/schema';
@@ -142,7 +143,7 @@ export class ProcessingService {
 
         await tx.update(batchTotals)
           .set({
-            [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount}`,
+            [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount} + ${Number(dto.wastageCount || 0)}`,
             scrapTotal: sql`${batchTotals.scrapTotal} + ${dto.wastageCount}`,
 
             // Enterprise Material Totals
@@ -186,10 +187,10 @@ export class ProcessingService {
   private async processEnterpriseInventory(tx: any, factoryId: string, dto: TelemetryDto, logId: number) {
     const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
-    if (dto.capUsage) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage) + Number(dto.capRejection || 0), category: 'Caps' });
-    if (dto.preformUsage) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage) + Number(dto.preformRejection || 0), category: 'Preforms' });
-    if (dto.bopRollUsage) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage) + Number(dto.bopRejection || 0), category: 'Labels' });
-    if (dto.shrinkWeightUsed) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
+    if (dto.capUsage || dto.capRejection) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage || 0) + Number(dto.capRejection || 0), category: 'Caps' });
+    if (dto.preformUsage || dto.preformRejection) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage || 0) + Number(dto.preformRejection || 0), category: 'Preforms' });
+    if (dto.bopRollUsage || dto.bopRejection) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage || 0) + Number(dto.bopRejection || 0), category: 'Labels' });
+    if (dto.shrinkWeightUsed || dto.shrinkWeightRejected) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed || 0) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
     if (dto.inkUsage) consumptionMap.push({ name: 'Ink', qty: Number(dto.inkUsage), category: 'Chemicals' });
     if (dto.solventUsage) consumptionMap.push({ name: 'Solvent', qty: Number(dto.solventUsage), category: 'Chemicals' });
 
@@ -445,7 +446,7 @@ export class ProcessingService {
       const updateField = this.getFieldName(existing.station);
       await db.update(batchTotals)
         .set({
-          [updateField]: sql`${batchTotals[updateField]} + ${primaryDelta}`,
+          [updateField]: sql`${batchTotals[updateField]} + ${primaryDelta} + ${wastageDelta}`,
           scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
           updatedAt: new Date()
         })
@@ -495,7 +496,9 @@ export class ProcessingService {
     return await db.select({
       id: productionLogs.id,
       batchId: productionLogs.batchId,
+      batchCode: productionBatches.batchCode,
       lineId: productionLogs.lineId,
+      lineName: productionLines.name,
       station: productionLogs.station,
       primaryCount: productionLogs.primaryCount,
       wastageCount: productionLogs.wastageCount,
@@ -504,10 +507,13 @@ export class ProcessingService {
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
       updatedAt: productionLogs.updatedAt,
-      deletedAt: productionLogs.deletedAt
+      deletedAt: productionLogs.deletedAt,
+      status: productionLogs.status
     })
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
+      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(productionLogs.loggedAt))
       .limit(limit);

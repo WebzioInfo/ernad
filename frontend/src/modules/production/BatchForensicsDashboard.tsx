@@ -258,6 +258,12 @@ export default function BatchForensicsDashboard() {
                             {entry.wastageCount} <span className="text-[10px] text-slate-400 font-bold">UNITS</span>
                           </p>
                         </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Used</p>
+                          <p className="font-black text-indigo-600">
+                            {Number(entry.primaryCount) + Number(entry.wastageCount)} <span className="text-[10px] text-indigo-400 font-bold">UNITS</span>
+                          </p>
+                        </div>
                         <div className="flex items-center gap-2 ml-8">
                           <button
                             className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-indigo-600 transition-all border border-transparent hover:border-slate-200"

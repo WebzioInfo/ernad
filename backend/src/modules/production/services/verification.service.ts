@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { db } from '../../../database/db';
-import { productionLogs, users } from '../../../database/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { productionLogs, users, batchTotals } from '../../../database/schema';
+import { eq, and, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../../audit/audit.service';
 
 @Injectable()
@@ -61,6 +61,16 @@ export class VerificationService {
         .where(eq(productionLogs.id, logId))
         .returning();
 
+      // Subtract from totals
+      const updateField = this.getFieldName(log.station);
+      await tx.update(batchTotals)
+        .set({
+          [updateField]: sql`${batchTotals[updateField]} - ${log.primaryCount}`,
+          scrapTotal: sql`${batchTotals.scrapTotal} - ${log.wastageCount}`,
+          updatedAt: new Date()
+        })
+        .where(eq(batchTotals.batchId, log.batchId));
+
       await this.audit.logAction({
         userId: verifierId,
         action: 'LOG_REJECTION',
@@ -92,6 +102,21 @@ export class VerificationService {
         .where(eq(productionLogs.id, logId))
         .returning();
 
+      // Apply deltas to totals
+      const primaryDelta = (newData.primaryCount !== undefined ? newData.primaryCount : oldLog.primaryCount) - oldLog.primaryCount;
+      const wastageDelta = (newData.wastageCount !== undefined ? newData.wastageCount : oldLog.wastageCount) - oldLog.wastageCount;
+
+      if (primaryDelta !== 0 || wastageDelta !== 0) {
+        const updateField = this.getFieldName(oldLog.station);
+        await tx.update(batchTotals)
+          .set({
+            [updateField]: sql`${batchTotals[updateField]} + ${primaryDelta} + ${wastageDelta}`,
+            scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
+            updatedAt: new Date()
+          })
+          .where(eq(batchTotals.batchId, oldLog.batchId));
+      }
+
       await this.audit.logCorrection(
         verifierId,
         'production_logs',
@@ -103,5 +128,16 @@ export class VerificationService {
 
       return updated;
     });
+  }
+
+  private getFieldName(station: string): any {
+    const map: any = {
+      BLOWING: 'blowingTotal',
+      FILLING: 'fillingTotal',
+      LABELING: 'labelingTotal',
+      PACKING: 'packingTotal',
+      QC: 'scrapTotal'
+    };
+    return map[station] || 'scrapTotal';
   }
 }

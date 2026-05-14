@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../database/db';
-import { changeoverLogs, productionBatches, productionLines, factories, batchTotals } from '../../database/schema';
+import { changeoverLogs, productionBatches, productionLines, factories, batchTotals, operatorSessions } from '../../database/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { BatchService } from './services/batch.service';
@@ -98,6 +98,10 @@ export class ChangeoverService {
         finishedGoodsTotal: 0,
         casesTotal: 0,
       });
+
+      await tx.update(operatorSessions)
+        .set({ batchId: newBatch.id })
+        .where(and(eq(operatorSessions.lineId, log.lineId), eq(operatorSessions.isActive, true)));
 
       await tx.update(productionLines).set({ status: 'RUNNING' }).where(eq(productionLines.id, log.lineId));
 

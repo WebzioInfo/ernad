@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Activity, Monitor, Layout, ShieldCheck, LayoutDashboard, Database } from 'lucide-react';
+import { Activity, Monitor, Layout, LayoutDashboard, Database } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const productionConfig: ModuleConfig = {
@@ -33,11 +33,11 @@ export const productionConfig: ModuleConfig = {
       element: lazy(() => import('./ProductionLogsManager')),
       allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
     },
-    {
+    /* {
       path: 'quality',
       element: lazy(() => import('./QualityManagementPage')),
       allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
-    }
+    } */
   ],
   sidebarGroups: [
     {
@@ -81,7 +81,7 @@ export const productionConfig: ModuleConfig = {
         }
       ]
     },
-    {
+    /* {
       id: 'quality',
       label: 'Quality',
       items: [
@@ -93,6 +93,6 @@ export const productionConfig: ModuleConfig = {
           allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
         }
       ]
-    }
+    } */
   ]
 };

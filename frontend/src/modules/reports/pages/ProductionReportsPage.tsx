@@ -129,6 +129,7 @@ export default function ProductionReportsPage() {
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU Details</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Output</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Wastage</th>
+                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Processed</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Quality Yield</th>
                 </tr>
               </thead>
@@ -177,6 +178,10 @@ export default function ProductionReportsPage() {
                       <td className="px-10 py-8 text-right">
                         <span className="text-xl font-black text-rose-600 tabular-nums tracking-tighter">{Number(item.totalWastage).toLocaleString()}</span>
                         <p className="text-[10px] font-black text-rose-400/60 uppercase tracking-widest mt-1">Rejected</p>
+                      </td>
+                      <td className="px-10 py-8 text-right">
+                        <span className="text-xl font-black text-indigo-600 tabular-nums tracking-tighter">{(Number(item.totalOutput) + Number(item.totalWastage)).toLocaleString()}</span>
+                        <p className="text-[10px] font-black text-indigo-400/60 uppercase tracking-widest mt-1">Total Used</p>
                       </td>
                       <td className="px-10 py-8">
                         <div className="flex flex-col items-center">

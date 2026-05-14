@@ -184,6 +184,14 @@ export default function OperatorPanel() {
     }
   }, [isLoadingBatch, isLoadingSession]);
 
+  // Enforce Formula: Used = Production + Wastage
+  useEffect(() => {
+    const total = primaryCount + rejectionCount;
+    if (currentStationId === 'BLOWING') setPreformUsage(total);
+    if (currentStationId === 'FILLING') setCapUsage(total);
+    if (currentStationId === 'LABELING') setLabelUsage(total);
+  }, [primaryCount, rejectionCount, currentStationId]);
+
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch && !session?.batchId) return toast.error('No active batch found.');
     if (isSubmitting) return;
@@ -222,9 +230,9 @@ export default function OperatorPanel() {
       // We track 'preformsUsed' as the count of preforms consumed.
       logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
     } else if (currentStation.id === 'FILLING') {
-      logEntry.capUsage = capUsage || primaryCount;
+      logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
     } else if (currentStation.id === 'LABELING') {
-      logEntry.bopRollUsage = labelUsage || primaryCount;
+      logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
       logEntry.inkUsage = inkUsage;
       logEntry.solventUsage = solventUsage;
     } else if (currentStation.id === 'PACKING') {
@@ -318,12 +326,36 @@ export default function OperatorPanel() {
                   suffix="Units"
                 />
                 {currentStation.id === 'BLOWING' ? (
-                  <IndustrialNumericInput
-                    label="Preforms Used"
-                    value={preformUsage}
-                    onChange={setPreformUsage}
-                    suffix="Pcs"
-                  />
+                  <div className="space-y-1">
+                    <IndustrialNumericInput
+                      label="Preforms Used (This Log)"
+                      value={preformUsage}
+                      onChange={() => {}} 
+                      suffix="Pcs"
+                      readOnly
+                    />
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-2">
+                      Batch Total: <span className="text-white">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
+                    </p>
+                  </div>
+                ) : currentStation.id === 'FILLING' || currentStation.id === 'LABELING' ? (
+                  <div className="space-y-1">
+                    <IndustrialNumericInput
+                      label={currentStation.id === 'FILLING' ? "Caps Used (This Log)" : "Labels Used (This Log)"}
+                      value={currentStation.id === 'FILLING' ? capUsage : labelUsage}
+                      onChange={() => {}}
+                      suffix="Pcs"
+                      readOnly
+                    />
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-2">
+                      Batch Total: <span className="text-white">
+                        {currentStation.id === 'FILLING' 
+                          ? ((activeBatch as any)?.materialTotals?.capTotal || 0) 
+                          : ((activeBatch as any)?.materialTotals?.labelTotal || 0)
+                        } PCS
+                      </span>
+                    </p>
+                  </div>
                 ) : (
                   <IndustrialNumericInput
                     label="Bags / Boxes Completed"

@@ -3,9 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database, Search, RefreshCw,
-  Edit3, Shield,
-  Box, AlertCircle,
-  X, Save, ShieldCheck
+  Edit3, AlertCircle,
+  X, ShieldCheck
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { api } from '../../services/api-client';
@@ -17,27 +16,27 @@ import { toast } from 'sonner';
 // --- COMPONENTS ---
 
 const TechnicalBackground = () => (
-  <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#02040a]">
+  <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden bg-[#f8fafc]">
     <div
-      className="absolute inset-0 opacity-[0.03]"
+      className="absolute inset-0 opacity-[0.4]"
       style={{
-        backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+        backgroundImage: `radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0)`,
         backgroundSize: '40px 40px'
       }}
     />
-    <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.02),rgba(0,255,0,0.01),rgba(0,0,255,0.02))] z-10 bg-[length:100%_4px,3px_100%] pointer-events-none opacity-20" />
-    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px]" />
+    <div className="absolute inset-0 bg-[linear-gradient(rgba(248,250,252,0)_50%,rgba(226,232,240,0.05)_50%),linear-gradient(90deg,rgba(79,70,229,0.01),rgba(16,185,129,0.005),rgba(79,70,229,0.01))] z-10 bg-[length:100%_4px,3px_100%] pointer-events-none opacity-40" />
+    <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px]" />
     <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-rose-500/5 rounded-full blur-[120px]" />
   </div>
 );
 
 const Badge = ({ children, variant = 'default' }: any) => {
   const styles: any = {
-    default: 'bg-white/10 text-slate-400 border-white/10',
-    success: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-    warning: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    danger: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
-    indigo: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
+    default: 'bg-slate-100 text-slate-500 border-slate-200',
+    success: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    warning: 'bg-amber-50 text-amber-600 border-amber-100',
+    danger: 'bg-rose-50 text-rose-600 border-rose-100',
+    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
   };
   return (
     <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border inline-block", styles[variant])}>
@@ -133,35 +132,45 @@ export default function ProductionLogsManager() {
     );
   }, [logs, search]);
 
+  if (loadingLogs) return (
+    <div className="h-screen w-full bg-[#f8fafc] flex flex-col items-center justify-center relative overflow-hidden text-slate-900">
+      <TechnicalBackground />
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        className="w-16 h-16 border-t-2 border-indigo-500 rounded-full mb-6"
+      />
+      <p className="text-slate-400 font-mono text-[10px] uppercase tracking-[0.4em] animate-pulse">Synchronizing Logs...</p>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-[#02040a] text-slate-300 selection:bg-indigo-500 selection:text-white pb-20">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 selection:bg-indigo-500 selection:text-white pb-20">
       <TechnicalBackground />
 
-      <main className="relative z-10 p-8 lg:p-12 space-y-8 max-w-[1800px] mx-auto">
+      <main className="relative z-10 p-8 lg:p-12 space-y-12 max-w-[1800px] mx-auto">
 
         {/* --- HEADER --- */}
         <header className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="p-3 bg-rose-600 text-white rounded-2xl shadow-[0_0_40px_rgba(225,29,72,0.3)]">
-                <Shield size={32} />
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-xl">
+                <Database size={32} />
               </div>
-              <div>
-                <h1 className="text-5xl font-black text-white tracking-tighter uppercase italic leading-none">
-                  Log <span className="text-rose-500">Governance</span>
-                </h1>
-                <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px] mt-2 flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_#f43f5e]" />
-                  Operational Audit Mode • Enterprise Correction Interface
-                </p>
-              </div>
+              <h1 className="text-5xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+                Audit <span className="text-indigo-600">Logs</span>
+              </h1>
             </div>
-          </motion.div>
+            <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-[10px] ml-1 flex items-center gap-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              Verified Transactional Integrity • Real-time Monitoring
+            </p>
+          </div>
 
           <div className="flex items-center gap-4">
             <button
               onClick={() => refetch()}
-              className="p-4 bg-indigo-600/10 text-indigo-500 border border-indigo-500/20 rounded-2xl hover:bg-indigo-600/20 transition-all group"
+              className="p-4 bg-slate-50 text-slate-400 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-all group active:scale-95"
             >
               <RefreshCw className="group-hover:rotate-180 transition-transform duration-700" size={20} />
             </button>
@@ -169,15 +178,15 @@ export default function ProductionLogsManager() {
         </header>
 
         {/* --- FILTER BAR --- */}
-        <section className="bg-white/[0.02] border border-white/[0.05] backdrop-blur-xl p-6 rounded-[2rem] grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <section className="bg-white border border-slate-200/60 p-6 rounded-[2rem] grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 shadow-sm">
           <div className="space-y-2">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Line Filter</label>
             <select
               value={filters.lineId}
               onChange={(e) => setFilters({ ...filters, lineId: e.target.value })}
-              className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             >
-              <option value="">All Production Lines</option>
+              <option value="">All Lines</option>
               {lines?.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
@@ -187,7 +196,7 @@ export default function ProductionLogsManager() {
             <select
               value={filters.station}
               onChange={(e) => setFilters({ ...filters, station: e.target.value })}
-              className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             >
               <option value="">All Stations</option>
               <option value="BLOWING">Blowing</option>
@@ -202,7 +211,7 @@ export default function ProductionLogsManager() {
             <select
               value={filters.batchId}
               onChange={(e) => setFilters({ ...filters, batchId: e.target.value })}
-              className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             >
               <option value="">All Batches</option>
               {batches?.map((b: any) => <option key={b.id} value={b.id}>{b.batchCode}</option>)}
@@ -215,20 +224,20 @@ export default function ProductionLogsManager() {
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-              className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             />
           </div>
 
           <div className="space-y-2">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Search</label>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input
                 type="text"
-                placeholder="Remarks/Operator..."
+                placeholder="Search Logs..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-12 bg-black/40 border border-white/10 rounded-xl pl-11 pr-4 text-xs font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-6 text-sm font-bold text-slate-700 outline-none focus:border-indigo-500/50 transition-all"
               />
             </div>
           </div>
@@ -237,7 +246,7 @@ export default function ProductionLogsManager() {
             <label className="flex items-center gap-3 cursor-pointer group">
               <div className={cn(
                 "w-10 h-6 rounded-full p-1 transition-all",
-                filters.isDeleted ? "bg-rose-600" : "bg-white/10"
+                filters.isDeleted ? "bg-rose-600" : "bg-slate-200"
               )}
                 onClick={() => setFilters({ ...filters, isDeleted: !filters.isDeleted })}
               >
@@ -252,77 +261,69 @@ export default function ProductionLogsManager() {
         </section>
 
         {/* --- MAIN LEDGER --- */}
-        <section className="bg-white/[0.02] border border-white/[0.05] rounded-[2.5rem] overflow-hidden backdrop-blur-md">
+        <div className="bg-white border border-slate-200/60 rounded-[3rem] overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white/[0.02] border-b border-white/[0.05]">
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Index / ID</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Production Context</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Primary Count</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Wastage</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Recorded By</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest">Timestamp</th>
-                   <th className="px-8 py-5 text-[9px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
+                <tr className="bg-slate-50/50 border-b border-slate-100">
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Line / Batch</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Station</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Yield / Scrap</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Used</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.03]">
+              <tbody className="divide-y divide-slate-100">
                 <AnimatePresence>
-                  {loadingLogs ? (
-                    <tr>
-                      <td colSpan={7} className="py-24 text-center">
-                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="w-8 h-8 border-t-2 border-indigo-500 rounded-full mx-auto mb-4" />
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest animate-pulse">Syncing Enterprise Ledger...</p>
-                      </td>
-                    </tr>
-                  ) : filteredLogs.map((log: any, i: number) => (
+                  {filteredLogs.map((log: any, i: number) => (
                     <motion.tr
                       key={log.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.02 }}
                       className={cn(
-                        "group hover:bg-white/[0.02] transition-colors",
-                        log.deletedAt && "opacity-50 grayscale"
+                        "hover:bg-slate-50/80 transition-colors group",
+                        log.deletedAt && "opacity-40 grayscale pointer-events-none"
                       )}
                     >
                       <td className="px-8 py-6">
-                        <p className="text-xs font-black text-white font-mono tracking-tighter">#{log.id}</p>
-                        {log.deletedAt && <Badge variant="danger">VOIDED</Badge>}
+                        <p className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors font-mono tracking-tight">#{log.id}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{format(new Date(log.loggedAt), 'HH:mm:ss')}</p>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="indigo">{log.station}</Badge>
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter italic">Batch {log.batchId.slice(-6).toUpperCase()}</span>
+                        <p className="text-xs font-black text-slate-600 uppercase tracking-tight">{log.lineName}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase">{log.batchCode}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <Badge variant="indigo">{log.station}</Badge>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-6">
+                          <div>
+                            <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
+                            <p className="text-[8px] font-black text-slate-400 uppercase">Production</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{(log.wastageCount || 0).toLocaleString()}</p>
+                            <p className="text-[8px] font-black text-slate-400 uppercase">Wastage</p>
+                          </div>
                         </div>
-                        {log.remarks && (
-                          <p className="text-[10px] font-bold text-slate-600 mt-1 italic truncate max-w-[200px]">{log.remarks}</p>
-                        )}
                       </td>
                       <td className="px-8 py-6">
-                        <p className="text-sm font-black text-white font-mono">{log.primaryCount.toLocaleString()}</p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-sm font-black text-rose-500 font-mono">{log.wastageCount.toLocaleString()}</p>
+                        <p className="text-sm font-black text-indigo-600 tabular-nums font-mono">{(log.primaryCount + log.wastageCount).toLocaleString()}</p>
+                        <p className="text-[8px] font-black text-slate-400 uppercase">Total Used</p>
                       </td>
                       <td className="px-8 py-6">
                         <Badge variant={
                           log.status === 'VERIFIED' ? 'success' :
-                          log.status === 'REJECTED' ? 'danger' :
-                          log.status === 'CORRECTED' ? 'warning' :
-                          'indigo'
+                            log.status === 'REJECTED' ? 'danger' :
+                              log.status === 'CORRECTED' ? 'warning' :
+                                'indigo'
                         }>
                           {log.status || 'SUBMITTED'}
                         </Badge>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-xs font-black text-slate-300 uppercase">{log.userName || 'SYSTEM'}</p>
-                        <p className="text-[9px] font-bold text-slate-600 uppercase tracking-tighter">Terminal Active</p>
-                      </td>
-                      <td className="px-8 py-6">
-                        <p className="text-[10px] font-bold text-slate-400 font-mono">{format(new Date(log.loggedAt), 'HH:mm:ss')}</p>
-                        <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">{format(new Date(log.loggedAt), 'MMM dd, yyyy')}</p>
                       </td>
                       <td className="px-8 py-6">
                         {!log.deletedAt && (
@@ -330,7 +331,7 @@ export default function ProductionLogsManager() {
                             {log.status !== 'VERIFIED' && log.userId !== user?.id && (
                               <button
                                 onClick={() => setVerifyingLog(log)}
-                                className="p-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-500 border border-emerald-500/20 rounded-lg transition-all"
+                                className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg transition-all"
                                 title="Verify Log"
                               >
                                 <ShieldCheck size={14} />
@@ -339,7 +340,7 @@ export default function ProductionLogsManager() {
                             {log.status === 'SUBMITTED' && log.userId !== user?.id && (
                               <button
                                 onClick={() => setRejectingLog(log)}
-                                className="p-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-500 border border-rose-500/20 rounded-lg transition-all"
+                                className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-lg transition-all"
                                 title="Reject Log"
                               >
                                 <X size={14} />
@@ -347,7 +348,7 @@ export default function ProductionLogsManager() {
                             )}
                             <button
                               onClick={() => setEditingLog(log)}
-                              className="p-2 bg-white/5 hover:bg-indigo-600/20 text-slate-400 hover:text-indigo-400 border border-white/10 rounded-lg transition-all"
+                              className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded-lg transition-all"
                             >
                               <Edit3 size={14} />
                             </button>
@@ -363,104 +364,73 @@ export default function ProductionLogsManager() {
 
           {filteredLogs.length === 0 && !loadingLogs && (
             <div className="py-24 text-center">
-              <div className="w-16 h-16 bg-white/[0.02] rounded-full flex items-center justify-center mx-auto mb-4 border border-white/5">
-                <Database className="w-8 h-8 text-slate-700" />
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                <Database className="w-8 h-8 text-slate-300" />
               </div>
               <h4 className="text-slate-400 font-black uppercase tracking-[0.2em] text-xs">No Records Found</h4>
-              <p className="text-slate-600 text-[10px] font-bold mt-2 uppercase tracking-widest">Adjust filters to broaden the governance scope.</p>
             </div>
           )}
-        </section>
+        </div>
       </main>
 
       {/* --- MODALS --- */}
-
       <AnimatePresence>
         {editingLog && (
           <div className="fixed inset-0 z-[100] flex items-center justify-end p-6">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setEditingLog(null)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-              className="relative w-full max-w-lg bg-[#0a0c14] border-l border-white/10 h-full rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setEditingLog(null)} className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="relative w-full max-w-lg bg-white border-l border-slate-200 h-full rounded-[2.5rem] p-10 shadow-2xl overflow-y-auto">
               <div className="flex justify-between items-start mb-10">
                 <div>
-                  <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Correct <span className="text-indigo-500">Log</span></h2>
-                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Entry ID: #{editingLog.id} • Station: {editingLog.station}</p>
+                  <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tighter">Correct <span className="text-indigo-600">Log</span></h2>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.3em] mt-2">Entry ID: #{editingLog.id}</p>
                 </div>
-                <button onClick={() => setEditingLog(null)} className="p-3 bg-white/5 rounded-2xl text-slate-500 hover:text-white transition-all"><X size={24} /></button>
+                <button onClick={() => setEditingLog(null)} className="p-3 bg-slate-50 rounded-2xl text-slate-500 hover:text-slate-900 transition-all"><X size={24} /></button>
               </div>
 
               <form className="space-y-8" onSubmit={(e) => {
                 e.preventDefault();
-                const formData = new FormData(e.currentTarget);
                 correctMutation.mutate({
                   id: editingLog.id,
                   data: {
-                    primaryCount: Number(formData.get('primaryCount')),
-                    wastageCount: Number(formData.get('wastageCount')),
-                    remarks: formData.get('remarks')
+                    primaryCount: editingLog.primaryCount,
+                    wastageCount: editingLog.wastageCount,
+                    remarks: editingLog.remarks
                   },
-                  reason: formData.get('remarks')
+                  reason: editingLog.remarks
                 });
               }}>
-                <div className="space-y-4">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Primary Yield Correction</label>
-                  <div className="relative">
-                    <Box className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-600" size={20} />
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Count</label>
                     <input
                       type="number"
-                      name="primaryCount"
-                      defaultValue={editingLog.primaryCount}
-                      className="w-full bg-black/40 border-2 border-white/5 rounded-2xl py-5 pl-14 pr-6 text-2xl font-mono font-black text-white outline-none focus:border-indigo-500/50 transition-all"
+                      value={editingLog.primaryCount}
+                      onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
+                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Wastage Count</label>
+                    <input
+                      type="number"
+                      value={editingLog.wastageCount}
+                      onChange={(e) => setEditingLog({ ...editingLog, wastageCount: Number(e.target.value) })}
+                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Wastage / Reject Adjustment</label>
-                  <div className="relative">
-                    <AlertCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-rose-500/50" size={20} />
-                    <input
-                      type="number"
-                      name="wastageCount"
-                      defaultValue={editingLog.wastageCount}
-                      className="w-full bg-black/40 border-2 border-white/5 rounded-2xl py-5 pl-14 pr-6 text-2xl font-mono font-black text-rose-500 outline-none focus:border-rose-500/30 transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Audit Remark (Required)</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Correction Reason</label>
                   <textarea
-                    name="remarks"
                     required
-                    placeholder="Provide justification for this data correction..."
-                    defaultValue={editingLog.remarks}
-                    className="w-full bg-black/40 border-2 border-white/5 rounded-2xl py-5 px-6 text-sm font-bold text-slate-300 outline-none focus:border-indigo-500/50 transition-all min-h-[150px]"
+                    value={editingLog.remarks}
+                    onChange={(e) => setEditingLog({ ...editingLog, remarks: e.target.value })}
+                    className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/50 transition-all resize-none"
                   />
                 </div>
 
-                <div className="p-6 bg-amber-500/5 border border-amber-500/20 rounded-2xl">
-                  <div className="flex gap-4">
-                    <Shield className="text-amber-500 shrink-0" size={20} />
-                    <div>
-                      <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Administrative Warning</p>
-                      <p className="text-[10px] font-bold text-amber-500/70 leading-relaxed uppercase italic">Any correction will be logged in the permanent audit trail. Production totals for Batch {editingLog.batchId.slice(-6).toUpperCase()} will be reconciled automatically.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={correctMutation.isPending}
-                  className="w-full py-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-indigo-900/40 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                >
-                  {correctMutation.isPending ? <RefreshCw className="animate-spin" /> : <Save size={18} />}
+                <button type="submit" disabled={correctMutation.isPending} className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-95">
                   Commit Correction
                 </button>
               </form>
@@ -470,28 +440,22 @@ export default function ProductionLogsManager() {
 
         {verifyingLog && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setVerifyingLog(null)} />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0c14] border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setVerifyingLog(null)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-white border border-slate-200 rounded-[3rem] p-10 shadow-2xl">
               <ShieldCheck className="w-16 h-16 text-emerald-500 mx-auto mb-6" />
-              <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter text-center mb-4">Verify Production Log</h2>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-center mb-8 px-4">Authorizing entry #{verifyingLog.id} for final batch totals.</p>
-              
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic text-center">Authorize <span className="text-emerald-600">Verification</span></h3>
+              <p className="text-slate-500 font-bold mt-2 text-sm text-center mb-8">Seal this record for batch DNA finalization.</p>
+
               <textarea
                 placeholder="Verification remarks (optional)..."
                 value={verificationRemarks}
                 onChange={(e) => setVerificationRemarks(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold text-white outline-none focus:border-emerald-500/50 transition-all mb-8 min-h-[100px]"
+                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500/50 transition-all mb-8 resize-none"
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setVerifyingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
-                <button
-                  onClick={() => verifyMutation.mutate({ id: verifyingLog.id, remarks: verificationRemarks })}
-                  disabled={verifyMutation.isPending}
-                  className="py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px]"
-                >
-                  Confirm Verify
-                </button>
+                <button onClick={() => setVerifyingLog(null)} className="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
+                <button onClick={() => verifyMutation.mutate({ id: verifyingLog.id, remarks: verificationRemarks })} disabled={verifyMutation.isPending} className="py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px]">Confirm</button>
               </div>
             </motion.div>
           </div>
@@ -499,21 +463,21 @@ export default function ProductionLogsManager() {
 
         {rejectingLog && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setRejectingLog(null)} />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0a0c14] border border-white/10 rounded-[3rem] p-10 shadow-2xl">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setRejectingLog(null)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-white border border-slate-200 rounded-[3rem] p-10 shadow-2xl">
               <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-6" />
-              <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter text-center mb-4">Reject Production Log</h2>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest text-center mb-8 px-4">Log #{rejectingLog.id} will be marked as invalid. Reason required.</p>
-              
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic text-center">Reject <span className="text-rose-600">Transaction</span></h3>
+              <p className="text-slate-500 font-bold mt-2 text-sm text-center mb-8">Voiding this record will reconcile batch totals.</p>
+
               <textarea
                 placeholder="Reason for rejection (required)..."
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold text-white outline-none focus:border-rose-500/50 transition-all mb-8 min-h-[100px]"
+                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-900 outline-none focus:border-rose-500/50 transition-all mb-8 resize-none"
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setRejectingLog(null)} className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
+                <button onClick={() => setRejectingLog(null)} className="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
                 <button
                   onClick={() => rejectMutation.mutate({ id: rejectingLog.id, reason: rejectionReason })}
                   disabled={!rejectionReason || rejectMutation.isPending}

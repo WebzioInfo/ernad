@@ -172,7 +172,7 @@ export class ProductionController {
   }
 
   @Post('batches/:id/complete-changeover')
-  @Permissions('production:close')
+  @Permissions('production:start')
   async completeChangeover(
     @Param('id') batchId: string,
     @Req() req: any
