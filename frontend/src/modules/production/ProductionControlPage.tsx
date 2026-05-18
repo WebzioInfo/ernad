@@ -530,7 +530,6 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
   const [changeoverModalOpen, setChangeoverModalOpen] = useState(false);
   const [changeoverBrand, setChangeoverBrand] = useState('');
   const [changeoverProduct, setChangeoverProduct] = useState('');
-  const [materialReturns, setMaterialReturns] = useState<any>({ preforms: 0, caps: 0, labels: 0 });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['production-lines'] });
@@ -554,6 +553,45 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
     }
   });
 
+  const { data: activeBatchLogs, isLoading: loadingBatchLogs } = useQuery({
+    queryKey: ['active-batch-logs', line.batch?.id],
+    queryFn: async () => {
+      if (!line.batch?.id) return [];
+      return (await api.get(ENDPOINTS.TELEMETRY.LOGS, { params: { batchId: line.batch.id } })).data;
+    },
+    enabled: !!line.batch?.id && stopConfirmOpen
+  });
+
+  const verifyLogMutation = useMutation({
+    mutationFn: async (logId: number) => {
+      return await api.post(ENDPOINTS.PRODUCTION.LOGS_VERIFY.replace(':id', String(logId)), { remarks: 'Verified on batch close' });
+    },
+    onSuccess: () => {
+      toast.success('Log verified');
+      queryClient.invalidateQueries({ queryKey: ['active-batch-logs', line.batch?.id] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to verify log');
+    }
+  });
+
+  const verifyAllLogsMutation = useMutation({
+    mutationFn: async (unverifiedLogs: any[]) => {
+      await Promise.all(
+        unverifiedLogs.map(log => 
+          api.post(ENDPOINTS.PRODUCTION.LOGS_VERIFY.replace(':id', String(log.id)), { remarks: 'Verified on batch close' })
+        )
+      );
+    },
+    onSuccess: () => {
+      toast.success('All logs verified successfully');
+      queryClient.invalidateQueries({ queryKey: ['active-batch-logs', line.batch?.id] });
+    },
+    onError: () => {
+      toast.error('Some logs failed to verify');
+    }
+  });
+
   const stopMutation = useMutation({
     mutationFn: () => {
       if (!line.batch?.id) {
@@ -563,7 +601,7 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
       return api.patch(ENDPOINTS.PRODUCTION.CLOSE_BATCH(line.batch.id), {
         remarks: stopRemarks,
         endTime: new Date(stopEndTime).toISOString(),
-        materialReturn: materialReturns
+        materialReturn: undefined
       });
     },
     onSuccess: () => {
@@ -730,22 +768,85 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
             className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-24 resize-none mb-6"
           />
 
-          <div className="bg-slate-50 p-6 rounded-[2rem] mb-8">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Material Returns</h4>
-            <div className="grid grid-cols-3 gap-4">
-              {Object.keys(materialReturns).map(key => (
-                <div key={key}>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 capitalize">{key}</label>
-                  <input
-                    type="number"
-                    value={materialReturns[key]}
-                    onChange={(e) => setMaterialReturns({ ...materialReturns, [key]: Number(e.target.value) })}
-                    className="w-full bg-white border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
-                </div>
-              ))}
+          {/* Operator Logs Verification */}
+          <div className="bg-slate-50 p-6 rounded-[2rem] mb-8 border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operator Logs</h4>
+                {activeBatchLogs && (
+                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[9px] font-black">
+                    {activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length} Pending
+                  </span>
+                )}
+              </div>
+              {activeBatchLogs && activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length > 0 && (
+                <button
+                  onClick={() => verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'))}
+                  disabled={verifyAllLogsMutation.isPending}
+                  className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  {verifyAllLogsMutation.isPending ? 'Verifying...' : 'Verify All'}
+                </button>
+              )}
             </div>
+
+            {loadingBatchLogs ? (
+              <div className="py-6 flex items-center justify-center gap-2 text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Loading logs...</span>
+              </div>
+            ) : !activeBatchLogs || activeBatchLogs.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 italic text-[10px] font-bold">
+                No logs recorded by operators for this batch.
+              </div>
+            ) : (
+              <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {activeBatchLogs.map((log: any) => {
+                  const isVerified = log.status === 'VERIFIED';
+                  return (
+                    <div key={log.id} className="bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between gap-4">
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase font-mono">#{log.id}</span>
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[8px] font-black uppercase tracking-wider">
+                            {log.station}
+                          </span>
+                        </div>
+                        <p className="text-xs font-black text-slate-800 mt-1">
+                          {log.primaryCount} <span className="text-[10px] text-slate-400 font-bold">Yield</span>
+                          {log.wastageCount > 0 && (
+                            <span className="text-rose-600 ml-2">
+                              • {log.wastageCount} <span className="text-[10px] text-rose-400 font-bold">Scrap</span>
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">
+                          By {log.userName || 'Operator'} • {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+
+                      <div>
+                        {isVerified ? (
+                          <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[8px] font-black uppercase tracking-widest">
+                            Verified
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => verifyLogMutation.mutate(log.id)}
+                            disabled={verifyLogMutation.isPending}
+                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                          >
+                            Verify
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
+
           <div className="flex gap-4">
             <button onClick={() => setStopConfirmOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
             <button onClick={() => stopMutation.mutate()} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-200">Confirm Close</button>
@@ -785,11 +886,10 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
 }
 
 function StartProductionForm({
-    shifts, brands, products, operators,
+    shifts, brands, products,
     selectedShift, setSelectedShift,
     selectedBrand, setSelectedBrand,
     selectedProduct, setSelectedProduct,
-    selectedOperators, setSelectedOperators,
     targetQuantity, setTargetQuantity,
     batchCode, setBatchCode,
     startTime, setStartTime,
@@ -827,18 +927,7 @@ function StartProductionForm({
             </select>
           </div>
         </div>
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Operator Assignment</label>
-          <div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-h-[60px]">
-            {operators?.map((op: any) => (
-              <button key={op.id} onClick={() => { setSelectedOperators((prev: string[]) => prev.includes(op.id) ? prev.filter((id: string) => id !== op.id) : [...prev, op.id]); }}
-                className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${selectedOperators?.includes(op.id) ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-white text-slate-500 border border-slate-200'}`}>
-                {op.name}
-              </button>
-            ))}
-            {(!operators || operators.length === 0) && <span className="text-slate-300 text-[10px] italic">Loading personnel...</span>}
-          </div>
-        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number</label>

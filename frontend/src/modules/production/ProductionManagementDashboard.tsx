@@ -259,7 +259,7 @@ export default function ProductionManagementDashboard() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: i * 0.05 }}
                           className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
-                          onClick={() => navigate(`/admin/forensics/${batch.id}`)}
+                          onClick={() => navigate(`${basePath}/forensics/${batch.id}`)}
                         >
                           <td className="px-8 py-6">
                             <p className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors font-mono tracking-tight">{batch.batchCode}</p>
@@ -410,7 +410,7 @@ export default function ProductionManagementDashboard() {
             </section>
 
             <button
-              onClick={() => navigate('/admin/production')}
+              onClick={() => navigate(`${basePath}/production`)}
               className="w-full py-6 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-emerald-900/40 transition-all active:scale-95 flex items-center justify-center gap-4"
             >
               <Layers size={18} /> Production Control Floor

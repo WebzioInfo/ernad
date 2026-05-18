@@ -5,6 +5,7 @@ import { factories, productionLines, productBrands, products } from './master-da
 import { shifts } from './biometric';
 import { terminals } from './terminals';
 import { qcStatusEnum } from './qc';
+import { sql } from 'drizzle-orm';
 
 export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
@@ -117,8 +118,6 @@ export const batchTotals = pgTable('batch_totals', {
   preformTotal: integer('preform_total').default(0).notNull(),
   bopRollTotal: decimal('bop_roll_total', { precision: 10, scale: 2 }).default('0').notNull(),
   shrinkWeightTotal: decimal('shrink_weight_total', { precision: 10, scale: 2 }).default('0').notNull(),
-  inkTotal: decimal('ink_total', { precision: 10, scale: 2 }).default('0').notNull(),
-  solventTotal: decimal('solvent_total', { precision: 10, scale: 2 }).default('0').notNull(),
   finishedGoodsTotal: integer('finished_goods_total').default(0).notNull(),
   casesTotal: integer('cases_total').default(0).notNull(),
   
@@ -134,7 +133,7 @@ export const auditLogs = pgTable('audit_logs', {
   entityType: varchar('entity_type', { length: 100 }),
   entityId: varchar('entity_id', { length: 100 }),
   category: varchar('category', { length: 50 }).notNull().default('GENERAL'), // AUTH, PRODUCTION, TELEMETRY, INVENTORY, QC, SALES, SECURITY
-  requestId: uuid('request_id'), // For cross-referencing with production_logs
+  requestId: uuid('request_id').default(sql`NULL`), // For cross-referencing with production_logs
   payload: jsonb('payload'),
   occurredAt: timestamp('occurred_at').defaultNow().notNull(),
 });

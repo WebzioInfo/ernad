@@ -115,8 +115,6 @@ export class ChangeoverService {
         preformTotal: 0,
         bopRollTotal: '0',
         shrinkWeightTotal: '0',
-        inkTotal: '0',
-        solventTotal: '0',
         finishedGoodsTotal: 0,
         casesTotal: 0,
       });

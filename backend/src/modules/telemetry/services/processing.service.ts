@@ -151,8 +151,6 @@ export class ProcessingService {
             preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
             bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.bopRollUsage || 0}`,
             shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
-            inkTotal: sql`${batchTotals.inkTotal} + ${dto.inkUsage || 0}`,
-            solventTotal: sql`${batchTotals.solventTotal} + ${dto.solventUsage || 0}`,
             finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
             casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
 
