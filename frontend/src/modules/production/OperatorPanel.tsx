@@ -272,7 +272,7 @@ export default function OperatorPanel() {
         description="Production Data Processing Node"
         sidebar={<ActivityFeed history={history || []} />}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Main Action Card */}
           <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-sm space-y-10">
             <div className="space-y-6">
@@ -283,7 +283,7 @@ export default function OperatorPanel() {
                 suffix="Units"
               />
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <IndustrialNumericInput
                   label="Rejects / Waste"
                   value={rejectionCount}
@@ -332,7 +332,7 @@ export default function OperatorPanel() {
               </div>
 
               {currentStation.id === 'LABELING' && (
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <IndustrialNumericInput label="Ink (g)" value={inkUsage} onChange={setInkUsage} />
                   <IndustrialNumericInput label="Solvent (g)" value={solventUsage} onChange={setSolventUsage} />
                 </div>
