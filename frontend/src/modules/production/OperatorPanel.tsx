@@ -283,7 +283,7 @@ export default function OperatorPanel() {
                 suffix="Units"
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-6">
                 <IndustrialNumericInput
                   label="Rejects / Waste"
                   value={rejectionCount}
@@ -299,8 +299,8 @@ export default function OperatorPanel() {
                       suffix="Pcs"
                       readOnly
                     />
-                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-2">
-                      Batch Total: <span className="text-white">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                      Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
                     </p>
                   </div>
                 ) : currentStation.id === 'FILLING' || currentStation.id === 'LABELING' ? (
@@ -312,8 +312,8 @@ export default function OperatorPanel() {
                       suffix="Pcs"
                       readOnly
                     />
-                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-2">
-                      Batch Total: <span className="text-white">
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                      Batch Total: <span className="text-slate-900">
                         {currentStation.id === 'FILLING' 
                           ? ((activeBatch as any)?.materialTotals?.capTotal || 0) 
                           : ((activeBatch as any)?.materialTotals?.labelTotal || 0)
@@ -332,7 +332,7 @@ export default function OperatorPanel() {
               </div>
 
               {currentStation.id === 'LABELING' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="flex flex-col gap-6">
                   <IndustrialNumericInput label="Ink (g)" value={inkUsage} onChange={setInkUsage} />
                   <IndustrialNumericInput label="Solvent (g)" value={solventUsage} onChange={setSolventUsage} />
                 </div>
