@@ -66,8 +66,13 @@ export class ProcessingService {
       const current = totalsList[0];
       const factoryId = current.factoryId;
 
-      // 3. Batch Integrity Validation
-      await this.validateBatchStatus(tx, dto.batchId);
+      // 3. Batch Integrity Validation & Retrieval
+      const batch = await this.validateBatchStatus(tx, dto.batchId);
+
+      // Auto-heal shiftId from active batch if not supplied by the operator client
+      if (!dto.shiftId && batch.shiftId) {
+        dto.shiftId = batch.shiftId;
+      }
 
       const isValidShift = await this.shiftService.validateShiftEntry(dto.shiftId, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
       if (!isValidShift) {
@@ -312,6 +317,7 @@ export class ProcessingService {
     if (batch[0].status !== 'RUNNING' && batch[0].status !== 'CHANGEOVER') {
       throw new BadRequestException(`CANNOT_LOG: Batch is currently in ${batch[0].status} state.`);
     }
+    return batch[0];
   }
 
   private async handleDowntime(tx: any, factoryId: string, dto: TelemetryDto) {

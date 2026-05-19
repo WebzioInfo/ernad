@@ -21,10 +21,26 @@ export class IngestionService {
     private readonly processingService: ProcessingService,
     private readonly terminalService: TerminalService,
   ) {}
-
   async createLog(authenticatedUserId: string, dto: TelemetryDto) {
     if (!dto.batchId || !dto.station) {
       throw new BadRequestException('Invalid telemetry payload. Batch ID and Station are required.');
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(dto.batchId)) {
+      throw new BadRequestException('Invalid Batch ID format. Must be a valid UUID.');
+    }
+    if (dto.productId && !uuidRegex.test(dto.productId)) {
+      throw new BadRequestException('Invalid Product ID format.');
+    }
+    if (dto.brandId && !uuidRegex.test(dto.brandId)) {
+      throw new BadRequestException('Invalid Brand ID format.');
+    }
+    if (dto.lineId && !uuidRegex.test(dto.lineId)) {
+      throw new BadRequestException('Invalid Line ID format.');
+    }
+    if (dto.shiftId && !uuidRegex.test(dto.shiftId)) {
+      throw new BadRequestException('Invalid Shift ID format.');
     }
 
     let finalUserId = authenticatedUserId;

@@ -32,6 +32,10 @@ export class ShiftService {
   }
 
   async validateShiftEntry(shiftId: string, loggedAt: Date) {
+    if (!shiftId) return true;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(shiftId)) return true;
+
     const shift = await db.select().from(shifts).where(eq(shifts.id, shiftId)).limit(1);
     if (!shift.length) return false;
 
