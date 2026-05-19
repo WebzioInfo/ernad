@@ -520,7 +520,7 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [batchCode, setBatchCode] = useState('');
-  const [targetQuantity, setTargetQuantity] = useState<number>(5000);
+  const targetQuantity = 5000;
   const [selectedOperators, setSelectedOperators] = useState<string[]>([]);
   const [remarks, setRemarks] = useState('');
   const [stopRemarks, setStopRemarks] = useState('');
@@ -660,7 +660,6 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
         selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
         selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
         selectedOperators={selectedOperators} setSelectedOperators={setSelectedOperators}
-        targetQuantity={targetQuantity} setTargetQuantity={setTargetQuantity}
         batchCode={batchCode} setBatchCode={setBatchCode}
         startTime={startTime} setStartTime={setStartTime}
         remarks={remarks} setRemarks={setRemarks}
@@ -890,7 +889,6 @@ function StartProductionForm({
     selectedShift, setSelectedShift,
     selectedBrand, setSelectedBrand,
     selectedProduct, setSelectedProduct,
-    targetQuantity, setTargetQuantity,
     batchCode, setBatchCode,
     startTime, setStartTime,
     remarks, setRemarks,
@@ -898,18 +896,12 @@ function StartProductionForm({
   }: any) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
-            <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-              <option value="">Select Shift</option>
-              {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Target Quantity (PCS)</label>
-            <input type="number" value={targetQuantity} onChange={(e) => setTargetQuantity(Number(e.target.value))} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
-          </div>
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
+          <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+            <option value="">Select Shift</option>
+            {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
