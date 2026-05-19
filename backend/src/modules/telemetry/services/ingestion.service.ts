@@ -34,15 +34,6 @@ export class IngestionService {
       const operator = await this.terminalService.verifyOperatorForAction(dto.operatorId, dto.operatorPin);
       finalUserId = operator.id;
       this.logger.debug(`[HYBRID] Action attributed to Operator: ${operator.name} via Terminal: ${dto.terminalId}`);
-    } else if (dto.sessionId) {
-      // Legacy/Persistent Session Logic
-      const session = await this.sessionService.getCurrentSession(authenticatedUserId);
-      if (!session || session.id !== dto.sessionId) {
-        throw new BadRequestException('No active session found for this operator or Session ID mismatch.');
-      }
-      if (session.station !== dto.station) {
-        throw new BadRequestException(`Operator assigned to ${session.station} but logging for ${dto.station}.`);
-      }
     }
 
     // 2. Validate Batch Status (Industrial Locking)

@@ -38,6 +38,20 @@ export class TelemetryController {
     return this.reconciliationService.getBatchReconciliation(batchId);
   }
 
+  @Get('history/:batchId/:station')
+  @Permissions('telemetry:log')
+  @ApiOperation({ summary: 'Get telemetry history for a batch and station' })
+  async getHistory(@Param('batchId') batchId: string, @Param('station') station: string) {
+    return this.ingestionService.getLogHistory(batchId, station);
+  }
+
+  @Get('active-events/:batchId')
+  @Permissions('telemetry:log')
+  @ApiOperation({ summary: 'Get active downtime events for a batch' })
+  async getActiveEvents(@Param('batchId') batchId: string) {
+    return this.processingService.getActiveEvents(batchId);
+  }
+
   @Get('logs')
   @Permissions('analytics:view')
   @ApiOperation({ summary: 'Get all production logs with advanced filtering (Manager portal)' })
