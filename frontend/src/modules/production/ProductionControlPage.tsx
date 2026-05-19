@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, forwardRef, type ReactNode } from 'react';
+import { useState, memo, useCallback, useEffect, forwardRef, useMemo, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutletContext, useNavigate } from 'react-router-dom';
@@ -7,7 +7,7 @@ import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
   Gauge, Loader2, X, Users, BarChart2,
   Clock, ArrowLeft, ShieldAlert, Zap, Shield,
-  Settings2, ActivitySquare, History
+  Settings2, ActivitySquare, History, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -530,6 +530,28 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
   const [changeoverModalOpen, setChangeoverModalOpen] = useState(false);
   const [changeoverBrand, setChangeoverBrand] = useState('');
   const [changeoverProduct, setChangeoverProduct] = useState('');
+  const [changeoverStartTime, setChangeoverStartTime] = useState(new Date().toISOString().slice(0, 16));
+
+  const { data: activeBatchLogs, isLoading: loadingBatchLogs } = useQuery({
+    queryKey: ['active-batch-logs', line.batch?.id],
+    queryFn: async () => {
+      if (!line.batch?.id) return [];
+      return (await api.get(ENDPOINTS.TELEMETRY.LOGS, { params: { batchId: line.batch.id } })).data;
+    },
+    enabled: !!line.batch?.id && (stopConfirmOpen || changeoverModalOpen)
+  });
+
+  const missingStations = useMemo(() => {
+    if (!activeBatchLogs) return [];
+    const loggedStations = new Set(activeBatchLogs.map((l: any) => l.station?.toUpperCase()));
+    const REQUIRED_STATIONS = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'];
+    return REQUIRED_STATIONS.filter(station => !loggedStations.has(station));
+  }, [activeBatchLogs]);
+
+  const hasUnverifiedLogs = useMemo(() => {
+    if (!activeBatchLogs) return false;
+    return activeBatchLogs.some((l: any) => l.status !== 'VERIFIED');
+  }, [activeBatchLogs]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['production-lines'] });
@@ -551,15 +573,6 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
       invalidate();
       toast.success('Production started');
     }
-  });
-
-  const { data: activeBatchLogs, isLoading: loadingBatchLogs } = useQuery({
-    queryKey: ['active-batch-logs', line.batch?.id],
-    queryFn: async () => {
-      if (!line.batch?.id) return [];
-      return (await api.get(ENDPOINTS.TELEMETRY.LOGS, { params: { batchId: line.batch.id } })).data;
-    },
-    enabled: !!line.batch?.id && stopConfirmOpen
   });
 
   const verifyLogMutation = useMutation({
@@ -618,7 +631,8 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
   const changeoverMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.PRODUCTION.LINE_CHANGEOVER(line.id), {
       productId: changeoverProduct,
-      batchId: line.batch?.id
+      batchId: line.batch?.id,
+      startTime: new Date(changeoverStartTime).toISOString()
     }),
     onSuccess: () => { invalidate(); setChangeoverModalOpen(false); toast.success('Changeover initiated'); },
     onError: (error: any) => {
@@ -856,27 +870,129 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
       {changeoverModalOpen && (
         <Modal onClose={() => setChangeoverModalOpen(false)}>
           <h3 className="text-xl font-black mb-4">Product Changeover</h3>
-          <p className="text-slate-500 mb-6">Select the next brand and product to be produced on this line.</p>
+          <p className="text-slate-500 mb-6">Verify operator logs and specify new SKU & start time to initiate changeover.</p>
 
-          <div className="space-y-4 mb-8">
-            <select value={changeoverBrand} onChange={(e) => { setChangeoverBrand(e.target.value); setChangeoverProduct(''); }} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4">
-              <option value="">Select Brand</option>
-              {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-1">Brand</label>
+              <select value={changeoverBrand} onChange={(e) => { setChangeoverBrand(e.target.value); setChangeoverProduct(''); }} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
+                <option value="">Select Brand</option>
+                {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
 
-            <select
-              value={changeoverProduct}
-              onChange={(e) => setChangeoverProduct(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 disabled:opacity-50"
-              disabled={!changeoverBrand}
-            >
-              <option value="">Select New Product</option>
-              {products?.filter((p: any) => p.brandId === changeoverBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-1">New Product</label>
+              <select
+                value={changeoverProduct}
+                onChange={(e) => setChangeoverProduct(e.target.value)}
+                className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 disabled:opacity-50"
+                disabled={!changeoverBrand}
+              >
+                <option value="">Select New Product</option>
+                {products?.filter((p: any) => p.brandId === changeoverBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest px-1 mb-1">Changeover Start Time</label>
+              <input
+                type="datetime-local"
+                value={changeoverStartTime}
+                onChange={(e) => setChangeoverStartTime(e.target.value)}
+                className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
           </div>
+
+          {/* Operator Logs Verification */}
+          <div className="bg-slate-50 p-6 rounded-[2rem] mb-6 border border-slate-100">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operator Logs</h4>
+                {activeBatchLogs && (
+                  <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[9px] font-black">
+                    {activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length} Pending
+                  </span>
+                )}
+              </div>
+              {activeBatchLogs && activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length > 0 && (
+                <button
+                  onClick={() => verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'))}
+                  disabled={verifyAllLogsMutation.isPending}
+                  className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors disabled:opacity-50"
+                >
+                  {verifyAllLogsMutation.isPending ? 'Verifying...' : 'Verify All'}
+                </button>
+              )}
+            </div>
+
+            {loadingBatchLogs ? (
+              <div className="py-6 flex items-center justify-center gap-2 text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Loading logs...</span>
+              </div>
+            ) : !activeBatchLogs || activeBatchLogs.length === 0 ? (
+              <div className="py-6 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+                No operator logs registered for this batch.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
+                {activeBatchLogs.map((log: any) => {
+                  return (
+                    <div key={log.id} className="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-xl hover:border-slate-200 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-slate-800 uppercase">{log.station}</span>
+                          <span className="text-[9px] font-semibold text-slate-400">Qty: {log.actualQuantity}</span>
+                        </div>
+                        <p className="text-[9px] font-bold text-slate-400 mt-0.5">By: {log.operatorName || 'Operator'}</p>
+                      </div>
+                      <div>
+                        {log.status === 'VERIFIED' ? (
+                          <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                            Verified
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => verifyLogMutation.mutate(log.id)}
+                            disabled={verifyLogMutation.isPending}
+                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                          >
+                            Verify
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {missingStations.length > 0 && (
+            <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-[10px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Missing logs for station(s): {missingStations.join(', ')}. Changeover blocked.</span>
+            </div>
+          )}
+
+          {missingStations.length === 0 && hasUnverifiedLogs && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-100 rounded-2xl text-[10px] font-black text-amber-600 uppercase tracking-wider flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Please verify all operator logs before initiating changeover.</span>
+            </div>
+          )}
+
           <div className="flex gap-4">
             <button onClick={() => setChangeoverModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
-            <button onClick={() => changeoverMutation.mutate()} className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-100">Initiate</button>
+            <button
+              onClick={() => changeoverMutation.mutate()}
+              disabled={!changeoverProduct || missingStations.length > 0 || hasUnverifiedLogs || changeoverMutation.isPending}
+              className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-100 disabled:opacity-50"
+            >
+              {changeoverMutation.isPending ? 'Initiating...' : 'Initiate'}
+            </button>
           </div>
         </Modal>
       )}

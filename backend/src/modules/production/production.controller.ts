@@ -126,9 +126,9 @@ export class ProductionController {
   async initiateChangeover(
     @Param('id') lineId: string, 
     @Req() req: any,
-    @Body() dto: { batchId: string; productId: string; reason?: string; notes?: string }
+    @Body() dto: { batchId: string; productId: string; reason?: string; notes?: string; startTime?: string }
   ) {
-    return await this.changeoverService.initiateChangeover(dto.batchId, dto.productId, req.user.sub, { reason: dto.reason, notes: dto.notes });
+    return await this.changeoverService.initiateChangeover(dto.batchId, dto.productId, req.user.sub, { reason: dto.reason, notes: dto.notes, startTime: dto.startTime });
   }
 
   @Patch('batches/:id/close')

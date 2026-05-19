@@ -23,7 +23,7 @@ export class ChangeoverService {
     return factory.id;
   }
 
-  async initiateChangeover(batchId: string, toProductId: string, userId: string, extra?: { reason?: string, notes?: string }) {
+  async initiateChangeover(batchId: string, toProductId: string, userId: string, extra?: { reason?: string, notes?: string, startTime?: string }) {
     const result = await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
       if (!batch) throw new BadRequestException('Batch not found');
@@ -37,11 +37,11 @@ export class ChangeoverService {
         lineId: batch.lineId,
         fromProductId: batch.productId,
         toProductId,
-        startTime: new Date(),
+        startTime: extra?.startTime ? new Date(extra.startTime) : new Date(),
         leftoverMaterials: {},
         wastedMaterials: {},
-        reason: (arguments as any)[3]?.reason || 'SKU_CHANGE',
-        notes: (arguments as any)[3]?.notes || null,
+        reason: extra?.reason || 'SKU_CHANGE',
+        notes: extra?.notes || null,
         createdBy: userId
       }).returning();
       return res[0];
