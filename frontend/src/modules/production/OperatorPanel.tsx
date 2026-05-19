@@ -42,14 +42,7 @@ export default function OperatorPanel() {
     },
   ];
 
-  const { data: session, isLoading: isLoadingSession } = useQuery({
-    queryKey: ['current-operator-session'],
-    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.CURRENT)).data,
-    retry: 1,
-    refetchOnWindowFocus: false
-  });
-
-  const currentStationId = urlStation?.toUpperCase() || session?.station || 'FILLING';
+  const currentStationId = urlStation?.toUpperCase() || 'FILLING';
   const currentStation = stations.find(s => s.id === currentStationId) || stations[1];
 
   const [loading, setLoading] = useState(true);
@@ -111,7 +104,6 @@ export default function OperatorPanel() {
   const endSessionMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
       if (location.pathname.startsWith('/operator')) {
         navigate('/operator/select');
       } else {
@@ -151,38 +143,11 @@ export default function OperatorPanel() {
     }
   }, [location, user, activeOperator]);
 
-  // Heartbeat to keep session active
   useEffect(() => {
-    if (!session) return;
-    const interval = setInterval(async () => {
-      try {
-        await api.post(ENDPOINTS.OPERATOR_SESSIONS.HEARTBEAT);
-      } catch (err) {
-        console.warn('[SESSION_HEARTBEAT_FAILED]', err);
-      }
-    }, 60000); // 1 minute
-    return () => clearInterval(interval);
-  }, [session]);
-
-  useEffect(() => {
-    if (!isLoadingSession && !session) {
-      if (location.pathname.includes('/workspace')) {
-        toast.error('Session ended or taken over by another device.');
-      }
-
-      if (location.pathname.startsWith('/operator')) {
-        navigate('/operator/select');
-      } else {
-        navigate('/line/select');
-      }
-    }
-  }, [session, isLoadingSession, navigate, location]);
-
-  useEffect(() => {
-    if (!isLoadingBatch && !isLoadingSession) {
+    if (!isLoadingBatch) {
       setLoading(false);
     }
-  }, [isLoadingBatch, isLoadingSession]);
+  }, [isLoadingBatch]);
 
   // Enforce Formula: Used = Production + Wastage
   useEffect(() => {
@@ -193,7 +158,7 @@ export default function OperatorPanel() {
   }, [primaryCount, rejectionCount, currentStationId]);
 
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
-    if (!activeBatch?.batch && !session?.batchId) return toast.error('No active batch found.');
+    if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
 
     if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
@@ -204,12 +169,12 @@ export default function OperatorPanel() {
     const currentBatch = activeBatch?.batch;
     const logEntry: any = {
       requestId: uuidv4(),
-      batchId: currentBatch?.id || session?.batchId,
-      sessionId: session?.id,
+      batchId: currentBatch?.id,
+      sessionId: undefined,
       lineId: lineId!,
-      brandId: currentBatch?.brandId || session?.brandId,
-      productId: currentBatch?.productId || session?.productId,
-      shiftId: currentBatch?.shiftId || session?.shiftId,
+      brandId: currentBatch?.brandId,
+      productId: currentBatch?.productId,
+      shiftId: currentBatch?.shiftId,
       operatorId: activeOperator.id,
       operatorPin: activeOperator.currentPin,
       station: currentStation.id,

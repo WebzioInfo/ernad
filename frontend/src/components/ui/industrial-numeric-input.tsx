@@ -65,7 +65,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             {...props}
           />
 
-          {suffix && (
+          {suffix && !value && (
             <span className="absolute right-16 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none">
               {suffix}
             </span>

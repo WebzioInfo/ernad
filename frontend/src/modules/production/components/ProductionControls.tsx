@@ -34,7 +34,9 @@ const IndustrialInput = ({ label, value, onChange, suffix }: { label: string, va
           placeholder="0"
           className="w-full text-center text-[40px] font-semibold tracking-tight text-gray-900 bg-transparent outline-none focus:text-indigo-600 transition-colors placeholder:text-gray-200"
         />
-        <div className="absolute right-2 bottom-2 text-[11px] font-semibold text-gray-400 uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-300">{suffix}</div>
+        {suffix && !value && (
+          <div className="absolute right-2 bottom-2 text-[11px] font-semibold text-gray-400 uppercase opacity-0 group-hover:opacity-100 transition-opacity duration-300">{suffix}</div>
+        )}
       </div>
       
       <button 
