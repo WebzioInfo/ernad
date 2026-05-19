@@ -74,6 +74,42 @@ export default function LineSelectionPage() {
     }
   });
 
+  const getStationFromRoles = (roles: string[]) => {
+    const r = roles.map(x => x.toUpperCase());
+    if (r.some(x => x.includes('BLOWING'))) return 'BLOWING';
+    if (r.some(x => x.includes('FILLING'))) return 'FILLING';
+    if (r.some(x => x.includes('LABELING'))) return 'LABELING';
+    if (r.some(x => x.includes('PACKING'))) return 'PACKING';
+    return null;
+  };
+
+  const handleLineSelect = (line: any) => {
+    setSelectedLine(line);
+    
+    // 1. If user already has an active session on this line, auto-navigate
+    const activeForUser = currentSession?.lineId === line.id ? currentSession : null;
+    if (activeForUser) {
+      navigate(`/operator/workspace/${line.id}/${activeForUser.station.toLowerCase()}`);
+      return;
+    }
+
+    // 2. If user has a station-specific role, auto-trigger session init
+    const userRoles = user?.roles || [];
+    const stationFromRole = getStationFromRoles(userRoles) || (user?.role ? getStationFromRoles([user.role]) : null);
+    if (stationFromRole) {
+      setSelectedStation(stationFromRole);
+      startSessionMutation.mutate({
+        lineId: line.id,
+        station: stationFromRole
+      });
+      return;
+    }
+
+    // 3. Otherwise, transition to station selection step
+    setStep('station');
+    queryClient.invalidateQueries({ queryKey: ['line', line.id] });
+  };
+
   useEffect(() => {
     // Only auto-navigate if the user IS an operator. Managers might want to select a different line.
     const isOperator = user?.roles?.some((r: any) => r.toUpperCase() === 'OPERATOR') || user?.role?.toUpperCase() === 'OPERATOR';
@@ -83,12 +119,14 @@ export default function LineSelectionPage() {
     }
   }, [currentSession, isLoadingSession, navigate, user]);
 
-  const isLoading = isLoadingLines || isLoadingSession;
+  const isLoading = isLoadingLines || isLoadingSession || startSessionMutation.isPending;
 
   if (isLoading) return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center gap-6">
       <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Initializing Factory Grid...</p>
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">
+        {startSessionMutation.isPending ? 'Initializing workspace session...' : 'Initializing Factory Grid...'}
+      </p>
     </div>
   );
 
@@ -128,15 +166,10 @@ export default function LineSelectionPage() {
 
         {step === 'line' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-            {lines?.map((line: any) => (
+            {lines?.filter((line: any) => line.status === 'RUNNING' || line.status === 'CHANGEOVER').map((line: any) => (
               <button
                 key={line.id}
-                onClick={() => {
-                  setSelectedLine(line);
-                  setStep('station');
-                  // Pre-invalidate to ensure fresh data for next step
-                  queryClient.invalidateQueries({ queryKey: ['line', line.id] });
-                }}
+                onClick={() => handleLineSelect(line)}
                 className="group bg-white border border-slate-200 p-10 rounded-[3rem] text-left hover:border-indigo-300 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 flex flex-col h-[320px] justify-between relative overflow-hidden"
               >
                 <div className="relative z-10">
@@ -194,13 +227,23 @@ export default function LineSelectionPage() {
                 const isStarting = startSessionMutation.isPending && selectedStation === station.id;
 
                 return (
-                  <div
+                  <button
                     key={station.id}
+                    onClick={() => {
+                      if (isStarting) return;
+                      setSelectedStation(station.id);
+                      startSessionMutation.mutate({
+                        lineId: selectedLine.id,
+                        station: station.id,
+                        force: occupant && !isMySession
+                      });
+                    }}
+                    disabled={isStarting}
                     className={cn(
-                      "group p-10 rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[340px]",
+                      "group p-10 rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[340px] w-full",
                       occupant
                         ? (isMySession ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100')
-                        : 'bg-white border-slate-200'
+                        : 'bg-white border-slate-200 hover:border-indigo-300 hover:-translate-y-2'
                     )}
                   >
                     <div className="relative z-10">
@@ -222,29 +265,24 @@ export default function LineSelectionPage() {
                       )}
                     </div>
 
-                    <button
-                      onClick={() => {
-                        setSelectedStation(station.id);
-                        startSessionMutation.mutate({
-                          lineId: selectedLine.id,
-                          station: station.id,
-                          force: occupant && !isMySession // Only force if it's someone else
-                        });
-                      }}
-                      disabled={isStarting}
-                      className={cn(
-                        "mt-auto w-full py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-2 shadow-sm",
-                        occupant
-                          ? (isMySession
-                            ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
-                            : 'bg-rose-100 text-rose-600 hover:bg-rose-600 hover:text-white')
-                          : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
+                    <div className="relative z-10 flex items-center justify-between w-full mt-auto">
+                      {isStarting ? (
+                        <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                      ) : occupant ? (
+                        <div className="flex items-center gap-2">
+                          <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMySession ? "bg-indigo-500" : "bg-rose-500")} />
+                          <span className={cn("text-[9px] font-black uppercase tracking-widest", isMySession ? "text-indigo-600" : "text-rose-600")}>
+                            {isMySession ? 'Resume Session' : 'Force Takeover'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                          Initialize Workspace
+                        </span>
                       )}
-                    >
-                      {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : (occupant ? (isMySession ? <Activity className="w-4 h-4" /> : <Zap className="w-4 h-4" />) : <Activity className="w-4 h-4" />)}
-                      {occupant ? (isMySession ? 'Resume Session' : 'Force Takeover') : 'Start Session'}
-                    </button>
-                  </div>
+                      <ArrowRight className="w-5 h-5 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                    </div>
+                  </button>
                 );
               })}
             </div>

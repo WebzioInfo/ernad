@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
-import { operatorSessions, productionBatches, users as usersTable, terminals } from '../../database/schema';
+import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines } from '../../database/schema';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 import { AuditService } from '../audit/audit.service';
@@ -25,6 +25,30 @@ export class OperatorSessionsService {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(userId) || !uuidRegex.test(lineId)) {
       throw new BadRequestException('Invalid User ID or Line ID format.');
+    }
+
+    // Validate Line is active (RUNNING or CHANGEOVER)
+    const [line] = await db.select({ status: productionLines.status }).from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+    if (!line) {
+      throw new BadRequestException('Production line not found.');
+    }
+    if (line.status !== 'RUNNING' && line.status !== 'CHANGEOVER') {
+      throw new BadRequestException('Line is not active for operator session');
+    }
+
+    // Idempotent reuse: if active session exists on this station, reuse it
+    const [existingActive] = await db.select().from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.userId, userId),
+        eq(operatorSessions.lineId, lineId),
+        eq(operatorSessions.station, station),
+        eq(operatorSessions.isActive, true)
+      ))
+      .limit(1);
+
+    if (existingActive) {
+      this.logger.log(`[SESSION_TRACE] Active session already exists for User: ${userId}, Line: ${lineId}, Station: ${station}. Reusing.`);
+      return existingActive;
     }
 
     // Close operator's other active sessions (to keep getCurrentSession consistent)
