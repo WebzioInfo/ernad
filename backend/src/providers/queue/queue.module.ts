@@ -21,8 +21,14 @@ import Redis from 'ioredis';
         const connection = new Redis(url, {
           maxRetriesPerRequest: null,
           enableReadyCheck: false,
+          connectTimeout: 5000,
+          enableOfflineQueue: false,
           tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
           retryStrategy: (times) => Math.min(times * 500, 30000),
+        });
+
+        connection.on('error', (err) => {
+          // Gracefully suppress connection errors to prevent console spam
         });
 
         return { connection };

@@ -42,14 +42,22 @@ export class TelemetryController {
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Get telemetry history for a batch and station' })
   async getHistory(@Param('batchId') batchId: string, @Param('station') station: string) {
-    return this.ingestionService.getLogHistory(batchId, station);
+    try {
+      return await this.ingestionService.getLogHistory(batchId, station);
+    } catch (err) {
+      return [];
+    }
   }
 
   @Get('active-events/:batchId')
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Get active downtime events for a batch' })
   async getActiveEvents(@Param('batchId') batchId: string) {
-    return this.processingService.getActiveEvents(batchId);
+    try {
+      return await this.processingService.getActiveEvents(batchId);
+    } catch (err) {
+      return [];
+    }
   }
 
   @Get('logs')

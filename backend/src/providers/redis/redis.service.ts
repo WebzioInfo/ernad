@@ -28,6 +28,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         lazyConnect: true,
         maxRetriesPerRequest: 0,
         connectTimeout: 5000,
+        enableOfflineQueue: false,
         tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
         retryStrategy: (times) => {
           if (times > 1) {
