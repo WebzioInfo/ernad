@@ -62,7 +62,7 @@ export default function OperatorPanel() {
   const [preformUsage, setPreformUsage] = useState(0);
   const [capUsage, setCapUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
-  const [shrinkUsage, setShrinkUsage] = useState(0);
+  const [shrinkUsage, setShrinkUsage] = useState('');
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
@@ -76,7 +76,7 @@ export default function OperatorPanel() {
   const [makeupUsage, setMakeupUsage] = useState(0);
   
   // New Packing Station States
-  const [shrinkWasteWeight, setShrinkWasteWeight] = useState(0);
+  const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
 
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
 
@@ -84,10 +84,6 @@ export default function OperatorPanel() {
   const [remarks, setRemarks] = useState('');
   const [fromTime] = useState('');
   const [toTime] = useState('');
-
-  // Enterprise & Inventory State
-  const [selectedStockId, setSelectedStockId] = useState<string>('');
-  const [packingConfigId, setPackingConfigId] = useState<string>('');
 
   const { data: batchData, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['active-batch', lineId],
@@ -146,15 +142,6 @@ export default function OperatorPanel() {
     retry: 1
   });
 
-  const { data: packingConfigs } = useQuery({
-    queryKey: ['packing-configs', activeBatch?.batch?.productId],
-    queryFn: async () => {
-      if (!activeBatch?.batch?.productId) return [];
-      return (await api.get(ENDPOINTS.INVENTORY.PACKAGING(activeBatch.batch.productId))).data;
-    },
-    enabled: !!activeBatch?.batch?.productId
-  });
-
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
     queryFn: async () => {
@@ -184,24 +171,11 @@ export default function OperatorPanel() {
     if (currentStationId === 'LABELING') setLabelUsage(total);
   }, [primaryCount, rejectionCount, currentStationId]);
 
-  // Packing Config auto-calculation
-  useEffect(() => {
-    if (currentStationId === 'PACKING' && packingConfigId && packingConfigs) {
-      const config = packingConfigs.find((c: any) => c.id === packingConfigId);
-      if (config && casesProduced > 0) {
-        setPrimaryCount(casesProduced * config.bottlesPerCase);
-      }
-    }
-  }, [casesProduced, packingConfigId, packingConfigs, currentStationId]);
-
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
 
     if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
-    if ((type === 'ALL' || type === 'COUNT') && !selectedStockId && currentStation.id !== 'PACKING' && currentStation.id !== 'QC') {
-      return toast.error('MATERIAL_BATCH_REQUIRED: Select stock batch.');
-    }
 
     const currentBatch = activeBatch?.batch;
     const logEntry: any = {
@@ -220,7 +194,6 @@ export default function OperatorPanel() {
       secondaryPackagingCount: Math.floor(secondaryPackagingCount),
       eventType: type === 'EVENT' ? eventType : 'NORMAL_PRODUCTION',
       isRework: false,
-      selectedStockId,
       remarks: type === 'EVENT' ? remarks : '',
       fromTime: type === 'EVENT' ? fromTime : undefined,
       toTime: type === 'EVENT' ? toTime : undefined,
@@ -242,12 +215,11 @@ export default function OperatorPanel() {
       logEntry.makeupChanged = makeupChanged;
       logEntry.makeupUsageMl = makeupChanged ? makeupUsage : 0;
     } else if (currentStation.id === 'PACKING') {
-      logEntry.shrinkWeightUsed = shrinkUsage;
-      logEntry.shrinkWasteWeight = shrinkWasteWeight;
+      logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
+      logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
-      logEntry.packingTypeId = packingConfigId;
     } else if (currentStation.id === 'QC') {
       logEntry.phValue = phValue;
       logEntry.tdsValue = tdsValue;
@@ -263,12 +235,12 @@ export default function OperatorPanel() {
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
-      setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage(0);
+      setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setLabelStickerWeight(0); setDamagedLabelWeight(0);
       setInkChanged(false); setInkUsage(0);
       setMakeupChanged(false); setMakeupUsage(0);
-      setShrinkWasteWeight(0);
+      setShrinkWasteWeight('');
     } catch (err: any) {
       toast.error('Failed to transmit log. Node error.');
     } finally { setIsSubmitting(false); }
@@ -421,11 +393,39 @@ export default function OperatorPanel() {
                     
                     <IndustrialNumericInput label="Cases Produced" value={casesProduced} onChange={setCasesProduced} suffix="Cases" />
                     <div className="opacity-50 pointer-events-none">
-                      <IndustrialNumericInput label="Total Bottles (Auto Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly />
+                      <IndustrialNumericInput label="Total Bottles (Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly />
                     </div>
                     
-                    <IndustrialNumericInput label="Shrink Material Used" value={shrinkUsage} onChange={setShrinkUsage} suffix="kg" />
-                    <IndustrialNumericInput label="Shrink Material Waste" value={shrinkWasteWeight} onChange={setShrinkWasteWeight} suffix="kg" />
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Shrink Material Used (g)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={shrinkUsage}
+                          onChange={e => setShrinkUsage(e.target.value)}
+                          placeholder="e.g. 1.256"
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Shrink Material Waste (g)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={shrinkWasteWeight}
+                          onChange={e => setShrinkWasteWeight(e.target.value)}
+                          placeholder="e.g. 0.124"
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -443,42 +443,6 @@ export default function OperatorPanel() {
 
           {/* Secondary Control Card */}
           <div className="space-y-8">
-            <div className="bg-white border border-slate-200 rounded-[2.5rem] p-8 shadow-sm">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6">Process Logistics</h3>
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Material Source Batch</label>
-                  <select
-                    value={selectedStockId}
-                    onChange={(e) => setSelectedStockId(e.target.value)}
-                    className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
-                  >
-                    <option value="">Select Stock Batch...</option>
-                    {inventory?.map((item: any) => (
-                      <option key={item.id} value={item.id}>
-                        {item.itemName} ({item.quantity} {item.unit}) • {item.quantity} Bags/Items
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {currentStation.id === 'PACKING' && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Packing Config</label>
-                    <select
-                      value={packingConfigId}
-                      onChange={(e) => setPackingConfigId(e.target.value)}
-                      className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
-                    >
-                      <option value="">Select Config...</option>
-                      {packingConfigs?.map((config: any) => (
-                        <option key={config.id} value={config.id}>{config.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
 
             <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] p-8">
               <div className="flex items-center gap-3 mb-4">
