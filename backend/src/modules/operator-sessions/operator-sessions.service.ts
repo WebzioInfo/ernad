@@ -165,6 +165,74 @@ export class OperatorSessionsService {
     return session;
   }
 
+  async changeStation(userId: string, newStation: string) {
+    const permittedStations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC', 'GENERAL'];
+    if (!permittedStations.includes(newStation.toUpperCase())) {
+      throw new BadRequestException(`Invalid station: ${newStation}`);
+    }
+
+    // Get the current active session
+    const [activeSession] = await db.select().from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.userId, userId),
+        eq(operatorSessions.isActive, true)
+      ))
+      .limit(1);
+
+    if (!activeSession) {
+      throw new BadRequestException('No active session found to change station.');
+    }
+
+    // Check if the target station is already occupied on the SAME LINE
+    const [activeOccupant] = await db.select({
+      id: operatorSessions.id,
+      userId: operatorSessions.userId
+    }).from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.lineId, activeSession.lineId),
+        eq(operatorSessions.station, newStation),
+        eq(operatorSessions.isActive, true)
+      ))
+      .limit(1);
+
+    if (activeOccupant && activeOccupant.userId !== userId) {
+      throw new BadRequestException({
+        message: 'This station is currently occupied by another operator. Please ask them to log out first.',
+        code: 'STATION_OCCUPIED',
+        ownerId: activeOccupant.userId
+      });
+    }
+
+    // Update the session
+    const [updatedSession] = await db.update(operatorSessions)
+      .set({ 
+        station: newStation,
+        lastActivityAt: new Date(),
+      })
+      .where(eq(operatorSessions.id, activeSession.id))
+      .returning();
+
+    // Log STATION_CHANGE event to audit log
+    await this.auditService.logAction({
+      userId,
+      action: 'STATION_CHANGE',
+      category: 'AUTH',
+      payload: {
+        fromStation: activeSession.station,
+        toStation: newStation,
+        lineId: activeSession.lineId
+      }
+    });
+
+    // Invalidate Cache
+    if (this.redis.getAvailability()) {
+      this.redis.del(`operator_session:${userId}`).catch(() => {});
+      this.redis.set(`operator_session:${userId}`, JSON.stringify(updatedSession), 'EX', 3600 * 12).catch(() => {});
+    }
+
+    return updatedSession;
+  }
+
   async getCurrentSession(userId: string) {
     if (this.redis.getAvailability()) {
       try {

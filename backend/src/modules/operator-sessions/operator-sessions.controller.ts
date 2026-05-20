@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Version, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Version, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OperatorSessionsService } from './operator-sessions.service';
 import { UsersService } from '../users/users.service';
@@ -76,5 +76,15 @@ export class OperatorSessionsController {
   @ApiOperation({ summary: 'Update last activity timestamp for the current session' })
   async heartbeat(@Req() req: any) {
     return await this.sessionService.heartbeat(req.user.sub);
+  }
+
+  @Post('change-station')
+  @Roles('OPERATOR', 'SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Change station without logging out' })
+  async changeStation(@Req() req: any, @Body() dto: { station: string }) {
+    if (!dto.station) {
+      throw new BadRequestException('Station is required');
+    }
+    return await this.sessionService.changeStation(req.user.sub, dto.station);
   }
 }

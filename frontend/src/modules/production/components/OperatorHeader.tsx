@@ -9,7 +9,8 @@ interface OperatorHeaderProps {
   batchCode?: string;
   productName?: string;
   onLogout: () => void;
-  onDowntime: () => void;
+  onChangeStation: () => void;
+  isLoggingOut?: boolean;
   machineStatus: 'RUNNING' | 'IDLE' | 'ERROR';
 }
 
@@ -21,6 +22,8 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
   productName,
   onLogout,
   onDowntime,
+  onChangeStation,
+  isLoggingOut,
   machineStatus
 }) => {
   return (
@@ -78,18 +81,28 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
           
           <div className="flex items-center gap-2.5">
             <button 
+              onClick={onChangeStation}
+              disabled={isLoggingOut}
+              className="px-3 py-2.5 bg-white text-indigo-600 font-bold text-xs uppercase tracking-wider rounded-[12px] hover:bg-indigo-50 active:scale-95 transition-all border border-indigo-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Change Station"
+            >
+              Change Station
+            </button>
+            <button 
               onClick={onDowntime}
-              className="p-2.5 bg-white text-gray-700 rounded-[12px] hover:bg-gray-50 active:scale-95 transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+              disabled={isLoggingOut}
+              className="p-2.5 bg-white text-gray-700 rounded-[12px] hover:bg-gray-50 active:scale-95 transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
               title="Report Downtime"
             >
               <Power size={18} strokeWidth={2.5} />
             </button>
             <button 
               onClick={onLogout}
-              className="p-2.5 bg-white text-gray-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 rounded-[12px] transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+              disabled={isLoggingOut}
+              className="p-2.5 bg-white text-gray-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 rounded-[12px] transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
               title="End Session"
             >
-              <LogOut size={18} strokeWidth={2.5} />
+              {isLoggingOut ? <Loader2 size={18} className="animate-spin text-gray-400" /> : <LogOut size={18} strokeWidth={2.5} />}
             </button>
           </div>
         </div>

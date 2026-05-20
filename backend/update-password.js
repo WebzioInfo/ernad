@@ -1,6 +1,6 @@
 const postgres = require('postgres');
 const bcrypt = require('bcryptjs');
-require('dotenv').config({ path: 'd:/Webzio/ernad/backend/.env' });
+require('dotenv').config({ path: __dirname + '/.env' });
 
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 
@@ -11,8 +11,8 @@ async function run() {
     const result = await sql`
       UPDATE users 
       SET password_hash = ${hashed} 
-      WHERE id = '6f7f4e37-045b-466b-80d8-d58aeacd70c7'
-      RETURNING id, name, username, password_hash
+      WHERE username = 'pranesh.manager'
+      RETURNING id, name, username
     `;
     console.log('Updated user:', result);
   } catch (error) {

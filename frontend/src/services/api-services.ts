@@ -225,6 +225,9 @@ export const OperatorSessionService = {
 
   end: () =>
     api.post(ENDPOINTS.OPERATOR_SESSIONS.END).then(r => r.data),
+
+  changeStation: (station: string) =>
+    api.post(ENDPOINTS.OPERATOR_SESSIONS.CHANGE_STATION, { station }).then(r => r.data),
 };
 
 // ─── MASTER DATA ──────────────────────────────────────────────────────────────

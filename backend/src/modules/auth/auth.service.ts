@@ -15,10 +15,15 @@ const ROLE_PRECEDENCE = [
 
 function normalizeRole(roleSlug: string): string {
   const r = (roleSlug || '').toUpperCase().trim();
+  
+  if (r === 'GENERIC OPERATOR') return 'OPERATOR';
+  if (r === 'PRODUCTION MANAGER') return 'MANAGER';
+  if (r === 'SYSTEM_ADMIN') return 'SUPER_ADMIN';
+
   if (r.includes('SUPER')) return 'SUPER_ADMIN';
   if (r.includes('ADMIN')) return 'ADMIN';
   if (r.includes('MANAGER')) return 'MANAGER';
-  if (r.includes('OPERATOR') || r.includes('USER')) return 'OPERATOR';
+  
   return 'OPERATOR'; // fallback
 }
 

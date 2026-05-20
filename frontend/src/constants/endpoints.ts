@@ -27,6 +27,7 @@ export const ENDPOINTS = {
     START: 'operator-sessions/start',
     END: 'operator-sessions/end',
     HEARTBEAT: 'operator-sessions/heartbeat',
+    CHANGE_STATION: 'operator-sessions/change-station',
   },
   PRODUCTION: {
     BATCHES: 'production/batches',

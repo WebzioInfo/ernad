@@ -47,9 +47,12 @@ export class BatchService {
 
       const finalBatchCode = batchCode || await this.generateBatchCode(tx);
 
-      // Idempotently reuse global daily batch if it exists
+      // Idempotently reuse global daily batch if it exists for THIS line
       const [existingBatch] = await tx.select().from(productionBatches)
-        .where(eq(productionBatches.batchCode, finalBatchCode))
+        .where(and(
+          eq(productionBatches.batchCode, finalBatchCode),
+          eq(productionBatches.lineId, lineId)
+        ))
         .limit(1);
 
       let newBatch;
@@ -174,9 +177,12 @@ export class BatchService {
         .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
         .leftJoin(products, eq(productionBatches.productId, products.id))
         .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
-        .where(or(
-          eq(productionBatches.status, 'RUNNING'),
-          eq(productionBatches.status, 'CHANGEOVER')
+        .where(and(
+          eq(productionBatches.lineId, lineId),
+          or(
+            eq(productionBatches.status, 'RUNNING'),
+            eq(productionBatches.status, 'CHANGEOVER')
+          )
         ))
         .orderBy(desc(productionBatches.startTime))
         .limit(1);

@@ -15,10 +15,12 @@ import { IndustrialNumericInput } from '../../components/ui/industrial-numeric-i
 import { TerminalLogin } from './components/TerminalLogin';
 import { ENDPOINTS } from '../../constants/endpoints';
 
-// New Atomic Components
 import { OperatorHeader } from './components/OperatorHeader';
 import { StationWorkspace } from './components/StationWorkspace';
 import { ActivityFeed } from './components/ActivityFeed';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Button } from "../../components/ui/button";
+import { Wind, PackageOpen, Zap, Box } from 'lucide-react';
 
 export default function OperatorPanel() {
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
@@ -29,16 +31,16 @@ export default function OperatorPanel() {
 
   const stations = [
     {
-      id: 'BLOWING', title: 'Blowing Station', materials: ['Preforms'], category: 'Preforms'
+      id: 'BLOWING', title: 'Blowing Station', materials: ['Preforms'], category: 'Preforms', icon: Wind, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100'
     },
     {
-      id: 'FILLING', title: 'Filling Station', materials: ['Caps'], category: 'Caps'
+      id: 'FILLING', title: 'Filling Station', materials: ['Caps'], category: 'Caps', icon: PackageOpen, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100'
     },
     {
-      id: 'LABELING', title: 'Labeling Station', materials: ['Labels'], category: 'Labels'
+      id: 'LABELING', title: 'Labeling Station', materials: ['Labels'], category: 'Labels', icon: Zap, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100'
     },
     {
-      id: 'PACKING', title: 'Packing Station', materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls'
+      id: 'PACKING', title: 'Packing Station', materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls', icon: Box, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100'
     },
   ];
 
@@ -48,6 +50,8 @@ export default function OperatorPanel() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeOperator, setActiveOperator] = useState<any>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showStationModal, setShowStationModal] = useState(false);
 
   // Unified Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
@@ -103,12 +107,25 @@ export default function OperatorPanel() {
 
   const endSessionMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
+    onMutate: () => setIsLoggingOut(true),
     onSuccess: () => {
       api.post(ENDPOINTS.AUTH.LOGOUT)
         .catch(() => {})
         .finally(() => {
-          authLogout();
+          setTimeout(() => authLogout(), 1200);
         });
+    }
+  });
+
+  const changeStationMutation = useMutation({
+    mutationFn: (station: string) => api.post(ENDPOINTS.OPERATOR_SESSIONS.CHANGE_STATION, { station }),
+    onSuccess: (res, newStation) => {
+      setShowStationModal(false);
+      navigate(`/operator/workspace/${lineId}/${newStation.toLowerCase()}`, { replace: true });
+      toast.success(`Station switched to ${newStation}`);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to switch station');
     }
   });
 
@@ -256,6 +273,14 @@ export default function OperatorPanel() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col overflow-hidden">
+      {isLoggingOut && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-all duration-500 animate-in fade-in">
+          <Loader2 className="w-16 h-16 text-indigo-500 animate-spin mb-6" />
+          <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] mb-2">Terminating Session</h2>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Securing workspace and syncing ledger...</p>
+        </div>
+      )}
+
       <OperatorHeader
         lineName={line?.name || 'Line'}
         stationName={currentStation.title}
@@ -263,6 +288,8 @@ export default function OperatorPanel() {
         batchCode={activeBatch?.batch?.batchCode}
         productName={activeBatch?.productName}
         machineStatus={machineStatus}
+        isLoggingOut={isLoggingOut}
+        onChangeStation={() => setShowStationModal(true)}
         onLogout={() => endSessionMutation.mutate()}
         onDowntime={() => toast.info('Downtime Modal: Coming Soon')}
       />
@@ -403,6 +430,58 @@ export default function OperatorPanel() {
           </div>
         </div>
       </StationWorkspace>
+
+      <Dialog open={showStationModal} onOpenChange={setShowStationModal}>
+        <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8">
+          <DialogHeader className="space-y-4 mb-6">
+            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-slate-900">
+              Change <span className="text-indigo-600">Station</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              Select a new process node on {line?.name || 'this line'}. Your session will seamlessly transfer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {stations.map(station => {
+              const isActive = station.id === currentStationId;
+              const isSwitching = changeStationMutation.isPending && changeStationMutation.variables === station.id;
+              
+              return (
+                <button
+                  key={station.id}
+                  disabled={isActive || changeStationMutation.isPending}
+                  onClick={() => changeStationMutation.mutate(station.id)}
+                  className={`group p-6 rounded-2xl border transition-all text-left flex items-center gap-4 ${
+                    isActive 
+                      ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md cursor-pointer'
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${station.bg} ${station.border}`}>
+                    <station.icon className={`w-6 h-6 ${station.color}`} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-black uppercase text-slate-900">{station.title}</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      {isActive ? 'Current Node' : 'Switch Context'}
+                    </p>
+                  </div>
+                  {isSwitching && <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-8 flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setShowStationModal(false)}
+              className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
