@@ -524,14 +524,12 @@ const TelemetryCard = memo(({ label, value, icon: Icon, color, sub, delay = 0 }:
   );
 });
 
-function LineControlButtons({ line, brands, products, shifts, operators }: any) {
+function LineControlButtons({ line, brands, products, shifts }: any) {
   const queryClient = useQueryClient();
   const [selectedShift, setSelectedShift] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('');
   const [batchCode, setBatchCode] = useState('');
-  const targetQuantity = 5000;
-  const [selectedOperators, setSelectedOperators] = useState<string[]>([]);
   const [remarks, setRemarks] = useState('');
   const [stopRemarks, setStopRemarks] = useState('');
   const [startTime, setStartTime] = useState(new Date().toISOString().slice(0, 16));
@@ -576,8 +574,6 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
       batchCode: batchCode || undefined,
       remarks,
       startTime: new Date(startTime).toISOString(),
-      targetQuantity,
-      operatorIds: selectedOperators
     }),
     onSuccess: () => {
       invalidate();
@@ -1271,59 +1267,6 @@ function StartProductionModal({
   );
 }
 
-function StartProductionForm({
-    shifts, brands, products,
-    selectedShift, setSelectedShift,
-    selectedBrand, setSelectedBrand,
-    selectedProduct, setSelectedProduct,
-    batchCode, setBatchCode,
-    startTime, setStartTime,
-    remarks, setRemarks,
-    onSubmit, isPending
-  }: any) {
-    return (
-      <div className="space-y-4">
-        <div className="space-y-1">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Shift Configuration</label>
-          <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-            <option value="">Select Shift</option>
-            {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.startTime}-{s.endTime})</option>)}
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Brand</label>
-            <select value={selectedBrand} onChange={(e) => setSelectedBrand(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-              <option value="">Select Brand</option>
-              {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Product</label>
-            <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700">
-              <option value="">Select Product</option>
-              {products?.filter((p: any) => p.brandId === selectedBrand).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Optional)</label>
-            <input type="text" placeholder="e.g. EB26365 (Defaults to daily global)" value={batchCode} onChange={(e) => setBatchCode(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>
-            <input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
-          </div>
-        </div>
-        <textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Shift remarks (optional)..." className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700 h-20 resize-none" />
-        <button onClick={onSubmit} disabled={!selectedProduct || !selectedShift || isPending} className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-widest shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-50">
-          {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
-          Commit Production Start
-        </button>
-      </div>
-    );
-  }
 
   function Modal({ children, onClose, full = false }: { children: ReactNode, onClose: () => void, full?: boolean }) {
     useEffect(() => {

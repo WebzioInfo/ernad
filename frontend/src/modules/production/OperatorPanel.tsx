@@ -95,12 +95,6 @@ export default function OperatorPanel() {
 
   const activeBatch = batchData;
 
-  const { data: inventory } = useQuery({
-    queryKey: ['station-inventory', currentStationId],
-    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.STOCK_BY_CATEGORY(currentStation.category || 'Raw Materials'))).data,
-    enabled: !!currentStation.category
-  });
-
   const { data: activeEvents } = useQuery({
     queryKey: ['active-downtime-events', activeBatch?.batch?.id],
     queryFn: async () => {
