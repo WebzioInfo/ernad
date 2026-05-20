@@ -91,7 +91,7 @@ export function AppRoutes() {
         <Route
           path="/operator"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }
@@ -106,7 +106,7 @@ export function AppRoutes() {
         <Route
           path="/line"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }
@@ -121,7 +121,7 @@ export function AppRoutes() {
         <Route
           path="/terminal"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']}>
+            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }

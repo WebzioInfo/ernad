@@ -42,7 +42,7 @@ export const productionBatches = pgTable('production_batches', {
   return [
     index('idx_batches_line_status').on(table.lineId, table.status),
     index('idx_batches_product').on(table.productId),
-    uniqueIndex('idx_batches_code_factory').on(table.batchCode, table.factoryId),
+    index('idx_batches_code_factory').on(table.batchCode, table.factoryId),
     index('idx_batches_factory').on(table.factoryId),
     index('idx_batches_deleted').on(table.deletedAt),
   ];

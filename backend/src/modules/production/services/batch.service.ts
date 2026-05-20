@@ -46,41 +46,56 @@ export class BatchService {
       }
 
       const finalBatchCode = batchCode || await this.generateBatchCode(tx);
-      if (batchCode) {
-        const [existing] = await tx.select({ id: productionBatches.id }).from(productionBatches).where(eq(productionBatches.batchCode, finalBatchCode)).limit(1);
-        if (existing) throw new BadRequestException(`Batch code ${finalBatchCode} already exists.`);
+
+      // Idempotently reuse global daily batch if it exists
+      const [existingBatch] = await tx.select().from(productionBatches)
+        .where(eq(productionBatches.batchCode, finalBatchCode))
+        .limit(1);
+
+      let newBatch;
+      
+      if (existingBatch) {
+        newBatch = existingBatch;
+        
+        if (existingBatch.status !== 'RUNNING' && existingBatch.status !== 'CHANGEOVER') {
+          await tx.update(productionBatches)
+            .set({ status: 'RUNNING' })
+            .where(eq(productionBatches.id, existingBatch.id));
+        }
+      } else {
+        const [insertedBatch] = await tx.insert(productionBatches).values({
+          batchCode: finalBatchCode,
+          factoryId,
+          lineId,
+          brandId,
+          productId,
+          shiftId,
+          targetQuantity,
+          startTime: startTime ? new Date(startTime) : new Date(),
+          status: 'RUNNING',
+          createdBy,
+          remarks,
+        }).returning();
+        
+        newBatch = insertedBatch;
+
+        await tx.insert(batchTotals).values({
+          batchId: newBatch.id,
+          factoryId,
+          lineId,
+          blowingTotal: 0,
+          fillingTotal: 0,
+          labelingTotal: 0,
+          packingTotal: 0,
+          scrapTotal: 0,
+          capTotal: 0,
+          preformTotal: 0,
+          bopRollTotal: '0',
+          shrinkWeightTotal: '0',
+          finishedGoodsTotal: 0,
+          casesTotal: 0,
+        });
       }
-
-      const [newBatch] = await tx.insert(productionBatches).values({
-        batchCode: finalBatchCode,
-        factoryId,
-        lineId,
-        brandId,
-        productId,
-        shiftId,
-        targetQuantity,
-        startTime: startTime ? new Date(startTime) : new Date(),
-        status: 'RUNNING',
-        createdBy,
-        remarks,
-      }).returning();
-
-      await tx.insert(batchTotals).values({
-        batchId: newBatch.id,
-        factoryId,
-        lineId,
-        blowingTotal: 0,
-        fillingTotal: 0,
-        labelingTotal: 0,
-        packingTotal: 0,
-        scrapTotal: 0,
-        capTotal: 0,
-        preformTotal: 0,
-        bopRollTotal: '0',
-        shrinkWeightTotal: '0',
-        finishedGoodsTotal: 0,
-        casesTotal: 0,
-      });
 
       // Auto-assign operators if provided
       if (operatorIds.length > 0) {
@@ -134,6 +149,21 @@ export class BatchService {
 
   async getActiveBatch(lineId: string) {
     try {
+      const line = await db.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
+      const lineData = line[0];
+      
+      if (!lineData) {
+        return { lineId, status: 'IDLE', batch: null, error: 'Line not found' };
+      }
+
+      if (lineData.status !== 'RUNNING' && lineData.status !== 'CHANGEOVER') {
+        return {
+          lineId,
+          status: lineData.status,
+          batch: null
+        };
+      }
+
       const results = await db.select({
         batch: productionBatches,
         brand: productBrands,
@@ -144,23 +174,17 @@ export class BatchService {
         .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
         .leftJoin(products, eq(productionBatches.productId, products.id))
         .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
-        .where(and(
-          eq(productionBatches.lineId, lineId),
-          or(
-            eq(productionBatches.status, 'RUNNING'),
-            eq(productionBatches.status, 'CHANGEOVER')
-          )
+        .where(or(
+          eq(productionBatches.status, 'RUNNING'),
+          eq(productionBatches.status, 'CHANGEOVER')
         ))
         .orderBy(desc(productionBatches.startTime))
         .limit(1);
 
-      const line = await db.select().from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
-      const lineData = line[0];
-
       if (!results[0]) {
         return {
           lineId,
-          status: lineData?.status || 'IDLE',
+          status: lineData.status,
           batch: null
         };
       }
@@ -204,20 +228,30 @@ export class BatchService {
     }
   }
 
-  async generateBatchCode(tx: any): Promise<string> {
+  async generateBatchCode(tx?: any): Promise<string> {
+    const timezone = process.env.FACTORY_TIMEZONE || 'Asia/Kolkata';
     const now = new Date();
-    const yearStr = now.getFullYear().toString().slice(-2);
-    const startOfYear = new Date(now.getFullYear(), 0, 0);
-    const dayOfYear = Math.floor((Number(now) - Number(startOfYear)) / (1000 * 60 * 60 * 24));
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric'
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === 'year')!.value);
+    const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
+    const day = parseInt(parts.find(p => p.type === 'day')!.value);
+    
+    const targetDate = new Date(Date.UTC(year, month, day));
+    const startOfYear = new Date(Date.UTC(year, 0, 0));
+    const diff = targetDate.getTime() - startOfYear.getTime();
+    const oneDay = 1000 * 60 * 60 * 24;
+    const dayOfYear = Math.floor(diff / oneDay);
+    
+    const yearStr = year.toString().slice(-2);
     const dayStr = dayOfYear.toString().padStart(3, '0');
-
-    const baseCode = `EB${yearStr}${dayStr}`;
-
-    const [{ count }] = await tx.select({ count: sql<number>`count(*)` })
-      .from(productionBatches)
-      .where(sql`${productionBatches.batchCode} LIKE ${baseCode + '%'}`);
-
-    const suffix = Number(count) === 0 ? '' : String.fromCharCode(64 + Number(count));
-    return `${baseCode}${suffix}`;
+    
+    return `EB${yearStr}${dayStr}`;
   }
 }

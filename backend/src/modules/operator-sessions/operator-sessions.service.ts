@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
 import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines } from '../../database/schema';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull, or } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -36,6 +36,11 @@ export class OperatorSessionsService {
       throw new BadRequestException('Line is not active for operator session');
     }
 
+    const permittedStations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC', 'GENERAL'];
+    if (!permittedStations.includes(station.toUpperCase())) {
+      throw new BadRequestException(`Invalid station: ${station}`);
+    }
+
     // Idempotent reuse: if active session exists on this station, reuse it
     const [existingActive] = await db.select().from(operatorSessions)
       .where(and(
@@ -51,14 +56,46 @@ export class OperatorSessionsService {
       return existingActive;
     }
 
+    // Check if another user has an active session on this line and station
+    const [activeOccupant] = await db.select({
+      id: operatorSessions.id,
+      userId: operatorSessions.userId
+    }).from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.lineId, lineId),
+        eq(operatorSessions.station, station),
+        eq(operatorSessions.isActive, true)
+      ))
+      .limit(1);
+
+    if (activeOccupant && activeOccupant.userId !== userId) {
+      if (!force || !supervisorId) {
+        throw new BadRequestException({
+          message: 'This station is currently occupied by another operator. Supervisor override required.',
+          code: 'SUPERVISOR_OVERRIDE_REQUIRED',
+          ownerId: activeOccupant.userId
+        });
+      }
+      // If force is true and we have supervisor override, close the active occupant's session
+      await db.update(operatorSessions)
+        .set({
+          isActive: false,
+          endTime: new Date(),
+          endedBy: supervisorId,
+          endReason: 'supervisor_takeover'
+        })
+        .where(eq(operatorSessions.id, activeOccupant.id));
+    }
+
     // Close operator's other active sessions (to keep getCurrentSession consistent)
     await db.update(operatorSessions)
       .set({ isActive: false, endTime: new Date(), endedBy: userId, endReason: 'switched_station' })
       .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)));
 
-    // Bind to active batch
+    // Bind to active batch (Global)
     const [activeBatch] = await db.select().from(productionBatches)
-      .where(and(eq(productionBatches.lineId, lineId), eq(productionBatches.status, 'RUNNING')))
+      .where(or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER')))
+      .orderBy(desc(productionBatches.startTime))
       .limit(1);
 
     // Determine Factory

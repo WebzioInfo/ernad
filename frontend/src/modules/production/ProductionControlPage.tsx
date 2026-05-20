@@ -1038,8 +1038,8 @@ function StartProductionForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number</label>
-            <input type="text" placeholder="EB-2026-XXXX" value={batchCode} onChange={(e) => setBatchCode(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Optional)</label>
+            <input type="text" placeholder="e.g. EB26365 (Defaults to daily global)" value={batchCode} onChange={(e) => setBatchCode(e.target.value)} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold text-slate-700" />
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Start Time</label>

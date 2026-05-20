@@ -20,7 +20,23 @@ const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isInitialized: false,
       setAuth: (token, user) => set({ token, user, isAuthenticated: true, isInitialized: true }),
-      logout: () => set({ token: null, user: null, isAuthenticated: false, isInitialized: true }),
+      logout: () => {
+        set({ token: null, user: null, isAuthenticated: false, isInitialized: true });
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+          if (typeof window !== 'undefined' && 'caches' in window) {
+            caches.keys().then((names) => {
+              names.forEach(name => caches.delete(name));
+            });
+          }
+        } catch (err) {
+          console.error('Error clearing storage or cache:', err);
+        }
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 150);
+      },
       setInitialized: (val) => set({ isInitialized: val }),
     }),
     {

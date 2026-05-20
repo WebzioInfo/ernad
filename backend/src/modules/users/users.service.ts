@@ -688,10 +688,10 @@ export class UsersService {
   async verifySupervisorPin(pin: string) {
     if (!pin || pin.length !== 4) return null;
 
-    // Find users with Supervisor or Manager or Admin roles
+    // Find users with Manager or Admin roles
     const supervisorRoles = await db.select({ id: roles.id })
       .from(roles)
-      .where(inArray(roles.slug, ['SUPERVISOR', 'MANAGER', 'ADMIN', 'SUPER_ADMIN']));
+      .where(inArray(roles.slug, ['MANAGER', 'ADMIN', 'SUPER_ADMIN']));
     
     if (supervisorRoles.length === 0) return null;
 

@@ -6,6 +6,23 @@ import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { OperatorSessionsService } from '../operator-sessions/operator-sessions.service';
 
+const ROLE_PRECEDENCE = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'MANAGER',
+  'OPERATOR'
+];
+
+function sortRoles(roleSlugs: string[]): string[] {
+  return [...roleSlugs].sort((a, b) => {
+    let indexA = ROLE_PRECEDENCE.indexOf(a);
+    let indexB = ROLE_PRECEDENCE.indexOf(b);
+    if (indexA === -1) indexA = 999;
+    if (indexB === -1) indexB = 999;
+    return indexA - indexB;
+  });
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -37,53 +54,7 @@ export class AuthService {
         throw new UnauthorizedException('Identity signature not recognized.');
       }
 
-      this.logger.debug(`[AUTH_TRACE] 3. Starting credential verification (bcrypt)...`);
-      let isMatch = false;
-
-      try {
-        if (type === 'PIN') {
-          // Try PIN first, fallback to password
-          if (user.pinCode) {
-            isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
-          }
-          if (!isMatch && user.passwordHash) {
-            isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
-          }
-          if (!isMatch && !user.pinCode && !user.passwordHash) {
-            throw new UnauthorizedException('PIN or password access not configured.');
-          }
-        } else {
-          // Try password first, fallback to PIN
-          if (user.passwordHash) {
-            isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
-          }
-          if (!isMatch && user.pinCode) {
-            isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
-          }
-          if (!isMatch && !user.passwordHash && !user.pinCode) {
-            throw new UnauthorizedException('Password or PIN access not configured.');
-          }
-        }
-      } catch (bcryptErr: any) {
-        if (bcryptErr instanceof UnauthorizedException) {
-          throw bcryptErr;
-        }
-        this.logger.error(`[AUTH_TRACE] CRITICAL: Bcrypt module failure: ${bcryptErr.message}`);
-        throw new UnauthorizedException('Security validation failure.');
-      }
-
-      this.logger.debug(`[AUTH_TRACE] 4. Credential verification result: ${isMatch}`);
-
-      if (!isMatch) {
-        this.logger.warn(`[AUTH_TRACE] Login aborted: Invalid credentials for ${user.username}`);
-        throw new UnauthorizedException('Access credential rejected.');
-      }
-
-      if (!user.isActive) {
-        throw new UnauthorizedException('Account deactivated.');
-      }
-
-      this.logger.debug(`[AUTH_TRACE] 5. Compiling RBAC roles and permissions...`);
+      this.logger.debug(`[AUTH_TRACE] 3. Compiling RBAC roles and permissions...`);
 
       // ── RBAC Resolution ──
       const userRolesResult = await db.select({
@@ -96,7 +67,46 @@ export class AuthService {
       .where(eq(userRoles.userId, user.id));
 
       const roleSlugs = userRolesResult.map(r => r.slug);
-      
+      const sortedRoles = sortRoles(roleSlugs);
+      const effectiveRole = sortedRoles[0] || 'OPERATOR';
+      const isManagerOrAdmin = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(effectiveRole);
+
+      this.logger.debug(`[AUTH_TRACE] 4. Starting credential verification (bcrypt) for role: ${effectiveRole}...`);
+      let isMatch = false;
+
+      try {
+        if (isManagerOrAdmin) {
+          // Managers/admins MUST authenticate via password
+          if (!user.passwordHash) {
+            throw new UnauthorizedException('Password access credentials not configured.');
+          }
+          isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
+        } else {
+          // Operators authenticate via PIN
+          if (!user.pinCode) {
+            throw new UnauthorizedException('PIN access credentials not configured.');
+          }
+          isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
+        }
+      } catch (bcryptErr: any) {
+        if (bcryptErr instanceof UnauthorizedException) {
+          throw bcryptErr;
+        }
+        this.logger.error(`[AUTH_TRACE] CRITICAL: Bcrypt module failure: ${bcryptErr.message}`);
+        throw new UnauthorizedException('Security validation failure.');
+      }
+
+      this.logger.debug(`[AUTH_TRACE] 5. Credential verification result: ${isMatch}`);
+
+      if (!isMatch) {
+        this.logger.warn(`[AUTH_TRACE] Login aborted: Invalid credentials for ${user.username}`);
+        throw new UnauthorizedException('Access credential rejected.');
+      }
+
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account deactivated.');
+      }
+
       let permissionsSlugs: string[] = [];
       if (userRolesResult.length > 0) {
         const perms = await db.select({
@@ -113,9 +123,10 @@ export class AuthService {
 
       const payload = {
         sub: user.id,
+        id: user.id,
         username: user.username,
-        role: roleSlugs[0],
-        roles: roleSlugs,
+        role: effectiveRole,
+        roles: sortedRoles,
         permissions: permissionsSlugs,
         name: user.name,
         factoryId: user.factoryId,
@@ -131,8 +142,8 @@ export class AuthService {
           name: user.name,
           username: user.username,
           email: user.email,
-          role: roleSlugs[0],
-          roles: roleSlugs,
+          role: effectiveRole,
+          roles: sortedRoles,
           permissions: permissionsSlugs,
           jobTitle: user.jobTitle,
           department: user.department,
@@ -301,10 +312,6 @@ export class AuthService {
     // Explicit list of authorized operator roles (No substring matching)
     const allowedOperatorRoles = [
       'OPERATOR', 
-      'OPERATOR_BLOWING', 
-      'OPERATOR_FILLING', 
-      'OPERATOR_LABELING', 
-      'OPERATOR_PACKING',
       'SUPER_ADMIN', // Keep emergency override
       'ADMIN',        // Keep emergency override
       'MANAGER'       // Allow managers to access terminal
@@ -316,6 +323,10 @@ export class AuthService {
       this.logger.error(`[RBAC_VIOLATION] Unauthorized terminal access attempt by role: ${roleSlugs.join(', ')}`);
       throw new ForbiddenException('Your role does not permit operator terminal access.');
     }
+
+    const sortedRoles = sortRoles(roleSlugs);
+    const operatorRoles = sortedRoles.filter(r => r === 'OPERATOR');
+    const effectiveRole = operatorRoles[0] || sortedRoles[0] || 'OPERATOR';
 
     let permissionsSlugs: string[] = [];
     if (userRolesResult.length > 0) {
@@ -336,9 +347,10 @@ export class AuthService {
       // 7. Generate Token with Dynamic Roles
       const payload = {
         sub: user.id,
+        id: user.id,
         username: user.username,
-        role: roleSlugs[0] || 'OPERATOR',
-        roles: roleSlugs,
+        role: effectiveRole,
+        roles: sortedRoles,
         permissions: permissionsSlugs,
         name: user.name,
         factoryId: user.factoryId,
@@ -356,8 +368,8 @@ export class AuthService {
           id: user.id,
           name: user.name,
           username: user.username,
-          role: roleSlugs[0] || 'OPERATOR',
-          roles: roleSlugs,
+          role: effectiveRole,
+          roles: sortedRoles,
           permissions: permissionsSlugs,
           factoryId: user.factoryId,
           sessionId: session.id,

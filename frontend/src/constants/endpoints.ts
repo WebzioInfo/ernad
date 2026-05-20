@@ -15,7 +15,7 @@ export const ENDPOINTS = {
   TERMINALS: {
     OPERATORS: 'terminals/operators',
     AUTH_VERIFY: 'telemetry/verify-operator',
-    AUTH_LOGIN: 'operator-sessions/start',
+    AUTH_LOGIN: 'terminals/auth/login',
     REGISTER: 'terminals/register',
     STATE: (id: string) => `terminals/state/${id}`,
     ACTIVATE: 'terminals/activate',

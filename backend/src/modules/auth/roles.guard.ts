@@ -43,7 +43,7 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    const rawRoles = user.roles || (user.role ? [user.role] : []);
+    const rawRoles = user.role ? [user.role] : (user.roles || []);
     const userRoles = rawRoles.map((r: any) => String(r).toUpperCase());
     const userPermissions = user.permissions || [];
     
@@ -54,12 +54,10 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // ── Role Check (Supports Prefix Matching e.g. OPERATOR_*) ──
+    // ── Role Check (Strict Exact Match) ──
     if (requiredRoles && requiredRoles.length > 0) {
       const rolePassed = requiredRoles.some(reqRole => 
-        userRoles.some(userRole => 
-          userRole === reqRole.toUpperCase() || userRole.startsWith(`${reqRole.toUpperCase()}_`)
-        )
+        userRoles.includes(reqRole.toUpperCase())
       );
       if (!rolePassed) {
         this.logger.warn(`[RolesGuard] Role Check Failed: User ${user.username} lacks required roles ${JSON.stringify(requiredRoles)}`);

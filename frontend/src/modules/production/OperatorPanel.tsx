@@ -25,7 +25,7 @@ export default function OperatorPanel() {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, logout: authLogout } = useAuthStore();
 
   const stations = [
     {
@@ -104,11 +104,11 @@ export default function OperatorPanel() {
   const endSessionMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
     onSuccess: () => {
-      if (location.pathname.startsWith('/operator')) {
-        navigate('/operator/select');
-      } else {
-        navigate('/line/select');
-      }
+      api.post(ENDPOINTS.AUTH.LOGOUT)
+        .catch(() => {})
+        .finally(() => {
+          authLogout();
+        });
     }
   });
 

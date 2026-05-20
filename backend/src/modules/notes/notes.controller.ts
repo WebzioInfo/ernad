@@ -15,31 +15,31 @@ export class NotesController {
 
   @Post()
   create(@Request() req, @Body() dto: CreateNoteDto) {
-    const userRole = req.user.roles[0]; // Assuming primary role is first
+    const userRole = req.user.role; // Assuming primary role is first
     return this.notesService.create(req.user.id, userRole, dto);
   }
 
   @Get()
   findAll(@Request() req, @Query() filters: any) {
-    const userRole = req.user.roles[0];
+    const userRole = req.user.role;
     return this.notesService.findAll(req.user.id, userRole, filters);
   }
 
   @Get(':id')
   findOne(@Request() req, @Param('id') id: string) {
-    const userRole = req.user.roles[0];
+    const userRole = req.user.role;
     return this.notesService.findOne(id, req.user.id, userRole);
   }
 
   @Patch(':id')
   update(@Request() req, @Param('id') id: string, @Body() dto: UpdateNoteDto) {
-    const userRole = req.user.roles[0];
+    const userRole = req.user.role;
     return this.notesService.update(id, req.user.id, userRole, dto);
   }
 
   @Delete(':id')
   remove(@Request() req, @Param('id') id: string) {
-    const userRole = req.user.roles[0];
+    const userRole = req.user.role;
     return this.notesService.remove(id, req.user.id, userRole);
   }
 }

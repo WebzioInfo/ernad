@@ -19,7 +19,7 @@ export default function Login() {
   // Redirect if already authenticated
   if (isAuthenticated) {
     const userRoles = user?.roles || (user?.role ? [user.role] : []);
-    const isOperator = userRoles.some((r: string) => r.includes('OPERATOR'));
+    const isOperator = userRoles.includes('OPERATOR');
     const isManager = userRoles.includes('MANAGER');
     
     if (isManager) return <Navigate to="/manager/overview" replace />;
@@ -47,7 +47,7 @@ export default function Login() {
       const role = res.data.user.role;
       if (role === 'SUPER_ADMIN' || role === 'ADMIN') navigate('/admin');
       else if (role === 'MANAGER') navigate('/manager');
-      else if (role.includes('OPERATOR')) navigate('/operator/select');
+      else if (role === 'OPERATOR') navigate('/operator/select');
       else navigate('/admin'); // Fallback
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Access Denied: Invalid Identity or Credential');

@@ -10,7 +10,7 @@ export default function SmartRedirect() {
 
   // Determine home based on role
   const userRoles = user?.roles || (user?.role ? [user.role] : []);
-  const isOperator = userRoles.some(r => r.includes('OPERATOR'));
+  const isOperator = userRoles.includes('OPERATOR');
   const isManager = userRoles.includes('MANAGER');
   
   if (isManager) {

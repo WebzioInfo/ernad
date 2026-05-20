@@ -26,6 +26,15 @@ async function migrate() {
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verification_reason" varchar(500)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_production_logs_status" ON "production_logs" ("status")`);
 
+    // 4. Drop unique batch code index and create non-unique index
+    try {
+      await db.execute(sql`DROP INDEX IF EXISTS "idx_batches_code_factory"`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_batches_code_factory" ON "production_batches" ("batch_code", "factory_id")`);
+      console.log('Successfully updated idx_batches_code_factory to non-unique index.');
+    } catch (e: any) {
+      console.error('Failed to update idx_batches_code_factory:', e.message);
+    }
+
     console.log('Migrations applied successfully.');
     process.exit(0);
   } catch (err) {

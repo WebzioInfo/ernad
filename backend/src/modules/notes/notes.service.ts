@@ -18,8 +18,8 @@ export class NotesService {
   private getHierarchyRoles(role: string): string[] {
     const r = role.toUpperCase();
     if (r === 'SUPER_ADMIN') return []; // Special case: see all
-    if (r === 'ADMIN') return ['ADMIN', 'MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING'];
-    if (r === 'MANAGER') return ['MANAGER', 'OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING'];
+    if (r === 'ADMIN') return ['ADMIN', 'MANAGER', 'OPERATOR'];
+    if (r === 'MANAGER') return ['MANAGER', 'OPERATOR'];
     return []; // Operators only see their own
   }
 
