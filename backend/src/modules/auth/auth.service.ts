@@ -279,6 +279,7 @@ export class AuthService {
 
     // 5. RBAC Enforcement: Strict Exact-Match Operator Check
     const userRolesResult = await db.select({
+      id: roles.id,
       slug: roles.slug,
     })
     .from(roles)
@@ -305,6 +306,18 @@ export class AuthService {
       throw new ForbiddenException('Your role does not permit operator terminal access.');
     }
 
+    let permissionsSlugs: string[] = [];
+    if (userRolesResult.length > 0) {
+      const perms = await db.select({
+        slug: permissions.slug,
+      })
+      .from(permissions)
+      .innerJoin(rolePermissions, eq(rolePermissions.permissionId, permissions.id))
+      .where(or(...userRolesResult.map(r => eq(rolePermissions.roleId, r.id))));
+      
+      permissionsSlugs = Array.from(new Set(perms.map(p => p.slug)));
+    }
+
     // 6. Start Session
     try {
       const session = await this.sessionService.startSession(operatorId, lineId, station, undefined, true, terminalId);
@@ -313,8 +326,9 @@ export class AuthService {
       const payload = {
         sub: user.id,
         username: user.username,
-        role: roleSlugs[0] || 'OPERATOR', // Fallback for safety, but real roles are passed below
+        role: roleSlugs[0] || 'OPERATOR',
         roles: roleSlugs,
+        permissions: permissionsSlugs,
         name: user.name,
         factoryId: user.factoryId,
         sessionId: session.id,
@@ -327,6 +341,16 @@ export class AuthService {
       return {
         success: true,
         access_token: token,
+        user: {
+          id: user.id,
+          name: user.name,
+          username: user.username,
+          role: roleSlugs[0] || 'OPERATOR',
+          roles: roleSlugs,
+          permissions: permissionsSlugs,
+          factoryId: user.factoryId,
+          sessionId: session.id,
+        },
         operator: {
           id: user.id,
           name: user.name,

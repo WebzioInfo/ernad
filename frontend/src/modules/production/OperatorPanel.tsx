@@ -170,7 +170,7 @@ export default function OperatorPanel() {
     const logEntry: any = {
       requestId: uuidv4(),
       batchId: currentBatch?.id,
-      sessionId: undefined,
+      sessionId: activeOperator?.sessionId || user?.sessionId || undefined,
       lineId: lineId!,
       brandId: currentBatch?.brandId,
       productId: currentBatch?.productId,

@@ -135,6 +135,7 @@ export interface AuthUser {
   jobTitle?: string | null;
   avatarUrl?: string | null;
   factoryId?: string | null;
+  sessionId?: string | null;
   /** Primary role slug (legacy compat) */
   role: string;
   /** All role slugs */

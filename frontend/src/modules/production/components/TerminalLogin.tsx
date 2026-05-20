@@ -58,13 +58,13 @@ export function TerminalLogin({ onSuccess, onClose, lineName, lineId, station, t
         terminalId: terminalId,
       });
       
-      const { access_token, user } = response.data;
+      const { access_token, user, session } = response.data;
       
       // PERSIST INDUSTRIAL IDENTITY
       setAuth(access_token, user);
       
       toast.success(`Welcome, ${selectedOperator.name}`);
-      onSuccess({ ...selectedOperator, currentPin: pin });
+      onSuccess({ ...selectedOperator, currentPin: pin, sessionId: session?.id || user?.sessionId });
       
       // Navigate to Operator Panel
       navigate(`/line/${lineId}/${station?.toLowerCase() || 'filling'}/operator`);

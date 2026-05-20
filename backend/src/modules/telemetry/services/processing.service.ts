@@ -12,7 +12,8 @@ import {
   productionBatches,
   productionLines,
   downtimeLogs,
-  users
+  users,
+  operatorSessions
 } from '../../../database/schema';
 import { billOfMaterials } from '../../../database/schema';
 import { TelemetryDto } from '../dto/telemetry.dto';
@@ -88,6 +89,22 @@ export class ProcessingService {
         await this.validateProductionFlow(dto.station, finalPrimaryCount, current);
       }
 
+      let sessionId = dto.sessionId;
+      if (!sessionId) {
+        const [activeSession] = await tx.select({ id: operatorSessions.id })
+          .from(operatorSessions)
+          .where(and(
+            eq(operatorSessions.userId, userId),
+            eq(operatorSessions.lineId, dto.lineId),
+            eq(operatorSessions.station, dto.station),
+            eq(operatorSessions.isActive, true)
+          ))
+          .limit(1);
+        if (activeSession) {
+          sessionId = activeSession.id;
+        }
+      }
+
       const [log] = await tx.insert(productionLogs).values({
         requestId: dto.requestId,
         batchId: dto.batchId,
@@ -97,7 +114,7 @@ export class ProcessingService {
         productId: dto.productId,
         factoryId: factoryId,
         userId: userId,
-        sessionId: dto.sessionId,
+        sessionId: sessionId,
         station: dto.station,
         primaryCount: finalPrimaryCount,
         splitValues: dto.splitValues || [],
