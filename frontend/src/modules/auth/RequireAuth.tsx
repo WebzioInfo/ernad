@@ -16,7 +16,17 @@ export default function RequireAuth({ children, allowedRoles, requiredPermission
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const userRoles = user?.roles || (user?.role ? [user.role] : []);
+  const rawRoles = user?.roles || (user?.role ? [user.role] : []);
+  const canonicalRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
+  const hasInvalidRole = rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
+
+  if (hasInvalidRole) {
+    // Clear stale auth state immediately
+    useAuthStore.getState().logout();
+    return null;
+  }
+
+  const userRoles = rawRoles.map((r: string) => r.toUpperCase().trim());
   
   // SUPER_ADMIN bypass
   if (userRoles.includes('SUPER_ADMIN')) {
@@ -37,7 +47,7 @@ export default function RequireAuth({ children, allowedRoles, requiredPermission
 
   if (!rolePassed || !permissionPassed) {
     const isManager = userRoles.includes('MANAGER');
-    const isOperator = userRoles.some((r: string) => r.includes('OPERATOR'));
+    const isOperator = userRoles.includes('OPERATOR');
     
     if (isManager) return <Navigate to="/manager/overview" replace />;
     if (isOperator) return <Navigate to="/operator/select" replace />;

@@ -44,7 +44,14 @@ export class RolesGuard implements CanActivate {
     }
 
     const rawRoles = user.role ? [user.role] : (user.roles || []);
-    const userRoles = rawRoles.map((r: any) => String(r).toUpperCase());
+    const userRoles = rawRoles.map((r: any) => {
+      const roleStr = String(r).toUpperCase().trim();
+      if (roleStr.includes('SUPER')) return 'SUPER_ADMIN';
+      if (roleStr.includes('ADMIN')) return 'ADMIN';
+      if (roleStr.includes('MANAGER')) return 'MANAGER';
+      if (roleStr.includes('OPERATOR') || roleStr.includes('USER')) return 'OPERATOR';
+      return 'OPERATOR'; // Fallback
+    });
     const userPermissions = user.permissions || [];
     
     this.logger.debug(`[RolesGuard] Path: ${request.method} ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)} | Required: ${JSON.stringify(requiredPermissions)}`);

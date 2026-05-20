@@ -9,7 +9,16 @@ export default function SmartRedirect() {
   }
 
   // Determine home based on role
-  const userRoles = user?.roles || (user?.role ? [user.role] : []);
+  const rawRoles = user?.roles || (user?.role ? [user.role] : []);
+  const canonicalRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
+  const hasInvalidRole = rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
+
+  if (hasInvalidRole) {
+    useAuthStore.getState().logout();
+    return null;
+  }
+
+  const userRoles = rawRoles.map((r: string) => r.toUpperCase().trim());
   const isOperator = userRoles.includes('OPERATOR');
   const isManager = userRoles.includes('MANAGER');
   
