@@ -133,23 +133,33 @@ const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shif
       </div>
 
       {isStartModalOpen && (
-        <Modal full onClose={() => setIsStartModalOpen(false)}>
-          <div className="bg-slate-50/50 p-12 rounded-[3rem] border border-slate-100 shadow-inner">
-            <StartProductionForm
-              shifts={shifts}
-              brands={brands}
-              products={products}
-              selectedShift={selectedShift} setSelectedShift={setSelectedShift}
-              selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
-              selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
-              batchCode={batchCode} setBatchCode={setBatchCode}
-              startTime={startTime} setStartTime={setStartTime}
-              remarks={remarks} setRemarks={setRemarks}
-              onSubmit={() => startMutation.mutate()}
-              isPending={startMutation.isPending}
-            />
-          </div>
-        </Modal>
+        <StartProductionModal
+          lineName={line.name}
+          shifts={shifts}
+          brands={brands}
+          products={products}
+          onClose={() => setIsStartModalOpen(false)}
+          onSubmit={(payload: any) => {
+            Object.assign({
+              lineId: line.id,
+              shiftId: selectedShift,
+              brandId: selectedBrand,
+              productId: selectedProduct,
+              batchCode: batchCode || undefined,
+              remarks,
+              startTime: new Date(startTime).toISOString(),
+            }, payload);
+            startMutation.mutate();
+          }}
+          isPending={startMutation.isPending}
+          // pipe state setters so modal can drive the form
+          selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+          selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+          selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+          batchCode={batchCode} setBatchCode={setBatchCode}
+          startTime={startTime} setStartTime={setStartTime}
+          remarks={remarks} setRemarks={setRemarks}
+        />
       )}
     </motion.div>
   );
@@ -663,23 +673,36 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
     onError: (err: any) => toast.error(err.response?.data?.message || 'Reopen failed')
   });
 
+  const [showStartModal, setShowStartModal] = useState(false);
+
   if (line.status === 'IDLE') {
     return (
-      <StartProductionForm
-        shifts={shifts}
-        brands={brands}
-        products={products}
-        operators={operators}
-        selectedShift={selectedShift} setSelectedShift={setSelectedShift}
-        selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
-        selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
-        selectedOperators={selectedOperators} setSelectedOperators={setSelectedOperators}
-        batchCode={batchCode} setBatchCode={setBatchCode}
-        startTime={startTime} setStartTime={setStartTime}
-        remarks={remarks} setRemarks={setRemarks}
-        onSubmit={() => startMutation.mutate()}
-        isPending={startMutation.isPending}
-      />
+      <>
+        <button
+          onClick={() => setShowStartModal(true)}
+          className="w-full flex items-center justify-center gap-3 py-6 bg-indigo-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-indigo-200 hover:bg-indigo-500 transition-all active:scale-[0.98] group"
+        >
+          <Play className="w-5 h-5 fill-white group-hover:scale-110 transition-transform" />
+          Start Production
+        </button>
+        {showStartModal && (
+          <StartProductionModal
+            lineName={line.name}
+            shifts={shifts}
+            brands={brands}
+            products={products}
+            onClose={() => setShowStartModal(false)}
+            onSubmit={() => startMutation.mutate()}
+            isPending={startMutation.isPending}
+            selectedShift={selectedShift} setSelectedShift={setSelectedShift}
+            selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
+            selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
+            batchCode={batchCode} setBatchCode={setBatchCode}
+            startTime={startTime} setStartTime={setStartTime}
+            remarks={remarks} setRemarks={setRemarks}
+          />
+        )}
+      </>
     );
   }
 
@@ -1000,6 +1023,254 @@ function LineControlButtons({ line, brands, products, shifts, operators }: any) 
   );
 }
 
+function StartProductionModal({
+  lineName, shifts, brands, products,
+  selectedShift, setSelectedShift,
+  selectedBrand, setSelectedBrand,
+  selectedProduct, setSelectedProduct,
+  batchCode, setBatchCode,
+  startTime, setStartTime,
+  remarks, setRemarks,
+  onClose, onSubmit, isPending
+}: any) {
+  const [step, setStep] = useState(1);
+  const totalSteps = 3;
+
+  const selectedBrandObj = brands?.find((b: any) => b.id === selectedBrand);
+  const selectedProductObj = products?.find((p: any) => p.id === selectedProduct);
+  const selectedShiftObj = shifts?.find((s: any) => s.id === selectedShift);
+
+  const canProceedStep1 = !!selectedShift;
+  const canProceedStep2 = !!selectedBrand && !!selectedProduct;
+  const canSubmit = canProceedStep1 && canProceedStep2;
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  const stepLabels = ['Shift Setup', 'Product Config', 'Confirm & Launch'];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white w-full sm:max-w-2xl sm:mx-6 rounded-t-[3rem] sm:rounded-[3rem] shadow-[0_40px_120px_rgba(0,0,0,0.35)] flex flex-col max-h-[95vh] animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-400 overflow-hidden">
+
+        {/* Gradient accent bar */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500 shrink-0" />
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-10 pt-8 pb-6 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-200">
+              <Play className="w-5 h-5 fill-white text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight leading-none">Start Production</h2>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{lineName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 hover:bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 transition-all">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Step Indicator */}
+        <div className="px-10 pb-6 shrink-0">
+          <div className="flex items-center gap-2">
+            {stepLabels.map((label, i) => {
+              const num = i + 1;
+              const isActive = num === step;
+              const isDone = num < step;
+              return (
+                <div key={num} className="flex items-center gap-2 flex-1">
+                  <div className={`flex items-center gap-2.5 ${isActive ? 'opacity-100' : isDone ? 'opacity-70' : 'opacity-30'} transition-opacity`}>
+                    <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${
+                      isDone ? 'bg-emerald-500 text-white' :
+                      isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' :
+                      'bg-slate-100 text-slate-500'
+                    }`}>
+                      {isDone ? '✓' : num}
+                    </div>
+                    <span className={`text-[9px] font-black uppercase tracking-widest hidden sm:block ${
+                      isActive ? 'text-indigo-600' : isDone ? 'text-emerald-600' : 'text-slate-400'
+                    }`}>{label}</span>
+                  </div>
+                  {i < totalSteps - 1 && (
+                    <div className={`flex-1 h-px mx-1 transition-colors ${isDone ? 'bg-emerald-300' : 'bg-slate-200'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-10 pb-6">
+          {step === 1 && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1">Step 1 of 3</p>
+                <p className="text-sm font-bold text-slate-700">Select the active shift for this production run.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Shift Configuration</label>
+                <select
+                  value={selectedShift}
+                  onChange={e => setSelectedShift(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all"
+                >
+                  <option value="">-- Select Active Shift --</option>
+                  {shifts?.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.startTime} – {s.endTime})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Production Start Time</label>
+                <input
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="p-6 bg-violet-50 border border-violet-100 rounded-2xl">
+                <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">Step 2 of 3</p>
+                <p className="text-sm font-bold text-slate-700">Choose the brand and product SKU for this run.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Brand</label>
+                <select
+                  value={selectedBrand}
+                  onChange={e => { setSelectedBrand(e.target.value); setSelectedProduct(''); }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-violet-400 transition-all"
+                >
+                  <option value="">-- Select Brand --</option>
+                  {brands?.map((b: any) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Product / SKU</label>
+                <select
+                  value={selectedProduct}
+                  onChange={e => setSelectedProduct(e.target.value)}
+                  disabled={!selectedBrand}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-violet-400 transition-all disabled:opacity-40"
+                >
+                  <option value="">-- Select Product --</option>
+                  {products?.filter((p: any) => p.brandId === selectedBrand).map((p: any) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Batch Number <span className="text-slate-300 font-semibold normal-case tracking-normal">(Optional — auto-assigned if blank)</span></label>
+                <input
+                  type="text"
+                  value={batchCode}
+                  onChange={e => setBatchCode(e.target.value)}
+                  placeholder="e.g. EB26365"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-violet-400 transition-all font-mono"
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Step 3 of 3 — Final Review</p>
+                <p className="text-sm font-bold text-slate-700">Confirm all parameters before committing production start.</p>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Shift</p>
+                  <p className="text-sm font-black text-slate-900 truncate">{selectedShiftObj?.name || '—'}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{selectedShiftObj ? `${selectedShiftObj.startTime} – ${selectedShiftObj.endTime}` : ''}</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Start Time</p>
+                  <p className="text-sm font-black text-slate-900">{new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{new Date(startTime).toLocaleDateString()}</p>
+                </div>
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 col-span-2">
+                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Product</p>
+                  <p className="text-sm font-black text-slate-900">{selectedProductObj?.name || '—'}</p>
+                  <p className="text-[10px] text-indigo-500 font-bold mt-0.5 uppercase tracking-wider">{selectedBrandObj?.name}</p>
+                </div>
+                {batchCode && (
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch Code</p>
+                    <p className="text-sm font-black text-slate-900 font-mono">{batchCode}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Shift Remarks <span className="text-slate-300 font-semibold normal-case tracking-normal">(Optional)</span></label>
+                <textarea
+                  value={remarks}
+                  onChange={e => setRemarks(e.target.value)}
+                  placeholder="Notes for this production run..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold text-slate-800 outline-none focus:border-emerald-400 transition-all resize-none h-24"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Actions */}
+        <div className="px-10 py-6 border-t border-slate-100 bg-white shrink-0 flex gap-3">
+          {step > 1 ? (
+            <button
+              onClick={() => setStep(s => s - 1)}
+              className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+            >
+              Back
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-slate-200 transition-all"
+            >
+              Cancel
+            </button>
+          )}
+
+          {step < totalSteps ? (
+            <button
+              onClick={() => setStep(s => s + 1)}
+              disabled={step === 1 ? !canProceedStep1 : !canProceedStep2}
+              className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+            >
+              Continue <ArrowLeft className="w-4 h-4 rotate-180" />
+            </button>
+          ) : (
+            <button
+              onClick={onSubmit}
+              disabled={!canSubmit || isPending}
+              className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-emerald-200 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-700 transition-all flex items-center justify-center gap-2"
+            >
+              {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
+              Commit Production Start
+            </button>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function StartProductionForm({
     shifts, brands, products,
     selectedShift, setSelectedShift,
@@ -1035,7 +1306,6 @@ function StartProductionForm({
             </select>
           </div>
         </div>
-
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Batch Number (Optional)</label>
