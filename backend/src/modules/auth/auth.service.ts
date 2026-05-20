@@ -13,6 +13,15 @@ const ROLE_PRECEDENCE = [
   'OPERATOR'
 ];
 
+function normalizeRole(roleSlug: string): string {
+  const r = (roleSlug || '').toUpperCase().trim();
+  if (r.includes('SUPER')) return 'SUPER_ADMIN';
+  if (r.includes('ADMIN')) return 'ADMIN';
+  if (r.includes('MANAGER')) return 'MANAGER';
+  if (r.includes('OPERATOR') || r.includes('USER')) return 'OPERATOR';
+  return 'OPERATOR'; // fallback
+}
+
 function sortRoles(roleSlugs: string[]): string[] {
   return [...roleSlugs].sort((a, b) => {
     let indexA = ROLE_PRECEDENCE.indexOf(a);
@@ -66,7 +75,7 @@ export class AuthService {
       .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
       .where(eq(userRoles.userId, user.id));
 
-      const roleSlugs = userRolesResult.map(r => r.slug);
+      const roleSlugs = Array.from(new Set(userRolesResult.map(r => normalizeRole(r.slug))));
       const sortedRoles = sortRoles(roleSlugs);
       const effectiveRole = sortedRoles[0] || 'OPERATOR';
       const isManagerOrAdmin = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(effectiveRole);
@@ -307,7 +316,7 @@ export class AuthService {
     .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
     .where(eq(userRoles.userId, user.id));
 
-    const roleSlugs = userRolesResult.map(r => r.slug);
+    const roleSlugs = Array.from(new Set(userRolesResult.map(r => normalizeRole(r.slug))));
     
     // Explicit list of authorized operator roles (No substring matching)
     const allowedOperatorRoles = [

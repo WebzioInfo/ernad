@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import {
-  ShieldCheck, User, Loader2, ArrowRight, KeyRound
+  ShieldCheck, User, Loader2, ArrowRight, KeyRound, Eye, EyeOff
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import useAuthStore from './auth.store';
@@ -14,6 +14,7 @@ export default function Login() {
   const [identity, setIdentity] = useState('');
   const [credential, setCredential] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   // Redirect if already authenticated
@@ -101,14 +102,22 @@ export default function Login() {
                    <KeyRound className="w-5 h-5 text-slate-400" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={credential}
                   onChange={(e) => setCredential(e.target.value)}
                   autoComplete="current-password"
-                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-12 pr-4 py-3.5 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-12 pr-12 py-3.5 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
             </div>
 

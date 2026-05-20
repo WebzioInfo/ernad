@@ -74,14 +74,6 @@ export default function LineSelectionPage() {
     }
   });
 
-  const getStationFromRoles = (roles: string[]) => {
-    const r = roles.map(x => x.toUpperCase());
-    if (r.some(x => x.includes('BLOWING'))) return 'BLOWING';
-    if (r.some(x => x.includes('FILLING'))) return 'FILLING';
-    if (r.some(x => x.includes('LABELING'))) return 'LABELING';
-    if (r.some(x => x.includes('PACKING'))) return 'PACKING';
-    return null;
-  };
 
   const handleLineSelect = (line: any) => {
     setSelectedLine(line);
@@ -93,19 +85,7 @@ export default function LineSelectionPage() {
       return;
     }
 
-    // 2. If user has a station-specific role, auto-trigger session init
-    const userRoles = user?.roles || [];
-    const stationFromRole = getStationFromRoles(userRoles) || (user?.role ? getStationFromRoles([user.role]) : null);
-    if (stationFromRole) {
-      setSelectedStation(stationFromRole);
-      startSessionMutation.mutate({
-        lineId: line.id,
-        station: stationFromRole
-      });
-      return;
-    }
-
-    // 3. Otherwise, transition to station selection step
+    // 2. Transition to station selection step
     setStep('station');
     queryClient.invalidateQueries({ queryKey: ['line', line.id] });
   };

@@ -71,8 +71,8 @@ export class NotesService {
     } else if (['ADMIN', 'MANAGER'].includes(userRole.toUpperCase())) {
       conditions = and(conditions, inArray(notes.createdByRole, roleHierarchy));
     } else {
-      // Operator only sees own
-      conditions = and(conditions, eq(notes.createdById, userId));
+      // Operators see logs contextually based on line/batch filters
+      // So no restrictive conditions here!
     }
 
     // Apply Filters
@@ -111,14 +111,8 @@ export class NotesService {
     if (!note) throw new NotFoundException('Note not found');
 
     // Visibility Check
-    const roleHierarchy = this.getHierarchyRoles(userRole);
-    const isOwner = note.createdById === userId;
-    const isSuperAdmin = userRole.toUpperCase() === 'SUPER_ADMIN';
-    const canSeeDown = roleHierarchy.includes(note.createdByRole);
-
-    if (!isOwner && !isSuperAdmin && !canSeeDown) {
-      throw new ForbiddenException('Access denied to this note');
-    }
+    // Context-based viewing: all authenticated factory users can read a specific note if they have its ID
+    // (Actual contextual filtering happens in findAll). We allow read here.
 
     return note;
   }

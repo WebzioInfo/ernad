@@ -23,20 +23,27 @@ export class BiometricCronService {
     this.logger.log('Starting scheduled biometric sync for all active devices...');
 
     try {
-      const activeDevices = await db.select()
-        .from(biometricDevices)
-        .where(eq(biometricDevices.isActive, true));
+      let activeDevices: any[] = [];
+      try {
+        activeDevices = await db.select()
+          .from(biometricDevices)
+          .where(eq(biometricDevices.isActive, true));
+      } catch (dbErr: any) {
+        // Silently handle if table is missing or DB is down without breaking server
+        this.logger.warn(`Biometric devices unavailable. Skipping sync. (${dbErr.message})`);
+        return;
+      }
 
       for (const device of activeDevices) {
         try {
           this.logger.log(`Syncing device: ${device.name} (${device.ipAddress})`);
           const result = await this.biometricService.syncLogs(device.id);
           this.logger.log(`Device ${device.name} sync result: ${result.imported} new, ${result.skipped} skipped`);
-        } catch (err) {
+        } catch (err: any) {
           this.logger.error(`Failed to sync device ${device.name}: ${err.message}`);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       this.logger.error(`Critical error in biometric sync cron: ${err.message}`);
     } finally {
       this.isSyncing = false;
