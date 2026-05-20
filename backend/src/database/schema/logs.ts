@@ -61,6 +61,18 @@ export const productionLogs = pgTable('production_logs', {
   boxCount: integer('box_count').default(0),
   secondaryPackagingCount: integer('secondary_packaging_count').default(0).notNull(), // New: Tracking bags/boxes explicitly
 
+  // Packing Station Specifics
+  shrinkWasteWeight: decimal('shrink_waste_weight', { precision: 8, scale: 2 }),
+  sourceBatchNumber: varchar('source_batch_number', { length: 100 }),
+
+  // Label Station Specifics
+  labelStickerWeight: decimal('label_sticker_weight', { precision: 10, scale: 2 }),
+  damagedLabelWeight: decimal('damaged_label_weight', { precision: 10, scale: 2 }),
+  inkChanged: boolean('ink_changed').default(false),
+  inkUsageMl: decimal('ink_usage_ml', { precision: 8, scale: 2 }),
+  makeupChanged: boolean('makeup_changed').default(false),
+  makeupUsageMl: decimal('makeup_usage_ml', { precision: 8, scale: 2 }),
+
   // QC Parameters (Laboratory Telemetry)
   phValue: decimal('ph_value', { precision: 4, scale: 2 }),
   tdsValue: decimal('tds_value', { precision: 6, scale: 2 }),

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Layout, Power } from 'lucide-react';
+import { LogOut, Layout, Power, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OperatorHeaderProps {
@@ -10,6 +10,7 @@ interface OperatorHeaderProps {
   productName?: string;
   onLogout: () => void;
   onChangeStation: () => void;
+  onDowntime: () => void;
   isLoggingOut?: boolean;
   machineStatus: 'RUNNING' | 'IDLE' | 'ERROR';
 }
@@ -61,14 +62,14 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
         <div className={cn(
           "px-3 py-1.5 rounded-full flex items-center gap-2 border shadow-sm transition-all duration-300",
           machineStatus === 'RUNNING' ? "bg-emerald-50/50 border-emerald-200/60 text-emerald-700" :
-          machineStatus === 'ERROR' ? "bg-rose-50/50 border-rose-200/60 text-rose-700" :
-          "bg-gray-50 border-gray-200/60 text-gray-500"
+            machineStatus === 'ERROR' ? "bg-rose-50/50 border-rose-200/60 text-rose-700" :
+              "bg-gray-50 border-gray-200/60 text-gray-500"
         )}>
           <div className={cn(
             "w-1.5 h-1.5 rounded-full",
             machineStatus === 'RUNNING' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" :
-            machineStatus === 'ERROR' ? "bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.4)]" :
-            "bg-gray-400"
+              machineStatus === 'ERROR' ? "bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.4)]" :
+                "bg-gray-400"
           )} />
           <span className="text-[10px] font-semibold tracking-wider uppercase">{machineStatus}</span>
         </div>
@@ -78,9 +79,9 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             <p className="text-[13px] font-semibold text-gray-900 tracking-tight leading-none mb-1">{operatorName}</p>
             <p className="text-[10px] font-medium text-gray-400 tracking-wider uppercase">Active Operator</p>
           </div>
-          
+
           <div className="flex items-center gap-2.5">
-            <button 
+            <button
               onClick={onChangeStation}
               disabled={isLoggingOut}
               className="px-3 py-2.5 bg-white text-indigo-600 font-bold text-xs uppercase tracking-wider rounded-[12px] hover:bg-indigo-50 active:scale-95 transition-all border border-indigo-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -88,7 +89,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             >
               Change Station
             </button>
-            <button 
+            <button
               onClick={onDowntime}
               disabled={isLoggingOut}
               className="p-2.5 bg-white text-gray-700 rounded-[12px] hover:bg-gray-50 active:scale-95 transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -96,7 +97,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             >
               <Power size={18} strokeWidth={2.5} />
             </button>
-            <button 
+            <button
               onClick={onLogout}
               disabled={isLoggingOut}
               className="p-2.5 bg-white text-gray-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 rounded-[12px] transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"

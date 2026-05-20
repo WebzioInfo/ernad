@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, integer, decimal, uniqueIndex, text } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer, boolean, decimal, uniqueIndex, text } from 'drizzle-orm/pg-core';
 import { factories, products } from './master-data';
 import { users } from './users';
 
@@ -73,7 +73,9 @@ export const packagingConfigurations = pgTable('packaging_configurations', {
   bottlesPerCase: integer('bottles_per_case').notNull(),
   shrinkWeightPerCaseKg: decimal('shrink_weight_per_case_kg', { precision: 6, scale: 4 }).notNull(), // e.g. 0.0150 kg
   cartonsPerCase: integer('cartons_per_case').default(0).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 export const billOfMaterials = pgTable('bill_of_materials', {
@@ -92,11 +94,11 @@ export const inventoryLedger = pgTable('inventory_ledger', {
   stockId: uuid('stock_id').references(() => inventoryStock.id, { onDelete: 'cascade' }).notNull(),
   batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'set null' }),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-  
+
   type: varchar('type', { length: 50 }).notNull(), // INWARD, ISSUE, CONSUMPTION, WASTAGE, ADJUSTMENT, RETURN, PRODUCTION_OUTPUT, DISPATCH
   quantityChange: decimal('quantity_change', { precision: 12, scale: 4 }).notNull(),
   balanceAfter: decimal('balance_after', { precision: 12, scale: 4 }).notNull(),
-  
+
   remarks: varchar('remarks', { length: 255 }),
   occurredAt: timestamp('occurred_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),

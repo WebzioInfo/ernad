@@ -66,8 +66,18 @@ export default function OperatorPanel() {
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
+  
+  // New Label Station States
+  const [labelStickerWeight, setLabelStickerWeight] = useState(0);
+  const [damagedLabelWeight, setDamagedLabelWeight] = useState(0);
+  const [inkChanged, setInkChanged] = useState(false);
   const [inkUsage, setInkUsage] = useState(0);
-  const [solventUsage, setSolventUsage] = useState(0);
+  const [makeupChanged, setMakeupChanged] = useState(false);
+  const [makeupUsage, setMakeupUsage] = useState(0);
+  
+  // New Packing Station States
+  const [shrinkWasteWeight, setShrinkWasteWeight] = useState(0);
+
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
 
   const [eventType] = useState('NORMAL_PRODUCTION');
@@ -119,7 +129,7 @@ export default function OperatorPanel() {
 
   const changeStationMutation = useMutation({
     mutationFn: (station: string) => api.post(ENDPOINTS.OPERATOR_SESSIONS.CHANGE_STATION, { station }),
-    onSuccess: (res, newStation) => {
+    onSuccess: (_, newStation) => {
       setShowStationModal(false);
       navigate(`/operator/workspace/${lineId}/${newStation.toLowerCase()}`, { replace: true });
       toast.success(`Station switched to ${newStation}`);
@@ -174,6 +184,16 @@ export default function OperatorPanel() {
     if (currentStationId === 'LABELING') setLabelUsage(total);
   }, [primaryCount, rejectionCount, currentStationId]);
 
+  // Packing Config auto-calculation
+  useEffect(() => {
+    if (currentStationId === 'PACKING' && packingConfigId && packingConfigs) {
+      const config = packingConfigs.find((c: any) => c.id === packingConfigId);
+      if (config && casesProduced > 0) {
+        setPrimaryCount(casesProduced * config.bottlesPerCase);
+      }
+    }
+  }, [casesProduced, packingConfigId, packingConfigs, currentStationId]);
+
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
@@ -215,10 +235,16 @@ export default function OperatorPanel() {
       logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
     } else if (currentStation.id === 'LABELING') {
       logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
-      logEntry.inkUsage = inkUsage;
-      logEntry.solventUsage = solventUsage;
+      logEntry.labelStickerWeight = labelStickerWeight;
+      logEntry.damagedLabelWeight = damagedLabelWeight;
+      logEntry.inkChanged = inkChanged;
+      logEntry.inkUsageMl = inkChanged ? inkUsage : 0;
+      logEntry.makeupChanged = makeupChanged;
+      logEntry.makeupUsageMl = makeupChanged ? makeupUsage : 0;
     } else if (currentStation.id === 'PACKING') {
       logEntry.shrinkWeightUsed = shrinkUsage;
+      logEntry.shrinkWasteWeight = shrinkWasteWeight;
+      logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
       logEntry.packingTypeId = packingConfigId;
@@ -239,6 +265,10 @@ export default function OperatorPanel() {
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
       setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
+      setLabelStickerWeight(0); setDamagedLabelWeight(0);
+      setInkChanged(false); setInkUsage(0);
+      setMakeupChanged(false); setMakeupUsage(0);
+      setShrinkWasteWeight(0);
     } catch (err: any) {
       toast.error('Failed to transmit log. Node error.');
     } finally { setIsSubmitting(false); }
@@ -311,13 +341,16 @@ export default function OperatorPanel() {
               />
 
               <div className="flex flex-col gap-6">
-                <IndustrialNumericInput
-                  label="Rejects / Waste"
-                  value={rejectionCount}
-                  onChange={setRejectionCount}
-                  suffix="Units"
-                />
-                {currentStation.id === 'BLOWING' ? (
+                {currentStation.id !== 'PACKING' && (
+                  <IndustrialNumericInput
+                    label="Rejects / Waste"
+                    value={rejectionCount}
+                    onChange={setRejectionCount}
+                    suffix="Units"
+                  />
+                )}
+                
+                {currentStation.id === 'BLOWING' && (
                   <div className="space-y-1">
                     <IndustrialNumericInput
                       label="Preforms Used (This Log)"
@@ -330,40 +363,72 @@ export default function OperatorPanel() {
                       Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
                     </p>
                   </div>
-                ) : currentStation.id === 'FILLING' || currentStation.id === 'LABELING' ? (
+                )}
+                
+                {currentStation.id === 'FILLING' && (
                   <div className="space-y-1">
                     <IndustrialNumericInput
-                      label={currentStation.id === 'FILLING' ? "Caps Used (This Log)" : "Labels Used (This Log)"}
-                      value={currentStation.id === 'FILLING' ? capUsage : labelUsage}
+                      label="Caps Used (This Log)"
+                      value={capUsage}
                       onChange={() => {}}
                       suffix="Pcs"
                       readOnly
                     />
                     <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
                       Batch Total: <span className="text-slate-900">
-                        {currentStation.id === 'FILLING' 
-                          ? ((activeBatch as any)?.materialTotals?.capTotal || 0) 
-                          : ((activeBatch as any)?.materialTotals?.labelTotal || 0)
-                        } PCS
+                        {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
                       </span>
                     </p>
                   </div>
-                ) : (
-                  <IndustrialNumericInput
-                    label="Bags / Boxes Completed"
-                    value={secondaryPackagingCount}
-                    onChange={setSecondaryPackagingCount}
-                    suffix="Units"
-                  />
+                )}
+                
+                {currentStation.id === 'LABELING' && (
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <IndustrialNumericInput
+                        label="Labels Used (This Log)"
+                        value={labelUsage}
+                        onChange={() => {}}
+                        suffix="Pcs"
+                        readOnly
+                      />
+                    </div>
+                    <IndustrialNumericInput label="Label Sticker Weight" value={labelStickerWeight} onChange={setLabelStickerWeight} suffix="g" />
+                    <IndustrialNumericInput label="Damaged Label Waste" value={damagedLabelWeight} onChange={setDamagedLabelWeight} suffix="g" />
+                    
+                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Consumable Changed</span>
+                      </label>
+                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsage} onChange={setInkUsage} suffix="ml" />}
+                      
+                      <label className="flex items-center gap-3 cursor-pointer pt-2">
+                        <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Make-up Consumable Changed</span>
+                      </label>
+                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsage} onChange={setMakeupUsage} suffix="ml" />}
+                    </div>
+                  </div>
+                )}
+                
+                {currentStation.id === 'PACKING' && (
+                  <div className="space-y-6">
+                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
+                      <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
+                    </div>
+                    
+                    <IndustrialNumericInput label="Cases Produced" value={casesProduced} onChange={setCasesProduced} suffix="Cases" />
+                    <div className="opacity-50 pointer-events-none">
+                      <IndustrialNumericInput label="Total Bottles (Auto Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly />
+                    </div>
+                    
+                    <IndustrialNumericInput label="Shrink Material Used" value={shrinkUsage} onChange={setShrinkUsage} suffix="kg" />
+                    <IndustrialNumericInput label="Shrink Material Waste" value={shrinkWasteWeight} onChange={setShrinkWasteWeight} suffix="kg" />
+                  </div>
                 )}
               </div>
-
-              {currentStation.id === 'LABELING' && (
-                <div className="flex flex-col gap-6">
-                  <IndustrialNumericInput label="Ink (g)" value={inkUsage} onChange={setInkUsage} />
-                  <IndustrialNumericInput label="Solvent (g)" value={solventUsage} onChange={setSolventUsage} />
-                </div>
-              )}
             </div>
 
             <button

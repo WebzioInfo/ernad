@@ -139,6 +139,19 @@ export class ProcessingService {
         materialCost: String(dto.materialCost || 0),
         boxCount: dto.boxCount || 0,
         secondaryPackagingCount: dto.secondaryPackagingCount || 0,
+
+        // New Label Station Fields
+        labelStickerWeight: dto.labelStickerWeight ? String(dto.labelStickerWeight) : null,
+        damagedLabelWeight: dto.damagedLabelWeight ? String(dto.damagedLabelWeight) : null,
+        inkChanged: dto.inkChanged || false,
+        inkUsageMl: dto.inkUsageMl ? String(dto.inkUsageMl) : null,
+        makeupChanged: dto.makeupChanged || false,
+        makeupUsageMl: dto.makeupUsageMl ? String(dto.makeupUsageMl) : null,
+
+        // New Packing Station Fields
+        shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
+        sourceBatchNumber: dto.sourceBatchNumber || null,
+
         // QC Data
         phValue: String(dto.phValue || '0'),
         tdsValue: String(dto.tdsValue || '0'),
@@ -150,6 +163,18 @@ export class ProcessingService {
         for (const mat of dto.materials) {
           await this.processLegacyMaterialUsage(tx, log.id, dto.batchId, factoryId, mat, log.loggedAt);
         }
+      }
+
+      // Traceability Audit for Printer Consumables
+      if (dto.inkChanged || dto.makeupChanged) {
+        await this.auditService.logAction({
+          userId: userId,
+          action: 'CONSUMABLES_CHANGED',
+          entityType: 'production_logs',
+          entityId: String(log.id),
+          payload: { inkChanged: dto.inkChanged, inkUsageMl: dto.inkUsageMl, makeupChanged: dto.makeupChanged, makeupUsageMl: dto.makeupUsageMl },
+          category: 'TELEMETRY'
+        });
       }
 
       // New Enterprise Material Logic
@@ -422,6 +447,19 @@ export class ProcessingService {
       eventType: productionLogs.eventType,
       secondaryPackagingCount: productionLogs.secondaryPackagingCount,
       remarks: productionLogs.remarks,
+      
+      // Label specific
+      labelStickerWeight: productionLogs.labelStickerWeight,
+      damagedLabelWeight: productionLogs.damagedLabelWeight,
+      inkChanged: productionLogs.inkChanged,
+      inkUsageMl: productionLogs.inkUsageMl,
+      makeupChanged: productionLogs.makeupChanged,
+      makeupUsageMl: productionLogs.makeupUsageMl,
+      
+      // Packing specific
+      shrinkWasteWeight: productionLogs.shrinkWasteWeight,
+      sourceBatchNumber: productionLogs.sourceBatchNumber,
+
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
       updatedByName: updatedByUsers.name,
@@ -525,6 +563,19 @@ export class ProcessingService {
       wastageCount: productionLogs.wastageCount,
       eventType: productionLogs.eventType,
       remarks: productionLogs.remarks,
+
+      // Label specific
+      labelStickerWeight: productionLogs.labelStickerWeight,
+      damagedLabelWeight: productionLogs.damagedLabelWeight,
+      inkChanged: productionLogs.inkChanged,
+      inkUsageMl: productionLogs.inkUsageMl,
+      makeupChanged: productionLogs.makeupChanged,
+      makeupUsageMl: productionLogs.makeupUsageMl,
+      
+      // Packing specific
+      shrinkWasteWeight: productionLogs.shrinkWasteWeight,
+      sourceBatchNumber: productionLogs.sourceBatchNumber,
+
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
       updatedAt: productionLogs.updatedAt,

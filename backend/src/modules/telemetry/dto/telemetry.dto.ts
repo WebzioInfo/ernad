@@ -239,6 +239,46 @@ export class TelemetryDto {
   secondaryPackagingCount?: number;
 
   @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  labelStickerWeight?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  damagedLabelWeight?: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  inkChanged?: boolean;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  inkUsageMl?: number;
+
+  @ApiProperty()
+  @IsBoolean()
+  @IsOptional()
+  makeupChanged?: boolean;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  makeupUsageMl?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  shrinkWasteWeight?: number;
+
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  sourceBatchNumber?: string;
+
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   loggedAt: string;
