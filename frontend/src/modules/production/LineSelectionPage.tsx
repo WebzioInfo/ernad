@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
@@ -34,10 +34,7 @@ export default function LineSelectionPage() {
   const [supervisorPin, setSupervisorPin] = useState('');
   const [takeoverPayload, setTakeoverPayload] = useState<any>(null);
 
-  const { data: currentSession, isLoading: isLoadingSession } = useQuery({
-    queryKey: ['current-operator-session'],
-    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.CURRENT)).data,
-  });
+  // Session checks removed to enforce manual station selection
 
   const { data: activeSessions } = useQuery({
     queryKey: ['all-active-sessions'],
@@ -78,28 +75,16 @@ export default function LineSelectionPage() {
   const handleLineSelect = (line: any) => {
     setSelectedLine(line);
     
-    // 1. If user already has an active session on this line, auto-navigate
-    const activeForUser = currentSession?.lineId === line.id ? currentSession : null;
-    if (activeForUser) {
-      navigate(`/operator/workspace/${line.id}/${activeForUser.station.toLowerCase()}`);
-      return;
-    }
+    // 1. Removed auto-navigate. Operator MUST manually select station.
 
     // 2. Transition to station selection step
     setStep('station');
     queryClient.invalidateQueries({ queryKey: ['line', line.id] });
   };
 
-  useEffect(() => {
-    // Only auto-navigate if the user IS an operator. Managers might want to select a different line.
-    const isOperator = user?.roles?.some((r: any) => r.toUpperCase() === 'OPERATOR') || user?.role?.toUpperCase() === 'OPERATOR';
+  // Removed automatic station navigation effect to enforce manual line and station selection.
 
-    if (currentSession && !isLoadingSession && isOperator) {
-      navigate(`/operator/workspace/${currentSession.lineId}/${currentSession.station.toLowerCase()}`, { replace: true });
-    }
-  }, [currentSession, isLoadingSession, navigate, user]);
-
-  const isLoading = isLoadingLines || isLoadingSession || startSessionMutation.isPending;
+  const isLoading = isLoadingLines || startSessionMutation.isPending;
 
   if (isLoading) return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center justify-center gap-6">
