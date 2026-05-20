@@ -248,6 +248,18 @@ const CompactKPICard = ({ label, value, icon: Icon, color, sub, isAlert }: any) 
 
 const ActionTile = ({ icon: Icon, label, path, color }: any) => {
   const navigate = useNavigate();
+  
+  // Tailwind static class mapping to avoid dynamic compilation issues
+  const colorClasses = {
+    indigo: 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white',
+    emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white',
+    violet: 'bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white',
+    amber: 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white',
+    rose: 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white',
+    slate: 'bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white',
+    cyan: 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white',
+  }[color as string] || 'bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white';
+
   return (
     <button
       onClick={() => navigate(path)}
@@ -255,7 +267,7 @@ const ActionTile = ({ icon: Icon, label, path, color }: any) => {
     >
       <div className={cn(
         "w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm",
-        `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white`
+        colorClasses
       )}>
         <Icon className="w-5 h-5" />
       </div>

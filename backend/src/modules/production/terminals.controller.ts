@@ -41,11 +41,6 @@ export class TerminalsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify operator PIN for shared terminal usage' })
   async terminalVerify(@Req() req: any, @Body() body: { userId: string; pin: string }) {
-    // SECURITY: Reject if user is already authenticated as a MANAGER
-    const existingUser = req.user;
-    if (existingUser && existingUser.role === 'MANAGER') {
-      throw new BadRequestException('Security Violation: Managers cannot access operator authentication flows.');
-    }
     return await this.authService.verifyTerminalPin(body.userId, body.pin);
   }
 
@@ -54,11 +49,6 @@ export class TerminalsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Complete Terminal Authentication (PIN Verify + Session Init + JWT)' })
   async terminalLogin(@Req() req: any, @Body() dto: TerminalLoginDto) {
-    // SECURITY: Reject if user is already authenticated as a MANAGER
-    const existingUser = req.user;
-    if (existingUser && existingUser.role === 'MANAGER') {
-      throw new BadRequestException('Security Violation: Managers cannot initiate terminal production sessions.');
-    }
     return await this.authService.terminalLogin(
       dto.operatorId, 
       dto.pin, 

@@ -41,23 +41,33 @@ export class AuthService {
       let isMatch = false;
 
       try {
-        if (type) {
-          if (type === 'PASSWORD') {
-            if (!user.passwordHash) throw new UnauthorizedException('Password access not configured.');
-            isMatch = await bcrypt.compare(credential, user.passwordHash);
-          } else {
-            if (!user.pinCode) throw new UnauthorizedException('PIN access not configured.');
-            isMatch = await bcrypt.compare(credential, user.pinCode);
+        if (type === 'PIN') {
+          // Try PIN first, fallback to password
+          if (user.pinCode) {
+            isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
+          }
+          if (!isMatch && user.passwordHash) {
+            isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
+          }
+          if (!isMatch && !user.pinCode && !user.passwordHash) {
+            throw new UnauthorizedException('PIN or password access not configured.');
           }
         } else {
+          // Try password first, fallback to PIN
           if (user.passwordHash) {
-            isMatch = await bcrypt.compare(credential, user.passwordHash);
+            isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
           }
           if (!isMatch && user.pinCode) {
-            isMatch = await bcrypt.compare(credential, user.pinCode);
+            isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
+          }
+          if (!isMatch && !user.passwordHash && !user.pinCode) {
+            throw new UnauthorizedException('Password or PIN access not configured.');
           }
         }
       } catch (bcryptErr: any) {
+        if (bcryptErr instanceof UnauthorizedException) {
+          throw bcryptErr;
+        }
         this.logger.error(`[AUTH_TRACE] CRITICAL: Bcrypt module failure: ${bcryptErr.message}`);
         throw new UnauthorizedException('Security validation failure.');
       }
@@ -296,7 +306,8 @@ export class AuthService {
       'OPERATOR_LABELING', 
       'OPERATOR_PACKING',
       'SUPER_ADMIN', // Keep emergency override
-      'ADMIN'        // Keep emergency override
+      'ADMIN',        // Keep emergency override
+      'MANAGER'       // Allow managers to access terminal
     ];
 
     const isOperator = roleSlugs.some(r => allowedOperatorRoles.includes(r));

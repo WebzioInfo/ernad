@@ -19,7 +19,9 @@ export default function DashboardLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [isSidebarOpen, setSidebarOpen] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth >= 768 : true;
+  });
 
 
 
@@ -41,6 +43,13 @@ export default function DashboardLayout() {
     if (updated.timeRange !== 'live') params.timeRange = updated.timeRange;
     setSearchParams(params);
   };
+
+  useEffect(() => {
+    // Close sidebar on mobile/tablet when route changes
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const lineId = searchParams.get('lineId');
@@ -113,11 +122,21 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-[#FDFDFD]">
       <CommandPalette />
 
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`
-        ${isSidebarOpen ? 'w-72' : 'w-20'} 
-        bg-slate-900 transition-all duration-300 ease-in-out flex flex-col z-30
-      `}>
+      <aside className={cn(
+        "bg-slate-900 transition-all duration-300 ease-in-out flex flex-col z-40 fixed md:relative inset-y-0 left-0 h-full",
+        isSidebarOpen 
+          ? "w-72 translate-x-0" 
+          : "w-72 -translate-x-full md:w-20 md:translate-x-0"
+      )}>
         <div className="h-24 flex items-center px-6">
           <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 group">
             <Command className="w-7 h-7" />
@@ -227,7 +246,7 @@ export default function DashboardLayout() {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Modern Header */}
-        <header className="h-24 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 z-20">
+        <header className="h-24 bg-white/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 md:px-10 z-20">
           <div className="flex items-center gap-6">
             <button
               onClick={() => setSidebarOpen(!isSidebarOpen)}
@@ -285,7 +304,7 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <div id="main-scroll-container" className="flex-1 overflow-y-auto bg-[#FAFBFF] p-10 relative custom-scrollbar">
+        <div id="main-scroll-container" className="flex-1 overflow-y-auto bg-[#FAFBFF] p-4 sm:p-6 md:p-10 relative custom-scrollbar">
           <div className="max-w-[1700px] mx-auto">
             <AnimatePresence mode="wait">
               <motion.div
