@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Req, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -58,14 +58,14 @@ export class InventoryController {
   @Get('packaging/:productId')
   @Roles('OPERATOR', 'MANAGER', 'ADMIN')
   @ApiOperation({ summary: 'Get packaging configurations for a product' })
-  async getPackagingConfigs(@Param('productId') productId: string) {
+  async getPackagingConfigs(@Param('productId', ParseUUIDPipe) productId: string) {
     return await this.inventoryService.getPackagingConfigs(productId);
   }
 
   @Get(':id/ledger')
   @Permissions('inventory:view')
   @ApiOperation({ summary: 'Get transaction ledger for a stock item' })
-  async getMaterialLedger(@Param('id') id: string) {
+  async getMaterialLedger(@Param('id', ParseUUIDPipe) id: string) {
     return await this.inventoryService.getMaterialLedger(id);
   }
 

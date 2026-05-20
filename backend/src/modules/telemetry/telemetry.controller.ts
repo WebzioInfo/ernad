@@ -1,7 +1,7 @@
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
-import { Controller, Post, Body, UseGuards, UseInterceptors, Request, Get, Param, Patch, Delete, Query } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, UseInterceptors, Request, Get, Param, Patch, Delete, Query, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { TelemetryDto } from './dto/telemetry.dto';
@@ -34,14 +34,14 @@ export class TelemetryController {
   @Get('reconciliation/:batchId')
   @Permissions('analytics:view')
   @ApiOperation({ summary: 'Get material vs production reconciliation for a batch' })
-  async getReconciliation(@Param('batchId') batchId: string) {
+  async getReconciliation(@Param('batchId', ParseUUIDPipe) batchId: string) {
     return this.reconciliationService.getBatchReconciliation(batchId);
   }
 
   @Get('history/:batchId/:station')
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Get telemetry history for a batch and station' })
-  async getHistory(@Param('batchId') batchId: string, @Param('station') station: string) {
+  async getHistory(@Param('batchId', ParseUUIDPipe) batchId: string, @Param('station') station: string) {
     try {
       return await this.ingestionService.getLogHistory(batchId, station);
     } catch (err) {
@@ -52,7 +52,7 @@ export class TelemetryController {
   @Get('active-events/:batchId')
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Get active downtime events for a batch' })
-  async getActiveEvents(@Param('batchId') batchId: string) {
+  async getActiveEvents(@Param('batchId', ParseUUIDPipe) batchId: string) {
     try {
       return await this.processingService.getActiveEvents(batchId);
     } catch (err) {
@@ -86,10 +86,10 @@ export class TelemetryController {
   @ApiOperation({ summary: 'Update a production log entry (Manager only)' })
   async patchLog(
     @Request() req,
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() dto: { primaryCount?: number; wastageCount?: number; remarks?: string }
   ) {
-    return this.processingService.updateLog(Number(id), req.user.sub, dto);
+    return this.processingService.updateLog(id, req.user.sub, dto);
   }
 
   @Delete('logs/:id')
@@ -97,9 +97,9 @@ export class TelemetryController {
   @ApiOperation({ summary: 'Void a production log entry' })
   async voidLog(
     @Request() req,
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() body: { reason: string }
   ) {
-    return this.processingService.voidLog(Number(id), req.user.sub, body.reason);
+    return this.processingService.voidLog(id, req.user.sub, body.reason);
   }
 }

@@ -15,6 +15,10 @@ export class ProductionReconciliationService {
    * Compares expected material consumption (BOM) vs actual recorded consumption.
    */
   async getBatchReconciliation(batchId: string) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!batchId || !UUID_REGEX.test(batchId)) {
+      return null;
+    }
     // 1. Get Batch Info & Totals
     const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
     const [totals] = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batchId)).limit(1);

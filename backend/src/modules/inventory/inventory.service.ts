@@ -57,6 +57,10 @@ export class InventoryService {
   }
 
   async getMaterialLedger(stockId: string) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!stockId || !UUID_REGEX.test(stockId)) {
+      return [];
+    }
     return await db.select()
       .from(inventoryTransactions)
       .where(eq(inventoryTransactions.stockId, stockId))
@@ -65,6 +69,10 @@ export class InventoryService {
   }
 
   async getPackagingConfigs(productId: string) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!productId || !UUID_REGEX.test(productId)) {
+      return [];
+    }
     return await db.select()
       .from(packagingConfigurations)
       .where(eq(packagingConfigurations.productId, productId));
