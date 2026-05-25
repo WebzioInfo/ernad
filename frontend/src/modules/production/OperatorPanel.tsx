@@ -57,12 +57,23 @@ export default function OperatorPanel() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showStationModal, setShowStationModal] = useState(false);
 
+  // Shift Handover States
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [incomingOperatorId, setIncomingOperatorId] = useState('');
+  const [incomingOperatorPin, setIncomingOperatorPin] = useState('');
+  const [handoverNotes, setHandoverNotes] = useState('');
+  const [handoverIssues, setHandoverIssues] = useState('');
+  const [materialStateConfirmed, setMaterialStateConfirmed] = useState(false);
+  const [machineStatusAcknowledged, setMachineStatusAcknowledged] = useState(false);
+  const [isSubmittingHandover, setIsSubmittingHandover] = useState(false);
+
   // Unified Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
   const [rejectionCount, setRejectionCount] = useState(0);
   const [secondaryPackagingCount, setSecondaryPackagingCount] = useState(0); // Bag/Box Count
 
   // Station Specific States
+  const [selectedCapProductId, setSelectedCapProductId] = useState('');
   const [preformUsage, setPreformUsage] = useState(0);
   const [capUsage, setCapUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
@@ -140,11 +151,104 @@ export default function OperatorPanel() {
     retry: 1
   });
 
+  const { data: products } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data,
+  });
+
+  const capProducts = (products || []).filter((product: any) =>
+    String(product.category || '').toLowerCase() === 'caps'
+  );
+
+  // Fetch operators list for the handover selector
+  const { data: operatorsList } = useQuery({
+    queryKey: ['operators-list'],
+    queryFn: async () => (await api.get(ENDPOINTS.TERMINALS.OPERATORS)).data,
+  });
+
+  // Fetch recent handover details
+  const { data: recentHandover, refetch: refetchRecentHandover } = useQuery({
+    queryKey: ['recent-handover', lineId, currentStation.id],
+    queryFn: async () => {
+      if (!lineId || !currentStation.id) return null;
+      try {
+        const response = await api.get(`/operator-sessions/handover/recent/${lineId}/${currentStation.id}`);
+        return response.data;
+      } catch (err) {
+        return null;
+      }
+    },
+    enabled: !!lineId && !!currentStation.id,
+    refetchInterval: 15000,
+  });
+
+  const handleHandoverSubmit = async () => {
+    if (!incomingOperatorId) {
+      toast.error('Please select the incoming operator.');
+      return;
+    }
+    if (!incomingOperatorPin || incomingOperatorPin.length !== 4) {
+      toast.error('Please enter a 4-digit PIN for verification.');
+      return;
+    }
+    if (incomingOperatorId === activeOperator?.id) {
+      toast.error('Outgoing and incoming operators must be different.');
+      return;
+    }
+    if (!materialStateConfirmed) {
+      toast.error('Please confirm you verified material stock assignments.');
+      return;
+    }
+    if (!machineStatusAcknowledged) {
+      toast.error('Please confirm you acknowledged the machine status.');
+      return;
+    }
+
+    try {
+      setIsSubmittingHandover(true);
+      const response = await api.post('/operator-sessions/handover', {
+        incomingOperatorId,
+        incomingOperatorPin,
+        notes: handoverNotes,
+        pendingIssues: handoverIssues,
+        materialStateConfirmed,
+        machineStatusAcknowledged
+      });
+
+      const { access_token, user: newUser } = response.data;
+
+      // Update authentication store
+      useAuthStore.getState().setAuth(access_token, newUser);
+
+      // Invalidate query caches
+      queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-handover'] });
+      refetchRecentHandover();
+
+      // Reset form states
+      setIncomingOperatorId('');
+      setIncomingOperatorPin('');
+      setHandoverNotes('');
+      setHandoverIssues('');
+      setMaterialStateConfirmed(false);
+      setMachineStatusAcknowledged(false);
+
+      // Update operator state in active UI and close modal
+      setActiveOperator(newUser);
+      setShowHandoverModal(false);
+      toast.success(`Shift handover successful! Now logged in as ${newUser.name}`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Verification failure or handover rejected.');
+    } finally {
+      setIsSubmittingHandover(false);
+    }
+  };
+
   const { data: history, refetch: refetchHistory } = useQuery({
     queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
     queryFn: async () => {
       if (!activeBatch?.batch?.id) return [];
-      return (await api.get(ENDPOINTS.TELEMETRY.HISTORY(activeBatch.batch.id, currentStation.id))).data;
+      return (await api.get(`${ENDPOINTS.TELEMETRY.HISTORY(activeBatch.batch.id, currentStation.id)}?operatorView=true`)).data;
     },
     enabled: !!activeBatch?.batch?.id,
     refetchInterval: 5000,
@@ -175,8 +279,10 @@ export default function OperatorPanel() {
     if (isSubmitting) return;
 
     if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
+    if (currentStation.id === 'FILLING' && !selectedCapProductId) return toast.error('Please select the Caps product.');
 
     const currentBatch = activeBatch?.batch;
+    const selectedCapProduct = capProducts.find((product: any) => product.id === selectedCapProductId);
     const logEntry: any = {
       requestId: uuidv4(),
       batchId: currentBatch?.id,
@@ -205,6 +311,12 @@ export default function OperatorPanel() {
       logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
     } else if (currentStation.id === 'FILLING') {
       logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
+      logEntry.materials = selectedCapProduct ? [{
+        materialName: selectedCapProduct.name,
+        quantity: logEntry.capUsage,
+        unit: 'Pcs',
+        waste: rejectionCount,
+      }] : [];
     } else if (currentStation.id === 'LABELING') {
       logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
       logEntry.labelStickerWeight = labelStickerWeight;
@@ -234,7 +346,7 @@ export default function OperatorPanel() {
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
-      setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage('');
+      setPreformUsage(0); setCapUsage(0); setSelectedCapProductId(''); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setLabelStickerWeight(0); setDamagedLabelWeight(0);
       setInkChanged(false); setInkUsageMl(0);
@@ -293,6 +405,8 @@ export default function OperatorPanel() {
         onChangeStation={() => setShowStationModal(true)}
         onLogout={() => endSessionMutation.mutate()}
         onDowntime={() => toast.info('Downtime Modal: Coming Soon')}
+        onHandover={() => setShowHandoverModal(true)}
+        recentHandover={recentHandover}
       />
 
       <StationWorkspace
@@ -337,19 +451,44 @@ export default function OperatorPanel() {
                 )}
                 
                 {currentStation.id === 'FILLING' && (
-                  <div className="space-y-1">
-                    <IndustrialNumericInput
-                      label="Caps Used (This Log)"
-                      value={capUsage}
-                      onChange={() => {}}
-                      suffix="Pcs"
-                      readOnly
-                    />
-                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
-                      Batch Total: <span className="text-slate-900">
-                        {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
-                      </span>
-                    </p>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                        Caps Product
+                      </label>
+                      <select
+                        value={selectedCapProductId}
+                        onChange={e => setSelectedCapProductId(e.target.value)}
+                        className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500/40 transition-all"
+                      >
+                        <option value="">Select Caps product...</option>
+                        {capProducts.map((product: any) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name}{product.sku ? ` - ${product.sku}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {capProducts.length === 0 && (
+                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
+                          No products found with category Caps.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <IndustrialNumericInput
+                        label="Caps Used (This Log)"
+                        value={capUsage}
+                        onChange={() => {}}
+                        suffix="Pcs"
+                        readOnly
+                      />
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                        Batch Total: <span className="text-slate-900">
+                          {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 )}
                 
@@ -506,6 +645,124 @@ export default function OperatorPanel() {
               className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
             >
               Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showHandoverModal} onOpenChange={setShowHandoverModal}>
+        <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-4 mb-6">
+            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-slate-900">
+              Shift <span className="text-emerald-600">Handover</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              Transfer custody of the active production station. Counts, batch state, and telemetry will remain uninterrupted.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Outgoing Operator Notes */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Handover Notes</label>
+              <textarea
+                value={handoverNotes}
+                onChange={e => setHandoverNotes(e.target.value)}
+                placeholder="Describe current station run observations, parameters, heater zones..."
+                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all resize-none"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Pending Issues / Maintenance remarks</label>
+              <input
+                type="text"
+                value={handoverIssues}
+                onChange={e => setHandoverIssues(e.target.value)}
+                placeholder="List any mechanical faults or raw material delays..."
+                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all"
+              />
+            </div>
+
+            <hr className="border-slate-100" />
+
+            {/* Incoming Operator Identification */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Incoming Operator Auth</h4>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Select Operator</label>
+                  <select
+                    value={incomingOperatorId}
+                    onChange={e => setIncomingOperatorId(e.target.value)}
+                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all"
+                  >
+                    <option value="">Choose Operator...</option>
+                    {operatorsList?.filter((op: any) => op.id !== activeOperator?.id).map((op: any) => (
+                      <option key={op.id} value={op.id}>{op.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Enter Security PIN</label>
+                  <input
+                    type="password"
+                    maxLength={4}
+                    value={incomingOperatorPin}
+                    onChange={e => setIncomingOperatorPin(e.target.value)}
+                    placeholder="****"
+                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-center text-lg font-black text-slate-900 outline-none tracking-widest focus:border-emerald-500 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-slate-100" />
+
+            {/* Checkbox Acknowledgment */}
+            <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={materialStateConfirmed}
+                  onChange={e => setMaterialStateConfirmed(e.target.checked)}
+                  className="w-5 h-5 rounded text-emerald-600 mt-0.5 border-slate-300 focus:ring-emerald-500"
+                />
+                <span className="text-[11px] font-bold text-slate-700 leading-normal">
+                  I confirm that physical raw material counts (preforms/caps/shrink rolls) align with the counts recorded in the terminal.
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={machineStatusAcknowledged}
+                  onChange={e => setMachineStatusAcknowledged(e.target.checked)}
+                  className="w-5 h-5 rounded text-emerald-600 mt-0.5 border-slate-300 focus:ring-emerald-500"
+                />
+                <span className="text-[11px] font-bold text-slate-700 leading-normal">
+                  I acknowledge the current machine running state and verified that all safety shields are active.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-8 flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowHandoverModal(false)}
+              className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={isSubmittingHandover}
+              onClick={handleHandoverSubmit}
+              className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
+            >
+              {isSubmittingHandover ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Handover'}
             </Button>
           </div>
         </DialogContent>

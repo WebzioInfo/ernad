@@ -120,7 +120,7 @@ export class IngestionService {
     }
   }
 
-  async getLogHistory(batchId: string, station: string) {
-    return this.processingService.getLogHistory(batchId, station);
+  async getLogHistory(batchId: string, station: string, operatorView = false) {
+    return this.processingService.getLogHistory(batchId, station, 50, operatorView);
   }
 }

@@ -34,7 +34,14 @@ async function main() {
   } as any;
   const redisService = new RedisService(mockConfigService);
   const auditService = new AuditService();
-  const sessionService = new OperatorSessionsService(redisService, auditService);
+  const mockEventsService = {
+    emitProductionUpdated: async () => {},
+    emitShiftHandover: async () => {},
+  } as any;
+  const mockJwtService = {
+    signAsync: async () => 'mock-token'
+  } as any;
+  const sessionService = new OperatorSessionsService(redisService, auditService, mockEventsService, mockJwtService);
   
   // Force clean existing active sessions on this station to avoid interference
   await db.update(operatorSessions).set({ isActive: false }).where(and(eq(operatorSessions.lineId, lineId), eq(operatorSessions.station, station)));

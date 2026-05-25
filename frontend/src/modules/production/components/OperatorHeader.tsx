@@ -11,8 +11,13 @@ interface OperatorHeaderProps {
   onLogout: () => void;
   onChangeStation: () => void;
   onDowntime: () => void;
+  onHandover: () => void;
   isLoggingOut?: boolean;
   machineStatus: 'RUNNING' | 'IDLE' | 'ERROR';
+  recentHandover?: {
+    outgoingOperatorName: string;
+    handoverTime: string;
+  } | null;
 }
 
 export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
@@ -24,8 +29,10 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
   onLogout,
   onDowntime,
   onChangeStation,
+  onHandover,
   isLoggingOut,
-  machineStatus
+  machineStatus,
+  recentHandover
 }) => {
   return (
     <header className="px-8 py-5 flex items-center justify-between">
@@ -78,9 +85,22 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
           <div className="text-right mr-2 hidden sm:block">
             <p className="text-[13px] font-semibold text-gray-900 tracking-tight leading-none mb-1">{operatorName}</p>
             <p className="text-[10px] font-medium text-gray-400 tracking-wider uppercase">Active Operator</p>
+            {recentHandover && (
+              <p className="text-[9px] font-bold text-indigo-600 tracking-wide uppercase mt-1">
+                Prev: {recentHandover.outgoingOperatorName} ({new Date(recentHandover.handoverTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={onHandover}
+              disabled={isLoggingOut}
+              className="px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-[12px] active:scale-95 transition-all shadow-[0_2px_8px_rgba(16,185,129,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Shift Handover"
+            >
+              Shift Handover
+            </button>
             <button
               onClick={onChangeStation}
               disabled={isLoggingOut}

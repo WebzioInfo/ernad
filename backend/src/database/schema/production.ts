@@ -1,4 +1,4 @@
-import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, timestamp, pgEnum, index, jsonb, varchar, integer, decimal, bigserial, uniqueIndex, boolean, text } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { factories, productionLines, productBrands, products } from './master-data';
 import { terminals } from './terminals';
@@ -156,5 +156,42 @@ export const downtimeLogs = pgTable('downtime_logs', {
     index('idx_downtime_active').on(table.batchId, table.endTime),
     index('idx_downtime_time').on(table.startTime), // New: Critical for analytics performance
     index('idx_downtime_deleted').on(table.deletedAt),
+  ];
+});
+
+export const machineStates = pgTable('machine_states', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
+  station: varchar('station', { length: 50 }).notNull(),
+  state: varchar('state', { length: 50 }).default('STOPPED').notNull(), // RUNNING, STOPPED, CHANGEOVER, MAINTENANCE, FAULT
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    uniqueIndex('idx_machine_states_line_station').on(table.lineId, table.station)
+  ];
+});
+
+export const shiftHandovers = pgTable('shift_handovers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
+  station: varchar('station', { length: 50 }).notNull(),
+  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
+  outgoingOperatorId: uuid('outgoing_operator_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  incomingOperatorId: uuid('incoming_operator_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  handoverTime: timestamp('handover_time').defaultNow().notNull(),
+  outgoingSessionId: uuid('outgoing_session_id').references(() => operatorSessions.id, { onDelete: 'set null' }),
+  incomingSessionId: uuid('incoming_session_id').references(() => operatorSessions.id, { onDelete: 'set null' }),
+  notes: text('notes'),
+  pendingIssues: text('pending_issues'),
+  machineStateSnapshot: varchar('machine_state_snapshot', { length: 50 }),
+  productionCountSnapshot: integer('production_count_snapshot').default(0).notNull(),
+  wasteCountSnapshot: integer('waste_count_snapshot').default(0).notNull(),
+  materialStateConfirmed: boolean('material_state_confirmed').default(false).notNull(),
+  machineStatusAcknowledged: boolean('machine_status_acknowledged').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_shift_handovers_line_station').on(table.lineId, table.station),
+    index('idx_shift_handovers_batch').on(table.batchId),
   ];
 });

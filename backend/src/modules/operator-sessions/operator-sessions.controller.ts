@@ -1,11 +1,11 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Version, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Version, ForbiddenException, BadRequestException, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OperatorSessionsService } from './operator-sessions.service';
 import { UsersService } from '../users/users.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { StartSessionDto } from './dto/operator-sessions.dto';
+import { StartSessionDto, ShiftHandoverDto } from './dto/operator-sessions.dto';
 import { Public } from '../auth/public.decorator';
 
 @ApiTags('Operator Sessions')
@@ -86,5 +86,22 @@ export class OperatorSessionsController {
       throw new BadRequestException('Station is required');
     }
     return await this.sessionService.changeStation(req.user.sub, dto.station);
+  }
+
+  @Post('handover')
+  @Roles('OPERATOR', 'SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Handover shift to another operator' })
+  async handover(@Req() req: any, @Body() dto: ShiftHandoverDto) {
+    return await this.sessionService.initiateHandover(req.user.sub, dto);
+  }
+
+  @Get('handover/recent/:lineId/:station')
+  @Roles('OPERATOR', 'SUPER_ADMIN', 'ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get most recent handover for a station and line' })
+  async getRecentHandover(@Param('lineId') lineId: string, @Param('station') station: string) {
+    if (!lineId || !station) {
+      throw new BadRequestException('Line ID and station are required');
+    }
+    return await this.sessionService.getRecentHandover(lineId, station);
   }
 }

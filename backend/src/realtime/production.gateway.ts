@@ -43,6 +43,12 @@ export class ProductionEventsService {
     await this.realtimeService.emit('managers', 'PRODUCTION_UPDATED', { batchId, lineId });
   }
 
+  async emitShiftHandover(handover: any) {
+    this.logger.log(`Emitting shift handover for line_${handover.lineId} via Pusher`);
+    await this.realtimeService.emit(`line_${handover.lineId}`, 'shift_handover', handover);
+    await this.realtimeService.emit('managers', 'global_log_update', { lineId: handover.lineId });
+  }
+
   async emitNotification(notification: any) {
     // RED TEAM FIX: Sanitize notification payload for different channels
     const privilegedKeywords = ['ADMIN', 'SUPER', 'PASSWORD', 'PIN', 'SECRET'];

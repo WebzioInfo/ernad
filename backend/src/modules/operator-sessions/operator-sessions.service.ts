@@ -1,16 +1,23 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
-import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines } from '../../database/schema';
+import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines, machineStates, shiftHandovers, batchTotals, roles, userRoles, permissions, rolePermissions } from '../../database/schema';
 import { eq, and, desc, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { RedisService } from '../../providers/redis/redis.service';
 import { AuditService } from '../audit/audit.service';
+import { ProductionEventsService } from '../../realtime/production.gateway';
+import { ShiftHandoverDto } from './dto/operator-sessions.dto';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class OperatorSessionsService {
   private readonly logger = new Logger(OperatorSessionsService.name);
   constructor(
     private readonly redis: RedisService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly eventsService: ProductionEventsService,
+    private readonly jwtService: JwtService
   ) {}
 
   async getTerminalById(id: string) {
@@ -363,5 +370,285 @@ export class OperatorSessionsService {
     }
 
     return closedCount;
+  }
+
+  async initiateHandover(outgoingUserId: string, dto: ShiftHandoverDto) {
+    this.logger.log(`[HANDOVER_TRACE] Initiating shift handover. Outgoing: ${outgoingUserId}, Incoming: ${dto.incomingOperatorId}`);
+
+    if (outgoingUserId === dto.incomingOperatorId) {
+      throw new BadRequestException('Outgoing and incoming operators must be different.');
+    }
+
+    return await db.transaction(async (tx) => {
+      // 1. Get active session of outgoing operator
+      const [outgoingSession] = await tx.select().from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.userId, outgoingUserId),
+          eq(operatorSessions.isActive, true)
+        ))
+        .limit(1);
+
+      if (!outgoingSession) {
+        throw new BadRequestException('Outgoing operator does not have an active session.');
+      }
+
+      // 2. Verify incoming operator ID and PIN
+      const [incomingUser] = await tx.select().from(usersTable)
+        .where(eq(usersTable.id, dto.incomingOperatorId))
+        .limit(1);
+
+      if (!incomingUser || !incomingUser.isActive) {
+        throw new BadRequestException('Invalid or inactive incoming operator.');
+      }
+
+      const isPinValid = await bcrypt.compare(dto.incomingOperatorPin, incomingUser.pinCode);
+      if (!isPinValid) {
+        throw new BadRequestException('Invalid PIN code for incoming operator.');
+      }
+
+      // 3. Resolve active batch context
+      let batchId = outgoingSession.batchId;
+      if (!batchId) {
+        // Fallback: find active batch on the line
+        const [activeBatch] = await tx.select({ id: productionBatches.id }).from(productionBatches)
+          .where(and(
+            eq(productionBatches.lineId, outgoingSession.lineId),
+            or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER'))
+          ))
+          .orderBy(desc(productionBatches.startTime))
+          .limit(1);
+        batchId = activeBatch?.id || null;
+      }
+
+      if (!batchId) {
+        throw new BadRequestException('No active production batch found for this line.');
+      }
+
+      // 4. Capture current production and waste snapshots from batchTotals
+      let productionCount = 0;
+      let wasteCount = 0;
+
+      const [totals] = await tx.select().from(batchTotals)
+        .where(eq(batchTotals.batchId, batchId))
+        .limit(1);
+
+      if (totals) {
+        const stationUpper = outgoingSession.station.toUpperCase();
+        if (stationUpper === 'BLOWING') {
+          productionCount = totals.blowingTotal;
+        } else if (stationUpper === 'FILLING') {
+          productionCount = totals.fillingTotal;
+        } else if (stationUpper === 'LABELING') {
+          productionCount = totals.labelingTotal;
+        } else if (stationUpper === 'PACKING') {
+          productionCount = totals.packingTotal;
+        }
+        wasteCount = totals.scrapTotal;
+      }
+
+      // 5. Retrieve current machine state
+      const [mState] = await tx.select().from(machineStates)
+        .where(and(
+          eq(machineStates.lineId, outgoingSession.lineId),
+          eq(machineStates.station, outgoingSession.station.toUpperCase())
+        ))
+        .limit(1);
+      const machineStateSnapshot = mState?.state || 'STOPPED';
+
+      // 6. Terminate outgoing operator session
+      await tx.update(operatorSessions)
+        .set({
+          isActive: false,
+          endTime: new Date(),
+          endedBy: outgoingUserId,
+          endReason: 'handover'
+        })
+        .where(eq(operatorSessions.id, outgoingSession.id));
+
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${outgoingUserId}`).catch(() => {});
+      }
+
+      // 7. Auto-start new operator session for incoming operator
+      const [incomingSession] = await tx.insert(operatorSessions).values({
+        userId: dto.incomingOperatorId,
+        lineId: outgoingSession.lineId,
+        station: outgoingSession.station,
+        batchId,
+        shiftId: outgoingSession.shiftId,
+        factoryId: outgoingSession.factoryId,
+        terminalId: outgoingSession.terminalId,
+        isActive: true,
+        startTime: new Date(),
+        lastActivityAt: new Date()
+      }).returning();
+
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${dto.incomingOperatorId}`).catch(() => {});
+      }
+
+      // 8. Save shift handover audit log
+      const [handover] = await tx.insert(shiftHandovers).values({
+        lineId: outgoingSession.lineId,
+        station: outgoingSession.station,
+        batchId,
+        outgoingOperatorId: outgoingUserId,
+        incomingOperatorId: dto.incomingOperatorId,
+        handoverTime: new Date(),
+        outgoingSessionId: outgoingSession.id,
+        incomingSessionId: incomingSession.id,
+        notes: dto.notes || null,
+        pendingIssues: dto.pendingIssues || null,
+        machineStateSnapshot,
+        productionCountSnapshot: productionCount,
+        wasteCountSnapshot: wasteCount,
+        materialStateConfirmed: dto.materialStateConfirmed,
+        machineStatusAcknowledged: dto.machineStatusAcknowledged,
+      }).returning();
+
+      // 9. Log action in Audit Ledger
+      await this.auditService.logAction({
+        userId: outgoingUserId,
+        action: 'SHIFT_HANDOVER',
+        category: 'PRODUCTION',
+        payload: {
+          lineId: outgoingSession.lineId,
+          station: outgoingSession.station,
+          batchId,
+          incomingOperatorId: dto.incomingOperatorId,
+          productionCount,
+          wasteCount,
+          machineStateSnapshot,
+        }
+      });
+
+      // 10. Broadcast Pusher Events
+      try {
+        await this.eventsService.emitProductionUpdated(batchId, outgoingSession.lineId);
+        await this.eventsService.emitShiftHandover({
+          id: handover.id,
+          lineId: outgoingSession.lineId,
+          station: outgoingSession.station,
+          batchId,
+          outgoingOperatorId: outgoingUserId,
+          incomingOperatorId: dto.incomingOperatorId,
+          handoverTime: handover.handoverTime,
+          notes: handover.notes,
+          pendingIssues: handover.pendingIssues,
+          machineStateSnapshot,
+          productionCountSnapshot: productionCount,
+          wasteCountSnapshot: wasteCount,
+        });
+      } catch (err) {
+        this.logger.error('Failed to broadcast shift handover events', err);
+      }
+
+      // 9. Fetch roles and permissions of incoming user to generate JWT token
+      const userRolesResult = await tx.select({
+        id: roles.id,
+        slug: roles.slug,
+      })
+      .from(roles)
+      .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
+      .where(eq(userRoles.userId, incomingUser.id));
+
+      const roleSlugs = Array.from(new Set(userRolesResult.map(r => {
+        const slug = (r.slug || '').toUpperCase().trim();
+        if (slug === 'GENERIC OPERATOR') return 'OPERATOR';
+        if (slug === 'PRODUCTION MANAGER') return 'MANAGER';
+        if (slug === 'SYSTEM_ADMIN') return 'SUPER_ADMIN';
+        if (slug.includes('SUPER')) return 'SUPER_ADMIN';
+        if (slug.includes('ADMIN')) return 'ADMIN';
+        if (slug.includes('MANAGER')) return 'MANAGER';
+        return 'OPERATOR';
+      })));
+
+      const sortedRoles = [...roleSlugs].sort((a, b) => {
+        const order = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
+        let idxA = order.indexOf(a);
+        let idxB = order.indexOf(b);
+        if (idxA === -1) idxA = 999;
+        if (idxB === -1) idxB = 999;
+        return idxA - idxB;
+      });
+
+      const effectiveRole = sortedRoles.find(r => r === 'OPERATOR') || sortedRoles[0] || 'OPERATOR';
+
+      let permissionsSlugs: string[] = [];
+      if (userRolesResult.length > 0) {
+        const perms = await tx.select({
+          slug: permissions.slug,
+        })
+        .from(permissions)
+        .innerJoin(rolePermissions, eq(rolePermissions.permissionId, permissions.id))
+        .where(or(...userRolesResult.map(r => eq(rolePermissions.roleId, r.id))));
+        
+        permissionsSlugs = Array.from(new Set(perms.map(p => p.slug)));
+      }
+
+      const payload = {
+        sub: incomingUser.id,
+        id: incomingUser.id,
+        username: incomingUser.username,
+        role: effectiveRole,
+        roles: sortedRoles,
+        permissions: permissionsSlugs,
+        name: incomingUser.name,
+        factoryId: incomingUser.factoryId,
+        sessionId: incomingSession.id,
+        deviceId: undefined
+      };
+
+      const token = await this.jwtService.signAsync(payload);
+
+      return {
+        handover,
+        incomingSession,
+        access_token: token,
+        user: {
+          id: incomingUser.id,
+          name: incomingUser.name,
+          username: incomingUser.username,
+          role: effectiveRole,
+          roles: sortedRoles,
+          permissions: permissionsSlugs,
+          factoryId: incomingUser.factoryId,
+          sessionId: incomingSession.id,
+        }
+      };
+    });
+  }
+
+  async getRecentHandover(lineId: string, station: string) {
+    const outgoingUser = alias(usersTable, 'outgoing_user');
+    const incomingUser = alias(usersTable, 'incoming_user');
+
+    const [handover] = await db.select({
+      id: shiftHandovers.id,
+      lineId: shiftHandovers.lineId,
+      station: shiftHandovers.station,
+      batchId: shiftHandovers.batchId,
+      outgoingOperatorId: shiftHandovers.outgoingOperatorId,
+      outgoingOperatorName: outgoingUser.name,
+      incomingOperatorId: shiftHandovers.incomingOperatorId,
+      incomingOperatorName: incomingUser.name,
+      handoverTime: shiftHandovers.handoverTime,
+      notes: shiftHandovers.notes,
+      pendingIssues: shiftHandovers.pendingIssues,
+      machineStateSnapshot: shiftHandovers.machineStateSnapshot,
+      productionCountSnapshot: shiftHandovers.productionCountSnapshot,
+      wasteCountSnapshot: shiftHandovers.wasteCountSnapshot,
+    })
+    .from(shiftHandovers)
+    .leftJoin(outgoingUser, eq(shiftHandovers.outgoingOperatorId, outgoingUser.id))
+    .leftJoin(incomingUser, eq(shiftHandovers.incomingOperatorId, incomingUser.id))
+    .where(and(
+      eq(shiftHandovers.lineId, lineId),
+      eq(shiftHandovers.station, station)
+    ))
+    .orderBy(desc(shiftHandovers.handoverTime))
+    .limit(1);
+
+    return handover || null;
   }
 }

@@ -8,6 +8,7 @@ import { LifecycleService } from './services/lifecycle.service';
 import { ChangeoverService } from './changeover.service';
 import { TerminalService } from './services/terminal.service';
 import { VerificationService } from './services/verification.service';
+import { MachineStateService } from './services/machine-state.service';
 
 import { EventsModule } from '../../realtime/events.module';
 
@@ -24,7 +25,8 @@ import { UsersModule } from '../users/users.module';
     LifecycleService, 
     ChangeoverService, 
     TerminalService,
-    VerificationService
+    VerificationService,
+    MachineStateService
   ],
   exports: [
     BatchService, 
@@ -32,7 +34,8 @@ import { UsersModule } from '../users/users.module';
     LifecycleService, 
     ChangeoverService, 
     TerminalService,
-    VerificationService
+    VerificationService,
+    MachineStateService
   ],
 })
 export class ProductionModule {}

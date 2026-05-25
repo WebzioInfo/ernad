@@ -41,9 +41,14 @@ export class TelemetryController {
   @Get('history/:batchId/:station')
   @Permissions('telemetry:log')
   @ApiOperation({ summary: 'Get telemetry history for a batch and station' })
-  async getHistory(@Param('batchId', ParseUUIDPipe) batchId: string, @Param('station') station: string) {
+  async getHistory(
+    @Param('batchId', ParseUUIDPipe) batchId: string,
+    @Param('station') station: string,
+    @Query('operatorView') operatorView?: string,
+  ) {
     try {
-      return await this.ingestionService.getLogHistory(batchId, station);
+      const isOperatorView = operatorView === 'true';
+      return await this.ingestionService.getLogHistory(batchId, station, isOperatorView);
     } catch (err) {
       return [];
     }

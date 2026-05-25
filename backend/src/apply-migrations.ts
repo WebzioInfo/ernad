@@ -44,6 +44,53 @@ async function migrate() {
       console.error('Failed to update idx_operator_sessions_unique_active:', e.message);
     }
 
+    // 6. Create machine_states table
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "machine_states" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "line_id" uuid NOT NULL REFERENCES "production_lines"("id") ON DELETE CASCADE,
+          "station" varchar(50) NOT NULL,
+          "state" varchar(50) NOT NULL DEFAULT 'STOPPED',
+          "updated_at" timestamp NOT NULL DEFAULT now()
+        );
+      `);
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "idx_machine_states_line_station" ON "machine_states" ("line_id", "station")`);
+      console.log('Successfully created machine_states table and index.');
+    } catch (e: any) {
+      console.error('Failed to create machine_states table:', e.message);
+    }
+
+    // 7. Create shift_handovers table
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "shift_handovers" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "line_id" uuid NOT NULL REFERENCES "production_lines"("id") ON DELETE CASCADE,
+          "station" varchar(50) NOT NULL,
+          "batch_id" uuid NOT NULL REFERENCES "production_batches"("id") ON DELETE CASCADE,
+          "outgoing_operator_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+          "incoming_operator_id" uuid NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+          "handover_time" timestamp NOT NULL DEFAULT now(),
+          "outgoing_session_id" uuid REFERENCES "operator_sessions"("id") ON DELETE SET NULL,
+          "incoming_session_id" uuid REFERENCES "operator_sessions"("id") ON DELETE SET NULL,
+          "notes" text,
+          "pending_issues" text,
+          "machine_state_snapshot" varchar(50),
+          "production_count_snapshot" integer DEFAULT 0,
+          "waste_count_snapshot" integer DEFAULT 0,
+          "material_state_confirmed" boolean DEFAULT false,
+          "machine_status_acknowledged" boolean DEFAULT false,
+          "created_at" timestamp NOT NULL DEFAULT now()
+        );
+      `);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_shift_handovers_line_station" ON "shift_handovers" ("line_id", "station")`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_shift_handovers_batch" ON "shift_handovers" ("batch_id")`);
+      console.log('Successfully created shift_handovers table and indexes.');
+    } catch (e: any) {
+      console.error('Failed to create shift_handovers table:', e.message);
+    }
+
     console.log('Migrations applied successfully.');
     process.exit(0);
   } catch (err) {

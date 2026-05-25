@@ -23,6 +23,7 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { ShiftService } from '../../master-data/shift.service';
 import { RedisService } from '../../../providers/redis/redis.service';
 import { OperatorSessionsService } from '../../operator-sessions/operator-sessions.service';
+import { MachineStateService } from '../../production/services/machine-state.service';
 
 @Injectable()
 export class ProcessingService {
@@ -35,6 +36,7 @@ export class ProcessingService {
     private readonly redisService: RedisService,
     private readonly sessionService: OperatorSessionsService,
     private readonly auditService: AuditService,
+    private readonly machineStateService: MachineStateService,
   ) { }
 
   async preValidateTelemetry(userId: string, dto: TelemetryDto) {
@@ -73,7 +75,7 @@ export class ProcessingService {
   }
 
   async handleTelemetryLog(userId: string, dto: TelemetryDto) {
-    return await db.transaction(async (tx) => {
+    const log = await db.transaction(async (tx) => {
       this.logger.debug(`[PROCESSOR] Verifying idempotency for requestId: ${dto.requestId}`);
 
       const existing = await tx.select().from(productionLogs)
@@ -215,14 +217,13 @@ export class ProcessingService {
       // New Enterprise Material Logic
       await this.processEnterpriseInventory(tx, factoryId, dto, log.id);
 
-      if (!dto.isRework && dto.station !== 'QC') {
-        const updateField = this.getFieldName(dto.station);
+      // Fast-fail Redis increment
+      if (this.redisService.getAvailability()) {
+        this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => { });
+      }
 
-        // Fast-fail Redis increment
-        if (this.redisService.getAvailability()) {
-          this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => { });
-        }
-
+      const updateField = this.getFieldName(dto.station);
+      if (updateField) {
         await tx.update(batchTotals)
           .set({
             [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount} + ${Number(dto.wastageCount || 0)}`,
@@ -240,6 +241,7 @@ export class ProcessingService {
           })
           .where(eq(batchTotals.batchId, dto.batchId));
       }
+      
       // ── NEW: Downtime & Production Time Tracking ──
       await this.handleDowntime(tx, factoryId, dto);
 
@@ -250,6 +252,24 @@ export class ProcessingService {
 
       return log;
     });
+
+    // Decoupled Machine State Sync based on telemetry events
+    let targetState = 'RUNNING';
+    if (dto.eventType === 'POWER_FAILURE' || dto.eventType === 'MACHINE_BREAKDOWN') {
+      targetState = 'FAULT';
+    } else if (dto.eventType === 'DOWNTIME_PAUSE') {
+      targetState = 'STOPPED';
+    } else if (dto.eventType === 'MATERIAL_SHORTAGE' || dto.eventType === 'LOW_SPEED') {
+      targetState = 'FAULT';
+    }
+
+    try {
+      await this.machineStateService.updateMachineState(dto.lineId, dto.station, targetState);
+    } catch (err: any) {
+      this.logger.error(`Failed to update machine state for line ${dto.lineId} station ${dto.station}: ${err.message}`);
+    }
+
+    return log;
   }
 
   private async processLegacyMaterialUsage(tx: any, logId: number, batchId: string, factoryId: string, mat: any, loggedAt: Date) {
@@ -555,7 +575,7 @@ export class ProcessingService {
     return map[station] || 'scrapTotal';
   }
 
-  async getLogHistory(batchId: string, station: string, limit = 50) {
+  async getLogHistory(batchId: string, station: string, limit = 50, operatorView = false) {
     const targetStation = station.toUpperCase();
     const updatedByUsers = alias(users, 'updatedByUsers');
 
@@ -730,36 +750,38 @@ export class ProcessingService {
       }
     });
 
-    // Add operator sessions
-    sessions.forEach(s => {
-      feedEvents.push({
-        id: `session_start_${s.id}`,
-        primaryCount: 0,
-        wastageCount: 0,
-        eventType: 'OPERATOR_LOGIN',
-        remarks: `Operator ${s.userName || 'Unknown'} logged into ${s.station} Station`,
-        loggedAt: s.startTime,
-        userName: s.userName || 'Operator',
-        source: 'OPERATOR',
-        station: s.station,
-      });
-      if (!s.isActive) {
+    // Add operator sessions — ONLY for manager/admin views (not operator terminals)
+    if (!operatorView) {
+      sessions.forEach(s => {
         feedEvents.push({
-          id: `session_end_${s.id}`,
+          id: `session_start_${s.id}`,
           primaryCount: 0,
           wastageCount: 0,
-          eventType: 'OPERATOR_LOGOUT',
-          remarks: `Operator ${s.userName || 'Unknown'} logged out of ${s.station} Station. Reason: ${s.endReason || 'manual'}`,
-          loggedAt: s.endTime || new Date(),
+          eventType: 'OPERATOR_LOGIN',
+          remarks: `Operator ${s.userName || 'Unknown'} logged into ${s.station} Station`,
+          loggedAt: s.startTime,
           userName: s.userName || 'Operator',
           source: 'OPERATOR',
           station: s.station,
         });
-      }
-    });
+        if (!s.isActive) {
+          feedEvents.push({
+            id: `session_end_${s.id}`,
+            primaryCount: 0,
+            wastageCount: 0,
+            eventType: 'OPERATOR_LOGOUT',
+            remarks: `Operator ${s.userName || 'Unknown'} logged out of ${s.station} Station. Reason: ${s.endReason || 'manual'}`,
+            loggedAt: s.endTime || new Date(),
+            userName: s.userName || 'Operator',
+            source: 'OPERATOR',
+            station: s.station,
+          });
+        }
+      });
+    }
 
-    // Add batch lifecycle events
-    if (batch) {
+    // Add batch lifecycle events — ONLY for manager/admin views (not operator terminals)
+    if (!operatorView && batch) {
       feedEvents.push({
         id: `batch_start_${batch.id}`,
         primaryCount: 0,
