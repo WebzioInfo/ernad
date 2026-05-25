@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { NonRetryableBusinessError } from '../../../common/errors/non-retryable-business.error';
 import { AuditService } from '../../audit/audit.service';
 import { db } from '../../../database/db';
 import { eq, sql, and, isNull, desc, gte, lte } from 'drizzle-orm';
@@ -36,6 +37,40 @@ export class ProcessingService {
     private readonly auditService: AuditService,
   ) { }
 
+  async preValidateTelemetry(userId: string, dto: TelemetryDto) {
+    if (!dto.batchId || !dto.station) {
+      throw new NonRetryableBusinessError('Invalid telemetry payload. Batch ID and Station are required.');
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(dto.batchId)) {
+      throw new NonRetryableBusinessError('Invalid Batch ID format. Must be a valid UUID.');
+    }
+
+    // 1. Validate Batch Status (Industrial Locking)
+    const [batch] = await db.select({ status: productionBatches.status, shiftId: productionBatches.shiftId })
+      .from(productionBatches)
+      .where(eq(productionBatches.id, dto.batchId))
+      .limit(1);
+
+    if (!batch) {
+      throw new NonRetryableBusinessError('Associated production batch not found.');
+    }
+
+    const lockedStatuses = ['WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CLOSED', 'QC_PENDING'];
+    if (lockedStatuses.includes(batch.status)) {
+      throw new NonRetryableBusinessError(`DATA_ENTRY_FROZEN: Batch ${dto.batchId} is in ${batch.status} state and is locked.`);
+    }
+
+    // 2. Validate shift
+    const shiftIdToValidate = dto.shiftId || batch.shiftId;
+    if (shiftIdToValidate) {
+      const isValidShift = await this.shiftService.validateShiftEntry(shiftIdToValidate, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
+      if (!isValidShift) {
+        throw new NonRetryableBusinessError('Inactive or expired shift.');
+      }
+    }
+  }
 
   async handleTelemetryLog(userId: string, dto: TelemetryDto) {
     return await db.transaction(async (tx) => {
@@ -61,7 +96,7 @@ export class ProcessingService {
 
       if (totalsList.length === 0) {
         this.logger.error(`[PROCESSOR] Batch totals missing for batchId: ${dto.batchId}`);
-        throw new BadRequestException('Batch tracking not initialized.');
+        throw new NonRetryableBusinessError('Batch tracking not initialized.');
       }
 
       const current = totalsList[0];
@@ -77,7 +112,7 @@ export class ProcessingService {
 
       const isValidShift = await this.shiftService.validateShiftEntry(dto.shiftId, dto.loggedAt ? new Date(dto.loggedAt) : new Date());
       if (!isValidShift) {
-        throw new BadRequestException('Inactive or expired shift.');
+        throw new NonRetryableBusinessError('Inactive or expired shift.');
       }
 
       let finalPrimaryCount = dto.primaryCount;
@@ -265,20 +300,51 @@ export class ProcessingService {
 
       let stock;
 
-      // Mandatory Stock Selection for Production Stability
+      // Priority 1: BOM Auto-consumption (already resolved to exact stock ID in item.name)
       if (item.category === 'BOM_AUTO') {
         const results = await tx.select().from(inventoryStock)
           .where(eq(inventoryStock.id, item.name))
           .for('update');
         stock = results[0];
-      } else if (dto.selectedStockId) {
+      }
+
+      // Priority 2: Explicitly passed selectedStockId (if it matches item type)
+      if (!stock && dto.selectedStockId) {
         const results = await tx.select().from(inventoryStock)
           .where(eq(inventoryStock.id, dto.selectedStockId))
           .for('update');
-        stock = results[0];
+        const candidate = results[0];
+        if (candidate && this.matchesMaterialType(candidate.itemName, item.name)) {
+          stock = candidate;
+        }
       }
 
-      if (!stock && item.category !== 'BOM_AUTO') {
+      // Priority 3: Active Product BOM mapping lookup
+      if (!stock) {
+        const activeProductId = dto.productId;
+        if (activeProductId) {
+          const bomStocks = await tx.select({
+            stock: inventoryStock
+          })
+          .from(billOfMaterials)
+          .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
+          .where(and(
+            eq(billOfMaterials.productId, activeProductId),
+            eq(inventoryStock.factoryId, factoryId)
+          ))
+          .for('update');
+
+          for (const row of bomStocks) {
+            if (this.matchesMaterialType(row.stock.itemName, item.name)) {
+              stock = row.stock;
+              break;
+            }
+          }
+        }
+      }
+
+      // Priority 4: Exact Name Match
+      if (!stock) {
         const stockItems = await tx.select()
           .from(inventoryStock)
           .where(and(
@@ -286,16 +352,44 @@ export class ProcessingService {
             eq(inventoryStock.itemName, item.name)
           ))
           .for('update');
-        stock = stockItems[0];
+        if (stockItems.length > 0) {
+          stock = stockItems[0];
+        }
+      }
+
+      // Priority 5: Fuzzy ILIKE Match
+      if (!stock) {
+        let searchPattern = '';
+        const it = item.name.toLowerCase();
+        if (it.includes('preform')) searchPattern = '%preform%';
+        else if (it.includes('cap')) searchPattern = '%cap%';
+        else if (it.includes('label') || it.includes('sticker') || it.includes('bopp')) searchPattern = '%label%';
+        else if (it.includes('shrink') || it.includes('film') || it.includes('roll')) searchPattern = '%shrink%';
+        else if (it.includes('ink')) searchPattern = '%ink%';
+        else if (it.includes('solvent') || it.includes('makeup')) searchPattern = '%solvent%';
+
+        if (searchPattern) {
+          const fuzzyStocks = await tx.select()
+            .from(inventoryStock)
+            .where(and(
+              eq(inventoryStock.factoryId, factoryId),
+              sql`lower(${inventoryStock.itemName}) LIKE ${searchPattern}`
+            ))
+            .for('update');
+
+          if (fuzzyStocks.length > 0) {
+            stock = fuzzyStocks.find((s: any) => Number(s.quantity) > 0) || fuzzyStocks[0];
+          }
+        }
       }
 
       if (!stock) {
-        throw new BadRequestException(`Material stock not found for ${item.name}. Please assign stock in the Operator Panel.`);
+        throw new NonRetryableBusinessError(`Material stock not found for ${item.name}. Please assign stock in the Operator Panel.`);
       }
 
       const currentQty = Number(stock.quantity);
       if (currentQty < item.qty) {
-        throw new BadRequestException(`INSUFFICIENT_STOCK: Required ${item.qty} ${stock.unit} of ${stock.itemName}, but only ${currentQty} available.`);
+        throw new NonRetryableBusinessError(`INSUFFICIENT_STOCK: Required ${item.qty} ${stock.unit} of ${stock.itemName}, but only ${currentQty} available.`);
       }
 
       const newQty = currentQty - item.qty;
@@ -328,6 +422,30 @@ export class ProcessingService {
     }
   }
 
+  private matchesMaterialType(stockItemName: string, itemType: string): boolean {
+    const sin = stockItemName.toLowerCase();
+    const it = itemType.toLowerCase();
+    if (it.includes('preform') || it.includes('blowing')) {
+      return sin.includes('preform');
+    }
+    if (it.includes('cap') || it.includes('filling')) {
+      return sin.includes('cap');
+    }
+    if (it.includes('label') || it.includes('sticker') || it.includes('bopp') || it.includes('labeling')) {
+      return sin.includes('label') || sin.includes('sticker') || sin.includes('bopp');
+    }
+    if (it.includes('shrink') || it.includes('film') || it.includes('roll') || it.includes('packing')) {
+      return sin.includes('shrink') || sin.includes('film') || sin.includes('roll') || sin.includes('wrap');
+    }
+    if (it.includes('ink')) {
+      return sin.includes('ink');
+    }
+    if (it.includes('solvent') || it.includes('makeup')) {
+      return sin.includes('solvent') || sin.includes('makeup') || sin.includes('make-up');
+    }
+    return false;
+  }
+
   private async validateProductionFlow(station: string, count: number, totals: any) {
     const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
 
@@ -355,9 +473,9 @@ export class ProcessingService {
 
   private async validateBatchStatus(tx: any, batchId: string) {
     const batch = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
-    if (batch.length === 0) throw new BadRequestException('Batch not found.');
+    if (batch.length === 0) throw new NonRetryableBusinessError('Batch not found.');
     if (batch[0].status !== 'RUNNING' && batch[0].status !== 'CHANGEOVER') {
-      throw new BadRequestException(`CANNOT_LOG: Batch is currently in ${batch[0].status} state.`);
+      throw new NonRetryableBusinessError(`CANNOT_LOG: Batch is currently in ${batch[0].status} state.`);
     }
     return batch[0];
   }
@@ -438,9 +556,11 @@ export class ProcessingService {
   }
 
   async getLogHistory(batchId: string, station: string, limit = 50) {
+    const targetStation = station.toUpperCase();
     const updatedByUsers = alias(users, 'updatedByUsers');
 
-    return await db.select({
+    // 1. Fetch production logs for this batch and station
+    const logs = await db.select({
       id: productionLogs.id,
       primaryCount: productionLogs.primaryCount,
       wastageCount: productionLogs.wastageCount,
@@ -464,6 +584,7 @@ export class ProcessingService {
       userName: users.name,
       updatedByName: updatedByUsers.name,
       updatedAt: productionLogs.updatedAt,
+      station: productionLogs.station,
     })
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
@@ -471,12 +592,230 @@ export class ProcessingService {
       .where(
         and(
           eq(productionLogs.batchId, batchId),
-          eq(productionLogs.station, station as any),
+          eq(productionLogs.station, targetStation as any),
           isNull(productionLogs.deletedAt)
         )
       )
       .orderBy(desc(productionLogs.loggedAt))
       .limit(limit);
+
+    // 2. Fetch downtime logs for this batch and station
+    const downtimes = await db.select({
+      id: downtimeLogs.id,
+      station: downtimeLogs.station,
+      reason: downtimeLogs.reason,
+      startTime: downtimeLogs.startTime,
+      endTime: downtimeLogs.endTime,
+      remarks: downtimeLogs.remarks,
+    })
+      .from(downtimeLogs)
+      .where(
+        and(
+          eq(downtimeLogs.batchId, batchId),
+          eq(downtimeLogs.station, targetStation),
+          isNull(downtimeLogs.deletedAt)
+        )
+      )
+      .orderBy(desc(downtimeLogs.startTime))
+      .limit(limit);
+
+    // 3. Fetch operator sessions for this batch and station
+    const sessions = await db.select({
+      id: operatorSessions.id,
+      station: operatorSessions.station,
+      startTime: operatorSessions.startTime,
+      endTime: operatorSessions.endTime,
+      isActive: operatorSessions.isActive,
+      endReason: operatorSessions.endReason,
+      userName: users.name,
+    })
+      .from(operatorSessions)
+      .leftJoin(users, eq(operatorSessions.userId, users.id))
+      .where(
+        and(
+          eq(operatorSessions.batchId, batchId),
+          eq(operatorSessions.station, targetStation)
+        )
+      )
+      .orderBy(desc(operatorSessions.startTime))
+      .limit(limit);
+
+    // 4. Fetch batch details for lifecycle events (Batch started, ended)
+    const [batch] = await db.select({
+      id: productionBatches.id,
+      batchCode: productionBatches.batchCode,
+      status: productionBatches.status,
+      startTime: productionBatches.startTime,
+      closedAt: productionBatches.closedAt,
+      remarks: productionBatches.remarks,
+      createdByName: users.name,
+    })
+      .from(productionBatches)
+      .leftJoin(users, eq(productionBatches.createdBy, users.id))
+      .where(eq(productionBatches.id, batchId))
+      .limit(1);
+
+    // 5. Fetch material assignments from materials_usage
+    const materialUsageLogs = await db.select({
+      id: materialsUsage.id,
+      materialName: materialsUsage.materialName,
+      quantity: materialsUsage.quantity,
+      unit: materialsUsage.unit,
+      waste: materialsUsage.waste,
+      loggedAt: materialsUsage.loggedAt,
+    })
+      .from(materialsUsage)
+      .where(eq(materialsUsage.batchId, batchId))
+      .orderBy(desc(materialsUsage.loggedAt))
+      .limit(limit);
+
+    // Normalize and aggregate everything into a single feedEvents array
+    const feedEvents: any[] = [];
+
+    // Add production logs
+    logs.forEach(l => {
+      let source: 'OPERATOR' | 'MACHINE' | 'SYSTEM' = 'OPERATOR';
+      if (['MACHINE_BREAKDOWN', 'POWER_FAILURE', 'LOW_SPEED'].includes(l.eventType)) {
+        source = 'MACHINE';
+      }
+      feedEvents.push({
+        id: `prod_log_${l.id}`,
+        primaryCount: l.primaryCount,
+        wastageCount: l.wastageCount,
+        eventType: l.eventType,
+        secondaryPackagingCount: l.secondaryPackagingCount,
+        remarks: l.remarks,
+        loggedAt: l.loggedAt,
+        userName: l.userName || 'System',
+        source,
+        station: l.station,
+        // Label specific
+        labelStickerWeight: l.labelStickerWeight,
+        damagedLabelWeight: l.damagedLabelWeight,
+        inkChanged: l.inkChanged,
+        inkUsageMl: l.inkUsageMl,
+        makeupChanged: l.makeupChanged,
+        makeupUsageMl: l.makeupUsageMl,
+        // Packing specific
+        shrinkWasteWeight: l.shrinkWasteWeight,
+        sourceBatchNumber: l.sourceBatchNumber,
+      });
+    });
+
+    // Add downtime logs
+    downtimes.forEach(d => {
+      feedEvents.push({
+        id: `downtime_${d.id}`,
+        primaryCount: 0,
+        wastageCount: 0,
+        eventType: d.reason,
+        remarks: d.remarks || `Downtime started: ${d.reason.replace(/_/g, ' ')}`,
+        loggedAt: d.startTime,
+        userName: 'System',
+        source: 'MACHINE',
+        station: d.station,
+      });
+      if (d.endTime) {
+        feedEvents.push({
+          id: `downtime_end_${d.id}`,
+          primaryCount: 0,
+          wastageCount: 0,
+          eventType: 'DOWNTIME_RESOLVED',
+          remarks: `Downtime ended. Duration: ${Math.round((d.endTime.getTime() - d.startTime.getTime()) / 60000)} minutes`,
+          loggedAt: d.endTime,
+          userName: 'System',
+          source: 'MACHINE',
+          station: d.station,
+        });
+      }
+    });
+
+    // Add operator sessions
+    sessions.forEach(s => {
+      feedEvents.push({
+        id: `session_start_${s.id}`,
+        primaryCount: 0,
+        wastageCount: 0,
+        eventType: 'OPERATOR_LOGIN',
+        remarks: `Operator ${s.userName || 'Unknown'} logged into ${s.station} Station`,
+        loggedAt: s.startTime,
+        userName: s.userName || 'Operator',
+        source: 'OPERATOR',
+        station: s.station,
+      });
+      if (!s.isActive) {
+        feedEvents.push({
+          id: `session_end_${s.id}`,
+          primaryCount: 0,
+          wastageCount: 0,
+          eventType: 'OPERATOR_LOGOUT',
+          remarks: `Operator ${s.userName || 'Unknown'} logged out of ${s.station} Station. Reason: ${s.endReason || 'manual'}`,
+          loggedAt: s.endTime || new Date(),
+          userName: s.userName || 'Operator',
+          source: 'OPERATOR',
+          station: s.station,
+        });
+      }
+    });
+
+    // Add batch lifecycle events
+    if (batch) {
+      feedEvents.push({
+        id: `batch_start_${batch.id}`,
+        primaryCount: 0,
+        wastageCount: 0,
+        eventType: 'BATCH_START',
+        remarks: `Production Batch ${batch.batchCode} started by ${batch.createdByName || 'System'}`,
+        loggedAt: batch.startTime,
+        userName: batch.createdByName || 'System',
+        source: 'SYSTEM',
+        station: targetStation,
+      });
+      if (batch.closedAt) {
+        feedEvents.push({
+          id: `batch_end_${batch.id}`,
+          primaryCount: 0,
+          wastageCount: 0,
+          eventType: 'BATCH_END',
+          remarks: `Production Batch ${batch.batchCode} closed.`,
+          loggedAt: batch.closedAt,
+          userName: batch.createdByName || 'System',
+          source: 'SYSTEM',
+          station: targetStation,
+        });
+      }
+    }
+
+    // Add material assignments relevant to this station
+    materialUsageLogs.forEach(m => {
+      let isRelevant = false;
+      const matName = m.materialName.toLowerCase();
+      if (targetStation === 'BLOWING' && matName.includes('preform')) isRelevant = true;
+      else if (targetStation === 'FILLING' && (matName.includes('cap') || matName.includes('bottle'))) isRelevant = true;
+      else if (targetStation === 'LABELING' && matName.includes('label')) isRelevant = true;
+      else if (targetStation === 'PACKING' && (matName.includes('shrink') || matName.includes('carton') || matName.includes('box'))) isRelevant = true;
+      else if (targetStation === 'GENERAL') isRelevant = true;
+
+      if (isRelevant) {
+        feedEvents.push({
+          id: `mat_usage_${m.id}`,
+          primaryCount: Number(m.quantity) || 0,
+          wastageCount: Number(m.waste) || 0,
+          eventType: 'MATERIAL_ASSIGNMENT',
+          remarks: `Assigned ${m.quantity} ${m.unit} of ${m.materialName}`,
+          loggedAt: m.loggedAt,
+          userName: 'Logistics',
+          source: 'SYSTEM',
+          station: targetStation,
+        });
+      }
+    });
+
+    // Sort by loggedAt descending
+    feedEvents.sort((a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime());
+
+    // Slice to limit
+    return feedEvents.slice(0, limit);
   }
 
   async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string }) {
@@ -633,7 +972,7 @@ export class ProcessingService {
 
   async createManualLog(userId: string, dto: TelemetryDto) {
     const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, dto.batchId)).limit(1);
-    if (!batch) throw new BadRequestException('Target batch not found.');
+    if (!batch) throw new NonRetryableBusinessError('Target batch not found.');
     return await this.handleTelemetryLog(userId, dto);
   }
 

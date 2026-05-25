@@ -48,7 +48,8 @@ export default function LineSelectionPage() {
   });
 
   const startSessionMutation = useMutation({
-    mutationFn: (data: { lineId: string, station: string, force?: boolean, supervisorPin?: string }) => api.post(ENDPOINTS.OPERATOR_SESSIONS.START, data),
+    mutationFn: (data: { lineId: string, station: string, force?: boolean, supervisorPin?: string }) => 
+      api.post(ENDPOINTS.OPERATOR_SESSIONS.START, data, { skipGlobalToast: true } as any),
     onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ['current-operator-session'] });
       setShowSupervisorModal(false);
@@ -195,7 +196,7 @@ export default function LineSelectionPage() {
                   <button
                     key={station.id}
                     onClick={() => {
-                      if (isStarting) return;
+                      if (startSessionMutation.isPending) return;
                       setSelectedStation(station.id);
                       startSessionMutation.mutate({
                         lineId: selectedLine.id,
@@ -203,7 +204,7 @@ export default function LineSelectionPage() {
                         force: occupant && !isMySession
                       });
                     }}
-                    disabled={isStarting}
+                    disabled={startSessionMutation.isPending}
                     className={cn(
                       "group p-10 rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[340px] w-full",
                       occupant
@@ -256,7 +257,14 @@ export default function LineSelectionPage() {
       </div>
 
 
-      <Dialog open={showSupervisorModal} onOpenChange={setShowSupervisorModal}>
+      <Dialog open={showSupervisorModal} onOpenChange={(open) => {
+        setShowSupervisorModal(open);
+        if (!open) {
+          setSupervisorPin('');
+          setTakeoverPayload(null);
+          startSessionMutation.reset();
+        }
+      }}>
         <DialogContent className="sm:max-w-md bg-white rounded-[2rem] border-none shadow-2xl p-8">
           <DialogHeader className="space-y-4">
             <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center border border-rose-100">

@@ -5,12 +5,19 @@ import { ProcessingService } from './services/processing.service';
 import { TelemetryDto } from './dto/telemetry.dto';
 import { db } from '../../database/db';
 import { auditLogs } from '../../database/schema';
+import { RedisService } from '../../providers/redis/redis.service';
+import { NonRetryableBusinessError } from '../../common/errors/non-retryable-business.error';
+import { AuditService } from '../audit/audit.service';
 
 @Processor('telemetry')
 export class TelemetryProcessor extends WorkerHost {
   private readonly logger = new Logger(TelemetryProcessor.name);
 
-  constructor(private readonly processingService: ProcessingService) {
+  constructor(
+    private readonly processingService: ProcessingService,
+    private readonly redisService: RedisService,
+    private readonly auditService: AuditService,
+  ) {
     super();
   }
 
@@ -31,20 +38,53 @@ export class TelemetryProcessor extends WorkerHost {
       this.logger.log(`Successfully persisted telemetry for request ${dto.requestId}`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to process telemetry job ${job.id} (Attempt ${job.attemptsMade + 1}): ${error.message}`);
-      
-      // If it's a known bad request (Schema/Validation), don't retry endlessly
-      if (error instanceof BadRequestException || error.status === 400) {
-        this.logger.error(`Critical validation error in job ${job.id}. Marking as failed and auditing.`);
+      const isNonRetryable = error instanceof NonRetryableBusinessError;
+      const isFlowViolation = error.message.includes('FLOW_VIOLATION');
+      const isValidationError = error instanceof BadRequestException || error.status === 400 || error.name === 'ValidationError';
+      const isFinalAttempt = job.attemptsMade >= 4;
+
+      // Determine if failure is permanent (non-retryable)
+      const isPermanent = isNonRetryable || (isValidationError && !isFlowViolation) || (isFlowViolation && isFinalAttempt);
+
+      if (isPermanent) {
+        const errorType = isNonRetryable ? 'NON_RETRYABLE' : 'DEAD_LETTERED';
+        this.logger.error(`[${errorType}] Critical permanent validation error in job ${job.id}. Discarding and sending to DLQ. Error: ${error.message}`);
         
-        // Log poison job to audit log for investigation
-        await db.insert(auditLogs).values({
+        // Log poison job to audit log exactly once using AuditService for deduplication
+        await this.auditService.logAction({
+          userId,
           action: 'TELEMETRY_POISON_JOB',
           category: 'TELEMETRY',
           entityType: 'JOB',
           entityId: job.id as string,
+          requestId: dto.requestId,
           payload: { ...job.data, error: error.message },
-        }).catch(auditErr => this.logger.error(`Failed to audit poison job: ${auditErr.message}`));
+        });
+
+        // Push to Dead Letter Queue in Redis
+        if (this.redisService.getAvailability()) {
+          try {
+            await this.redisService.lpush('telemetry:dlq', JSON.stringify({
+              jobId: job.id,
+              data: job.data,
+              error: error.message,
+              errorType,
+              failedAt: new Date()
+            }));
+          } catch (dlqErr) {
+            this.logger.error(`Failed to push to Redis DLQ: ${dlqErr.message}`);
+          }
+        }
+
+        // Discard the job to prevent further retries
+        try {
+          await job.discard();
+        } catch (discardErr) {
+          this.logger.error(`Failed to discard job ${job.id}: ${discardErr.message}`);
+        }
+      } else {
+        // Transient/Retryable error
+        this.logger.warn(`[RETRYABLE] Transient failure processing job ${job.id} (Attempt ${job.attemptsMade + 1}/5). Error: ${error.message}`);
       }
       
       throw error;

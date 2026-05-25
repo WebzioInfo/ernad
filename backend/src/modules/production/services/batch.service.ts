@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import {
   productionBatches, batchTotals, productionLines, factories,
-  productBrands, products, operatorSessions
+  productBrands, products, operatorSessions, billOfMaterials, inventoryStock
 } from '../../../database/schema';
 import { eq, and, sql, desc, inArray, or } from 'drizzle-orm';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -43,6 +43,30 @@ export class BatchService {
       if (!line) throw new BadRequestException('Line not found.');
       if (line.status !== 'IDLE') {
         throw new BadRequestException(`Line is ${line.status}. Must be IDLE to start.`);
+      }
+
+      // Check if a BOM is configured for the product
+      const bomItems = await tx.select()
+        .from(billOfMaterials)
+        .where(eq(billOfMaterials.productId, productId));
+
+      if (bomItems.length > 0) {
+        for (const bom of bomItems) {
+          const [stock] = await tx.select()
+            .from(inventoryStock)
+            .where(and(
+              eq(inventoryStock.id, bom.stockId),
+              eq(inventoryStock.factoryId, factoryId)
+            ))
+            .limit(1);
+
+          if (!stock) {
+            throw new BadRequestException(`Cannot start production. Mapped stock item (ID: ${bom.stockId}) not found in the factory.`);
+          }
+          if (Number(stock.quantity) <= 0) {
+            throw new BadRequestException(`Cannot start production. Insufficient stock for BOM item: ${stock.itemName} (Available: ${stock.quantity} ${stock.unit}). Please assign or update stock in Operator Panel.`);
+          }
+        }
       }
 
       const finalBatchCode = batchCode || await this.generateBatchCode(tx);

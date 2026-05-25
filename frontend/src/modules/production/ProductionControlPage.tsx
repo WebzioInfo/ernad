@@ -152,6 +152,7 @@ const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shif
             startMutation.mutate();
           }}
           isPending={startMutation.isPending}
+          error={startMutation.error}
           // pipe state setters so modal can drive the form
           selectedShift={selectedShift} setSelectedShift={setSelectedShift}
           selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
@@ -690,6 +691,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
             onClose={() => setShowStartModal(false)}
             onSubmit={() => startMutation.mutate()}
             isPending={startMutation.isPending}
+            error={startMutation.error}
             selectedShift={selectedShift} setSelectedShift={setSelectedShift}
             selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand}
             selectedProduct={selectedProduct} setSelectedProduct={setSelectedProduct}
@@ -1027,7 +1029,7 @@ function StartProductionModal({
   batchCode, setBatchCode,
   startTime, setStartTime,
   remarks, setRemarks,
-  onClose, onSubmit, isPending
+  onClose, onSubmit, isPending, error
 }: any) {
   const [step, setStep] = useState(1);
   const totalSteps = 3;
@@ -1102,6 +1104,16 @@ function StartProductionModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-10 pb-6">
+          {error && (
+            <div className="p-6 mb-5 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 font-bold text-xs flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+              <AlertTriangle className="w-5 h-5 shrink-0 text-rose-500" />
+              <span>
+                {Array.isArray((error as any)?.response?.data?.message)
+                  ? (error as any).response.data.message.join(', ')
+                  : ((error as any)?.response?.data?.message || error.message || 'An error occurred.')}
+              </span>
+            </div>
+          )}
           {step === 1 && (
             <div className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
               <div className="p-6 bg-indigo-50 border border-indigo-100 rounded-2xl">

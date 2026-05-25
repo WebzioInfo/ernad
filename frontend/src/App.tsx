@@ -4,9 +4,11 @@ import { AppRoutes } from './app/routes';
 import { LoadingScreen } from './components/common/LoadingScreen';
 import useAuthStore from './modules/auth/auth.store';
 import { usePushNotifications } from './hooks/usePushNotifications';
+import { useWebSocket } from './hooks/useWebSocket';
 
 function AppInner() {
   usePushNotifications();
+  useWebSocket();
   return null;
 }
 

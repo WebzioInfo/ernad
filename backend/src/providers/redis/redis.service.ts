@@ -114,6 +114,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return 1;
   }
 
+  getClient(): Redis | null {
+    return this.client;
+  }
+
+  async lpush(key: string, value: string) {
+    if (this.isAvailable && this.client) {
+      try {
+        return await this.client.lpush(key, value);
+      } catch (err) {
+        this.isAvailable = false;
+      }
+    }
+    return 0;
+  }
+
   // --- Specialized MES Methods ---
 
   async incrementCounter(batchId: string, station: string, amount: number) {

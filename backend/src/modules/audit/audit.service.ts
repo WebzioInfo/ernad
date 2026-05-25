@@ -80,6 +80,20 @@ export class AuditService {
 
   async logAction(ctx: AuditContext) {
     try {
+      if (ctx.requestId) {
+        const [existing] = await db.select()
+          .from(auditLogs)
+          .where(and(
+            eq(auditLogs.requestId, ctx.requestId),
+            eq(auditLogs.action, ctx.action)
+          ))
+          .limit(1);
+        if (existing) {
+          this.logger.debug(`[AUDIT] Duplicate audit log prevented for requestId: ${ctx.requestId}, action: ${ctx.action}`);
+          return;
+        }
+      }
+
       await db.insert(auditLogs).values({
         actorId: ctx.userId,
         action: ctx.action,

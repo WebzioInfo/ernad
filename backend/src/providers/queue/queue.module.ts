@@ -36,7 +36,15 @@ import Redis from 'ioredis';
     }),
     BullModule.registerQueue({ 
       name: 'telemetry',
-      defaultJobOptions: { removeOnComplete: true },
+      defaultJobOptions: { 
+        removeOnComplete: true,
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 1000
+        },
+        removeOnFail: { age: 24 * 3600 }
+      },
       ...({ skipConfigCheck: true } as any) // Suppresses the "Eviction policy" warning
     }),
   ],

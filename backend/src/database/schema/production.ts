@@ -129,7 +129,7 @@ export const operatorSessions = pgTable('operator_sessions', {
     index('idx_operator_sessions_line').on(table.lineId, table.isActive),
     index('idx_operator_sessions_batch').on(table.batchId),
     index('idx_operator_sessions_terminal').on(table.terminalId),
-    uniqueIndex('idx_operator_sessions_unique_active').on(table.userId).where(eq(table.isActive, true)),
+    uniqueIndex('idx_operator_sessions_unique_active').on(table.userId, table.lineId, table.station).where(eq(table.isActive, true)),
   ];
 });
 

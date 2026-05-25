@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
+import { NonRetryableBusinessError } from '../../../common/errors/non-retryable-business.error';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TelemetryDto } from '../dto/telemetry.dto';
@@ -23,24 +24,34 @@ export class IngestionService {
   ) {}
   async createLog(authenticatedUserId: string, dto: TelemetryDto) {
     if (!dto.batchId || !dto.station) {
-      throw new BadRequestException('Invalid telemetry payload. Batch ID and Station are required.');
+      throw new NonRetryableBusinessError('Invalid telemetry payload. Batch ID and Station are required.');
     }
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(dto.batchId)) {
-      throw new BadRequestException('Invalid Batch ID format. Must be a valid UUID.');
+      throw new NonRetryableBusinessError('Invalid Batch ID format. Must be a valid UUID.');
     }
     if (dto.productId && !uuidRegex.test(dto.productId)) {
-      throw new BadRequestException('Invalid Product ID format.');
+      throw new NonRetryableBusinessError('Invalid Product ID format.');
     }
     if (dto.brandId && !uuidRegex.test(dto.brandId)) {
-      throw new BadRequestException('Invalid Brand ID format.');
+      throw new NonRetryableBusinessError('Invalid Brand ID format.');
     }
     if (dto.lineId && !uuidRegex.test(dto.lineId)) {
-      throw new BadRequestException('Invalid Line ID format.');
+      throw new NonRetryableBusinessError('Invalid Line ID format.');
     }
     if (dto.shiftId && !uuidRegex.test(dto.shiftId)) {
-      throw new BadRequestException('Invalid Shift ID format.');
+      throw new NonRetryableBusinessError('Invalid Shift ID format.');
+    }
+
+    // Deduplication check: block identical request IDs using Redis locks
+    const dedupeKey = `telemetry:fingerprint:${dto.requestId}`;
+    if (this.redisService.getAvailability() && dto.requestId) {
+      const isDuplicate = await this.redisService.get(dedupeKey);
+      if (isDuplicate) {
+        throw new NonRetryableBusinessError(`Duplicate request fingerprint detected: ${dto.requestId}`);
+      }
+      await this.redisService.set(dedupeKey, 'active', 'EX', 600);
     }
 
     let finalUserId = authenticatedUserId;
@@ -52,23 +63,17 @@ export class IngestionService {
       this.logger.debug(`[HYBRID] Action attributed to Operator: ${operator.name} via Terminal: ${dto.terminalId}`);
     }
 
-    // 2. Validate Batch Status (Industrial Locking)
-    const [batch] = await db.select({ status: productionBatches.status, factoryId: productionBatches.factoryId })
+    // 2. Pre-validate using processing service (Validates batch status and shift)
+    await this.processingService.preValidateTelemetry(finalUserId, dto);
+
+    // Fetch batch for factory ID filling if missing
+    const [batch] = await db.select({ factoryId: productionBatches.factoryId })
       .from(productionBatches)
       .where(eq(productionBatches.id, dto.batchId))
       .limit(1);
-
-    if (!batch) {
-      throw new BadRequestException('Associated production batch not found.');
-    }
-
-    if (!dto.factoryId) {
+    
+    if (batch && !dto.factoryId) {
       dto.factoryId = batch.factoryId;
-    }
-
-    const lockedStatuses = ['WAITING_APPROVAL', 'APPROVED', 'COMPLETED', 'CLOSED', 'QC_PENDING'];
-    if (lockedStatuses.includes(batch.status)) {
-      throw new BadRequestException(`DATA_ENTRY_FROZEN: Batch ${dto.batchId} is in ${batch.status} state and is locked for adjustments.`);
     }
 
     const isServerless = process.env.VERCEL === '1' || process.env.IS_SERVERLESS === 'true';

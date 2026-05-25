@@ -35,6 +35,15 @@ async function migrate() {
       console.error('Failed to update idx_batches_code_factory:', e.message);
     }
 
+    // 5. Update operator_sessions unique index
+    try {
+      await db.execute(sql`DROP INDEX IF EXISTS "idx_operator_sessions_unique_active"`);
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "idx_operator_sessions_unique_active" ON "operator_sessions" ("user_id", "line_id", "station_type") WHERE "is_active" = true`);
+      console.log('Successfully updated idx_operator_sessions_unique_active to be per user, line, and station.');
+    } catch (e: any) {
+      console.error('Failed to update idx_operator_sessions_unique_active:', e.message);
+    }
+
     console.log('Migrations applied successfully.');
     process.exit(0);
   } catch (err) {

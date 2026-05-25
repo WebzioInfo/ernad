@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
 import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines } from '../../database/schema';
-import { eq, and, desc, isNull, or } from 'drizzle-orm';
+import { eq, and, desc, isNull, or, sql } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -41,97 +41,154 @@ export class OperatorSessionsService {
       throw new BadRequestException(`Invalid station: ${station}`);
     }
 
-    // Idempotent reuse: if active session exists on this station, reuse it
-    const [existingActive] = await db.select().from(operatorSessions)
-      .where(and(
-        eq(operatorSessions.userId, userId),
-        eq(operatorSessions.lineId, lineId),
-        eq(operatorSessions.station, station),
-        eq(operatorSessions.isActive, true)
-      ))
-      .limit(1);
+    // Wrap everything in a database transaction for concurrency safety
+    return await db.transaction(async (tx) => {
+      // 1. Idempotent reuse: if active session exists on this station, reuse it
+      const [existingActive] = await tx.select().from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.userId, userId),
+          eq(operatorSessions.lineId, lineId),
+          eq(operatorSessions.station, station),
+          eq(operatorSessions.isActive, true)
+        ))
+        .limit(1);
 
-    if (existingActive) {
-      this.logger.log(`[SESSION_TRACE] Active session already exists for User: ${userId}, Line: ${lineId}, Station: ${station}. Reusing.`);
-      return existingActive;
-    }
-
-    // Check if another user has an active session on this line and station
-    const [activeOccupant] = await db.select({
-      id: operatorSessions.id,
-      userId: operatorSessions.userId
-    }).from(operatorSessions)
-      .where(and(
-        eq(operatorSessions.lineId, lineId),
-        eq(operatorSessions.station, station),
-        eq(operatorSessions.isActive, true)
-      ))
-      .limit(1);
-
-    if (activeOccupant && activeOccupant.userId !== userId) {
-      if (!force || !supervisorId) {
-        throw new BadRequestException({
-          message: 'This station is currently occupied by another operator. Supervisor override required.',
-          code: 'SUPERVISOR_OVERRIDE_REQUIRED',
-          ownerId: activeOccupant.userId
-        });
+      if (existingActive) {
+        this.logger.log(`[SESSION_TRACE] Active session already exists for User: ${userId}, Line: ${lineId}, Station: ${station}. Reusing.`);
+        // Update last activity timestamp
+        await tx.update(operatorSessions)
+          .set({ lastActivityAt: new Date() })
+          .where(eq(operatorSessions.id, existingActive.id));
+        return { ...existingActive, lastActivityAt: new Date() };
       }
-      // If force is true and we have supervisor override, close the active occupant's session
-      await db.update(operatorSessions)
-        .set({
-          isActive: false,
-          endTime: new Date(),
-          endedBy: supervisorId,
-          endReason: 'supervisor_takeover'
-        })
-        .where(eq(operatorSessions.id, activeOccupant.id));
-    }
 
-    // Close operator's other active sessions (to keep getCurrentSession consistent)
-    await db.update(operatorSessions)
-      .set({ isActive: false, endTime: new Date(), endedBy: userId, endReason: 'switched_station' })
-      .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)));
+      // 2. Find and auto-close stale/orphan sessions on this line and station, or operator's own stale sessions
+      const sessionTimeoutMs = Number(process.env.SESSION_TIMEOUT_MS) || 30 * 60 * 1000;
+      const staleThreshold = new Date(Date.now() - sessionTimeoutMs);
 
-    // Bind to active batch (Global)
-    const [activeBatch] = await db.select().from(productionBatches)
-      .where(or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER')))
-      .orderBy(desc(productionBatches.startTime))
-      .limit(1);
+      // Fetch all active sessions on this station to clean up stale ones
+      const activeOccupants = await tx.select().from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.lineId, lineId),
+          eq(operatorSessions.station, station),
+          eq(operatorSessions.isActive, true)
+        ));
 
-    // Determine Factory
-    const factoryId = activeBatch?.factoryId || (await db.select({ f: usersTable.factoryId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1))[0]?.f;
-
-    // Create Session
-    const [session] = await db.insert(operatorSessions).values({
-      userId,
-      lineId,
-      station,
-      batchId: activeBatch?.id || null,
-      shiftId: shiftId || null,
-      factoryId: factoryId,
-      terminalId: terminalId || null,
-      isActive: true,
-      startTime: new Date()
-    }).returning();
-
-    // Log LOGIN event to audit log
-    await this.auditService.logAction({
-      userId,
-      action: 'LOGIN',
-      category: 'AUTH',
-      payload: {
-        terminalId,
-        machineId: lineId,
-        station
+      for (const occupant of activeOccupants) {
+        const lastActivity = occupant.lastActivityAt || occupant.startTime;
+        if (lastActivity < staleThreshold) {
+          this.logger.log(`[SESSION_TRACE] Auto-closing stale session ${occupant.id} of User ${occupant.userId}`);
+          await tx.update(operatorSessions)
+            .set({
+              isActive: false,
+              endTime: new Date(),
+              endedBy: occupant.userId,
+              endReason: 'timeout'
+            })
+            .where(eq(operatorSessions.id, occupant.id));
+            
+          if (this.redis.getAvailability()) {
+            this.redis.del(`operator_session:${occupant.userId}`).catch(() => {});
+          }
+        }
       }
+
+      // Clean up operator's own stale sessions on other lines/stations
+      const myActiveSessions = await tx.select().from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.userId, userId),
+          eq(operatorSessions.isActive, true)
+        ));
+
+      for (const mySession of myActiveSessions) {
+        const lastActivity = mySession.lastActivityAt || mySession.startTime;
+        if (lastActivity < staleThreshold) {
+          this.logger.log(`[SESSION_TRACE] Auto-closing own stale session ${mySession.id}`);
+          await tx.update(operatorSessions)
+            .set({
+              isActive: false,
+              endTime: new Date(),
+              endedBy: userId,
+              endReason: 'timeout'
+            })
+            .where(eq(operatorSessions.id, mySession.id));
+            
+          if (this.redis.getAvailability()) {
+            this.redis.del(`operator_session:${userId}`).catch(() => {});
+          }
+        }
+      }
+
+      // 3. Force takeover handling: if force is true, end other active occupants' sessions
+      if (force) {
+        const nonStaleOccupants = await tx.select().from(operatorSessions)
+          .where(and(
+            eq(operatorSessions.lineId, lineId),
+            eq(operatorSessions.station, station),
+            eq(operatorSessions.isActive, true)
+          ));
+
+        for (const occupant of nonStaleOccupants) {
+          if (occupant.userId !== userId) {
+            this.logger.log(`[SESSION_TRACE] Force ending occupant session ${occupant.id} of User ${occupant.userId}`);
+            await tx.update(operatorSessions)
+              .set({
+                isActive: false,
+                endTime: new Date(),
+                endedBy: supervisorId || userId,
+                endReason: supervisorId ? 'supervisor_takeover' : 'forced_takeover'
+              })
+              .where(eq(operatorSessions.id, occupant.id));
+
+            if (this.redis.getAvailability()) {
+              this.redis.del(`operator_session:${occupant.userId}`).catch(() => {});
+            }
+          }
+        }
+      }
+
+      // 4. Bind to active batch (Global)
+      const [activeBatch] = await tx.select().from(productionBatches)
+        .where(or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER')))
+        .orderBy(desc(productionBatches.startTime))
+        .limit(1);
+
+      // Determine Factory
+      const factoryId = activeBatch?.factoryId || (await tx.select({ f: usersTable.factoryId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1))[0]?.f;
+
+      // Create Session
+      const [session] = await tx.insert(operatorSessions).values({
+        userId,
+        lineId,
+        station,
+        batchId: activeBatch?.id || null,
+        shiftId: shiftId || null,
+        factoryId: factoryId,
+        terminalId: terminalId || null,
+        isActive: true,
+        startTime: new Date(),
+        lastActivityAt: new Date()
+      }).returning();
+
+      // Log LOGIN event to audit log
+      await this.auditService.logAction({
+        userId,
+        action: 'LOGIN',
+        category: 'AUTH',
+        payload: {
+          terminalId,
+          machineId: lineId,
+          station
+        }
+      });
+
+      // Invalidate Cache
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${userId}`).catch(() => {});
+      }
+
+      return session;
     });
-
-    // Invalidate Cache
-    if (this.redis.getAvailability()) {
-      this.redis.del(`operator_session:${userId}`).catch(() => {});
-    }
-
-    return session;
   }
 
   async endSession(userId: string, endedBy?: string, reason = 'manual') {
@@ -183,24 +240,9 @@ export class OperatorSessionsService {
       throw new BadRequestException('No active session found to change station.');
     }
 
-    // Check if the target station is already occupied on the SAME LINE
-    const [activeOccupant] = await db.select({
-      id: operatorSessions.id,
-      userId: operatorSessions.userId
-    }).from(operatorSessions)
-      .where(and(
-        eq(operatorSessions.lineId, activeSession.lineId),
-        eq(operatorSessions.station, newStation),
-        eq(operatorSessions.isActive, true)
-      ))
-      .limit(1);
-
-    if (activeOccupant && activeOccupant.userId !== userId) {
-      throw new BadRequestException({
-        message: 'This station is currently occupied by another operator. Please ask them to log out first.',
-        code: 'STATION_OCCUPIED',
-        ownerId: activeOccupant.userId
-      });
+    // Check if the user is changing to the station they are already on
+    if (activeSession.station === newStation) {
+      return activeSession;
     }
 
     // Update the session
@@ -263,17 +305,63 @@ export class OperatorSessionsService {
   }
 
   async getAllActiveSessions() {
-    // Deprecated session listing, return empty list
-    return [];
+    return await db.select({
+      id: operatorSessions.id,
+      userId: operatorSessions.userId,
+      userName: usersTable.name,
+      lineId: operatorSessions.lineId,
+      station: operatorSessions.station,
+      isActive: operatorSessions.isActive,
+      startTime: operatorSessions.startTime,
+      lastActivityAt: operatorSessions.lastActivityAt
+    })
+    .from(operatorSessions)
+    .innerJoin(usersTable, eq(operatorSessions.userId, usersTable.id))
+    .where(eq(operatorSessions.isActive, true));
   }
 
   async heartbeat(userId: string) {
-    // Deprecated: Session heartbeats are no longer tracked
-    return;
+    await db.update(operatorSessions)
+      .set({ lastActivityAt: new Date() })
+      .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)));
+      
+    if (this.redis.getAvailability()) {
+      this.redis.del(`operator_session:${userId}`).catch(() => {});
+    }
   }
 
   async cleanupStaleSessions() {
-    // Deprecated: Session timeout cleanups are no longer tracked
-    return 0;
+    const sessionTimeoutMs = Number(process.env.SESSION_TIMEOUT_MS) || 30 * 60 * 1000;
+    const staleThreshold = new Date(Date.now() - sessionTimeoutMs);
+
+    const staleSessions = await db.select().from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.isActive, true),
+        or(
+          isNull(operatorSessions.lastActivityAt),
+          sql`${operatorSessions.lastActivityAt} < ${staleThreshold}`
+        )
+      ));
+
+    if (staleSessions.length === 0) return 0;
+
+    let closedCount = 0;
+    for (const session of staleSessions) {
+      await db.update(operatorSessions)
+        .set({
+          isActive: false,
+          endTime: new Date(),
+          endedBy: session.userId,
+          endReason: 'timeout'
+        })
+        .where(eq(operatorSessions.id, session.id));
+        
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${session.userId}`).catch(() => {});
+      }
+      closedCount++;
+    }
+
+    return closedCount;
   }
 }

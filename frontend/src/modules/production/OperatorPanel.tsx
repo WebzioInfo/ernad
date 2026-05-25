@@ -21,6 +21,7 @@ import { ActivityFeed } from './components/ActivityFeed';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
 import { Wind, PackageOpen, Zap, Box } from 'lucide-react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 export default function OperatorPanel() {
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
@@ -28,6 +29,9 @@ export default function OperatorPanel() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user, logout: authLogout } = useAuthStore();
+
+  // Initialize line-specific WebSocket connections
+  useWebSocket(lineId);
 
   const stations = [
     {
@@ -71,9 +75,9 @@ export default function OperatorPanel() {
   const [labelStickerWeight, setLabelStickerWeight] = useState(0);
   const [damagedLabelWeight, setDamagedLabelWeight] = useState(0);
   const [inkChanged, setInkChanged] = useState(false);
-  const [inkUsage, setInkUsage] = useState(0);
+  const [inkUsageMl, setInkUsageMl] = useState(0);
   const [makeupChanged, setMakeupChanged] = useState(false);
-  const [makeupUsage, setMakeupUsage] = useState(0);
+  const [makeupUsageMl, setMakeupUsageMl] = useState(0);
   
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
@@ -143,6 +147,7 @@ export default function OperatorPanel() {
       return (await api.get(ENDPOINTS.TELEMETRY.HISTORY(activeBatch.batch.id, currentStation.id))).data;
     },
     enabled: !!activeBatch?.batch?.id,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -205,9 +210,9 @@ export default function OperatorPanel() {
       logEntry.labelStickerWeight = labelStickerWeight;
       logEntry.damagedLabelWeight = damagedLabelWeight;
       logEntry.inkChanged = inkChanged;
-      logEntry.inkUsageMl = inkChanged ? inkUsage : 0;
+      logEntry.inkUsageMl = inkChanged ? inkUsageMl : 0;
       logEntry.makeupChanged = makeupChanged;
-      logEntry.makeupUsageMl = makeupChanged ? makeupUsage : 0;
+      logEntry.makeupUsageMl = makeupChanged ? makeupUsageMl : 0;
     } else if (currentStation.id === 'PACKING') {
       logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
       logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
@@ -232,8 +237,8 @@ export default function OperatorPanel() {
       setPreformUsage(0); setCapUsage(0); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setLabelStickerWeight(0); setDamagedLabelWeight(0);
-      setInkChanged(false); setInkUsage(0);
-      setMakeupChanged(false); setMakeupUsage(0);
+      setInkChanged(false); setInkUsageMl(0);
+      setMakeupChanged(false); setMakeupUsageMl(0);
       setShrinkWasteWeight('');
     } catch (err: any) {
       toast.error('Failed to transmit log. Node error.');
@@ -367,13 +372,13 @@ export default function OperatorPanel() {
                         <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
                         <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Consumable Changed</span>
                       </label>
-                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsage} onChange={setInkUsage} suffix="ml" />}
+                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsageMl} onChange={setInkUsageMl} suffix="ml" />}
                       
                       <label className="flex items-center gap-3 cursor-pointer pt-2">
                         <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
                         <span className="text-xs font-black uppercase tracking-widest text-slate-700">Make-up Consumable Changed</span>
                       </label>
-                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsage} onChange={setMakeupUsage} suffix="ml" />}
+                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsageMl} onChange={setMakeupUsageMl} suffix="ml" />}
                     </div>
                   </div>
                 )}

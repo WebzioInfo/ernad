@@ -168,14 +168,16 @@ api.interceptors.response.use(
       });
     } else if (error.response && error.response.status >= 400 && error.response.status !== 401 && error.response.status !== 403) {
       const data = error.response.data as any;
-      const message = data?.message || 'Something went wrong. Please try again.';
+      const rawMessage = data?.message;
+      const message = Array.isArray(rawMessage) ? rawMessage.join(', ') : (rawMessage || 'Something went wrong. Please try again.');
       const errorCode = data?.errorCode || 'SYSTEM_ERROR';
+      const skipGlobalToast = (config as any)?.skipGlobalToast;
 
       // Suppress 404 toasts for specific background queries that handle nulls gracefully
       const isBackgroundPoll = config?.url?.includes('/analytics/factory/live') || 
                               config?.url?.includes('/production/active-batch');
 
-      if (!(error.response.status === 404 && isBackgroundPoll)) {
+      if (!skipGlobalToast && !(error.response.status === 404 && isBackgroundPoll)) {
         toast.error(message, {
           description: `Reference: ${errorCode}`
         });
