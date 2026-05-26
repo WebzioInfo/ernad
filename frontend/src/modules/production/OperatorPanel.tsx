@@ -172,6 +172,11 @@ export default function OperatorPanel() {
   const capProducts = (products || []).filter((product: any) =>
     String(product.category || '').toLowerCase() === 'caps'
   );
+  const preformRawMaterials = (rawMaterials || []).filter((material: any) => {
+    const categoryName = String(material.categoryName || '').toLowerCase();
+    const materialName = String(material.name || '').toLowerCase();
+    return categoryName.includes('preform') || materialName.includes('preform');
+  });
 
   // Fetch operators list for the handover selector
   const { data: operatorsList } = useQuery({
@@ -471,29 +476,31 @@ export default function OperatorPanel() {
           />
         }
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-6">
           {/* Main Action Card */}
-          <div className="bg-white border border-slate-200 rounded-[2.5rem] p-10 shadow-sm space-y-10">
-            <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6">
               <IndustrialNumericInput
                 label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production Unit'} Count`}
                 value={primaryCount}
                 onChange={setPrimaryCount}
                 suffix="Units"
+                compact
               />
 
-              <div className="flex flex-col gap-6">
+              <div className="contents">
                 {currentStation.id !== 'PACKING' && (
                   <IndustrialNumericInput
                     label="Rejects / Waste"
                     value={rejectionCount}
                     onChange={setRejectionCount}
                     suffix="Units"
+                    compact
                   />
                 )}
                 
                 {currentStation.id === 'BLOWING' && (
-                  <div className="space-y-6">
+                  <>
                     <div className="space-y-2">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
                         Raw Material
@@ -501,18 +508,18 @@ export default function OperatorPanel() {
                       <select
                         value={selectedRawMaterialId}
                         onChange={e => setSelectedRawMaterialId(e.target.value)}
-                        className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/40 transition-all"
+                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/40 transition-all"
                       >
                         <option value="">Select Raw Material...</option>
-                        {rawMaterials?.map((material: any) => (
+                        {preformRawMaterials.map((material: any) => (
                           <option key={material.id} value={material.id}>
                             {material.name} ({material.categoryName})
                           </option>
                         ))}
                       </select>
-                      {(!rawMaterials || rawMaterials.length === 0) && (
+                      {preformRawMaterials.length === 0 && (
                         <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
-                          No raw materials found.
+                          No preform raw materials found.
                         </p>
                       )}
                     </div>
@@ -523,6 +530,7 @@ export default function OperatorPanel() {
                         value={bagsUsed}
                         onChange={setBagsUsed}
                         suffix="Bags"
+                        compact
                       />
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">
                         (1 bag = 25KG)
@@ -536,16 +544,17 @@ export default function OperatorPanel() {
                         onChange={() => {}} 
                         suffix="Pcs"
                         readOnly
+                        compact
                       />
                       <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
                         Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
                       </p>
                     </div>
-                  </div>
+                  </>
                 )}
                 
                 {currentStation.id === 'FILLING' && (
-                  <div className="space-y-6">
+                  <>
                     <div className="space-y-2">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
                         Caps Product
@@ -576,6 +585,7 @@ export default function OperatorPanel() {
                         onChange={() => {}}
                         suffix="Pcs"
                         readOnly
+                        compact
                       />
                       <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
                         Batch Total: <span className="text-slate-900">
@@ -583,11 +593,11 @@ export default function OperatorPanel() {
                         </span>
                       </p>
                     </div>
-                  </div>
+                  </>
                 )}
                 
                 {currentStation.id === 'LABELING' && (
-                  <div className="space-y-6">
+                  <>
                     <div className="space-y-1">
                       <IndustrialNumericInput
                         label="Labels Used (This Log)"
@@ -595,37 +605,38 @@ export default function OperatorPanel() {
                         onChange={() => {}}
                         suffix="Pcs"
                         readOnly
+                        compact
                       />
                     </div>
-                    <IndustrialNumericInput label="Label Sticker Weight" value={labelStickerWeight} onChange={setLabelStickerWeight} suffix="g" />
-                    <IndustrialNumericInput label="Damaged Label Waste" value={damagedLabelWeight} onChange={setDamagedLabelWeight} suffix="g" />
+                    <IndustrialNumericInput label="Label Sticker Weight" value={labelStickerWeight} onChange={setLabelStickerWeight} suffix="g" compact />
+                    <IndustrialNumericInput label="Damaged Label Waste" value={damagedLabelWeight} onChange={setDamagedLabelWeight} suffix="g" compact />
                     
                     <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
                         <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Consumable Changed</span>
                       </label>
-                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsageMl} onChange={setInkUsageMl} suffix="ml" />}
+                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsageMl} onChange={setInkUsageMl} suffix="ml" compact />}
                       
                       <label className="flex items-center gap-3 cursor-pointer pt-2">
                         <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
                         <span className="text-xs font-black uppercase tracking-widest text-slate-700">Make-up Consumable Changed</span>
                       </label>
-                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsageMl} onChange={setMakeupUsageMl} suffix="ml" />}
+                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsageMl} onChange={setMakeupUsageMl} suffix="ml" compact />}
                     </div>
-                  </div>
+                  </>
                 )}
                 
                 {currentStation.id === 'PACKING' && (
-                  <div className="space-y-6">
+                  <>
                     <div className="p-4 border border-slate-200 rounded-xl bg-slate-50">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
                       <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
                     </div>
                     
-                    <IndustrialNumericInput label="Cases Produced" value={casesProduced} onChange={setCasesProduced} suffix="Cases" />
+                    <IndustrialNumericInput label="Cases Produced" value={casesProduced} onChange={setCasesProduced} suffix="Cases" compact />
                     <div className="opacity-50 pointer-events-none">
-                      <IndustrialNumericInput label="Total Bottles (Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly />
+                      <IndustrialNumericInput label="Total Bottles (Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly compact />
                     </div>
                     
                     <div className="space-y-1">
@@ -658,26 +669,13 @@ export default function OperatorPanel() {
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
 
-            <button
-              onClick={() => handleSaveTelemetry('ALL')}
-              disabled={isSubmitting}
-              className="w-full h-20 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
-              Commit to Ledger
-            </button>
-          </div>
-
-          {/* Secondary Control Card */}
-          <div className="space-y-8">
-
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-[2rem] p-8">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 md:p-5">
+              <div className="flex items-center gap-3 mb-3">
                 <AlertTriangle className="text-amber-600" size={18} />
                 <h4 className="text-xs font-black text-amber-900 uppercase tracking-widest">Anomaly Signature</h4>
               </div>
@@ -685,9 +683,18 @@ export default function OperatorPanel() {
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Describe machine event or stop reason..."
-                className="w-full h-32 bg-white border border-amber-200 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-amber-900/30 outline-none focus:border-amber-500/50 transition-all resize-none"
+                className="w-full h-20 bg-white border border-amber-200 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-amber-900/30 outline-none focus:border-amber-500/50 transition-all resize-none"
               />
             </div>
+
+            <button
+              onClick={() => handleSaveTelemetry('ALL')}
+              disabled={isSubmitting}
+              className="w-full h-16 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
+              Commit to Ledger
+            </button>
           </div>
         </div>
       </StationWorkspace>

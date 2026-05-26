@@ -19,11 +19,11 @@ export const StationWorkspace: React.FC<StationWorkspaceProps> = ({
   return (
     <div className="flex-1 grid grid-cols-12 overflow-hidden min-h-0">
       {/* Main Action Area */}
-      <main className="col-span-12 lg:col-span-8 p-6 md:p-10 overflow-y-auto bg-slate-50 custom-scrollbar">
-        <div className="max-w-4xl mx-auto space-y-10">
-          <div className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <h2 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-4">
+      <main className="col-span-12 lg:col-span-8 p-4 md:p-6 overflow-y-auto bg-slate-50 custom-scrollbar">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="mb-6 flex items-start justify-between gap-4 md:gap-6">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-4">
                 {title}
               </h2>
               <div className="h-1 w-20 bg-indigo-600 rounded-full mb-4" />
@@ -32,7 +32,7 @@ export const StationWorkspace: React.FC<StationWorkspaceProps> = ({
               </p>
             </div>
             {headerActions && (
-              <div className="flex items-center">
+              <div className="flex shrink-0 items-center justify-end">
                 {headerActions}
               </div>
             )}

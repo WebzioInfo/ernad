@@ -11,10 +11,11 @@ export interface IndustrialNumericInputProps
   step?: number
   min?: number
   max?: number
+  compact?: boolean
 }
 
 const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNumericInputProps>(
-  ({ className, value, onChange, label, suffix, step = 1, min = 0, max, ...props }, ref) => {
+  ({ className, value, onChange, label, suffix, step = 1, min = 0, max, compact = false, ...props }, ref) => {
     const handleIncrement = () => {
       const newValue = value + step
       if (max === undefined || newValue <= max) {
@@ -46,7 +47,8 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
           </label>
         )}
         <div className={cn(
-          "flex items-center h-16 w-full rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/30",
+          "flex items-center w-full rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500/30",
+          compact ? "h-14" : "h-16",
           props.readOnly && "bg-slate-50 border-slate-150"
         )}>
           <button
@@ -62,7 +64,10 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             type="number"
             value={value || ''}
             onChange={handleInputChange}
-            className="flex-1 min-w-0 bg-transparent text-center text-2xl font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 tabular-nums"
+            className={cn(
+              "flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 tabular-nums",
+              compact ? "text-xl" : "text-2xl"
+            )}
             ref={ref}
             {...props}
           />
