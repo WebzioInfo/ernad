@@ -598,6 +598,7 @@ export class ProcessingService {
       remarks: productionLogs.remarks,
       
       // Label specific
+      bopRollUsage: productionLogs.bopRollUsage,
       labelStickerWeight: productionLogs.labelStickerWeight,
       damagedLabelWeight: productionLogs.damagedLabelWeight,
       inkChanged: productionLogs.inkChanged,
@@ -735,6 +736,7 @@ export class ProcessingService {
         source,
         station: l.station,
         // Label specific
+        bopRollUsage: l.bopRollUsage,
         labelStickerWeight: l.labelStickerWeight,
         damagedLabelWeight: l.damagedLabelWeight,
         inkChanged: l.inkChanged,

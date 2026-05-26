@@ -38,16 +38,16 @@ export default function OperatorPanel() {
 
   const stations = [
     {
-      id: 'BLOWING', title: 'Blowing Station', materials: ['Preforms'], category: 'Preforms', icon: Wind, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100'
+      id: 'BLOWING', title: 'Blowing Station', materials: ['Preforms'], category: 'Preforms', icon: Wind, color: 'text-[#16857D]', bg: 'bg-[#16857D]/5', border: 'border-[#16857D]/20'
     },
     {
-      id: 'FILLING', title: 'Filling Station', materials: ['Caps'], category: 'Caps', icon: PackageOpen, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100'
+      id: 'FILLING', title: 'Filling Station', materials: ['Caps'], category: 'Caps', icon: PackageOpen, color: 'text-[#16857D]', bg: 'bg-[#16857D]/5', border: 'border-[#16857D]/20'
     },
     {
-      id: 'LABELING', title: 'Labeling Station', materials: ['Labels'], category: 'Labels', icon: Zap, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100'
+      id: 'LABELING', title: 'Labeling Station', materials: ['Labels'], category: 'Labels', icon: Zap, color: 'text-[#16857D]', bg: 'bg-[#16857D]/5', border: 'border-[#16857D]/20'
     },
     {
-      id: 'PACKING', title: 'Packing Station', materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls', icon: Box, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100'
+      id: 'PACKING', title: 'Packing Station', materials: ['Shrink Rolls', 'Cartons'], category: 'Shrink Rolls', icon: Box, color: 'text-[#16857D]', bg: 'bg-[#16857D]/5', border: 'border-[#16857D]/20'
     },
   ];
 
@@ -95,13 +95,9 @@ export default function OperatorPanel() {
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
   
-  // New Label Station States
-  const [labelStickerWeight, setLabelStickerWeight] = useState(0);
-  const [damagedLabelWeight, setDamagedLabelWeight] = useState(0);
+  // Label station states
   const [inkChanged, setInkChanged] = useState(false);
-  const [inkUsageMl, setInkUsageMl] = useState(0);
   const [makeupChanged, setMakeupChanged] = useState(false);
-  const [makeupUsageMl, setMakeupUsageMl] = useState(0);
   
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
@@ -317,7 +313,6 @@ export default function OperatorPanel() {
       const total = primaryCount + rejectionCount;
       if (currentStationId === 'BLOWING') setPreformUsage(total);
       if (currentStationId === 'FILLING') setCapUsage(total);
-      if (currentStationId === 'LABELING') setLabelUsage(total);
     }
   }, [primaryCount, rejectionCount, rawProductionCount, bottleLeakage, capWastage, productionWastages, currentStationId]);
 
@@ -395,13 +390,13 @@ export default function OperatorPanel() {
         waste: (productionWastages ? capWastage : rejectionCount),
       }] : [];
     } else if (currentStation.id === 'LABELING') {
-      logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
-      logEntry.labelStickerWeight = labelStickerWeight;
-      logEntry.damagedLabelWeight = damagedLabelWeight;
+      logEntry.bopRollUsage = labelUsage;
+      logEntry.labelStickerWeight = labelUsage;
+      logEntry.damagedLabelWeight = rejectionCount;
       logEntry.inkChanged = inkChanged;
-      logEntry.inkUsageMl = inkChanged ? inkUsageMl : 0;
+      logEntry.inkUsageMl = 0;
       logEntry.makeupChanged = makeupChanged;
-      logEntry.makeupUsageMl = makeupChanged ? makeupUsageMl : 0;
+      logEntry.makeupUsageMl = 0;
     } else if (currentStation.id === 'PACKING') {
       logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
       logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
@@ -426,9 +421,8 @@ export default function OperatorPanel() {
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
       setPreformUsage(0); setCapUsage(0); setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
-      setLabelStickerWeight(0); setDamagedLabelWeight(0);
-      setInkChanged(false); setInkUsageMl(0);
-      setMakeupChanged(false); setMakeupUsageMl(0);
+      setInkChanged(false);
+      setMakeupChanged(false);
       setShrinkWasteWeight('');
       setRawProductionCount(0);
       setBottleLeakage(0);
@@ -441,7 +435,7 @@ export default function OperatorPanel() {
 
   if (!activeOperator) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-xl w-full">
           <TerminalLogin
             lineId={lineId!}
@@ -457,8 +451,8 @@ export default function OperatorPanel() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-6">
-        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-6">
+        <Loader2 className="w-12 h-12 text-[#16857D] animate-spin" />
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Initializing OS...</p>
       </div>
     );
@@ -467,10 +461,10 @@ export default function OperatorPanel() {
   const machineStatus = (activeEvents?.length > 0) ? 'ERROR' : (activeBatch?.batch?.status === 'RUNNING' ? 'RUNNING' : 'IDLE');
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
       {isLoggingOut && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-all duration-500 animate-in fade-in">
-          <Loader2 className="w-16 h-16 text-indigo-500 animate-spin mb-6" />
+          <Loader2 className="w-16 h-16 text-[#16857D] animate-spin mb-6" />
           <h2 className="text-2xl font-black text-white uppercase tracking-[0.2em] mb-2">Terminating Session</h2>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Securing workspace and syncing ledger...</p>
         </div>
@@ -497,7 +491,7 @@ export default function OperatorPanel() {
         headerActions={
           <button
             onClick={() => setIsHistoryDrawerOpen(true)}
-            className="lg:hidden px-5 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 transition-all shadow-lg flex items-center gap-2 cursor-pointer animate-in fade-in"
+            className="lg:hidden px-5 py-3 bg-[#16857D] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#126B65] active:scale-95 transition-all shadow-lg shadow-[#16857D]/15 flex items-center gap-2 cursor-pointer animate-in fade-in"
           >
             <History size={14} />
             {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
@@ -518,11 +512,11 @@ export default function OperatorPanel() {
       >
         <div className="grid grid-cols-1 gap-6">
           {/* Main Action Card */}
-          <div className="bg-white border border-slate-200 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-6">
+          <div className="bg-white border border-[#16857D]/15 rounded-[2rem] p-5 md:p-6 shadow-sm shadow-[#16857D]/5 space-y-6">
             {currentStation.id === 'FILLING' && (
               <div className="space-y-4">
                 {/* Production Wastages Toggle */}
-                <div className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100/60 rounded-2xl">
+                <div className="flex items-center justify-between p-4 bg-[#16857D]/5 border border-[#16857D]/15 rounded-2xl">
                   <div className="flex flex-col">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-700">Production Wastages</span>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Track bottle leaks and damaged caps</span>
@@ -531,7 +525,7 @@ export default function OperatorPanel() {
                     type="button"
                     onClick={() => setProductionWastages(!productionWastages)}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      productionWastages ? "bg-emerald-600" : "bg-slate-200"
+                      productionWastages ? "bg-[#16857D]" : "bg-slate-200"
                     }`}
                   >
                     <span
@@ -568,15 +562,24 @@ export default function OperatorPanel() {
                     suffix="Units"
                     compact
                   />
-                  <div className="xl:col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+                  <div className="xl:col-span-2 p-4 bg-[#16857D]/5 border border-[#16857D]/15 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
                     <div>
-                      Net Production: <span className="text-emerald-600 font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
+                      Net Production: <span className="text-[#16857D] font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
                     </div>
                     <div>
                       Total Wastage: <span className="text-rose-500 font-bold">{bottleLeakage + capWastage} Units</span>
                     </div>
                   </div>
                 </>
+              ) : currentStation.id === 'LABELING' ? (
+                <IndustrialNumericInput
+                  label="Label Wastage"
+                  value={rejectionCount}
+                  onChange={setRejectionCount}
+                  suffix="KG"
+                  step={0.01}
+                  compact
+                />
               ) : (
                 <>
                   <IndustrialNumericInput
@@ -611,7 +614,7 @@ export default function OperatorPanel() {
                       <select
                         value={selectedRawMaterialId}
                         onChange={e => setSelectedRawMaterialId(e.target.value)}
-                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/40 transition-all"
+                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#16857D]/45 transition-all"
                       >
                         <option value="">Select Raw Material...</option>
                         {preformRawMaterials.map((material: any) => (
@@ -649,7 +652,7 @@ export default function OperatorPanel() {
                         readOnly
                         compact
                       />
-                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                      <p className="text-[10px] font-black text-[#16857D] uppercase tracking-widest px-2">
                         Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
                       </p>
                     </div>
@@ -665,7 +668,7 @@ export default function OperatorPanel() {
                       <select
                         value={selectedCapRawMaterialId}
                         onChange={e => setSelectedCapRawMaterialId(e.target.value)}
-                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500/40 transition-all"
+                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#16857D]/45 transition-all"
                       >
                         <option value="">Select Caps raw material...</option>
                         {capRawMaterials.map((material: any) => (
@@ -698,7 +701,7 @@ export default function OperatorPanel() {
                         readOnly
                         compact
                       />
-                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                      <p className="text-[10px] font-black text-[#16857D] uppercase tracking-widest px-2">
                         Batch Total: <span className="text-slate-900">
                           {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
                         </span>
@@ -711,36 +714,32 @@ export default function OperatorPanel() {
                   <>
                     <div className="space-y-1">
                       <IndustrialNumericInput
-                        label="Labels Used (This Log)"
+                        label="Label Used"
                         value={labelUsage}
-                        onChange={() => {}}
-                        suffix="Pcs"
-                        readOnly
+                        onChange={setLabelUsage}
+                        suffix="KG"
+                        step={0.01}
                         compact
                       />
                     </div>
-                    <IndustrialNumericInput label="Label Sticker Weight" value={labelStickerWeight} onChange={setLabelStickerWeight} suffix="g" compact />
-                    <IndustrialNumericInput label="Damaged Label Waste" value={damagedLabelWeight} onChange={setDamagedLabelWeight} suffix="g" compact />
                     
-                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-4">
+                    <div className="p-4 border border-[#16857D]/15 rounded-xl bg-[#16857D]/5 space-y-4">
                       <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Consumable Changed</span>
+                        <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-[#16857D] focus:ring-[#16857D]" />
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Used</span>
                       </label>
-                      {inkChanged && <IndustrialNumericInput label="Ink Usage" value={inkUsageMl} onChange={setInkUsageMl} suffix="ml" compact />}
                       
                       <label className="flex items-center gap-3 cursor-pointer pt-2">
-                        <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-indigo-600" />
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Make-up Consumable Changed</span>
+                        <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-[#16857D] focus:ring-[#16857D]" />
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Makeup Used</span>
                       </label>
-                      {makeupChanged && <IndustrialNumericInput label="Make-up Usage" value={makeupUsageMl} onChange={setMakeupUsageMl} suffix="ml" compact />}
                     </div>
                   </>
                 )}
                 
                 {currentStation.id === 'PACKING' && (
                   <>
-                    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50">
+                    <div className="p-4 border border-[#16857D]/15 rounded-xl bg-[#16857D]/5">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
                       <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
                     </div>
@@ -760,7 +759,7 @@ export default function OperatorPanel() {
                           value={shrinkUsage}
                           onChange={e => setShrinkUsage(e.target.value)}
                           placeholder="e.g. 1.256"
-                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                          className="w-full h-14 bg-white border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-[#16857D]/35 transition-all"
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
                       </div>
@@ -775,7 +774,7 @@ export default function OperatorPanel() {
                           value={shrinkWasteWeight}
                           onChange={e => setShrinkWasteWeight(e.target.value)}
                           placeholder="e.g. 0.124"
-                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/30 transition-all"
+                          className="w-full h-14 bg-white border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-[#16857D]/35 transition-all"
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
                       </div>
@@ -785,23 +784,23 @@ export default function OperatorPanel() {
               </div>
             </div>
 
-            <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 md:p-5">
+            <div className="bg-[#16857D]/5 border border-[#16857D]/15 rounded-2xl p-4 md:p-5">
               <div className="flex items-center gap-3 mb-3">
-                <AlertTriangle className="text-amber-600" size={18} />
-                <h4 className="text-xs font-black text-amber-900 uppercase tracking-widest">Anomaly Signature</h4>
+                <AlertTriangle className="text-[#16857D]" size={18} />
+                <h4 className="text-xs font-black text-[#16857D] uppercase tracking-widest">Anomaly Signature</h4>
               </div>
               <textarea
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Describe machine event or stop reason..."
-                className="w-full h-20 bg-white border border-amber-200 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-amber-900/30 outline-none focus:border-amber-500/50 transition-all resize-none"
+                className="w-full h-20 bg-white border border-[#16857D]/20 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-[#16857D]/35 outline-none focus:border-[#16857D]/50 transition-all resize-none"
               />
             </div>
 
             <button
               onClick={() => handleSaveTelemetry('ALL')}
               disabled={isSubmitting}
-              className="w-full h-16 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+              className="w-full h-16 bg-[#16857D] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-[#16857D]/15 hover:bg-[#126B65] transition-all active:scale-[0.98]"
             >
               {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
               Commit to Ledger
@@ -829,7 +828,7 @@ export default function OperatorPanel() {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[90vw] bg-white z-50 lg:hidden shadow-2xl flex flex-col border-l border-slate-200"
             >
-              <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+              <div className="p-6 border-b border-[#16857D]/15 flex items-center justify-between bg-white">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">
                     {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
@@ -864,7 +863,7 @@ export default function OperatorPanel() {
         <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8">
           <DialogHeader className="space-y-4 mb-6">
             <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-slate-900">
-              Change <span className="text-indigo-600">Station</span>
+              Change <span className="text-[#16857D]">Station</span>
             </DialogTitle>
             <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
               Select a new process node on {line?.name || 'this line'}. Your session will seamlessly transfer.
@@ -883,7 +882,7 @@ export default function OperatorPanel() {
                   className={`group p-6 rounded-2xl border transition-all text-left flex items-center gap-4 ${
                     isActive 
                       ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
-                      : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md cursor-pointer'
+                      : 'bg-white border-slate-200 hover:border-[#16857D]/35 hover:shadow-md cursor-pointer'
                   }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${station.bg} ${station.border}`}>
@@ -895,7 +894,7 @@ export default function OperatorPanel() {
                       {isActive ? 'Current Node' : 'Switch Context'}
                     </p>
                   </div>
-                  {isSwitching && <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />}
+                  {isSwitching && <Loader2 className="w-5 h-5 text-[#16857D] animate-spin" />}
                 </button>
               );
             })}
@@ -916,7 +915,7 @@ export default function OperatorPanel() {
         <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="space-y-4 mb-6">
             <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-slate-900">
-              Shift <span className="text-emerald-600">Handover</span>
+              Shift <span className="text-[#16857D]">Handover</span>
             </DialogTitle>
             <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
               Transfer custody of the active production station. Counts, batch state, and telemetry will remain uninterrupted.
@@ -931,7 +930,7 @@ export default function OperatorPanel() {
                 value={handoverNotes}
                 onChange={e => setHandoverNotes(e.target.value)}
                 placeholder="Describe current station run observations, parameters, heater zones..."
-                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all resize-none"
+                className="w-full h-24 bg-white border border-slate-200 rounded-xl p-4 text-xs font-bold text-slate-700 outline-none focus:border-[#16857D] transition-all resize-none"
               />
             </div>
 
@@ -942,7 +941,7 @@ export default function OperatorPanel() {
                 value={handoverIssues}
                 onChange={e => setHandoverIssues(e.target.value)}
                 placeholder="List any mechanical faults or raw material delays..."
-                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all"
+                className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#16857D] transition-all"
               />
             </div>
 
@@ -958,7 +957,7 @@ export default function OperatorPanel() {
                   <select
                     value={incomingOperatorId}
                     onChange={e => setIncomingOperatorId(e.target.value)}
-                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-emerald-500 transition-all"
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#16857D] transition-all"
                   >
                     <option value="">Choose Operator...</option>
                     {operatorsList?.filter((op: any) => op.id !== activeOperator?.id).map((op: any) => (
@@ -975,7 +974,7 @@ export default function OperatorPanel() {
                     value={incomingOperatorPin}
                     onChange={e => setIncomingOperatorPin(e.target.value)}
                     placeholder="****"
-                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-center text-lg font-black text-slate-900 outline-none tracking-widest focus:border-emerald-500 transition-all"
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-center text-lg font-black text-slate-900 outline-none tracking-widest focus:border-[#16857D] transition-all"
                   />
                 </div>
               </div>
@@ -984,13 +983,13 @@ export default function OperatorPanel() {
             <hr className="border-slate-100" />
 
             {/* Checkbox Acknowledgment */}
-            <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl space-y-3">
+            <div className="p-4 bg-[#16857D]/5 border border-[#16857D]/15 rounded-2xl space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={materialStateConfirmed}
                   onChange={e => setMaterialStateConfirmed(e.target.checked)}
-                  className="w-5 h-5 rounded text-emerald-600 mt-0.5 border-slate-300 focus:ring-emerald-500"
+                  className="w-5 h-5 rounded text-[#16857D] mt-0.5 border-slate-300 focus:ring-[#16857D]"
                 />
                 <span className="text-[11px] font-bold text-slate-700 leading-normal">
                   I confirm that physical raw material counts (preforms/caps/shrink rolls) align with the counts recorded in the terminal.
@@ -1002,7 +1001,7 @@ export default function OperatorPanel() {
                   type="checkbox"
                   checked={machineStatusAcknowledged}
                   onChange={e => setMachineStatusAcknowledged(e.target.checked)}
-                  className="w-5 h-5 rounded text-emerald-600 mt-0.5 border-slate-300 focus:ring-emerald-500"
+                  className="w-5 h-5 rounded text-[#16857D] mt-0.5 border-slate-300 focus:ring-[#16857D]"
                 />
                 <span className="text-[11px] font-bold text-slate-700 leading-normal">
                   I acknowledge the current machine running state and verified that all safety shields are active.
@@ -1022,7 +1021,7 @@ export default function OperatorPanel() {
             <Button
               disabled={isSubmittingHandover}
               onClick={handleHandoverSubmit}
-              className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
+              className="h-12 bg-[#16857D] hover:bg-[#126B65] text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
             >
               {isSubmittingHandover ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Handover'}
             </Button>

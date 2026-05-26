@@ -16,6 +16,7 @@ interface LogEntry {
   station?: string;
   labelStickerWeight?: string | number;
   damagedLabelWeight?: string | number;
+  bopRollUsage?: string | number;
   inkChanged?: boolean;
   inkUsageMl?: string | number;
   makeupChanged?: boolean;
@@ -58,31 +59,31 @@ const getFriendlyEventName = (eventType: string) => {
 };
 
 const getDotColor = (eventType: string) => {
-  if (['NORMAL_PRODUCTION', 'OPERATOR_LOGIN'].includes(eventType)) return 'bg-emerald-500 ring-emerald-100';
-  if (['BATCH_START', 'BATCH_END'].includes(eventType)) return 'bg-blue-500 ring-blue-100';
-  if (['MATERIAL_ASSIGNMENT'].includes(eventType)) return 'bg-indigo-500 ring-indigo-100';
+  if (['NORMAL_PRODUCTION', 'OPERATOR_LOGIN'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
+  if (['BATCH_START', 'BATCH_END'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
+  if (['MATERIAL_ASSIGNMENT'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
   if (['OPERATOR_LOGOUT', 'DOWNTIME_RESOLVED'].includes(eventType)) return 'bg-slate-400 ring-slate-100';
   return 'bg-rose-500 ring-rose-100'; // Anomalies
 };
 
 const stationStyles: Record<string, string> = {
-  BLOWING: 'bg-blue-50 text-blue-700 border-blue-100/60',
-  FILLING: 'bg-emerald-50 text-emerald-700 border-emerald-100/60',
-  LABELING: 'bg-indigo-50 text-indigo-700 border-indigo-100/60',
-  PACKING: 'bg-amber-50 text-amber-700 border-amber-100/60',
+  BLOWING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
+  FILLING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
+  LABELING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
+  PACKING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
   QC: 'bg-rose-50 text-rose-700 border-rose-100/60',
 };
 
 const getSourceIcon = (source?: string) => {
-  if (source === 'MACHINE') return <Activity size={10} className="text-amber-600" />;
-  if (source === 'SYSTEM') return <Cpu size={10} className="text-blue-600" />;
-  return <User size={10} className="text-emerald-600" />;
+  if (source === 'MACHINE') return <Activity size={10} className="text-[#16857D]" />;
+  if (source === 'SYSTEM') return <Cpu size={10} className="text-[#16857D]" />;
+  return <User size={10} className="text-[#16857D]" />;
 };
 
 const getSourceBadgeClass = (source?: string) => {
-  if (source === 'MACHINE') return 'bg-amber-50 text-amber-700 border-amber-150';
-  if (source === 'SYSTEM') return 'bg-blue-50 text-blue-700 border-blue-150';
-  return 'bg-emerald-50 text-emerald-700 border-emerald-150';
+  if (source === 'MACHINE') return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
+  if (source === 'SYSTEM') return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
+  return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
 };
 
 const formatWastageValue = (value: string | number) => {
@@ -93,25 +94,25 @@ const formatWastageValue = (value: string | number) => {
 
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, isRefreshing }) => {
   return (
-    <div className="flex flex-col h-full bg-slate-50/30">
-      <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between bg-white/90 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+    <div className="flex flex-col h-full bg-white">
+      <div className="px-8 py-5 border-b border-[#16857D]/15 flex items-center justify-between bg-white/90 backdrop-blur-xl sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="w-8 h-8 rounded-[10px] bg-slate-100 hover:bg-slate-250 active:scale-95 flex items-center justify-center text-slate-700 border border-slate-200 transition-all disabled:opacity-50"
+            className="w-8 h-8 rounded-[10px] bg-[#16857D]/5 hover:bg-[#16857D]/10 active:scale-95 flex items-center justify-center text-[#16857D] border border-[#16857D]/15 transition-all disabled:opacity-50"
             title="Refresh Uplink Feed"
           >
-            <RefreshCw size={14} className={cn("text-slate-600", isRefreshing && "animate-spin")} />
+            <RefreshCw size={14} className={cn("text-[#16857D]", isRefreshing && "animate-spin")} />
           </button>
           <div>
             <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-800">Uplink Feed</h3>
             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Real-Time Event Stream</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100/60">
-          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Live Sync</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#16857D]/5 rounded-full border border-[#16857D]/15">
+          <span className="text-[9px] font-black text-[#16857D] uppercase tracking-wider">Live Sync</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#16857D] animate-pulse" />
         </div>
       </div>
 
@@ -151,7 +152,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                   )} />
 
                   {/* Glassmorphic Event Card */}
-                  <div className="p-2.5 bg-white border border-slate-200/80 rounded-[12px] hover:border-indigo-300/80 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(99,102,241,0.05)] hover:-translate-y-0.5">
+                  <div className="p-2.5 bg-white border border-[#16857D]/15 rounded-[12px] hover:border-[#16857D]/35 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(22,133,125,0.06)] hover:-translate-y-0.5">
                     {/* Header: Badges & Time */}
                     <div className="flex justify-between items-center gap-2 mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -194,7 +195,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                       {/* Material usage assignments */}
                       {log.eventType === 'MATERIAL_ASSIGNMENT' && log.primaryCount > 0 && (
-                        <div className="mt-0.5 flex items-baseline gap-1.5 text-indigo-700">
+                        <div className="mt-0.5 flex items-baseline gap-1.5 text-[#16857D]">
                           <Package size={12} className="self-center" />
                           <span className="text-sm font-black tracking-tight">
                             {log.primaryCount.toLocaleString()}
@@ -205,48 +206,48 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                     </div>
 
                     {/* Technical Parameter Details */}
-                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || (Number(log.wastageCount) || 0) > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.bagsUsed || log.capBoxUsage || log.capUsage || log.preformUsage || log.rawMaterialName) && (
+                    {(log.station === 'LABELING' || log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || (Number(log.wastageCount) || 0) > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.bagsUsed || log.capBoxUsage || log.capUsage || log.preformUsage || log.rawMaterialName) && (
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-1 px-2 bg-slate-50/70 border border-slate-100 rounded-lg my-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                         {log.rawMaterialName && (
                           <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-0.5 mb-0.5">
                             <span>Raw Material:</span>
-                            <span className="text-indigo-600 font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
+                            <span className="text-[#16857D] font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
                           </div>
                         )}
                         {log.bagsUsed !== undefined && Number(log.bagsUsed) > 0 && (
                           <>
                             <div className="flex justify-between">
                               <span>Bags Used:</span>
-                              <span className="text-indigo-600 font-black">{log.bagsUsed}</span>
+                              <span className="text-[#16857D] font-black">{log.bagsUsed}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Bags Weight:</span>
-                              <span className="text-indigo-600 font-black">{Number(log.bagsUsed) * 25} KG</span>
+                              <span className="text-[#16857D] font-black">{Number(log.bagsUsed) * 25} KG</span>
                             </div>
                           </>
                         )}
                         {log.capUsage !== undefined && Number(log.capUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Caps Used:</span>
-                            <span className="text-indigo-600 font-black">{log.capUsage}</span>
+                            <span className="text-[#16857D] font-black">{log.capUsage}</span>
                           </div>
                         )}
                         {log.preformUsage !== undefined && Number(log.preformUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Preforms Used:</span>
-                            <span className="text-indigo-600 font-black">{log.preformUsage}</span>
+                            <span className="text-[#16857D] font-black">{log.preformUsage}</span>
                           </div>
                         )}
                         {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Cap Boxes:</span>
-                            <span className="text-indigo-600 font-black">{log.capBoxUsage}</span>
+                            <span className="text-[#16857D] font-black">{log.capBoxUsage}</span>
                           </div>
                         )}
                         {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (
                           <div className="flex justify-between">
                             <span>Secondary:</span>
-                            <span className="text-indigo-600 font-black">{log.secondaryPackagingCount}</span>
+                            <span className="text-[#16857D] font-black">{log.secondaryPackagingCount}</span>
                           </div>
                         )}
                         {log.station === 'FILLING' && (Number(log.bottleLeakage) > 0 || Number(log.capWastage) > 0) ? (
@@ -288,28 +289,38 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                             </div>
                           )
                         )}
-                        {log.labelStickerWeight && (
+                        {log.station === 'LABELING' && (log.bopRollUsage !== undefined || log.labelStickerWeight !== undefined) && (
                           <div className="flex justify-between">
-                            <span>Label Wt:</span>
-                            <span className="text-indigo-600 font-black">{log.labelStickerWeight}g</span>
+                            <span>Label Used:</span>
+                            <span className="text-[#16857D] font-black">{log.bopRollUsage || log.labelStickerWeight} KG</span>
                           </div>
                         )}
-                        {log.damagedLabelWeight && (
+                        {log.station !== 'LABELING' && log.labelStickerWeight && (
+                          <div className="flex justify-between">
+                            <span>Label Wt:</span>
+                            <span className="text-[#16857D] font-black">{log.labelStickerWeight}g</span>
+                          </div>
+                        )}
+                        {log.station !== 'LABELING' && log.damagedLabelWeight && (
                           <div className="flex justify-between">
                             <span>Damage Wt:</span>
                             <span className="text-rose-500 font-black">{log.damagedLabelWeight}g</span>
                           </div>
                         )}
-                        {log.inkChanged && (
+                        {log.station === 'LABELING' && (
                           <div className="flex justify-between col-span-2">
-                            <span>Ink Consumable:</span>
-                            <span className="text-emerald-600 font-black">Replaced ({log.inkUsageMl}ml)</span>
+                            <span>Ink Used:</span>
+                            <span className={cn('font-black', log.inkChanged ? 'text-[#16857D]' : 'text-slate-400')}>
+                              {log.inkChanged ? 'Yes' : 'No'}
+                            </span>
                           </div>
                         )}
-                        {log.makeupChanged && (
+                        {log.station === 'LABELING' && (
                           <div className="flex justify-between col-span-2">
-                            <span>Makeup Consumable:</span>
-                            <span className="text-emerald-600 font-black">Replaced ({log.makeupUsageMl}ml)</span>
+                            <span>Makeup Used:</span>
+                            <span className={cn('font-black', log.makeupChanged ? 'text-[#16857D]' : 'text-slate-400')}>
+                              {log.makeupChanged ? 'Yes' : 'No'}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -317,8 +328,8 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                     {/* Remarks / Message Bubble */}
                     {log.remarks && (
-                      <div className="mt-1.5 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
-                        <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div className="mt-1.5 p-2 rounded-lg bg-[#16857D]/5 border border-[#16857D]/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
+                        <AlertTriangle size={12} className="text-[#16857D] shrink-0 mt-0.5" />
                         <span>{log.remarks}</span>
                       </div>
                     )}
