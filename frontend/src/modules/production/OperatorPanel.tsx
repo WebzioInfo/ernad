@@ -475,7 +475,7 @@ export default function OperatorPanel() {
         stationName={currentStation.title}
         operatorName={activeOperator?.name || 'Operator'}
         batchCode={activeBatch?.batch?.batchCode}
-        productName={activeBatch?.productName}
+        productName={activeBatch?.batch?.productName || activeBatch?.productName}
         machineStatus={machineStatus}
         isLoggingOut={isLoggingOut}
         onChangeStation={() => setShowStationModal(true)}

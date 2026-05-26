@@ -38,7 +38,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
     <header className="px-8 py-5 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4 pr-6 border-r border-gray-200/60">
-          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-white shadow-[0_4px_16px_rgba(26,154,145,0.12)] overflow-hidden shrink-0">
+          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-white overflow-hidden shrink-0">
             <img src="/fav-nobg.png" alt="Product logo" className="h-full w-full object-contain" />
           </div>
           <div>

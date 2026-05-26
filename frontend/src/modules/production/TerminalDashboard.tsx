@@ -56,7 +56,14 @@ export default function TerminalDashboard() {
     retry: 1
   }).data;
 
-  const activeBatch = batchData?.batch || lineData?.batch;
+  const activeBatch = batchData?.batch
+    ? {
+        ...batchData.batch,
+        target: batchData.target,
+        actual: batchData.actual,
+        rejectionTotal: batchData.rejectionTotal
+      }
+    : lineData?.batch;
 
   const stations = [
     { id: 'BLOWING', title: 'Blowing', icon: Wind, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },

@@ -25,8 +25,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title ?? 'Ernad MES Alert';
   const notificationOptions = {
     body:  payload.notification?.body ?? 'A production event occurred.',
-    icon:  '/icons/icon-192.png',
-    badge: '/icons/badge-72.png',
+    icon:  '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
     data:  payload.data,
     vibrate: [200, 100, 200],
   };

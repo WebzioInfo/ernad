@@ -6,6 +6,7 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
@@ -94,6 +95,14 @@
 }
 
 @layer base {
+  html,
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-family: var(--font-sans);
+  }
 
   *,
   ::after,
@@ -281,7 +290,7 @@
     --tw-shadow-color: rgb(22 133 125 / 0.18) !important;
   }
 
-  .operator-page .font-black {
+  .font-black {
     font-weight: 700;
   }
 

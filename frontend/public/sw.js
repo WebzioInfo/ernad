@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eranad-mes-cache-v3';
+const CACHE_NAME = 'eranad-mes-cache-v4';
 
 // ── INITIAL EVALUATION FIX ──
 // Ensure message listener is registered immediately to satisfy Chrome requirements.
@@ -12,6 +12,11 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/apple-touch-icon.png',
+  '/android-chrome-192x192.png',
+  '/android-chrome-512x512.png',
   '/favicon.ico',
 ];
 
