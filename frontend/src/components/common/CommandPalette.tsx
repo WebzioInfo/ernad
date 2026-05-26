@@ -31,7 +31,8 @@ export default function CommandPalette() {
   const ACTIONS = [
     { id: 'prod', name: 'Production Commander', icon: Activity, path: '/production', category: 'Operations' },
     { id: 'staff', name: 'Personnel Directory', icon: Users, path: '/personnel/staff', category: 'Management' },
-    { id: 'inventory', name: 'Inventory Ledger', icon: Package, path: '/inventory', category: 'Logistics' },
+    { id: 'products', name: 'Products Database', icon: Package, path: '/products', category: 'Logistics' },
+    { id: 'raw-materials', name: 'Raw Materials Database', icon: Package, path: '/raw-materials', category: 'Logistics' },
     { id: 'audit', name: 'System Security Audit', icon: ShieldCheck, path: '/personnel/users', category: 'Admin' },
     { id: 'settings', name: 'Factory Configuration', icon: Settings, path: '/settings', category: 'Admin' },
   ];

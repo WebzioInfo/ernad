@@ -8,7 +8,10 @@ import { Permissions } from '../auth/permissions.decorator';
 import { 
   CreateLineDto, 
   CreateBrandDto, 
-  CreateProductDto
+  CreateProductDto,
+  UpdateProductDto,
+  CreateRawMaterialDto,
+  UpdateRawMaterialDto
 } from './dto/master-data.dto';
 
 @ApiTags('Master Data')
@@ -85,6 +88,18 @@ export class MasterDataController {
     return await this.masterDataService.createProduct(dto);
   }
 
+  @Patch('products/:id')
+  @Permissions('settings:manage')
+  async updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
+    return await this.masterDataService.updateProduct(id, dto);
+  }
+
+  @Delete('products/:id')
+  @Permissions('settings:manage')
+  async deleteProduct(@Param('id') id: string) {
+    return await this.masterDataService.deleteProduct(id);
+  }
+
   @Get('shifts')
   @Permissions('settings:view')
   async getShifts() {
@@ -101,5 +116,23 @@ export class MasterDataController {
   @Permissions('settings:view')
   async getRawMaterials() {
     return await this.masterDataService.getRawMaterials();
+  }
+
+  @Post('raw-materials')
+  @Permissions('settings:manage')
+  async createRawMaterial(@Body() dto: CreateRawMaterialDto) {
+    return await this.masterDataService.createRawMaterial(dto);
+  }
+
+  @Patch('raw-materials/:id')
+  @Permissions('settings:manage')
+  async updateRawMaterial(@Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
+    return await this.masterDataService.updateRawMaterial(id, dto);
+  }
+
+  @Delete('raw-materials/:id')
+  @Permissions('settings:manage')
+  async deleteRawMaterial(@Param('id') id: string) {
+    return await this.masterDataService.deleteRawMaterial(id);
   }
 }

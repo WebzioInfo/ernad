@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../auth/auth.store';
 import {
   Loader2,
   AlertTriangle,
   Layers,
+  History,
+  X
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
@@ -71,6 +74,7 @@ export default function OperatorPanel() {
   const [primaryCount, setPrimaryCount] = useState(0);
   const [rejectionCount, setRejectionCount] = useState(0);
   const [secondaryPackagingCount, setSecondaryPackagingCount] = useState(0); // Bag/Box Count
+  const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
   // Station Specific States
   const [selectedCapProductId, setSelectedCapProductId] = useState('');
@@ -418,7 +422,7 @@ export default function OperatorPanel() {
   const machineStatus = (activeEvents?.length > 0) ? 'ERROR' : (activeBatch?.batch?.status === 'RUNNING' ? 'RUNNING' : 'IDLE');
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       {isLoggingOut && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-all duration-500 animate-in fade-in">
           <Loader2 className="w-16 h-16 text-indigo-500 animate-spin mb-6" />
@@ -445,6 +449,15 @@ export default function OperatorPanel() {
       <StationWorkspace
         title={currentStation.title}
         description="Production Data Processing Node"
+        headerActions={
+          <button
+            onClick={() => setIsHistoryDrawerOpen(true)}
+            className="lg:hidden px-5 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 active:scale-95 transition-all shadow-lg flex items-center gap-2 cursor-pointer animate-in fade-in"
+          >
+            <History size={14} />
+            {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
+          </button>
+        }
         sidebar={
           <ActivityFeed 
             history={history || []} 
@@ -678,6 +691,56 @@ export default function OperatorPanel() {
           </div>
         </div>
       </StationWorkspace>
+
+      <AnimatePresence>
+        {isHistoryDrawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsHistoryDrawerOpen(false)}
+              className="fixed inset-0 bg-black z-50 lg:hidden"
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed right-0 top-0 bottom-0 w-[420px] max-w-[90vw] bg-white z-50 lg:hidden shadow-2xl flex flex-col border-l border-slate-200"
+            >
+              <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">
+                    {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
+                  </h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">Real-time Telemetry Stream</p>
+                </div>
+                <button
+                  onClick={() => setIsHistoryDrawerOpen(false)}
+                  className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-800 transition-colors shadow-sm cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <ActivityFeed 
+                  history={history || []} 
+                  onRefresh={() => {
+                    refetchHistory();
+                    queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
+                    queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+                    toast.success('Uplink Feed Refreshed');
+                  }} 
+                  isRefreshing={isFetchingHistory} 
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <Dialog open={showStationModal} onOpenChange={setShowStationModal}>
         <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8">

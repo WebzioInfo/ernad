@@ -78,7 +78,7 @@ const ManagerDashboard = memo(() => {
               <ActionTile icon={LayoutDashboard} label="Production Floor" path={`${roleBase}/production`} color="indigo" />
               <ActionTile icon={Play} label="Start New Batch" path={`${roleBase}/production?action=start`} color="emerald" />
               <ActionTile icon={BarChart3} label="OEE Analytics" path={`${roleBase}/analytics`} color="violet" />
-              <ActionTile icon={Package} label="Inventory Status" path={`${roleBase}/inventory`} color="amber" />
+              <ActionTile icon={Package} label="Raw Materials" path={`${roleBase}/raw-materials`} color="amber" />
               <ActionTile icon={ShieldCheck} label="Quality Control" path={`${roleBase}/quality`} color="rose" />
               <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
               <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/users`} color="cyan" />

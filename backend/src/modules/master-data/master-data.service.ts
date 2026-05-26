@@ -106,7 +106,7 @@ export class MasterDataService {
     return await db.select().from(productBrands);
   }
 
-  async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
+  async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string; targetBPM?: number }) {
     const [product] = await db.insert(products).values({ ...dto }).returning();
     return product;
   }
@@ -151,5 +151,23 @@ export class MasterDataService {
     })
     .from(rawMaterials)
     .innerJoin(materialCategories, eq(rawMaterials.categoryId, materialCategories.id));
+  }
+
+  async createRawMaterial(dto: { name: string; categoryId: string }) {
+    const [rawMaterial] = await db.insert(rawMaterials).values({ ...dto }).returning();
+    return rawMaterial;
+  }
+
+  async updateRawMaterial(id: string, dto: { name?: string; categoryId?: string }) {
+    const [rawMaterial] = await db.update(rawMaterials)
+      .set({ ...dto, updatedAt: new Date() })
+      .where(eq(rawMaterials.id, id))
+      .returning();
+    return rawMaterial;
+  }
+
+  async deleteRawMaterial(id: string) {
+    await db.delete(rawMaterials).where(eq(rawMaterials.id, id));
+    return { success: true };
   }
 }

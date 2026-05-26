@@ -36,6 +36,11 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  targetBPM?: number;
 }
 
 export class CreateRawMaterialDto {
@@ -43,24 +48,9 @@ export class CreateRawMaterialDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 'PCS' })
+  @ApiProperty()
   @IsString()
-  unit: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  category?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  currentStock?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  minimumStock?: string;
+  categoryId: string;
 }
 
 export class UpdateStockDto {
@@ -110,6 +100,11 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  targetBPM?: number;
 }
 
 export class UpdateRawMaterialDto {
@@ -121,22 +116,7 @@ export class UpdateRawMaterialDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  unit?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  category?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  currentStock?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  minimumStock?: string;
+  categoryId?: string;
 }
 
 export class CreateShiftDto {

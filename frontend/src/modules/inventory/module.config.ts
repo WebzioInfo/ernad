@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Package } from 'lucide-react';
+import { Package, Layers } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const inventoryConfig: ModuleConfig = {
@@ -9,8 +9,13 @@ export const inventoryConfig: ModuleConfig = {
   order: 40,
   routes: [
     {
-      path: 'inventory',
-      element: lazy(() => import('./InventoryPage')),
+      path: 'products',
+      element: lazy(() => import('./ProductsPage')),
+      allowedRoles: ['ADMIN', 'MANAGER']
+    },
+    {
+      path: 'raw-materials',
+      element: lazy(() => import('./RawMaterialsPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
@@ -20,10 +25,17 @@ export const inventoryConfig: ModuleConfig = {
       label: 'Inventory',
       items: [
         {
-          id: 'inventory',
-          label: 'Materials',
+          id: 'products',
+          label: 'Products',
           icon: Package,
-          path: '/inventory',
+          path: '/products',
+          allowedRoles: ['ADMIN', 'MANAGER']
+        },
+        {
+          id: 'raw-materials',
+          label: 'Raw Materials',
+          icon: Layers,
+          path: '/raw-materials',
           allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]

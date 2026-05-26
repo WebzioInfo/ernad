@@ -104,7 +104,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar">
         <AnimatePresence mode="popLayout">
           {!history || history.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center py-24 opacity-60">
@@ -131,18 +131,18 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                   className="pl-6 relative group"
                 >
                   {/* Timeline Connection Line */}
-                  <div className="absolute left-[7px] top-4 bottom-[-20px] w-[2px] bg-slate-200/80 group-last:bg-transparent" />
+                  <div className="absolute left-[7px] top-3.5 bottom-[-16px] w-[2px] bg-slate-200/80 group-last:bg-transparent" />
                   
                   {/* Glowing Event Dot */}
                   <div className={cn(
-                    "absolute left-0 top-[18px] w-4 h-4 rounded-full border-[3px] border-white shadow-[0_1px_4px_rgba(0,0,0,0.1)] z-10 transition-transform duration-300 group-hover:scale-125 ring-2",
+                    "absolute left-0 top-[13px] w-4 h-4 rounded-full border-[3px] border-white shadow-[0_1px_4px_rgba(0,0,0,0.1)] z-10 transition-transform duration-300 group-hover:scale-125 ring-2",
                     dotColor
                   )} />
 
                   {/* Glassmorphic Event Card */}
-                  <div className="p-5 bg-white border border-slate-200/80 rounded-[18px] hover:border-indigo-300/80 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(99,102,241,0.05)] hover:-translate-y-0.5">
+                  <div className="p-3.5 bg-white border border-slate-200/80 rounded-[14px] hover:border-indigo-300/80 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(99,102,241,0.05)] hover:-translate-y-0.5">
                     {/* Header: Badges & Time */}
-                    <div className="flex justify-between items-center gap-2 mb-3">
+                    <div className="flex justify-between items-center gap-2 mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Source Tag */}
                         <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[8px] font-black uppercase tracking-wider", getSourceBadgeClass(log.source))}>
@@ -159,33 +159,33 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                       </div>
 
                       {/* Timestamp */}
-                      <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 tracking-wider uppercase bg-slate-50/80 px-2 py-1 rounded-md border border-slate-100">
+                      <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 tracking-wider uppercase bg-slate-50/80 px-2 py-0.5 rounded-md border border-slate-100">
                         <Clock size={9} strokeWidth={2.5} />
                         {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </div>
                     </div>
 
                     {/* Main Content Area */}
-                    <div className="mb-2">
+                    <div className="mb-1.5">
                       <h4 className="text-xs font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">
                         {friendlyEvent}
                       </h4>
                       
                       {/* Show production count prominently */}
                       {isNormalProd && log.primaryCount > 0 && (
-                        <div className="mt-2 flex items-baseline gap-1.5">
-                          <span className="text-2xl font-black text-slate-900 tracking-tighter">
+                        <div className="mt-1 flex items-baseline gap-1.5">
+                          <span className="text-xl font-black text-slate-900 tracking-tighter">
                             +{log.primaryCount.toLocaleString()}
                           </span>
-                          <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Units</span>
+                          <span className="text-[9px] font-bold text-slate-455 uppercase tracking-wider">Units</span>
                         </div>
                       )}
 
                       {/* Material usage assignments */}
                       {log.eventType === 'MATERIAL_ASSIGNMENT' && log.primaryCount > 0 && (
-                        <div className="mt-2 flex items-baseline gap-1.5 text-indigo-700">
+                        <div className="mt-1 flex items-baseline gap-1.5 text-indigo-700">
                           <Package size={12} className="self-center" />
-                          <span className="text-lg font-black tracking-tight">
+                          <span className="text-base font-black tracking-tight">
                             {log.primaryCount.toLocaleString()}
                           </span>
                           <span className="text-[9px] font-bold uppercase tracking-wider">Assigned</span>
@@ -195,15 +195,15 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                     {/* Technical Parameter Details */}
                     {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.rawMaterialName) && (
-                      <div className="grid grid-cols-2 gap-2 py-2.5 px-3 bg-slate-50/70 border border-slate-100 rounded-xl my-3 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                      <div className="grid grid-cols-2 gap-1.5 py-1.5 px-2.5 bg-slate-50/70 border border-slate-100 rounded-lg my-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
                         {log.rawMaterialName && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1.5 mb-1.5">
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
                             <span>Raw Material:</span>
                             <span className="text-indigo-600 font-extrabold">{log.rawMaterialName}</span>
                           </div>
                         )}
                         {log.bagsUsed !== undefined && Number(log.bagsUsed) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1.5 mb-1.5">
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
                             <span>Bags Used:</span>
                             <span className="text-indigo-600 font-extrabold">{log.bagsUsed} bags ({Number(log.bagsUsed) * 25} KG)</span>
                           </div>
@@ -255,14 +255,14 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                     {/* Remarks / Message Bubble */}
                     {log.remarks && (
-                      <div className="mt-2.5 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
+                      <div className="mt-1.5 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
                         <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
                         <span>{log.remarks}</span>
                       </div>
                     )}
 
                     {/* Operator Footer details */}
-                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider pt-3 border-t border-slate-100 mt-3">
+                    <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-wider pt-1.5 border-t border-slate-100 mt-1.5">
                       <div className="flex items-center gap-1.5 text-slate-500">
                         <User size={10} className="text-slate-400" />
                         <span>{log.userName || 'System'}</span>
