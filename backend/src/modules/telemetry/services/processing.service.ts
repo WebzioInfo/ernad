@@ -617,6 +617,8 @@ export class ProcessingService {
       rawMaterialId: productionLogs.rawMaterialId,
       rawMaterialName: rawMaterials.name,
       bagsUsed: productionLogs.bagsUsed,
+      preformUsage: productionLogs.preformUsage,
+      capUsage: productionLogs.capUsage,
       capBoxUsage: productionLogs.capBoxUsage,
       capRejection: productionLogs.capRejection,
       preformRejection: productionLogs.preformRejection,
@@ -709,7 +711,12 @@ export class ProcessingService {
       loggedAt: materialsUsage.loggedAt,
     })
       .from(materialsUsage)
-      .where(eq(materialsUsage.batchId, batchId))
+      .where(
+        and(
+          eq(materialsUsage.batchId, batchId),
+          isNull(materialsUsage.logId)
+        )
+      )
       .orderBy(desc(materialsUsage.loggedAt))
       .limit(limit);
 
@@ -747,6 +754,8 @@ export class ProcessingService {
         rawMaterialId: l.rawMaterialId,
         rawMaterialName: l.rawMaterialName,
         bagsUsed: l.bagsUsed,
+        preformUsage: l.preformUsage,
+        capUsage: l.capUsage,
         capBoxUsage: l.capBoxUsage,
         capRejection: l.capRejection,
         preformRejection: l.preformRejection,

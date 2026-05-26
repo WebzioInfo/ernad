@@ -26,6 +26,8 @@ interface LogEntry {
   rawMaterialName?: string;
   bagsUsed?: number | string;
   capBoxUsage?: number | string;
+  capUsage?: number | string;
+  preformUsage?: number | string;
   capRejection?: number | string;
   preformRejection?: number | string;
   bopRejection?: number | string;
@@ -109,7 +111,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         <AnimatePresence mode="popLayout">
           {!history || history.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center py-24 opacity-60">
@@ -145,144 +147,166 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                   )} />
 
                   {/* Glassmorphic Event Card */}
-                  <div className="p-3.5 bg-white border border-slate-200/80 rounded-[14px] hover:border-indigo-300/80 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(99,102,241,0.05)] hover:-translate-y-0.5">
+                  <div className="p-2.5 bg-white border border-slate-200/80 rounded-[12px] hover:border-indigo-300/80 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(99,102,241,0.05)] hover:-translate-y-0.5">
                     {/* Header: Badges & Time */}
-                    <div className="flex justify-between items-center gap-2 mb-2">
+                    <div className="flex justify-between items-center gap-2 mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
                         {/* Source Tag */}
-                        <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[8px] font-black uppercase tracking-wider", getSourceBadgeClass(log.source))}>
+                        <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider", getSourceBadgeClass(log.source))}>
                           {getSourceIcon(log.source)}
                           {log.source || 'OPERATOR'}
                         </div>
                         
                         {/* Station Badge */}
                         {log.station && (
-                          <span className={cn("px-2 py-0.5 rounded-md border text-[8px] font-black uppercase tracking-wider", stationStyles[log.station.toUpperCase()] || 'bg-slate-50 text-slate-650 border-slate-100')}>
+                          <span className={cn("px-2 py-0.5 rounded-md border text-[9px] font-black uppercase tracking-wider", stationStyles[log.station.toUpperCase()] || 'bg-slate-50 text-slate-650 border-slate-100')}>
                             {log.station}
                           </span>
                         )}
                       </div>
 
                       {/* Timestamp */}
-                      <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 tracking-wider uppercase bg-slate-50/80 px-2 py-0.5 rounded-md border border-slate-100">
+                      <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 tracking-wider uppercase bg-slate-50/80 px-2 py-0.5 rounded-md border border-slate-100">
                         <Clock size={9} strokeWidth={2.5} />
                         {new Date(log.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </div>
                     </div>
 
                     {/* Main Content Area */}
-                    <div className="mb-1.5">
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                    <div className="mb-1">
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                         {friendlyEvent}
                       </h4>
                       
                       {/* Show production count prominently */}
                       {isNormalProd && log.primaryCount > 0 && (
-                        <div className="mt-1 flex items-baseline gap-1.5">
-                          <span className="text-xl font-black text-slate-900 tracking-tighter">
+                        <div className="mt-0.5 flex items-baseline gap-1.5">
+                          <span className="text-base font-black text-slate-900 tracking-tighter">
                             +{log.primaryCount.toLocaleString()}
                           </span>
-                          <span className="text-[9px] font-bold text-slate-455 uppercase tracking-wider">Units</span>
+                          <span className="text-[10px] font-bold text-slate-455 uppercase tracking-wider">Units</span>
                         </div>
                       )}
 
                       {/* Material usage assignments */}
                       {log.eventType === 'MATERIAL_ASSIGNMENT' && log.primaryCount > 0 && (
-                        <div className="mt-1 flex items-baseline gap-1.5 text-indigo-700">
+                        <div className="mt-0.5 flex items-baseline gap-1.5 text-indigo-700">
                           <Package size={12} className="self-center" />
-                          <span className="text-base font-black tracking-tight">
+                          <span className="text-sm font-black tracking-tight">
                             {log.primaryCount.toLocaleString()}
                           </span>
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Assigned</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Assigned</span>
                         </div>
                       )}
                     </div>
 
                     {/* Technical Parameter Details */}
-                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.capBoxUsage || log.capRejection || log.preformRejection || log.bopRejection || log.shrinkWeightRejected || log.rawMaterialName) && (
-                      <div className="grid grid-cols-2 gap-1.5 py-1.5 px-2.5 bg-slate-50/70 border border-slate-100 rounded-lg my-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.capBoxUsage || log.capUsage || log.preformUsage || log.capRejection || log.preformRejection || log.bopRejection || log.shrinkWeightRejected || log.rawMaterialName) && (
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-1 px-2 bg-slate-50/70 border border-slate-100 rounded-lg my-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                         {log.rawMaterialName && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-0.5 mb-0.5">
                             <span>Raw Material:</span>
-                            <span className="text-indigo-600 font-extrabold">{log.rawMaterialName}</span>
+                            <span className="text-indigo-600 font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
                           </div>
                         )}
                         {log.bagsUsed !== undefined && Number(log.bagsUsed) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
-                            <span>Bags Used:</span>
-                            <span className="text-indigo-600 font-extrabold">{log.bagsUsed} bags ({Number(log.bagsUsed) * 25} KG)</span>
-                          </div>
+                          <>
+                            <div className="flex justify-between">
+                              <span>Bags Used:</span>
+                              <span className="text-indigo-600 font-black">{log.bagsUsed}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Bags Weight:</span>
+                              <span className="text-indigo-600 font-black">{Number(log.bagsUsed) * 25} KG</span>
+                            </div>
+                          </>
                         )}
-                        {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
-                            <span>Cap Boxes:</span>
-                            <span className="text-indigo-600 font-extrabold">{log.capBoxUsage}</span>
-                          </div>
-                        )}
-                        {log.preformRejection !== undefined && Number(log.preformRejection) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
-                            <span>Preform Rejects:</span>
-                            <span className="text-rose-500 font-extrabold">{log.preformRejection}</span>
+                        {log.capUsage !== undefined && Number(log.capUsage) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Caps Used:</span>
+                            <span className="text-indigo-600 font-black">{log.capUsage}</span>
                           </div>
                         )}
                         {log.capRejection !== undefined && Number(log.capRejection) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                          <div className="flex justify-between">
                             <span>Cap Rejects:</span>
-                            <span className="text-rose-500 font-extrabold">{log.capRejection}</span>
+                            <span className="text-rose-500 font-black">{log.capRejection}</span>
                           </div>
                         )}
-                        {log.bopRejection !== undefined && Number(log.bopRejection) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
-                            <span>Label Rejects:</span>
-                            <span className="text-rose-500 font-extrabold">{log.bopRejection}</span>
+                        {log.preformUsage !== undefined && Number(log.preformUsage) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Preforms Used:</span>
+                            <span className="text-indigo-600 font-black">{log.preformUsage}</span>
                           </div>
                         )}
-                        {log.shrinkWeightRejected !== undefined && Number(log.shrinkWeightRejected) > 0 && (
-                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
-                            <span>Shrink Reject:</span>
-                            <span className="text-rose-500 font-extrabold">{log.shrinkWeightRejected}g</span>
+                        {log.preformRejection !== undefined && Number(log.preformRejection) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Preform Rejects:</span>
+                            <span className="text-rose-500 font-black">{log.preformRejection}</span>
+                          </div>
+                        )}
+                        {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Cap Boxes:</span>
+                            <span className="text-indigo-600 font-black">{log.capBoxUsage}</span>
                           </div>
                         )}
                         {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (
-                          <div className="flex justify-between border-r border-slate-200/60 pr-2">
+                          <div className="flex justify-between">
                             <span>Secondary:</span>
-                            <span className="text-indigo-600 font-extrabold">{log.secondaryPackagingCount}</span>
+                            <span className="text-indigo-600 font-black">{log.secondaryPackagingCount}</span>
                           </div>
                         )}
-                        {log.wastageCount > 0 && (
-                          <div className="flex justify-between pl-2">
+                        {log.wastageCount > 0 && 
+                         !(log.station === 'BLOWING' && Number(log.preformRejection) > 0) &&
+                         !(log.station === 'FILLING' && Number(log.capRejection) > 0) &&
+                         !(log.station === 'LABELING' && Number(log.bopRejection) > 0) &&
+                         !(log.station === 'PACKING' && Number(log.shrinkWeightRejected) > 0) && (
+                          <div className="flex justify-between">
                             <span>Rejects:</span>
-                            <span className="text-rose-500 font-extrabold">{log.wastageCount}</span>
+                            <span className="text-rose-500 font-black">{log.wastageCount}</span>
+                          </div>
+                        )}
+                        {log.bopRejection !== undefined && Number(log.bopRejection) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Label Rejects:</span>
+                            <span className="text-rose-500 font-black">{log.bopRejection}</span>
+                          </div>
+                        )}
+                        {log.shrinkWeightRejected !== undefined && Number(log.shrinkWeightRejected) > 0 && (
+                          <div className="flex justify-between">
+                            <span>Shrink Reject:</span>
+                            <span className="text-rose-500 font-black">{log.shrinkWeightRejected}g</span>
                           </div>
                         )}
                         {log.labelStickerWeight && (
-                          <div className="flex justify-between border-r border-slate-200/60 pr-2">
+                          <div className="flex justify-between">
                             <span>Label Wt:</span>
-                            <span className="text-indigo-600 font-extrabold">{log.labelStickerWeight}g</span>
+                            <span className="text-indigo-600 font-black">{log.labelStickerWeight}g</span>
                           </div>
                         )}
                         {log.damagedLabelWeight && (
-                          <div className="flex justify-between pl-2">
+                          <div className="flex justify-between">
                             <span>Damage Wt:</span>
-                            <span className="text-rose-500 font-extrabold">{log.damagedLabelWeight}g</span>
+                            <span className="text-rose-500 font-black">{log.damagedLabelWeight}g</span>
                           </div>
                         )}
                         {log.inkChanged && (
-                          <div className="flex justify-between border-r border-slate-200/60 pr-2 col-span-2">
+                          <div className="flex justify-between col-span-2">
                             <span>Ink Consumable:</span>
-                            <span className="text-emerald-600 font-extrabold">Replaced ({log.inkUsageMl}ml)</span>
+                            <span className="text-emerald-600 font-black">Replaced ({log.inkUsageMl}ml)</span>
                           </div>
                         )}
                         {log.makeupChanged && (
-                          <div className="flex justify-between pl-2 col-span-2">
+                          <div className="flex justify-between col-span-2">
                             <span>Makeup Consumable:</span>
-                            <span className="text-emerald-600 font-extrabold">Replaced ({log.makeupUsageMl}ml)</span>
+                            <span className="text-emerald-600 font-black">Replaced ({log.makeupUsageMl}ml)</span>
                           </div>
                         )}
                         {log.shrinkWasteWeight && (
                           <div className="flex justify-between col-span-2">
                             <span>Shrink Waste:</span>
-                            <span className="text-rose-500 font-extrabold">{log.shrinkWasteWeight}g</span>
+                            <span className="text-rose-500 font-black">{log.shrinkWasteWeight}g</span>
                           </div>
                         )}
                       </div>
