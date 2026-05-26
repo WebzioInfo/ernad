@@ -25,6 +25,11 @@ interface LogEntry {
   rawMaterialId?: string;
   rawMaterialName?: string;
   bagsUsed?: number | string;
+  capBoxUsage?: number | string;
+  capRejection?: number | string;
+  preformRejection?: number | string;
+  bopRejection?: number | string;
+  shrinkWeightRejected?: number | string;
 }
 
 interface ActivityFeedProps {
@@ -194,7 +199,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                     </div>
 
                     {/* Technical Parameter Details */}
-                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.rawMaterialName) && (
+                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.capBoxUsage || log.capRejection || log.preformRejection || log.bopRejection || log.shrinkWeightRejected || log.rawMaterialName) && (
                       <div className="grid grid-cols-2 gap-1.5 py-1.5 px-2.5 bg-slate-50/70 border border-slate-100 rounded-lg my-2 text-[9px] font-bold uppercase tracking-wider text-slate-500">
                         {log.rawMaterialName && (
                           <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
@@ -206,6 +211,36 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                           <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
                             <span>Bags Used:</span>
                             <span className="text-indigo-600 font-extrabold">{log.bagsUsed} bags ({Number(log.bagsUsed) * 25} KG)</span>
+                          </div>
+                        )}
+                        {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                            <span>Cap Boxes:</span>
+                            <span className="text-indigo-600 font-extrabold">{log.capBoxUsage}</span>
+                          </div>
+                        )}
+                        {log.preformRejection !== undefined && Number(log.preformRejection) > 0 && (
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                            <span>Preform Rejects:</span>
+                            <span className="text-rose-500 font-extrabold">{log.preformRejection}</span>
+                          </div>
+                        )}
+                        {log.capRejection !== undefined && Number(log.capRejection) > 0 && (
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                            <span>Cap Rejects:</span>
+                            <span className="text-rose-500 font-extrabold">{log.capRejection}</span>
+                          </div>
+                        )}
+                        {log.bopRejection !== undefined && Number(log.bopRejection) > 0 && (
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                            <span>Label Rejects:</span>
+                            <span className="text-rose-500 font-extrabold">{log.bopRejection}</span>
+                          </div>
+                        )}
+                        {log.shrinkWeightRejected !== undefined && Number(log.shrinkWeightRejected) > 0 && (
+                          <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-1 mb-1">
+                            <span>Shrink Reject:</span>
+                            <span className="text-rose-500 font-extrabold">{log.shrinkWeightRejected}g</span>
                           </div>
                         )}
                         {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (

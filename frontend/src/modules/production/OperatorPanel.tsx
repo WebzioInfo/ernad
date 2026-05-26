@@ -77,11 +77,12 @@ export default function OperatorPanel() {
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
   // Station Specific States
-  const [selectedCapProductId, setSelectedCapProductId] = useState('');
+  const [selectedCapRawMaterialId, setSelectedCapRawMaterialId] = useState('');
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
   const [bagsUsed, setBagsUsed] = useState(0);
   const [preformUsage, setPreformUsage] = useState(0);
   const [capUsage, setCapUsage] = useState(0);
+  const [capBoxUsage, setCapBoxUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
   const [shrinkUsage, setShrinkUsage] = useState('');
   const [casesProduced, setCasesProduced] = useState(0);
@@ -158,24 +159,21 @@ export default function OperatorPanel() {
     retry: 1
   });
 
-  const { data: products } = useQuery({
-    queryKey: ['products'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data,
-  });
-
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials'],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.RAW_MATERIALS)).data,
-    enabled: currentStationId === 'BLOWING',
+    enabled: currentStationId === 'BLOWING' || currentStationId === 'FILLING',
   });
 
-  const capProducts = (products || []).filter((product: any) =>
-    String(product.category || '').toLowerCase() === 'caps'
-  );
   const preformRawMaterials = (rawMaterials || []).filter((material: any) => {
     const categoryName = String(material.categoryName || '').toLowerCase();
     const materialName = String(material.name || '').toLowerCase();
     return categoryName.includes('preform') || materialName.includes('preform');
+  });
+  const capRawMaterials = (rawMaterials || []).filter((material: any) => {
+    const categoryName = String(material.categoryName || '').toLowerCase();
+    const materialName = String(material.name || '').toLowerCase();
+    return categoryName.includes('cap') || materialName.includes('cap');
   });
 
   // Fetch operators list for the handover selector
@@ -317,11 +315,11 @@ export default function OperatorPanel() {
     if (isSubmitting) return;
 
     if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
-    if (currentStation.id === 'FILLING' && !selectedCapProductId) return toast.error('Please select the Caps product.');
+    if (currentStation.id === 'FILLING' && !selectedCapRawMaterialId) return toast.error('Please select the Caps raw material.');
     if (currentStation.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
 
     const currentBatch = activeBatch?.batch;
-    const selectedCapProduct = capProducts.find((product: any) => product.id === selectedCapProductId);
+    const selectedCapRawMaterial = capRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
     const logEntry: any = {
       requestId: uuidv4(),
       batchId: currentBatch?.id,
@@ -348,18 +346,23 @@ export default function OperatorPanel() {
       // For Blowing, we purchase in KGs but produce in COUNT.
       // We track 'preformsUsed' as the count of preforms consumed.
       logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
+      logEntry.preformRejection = rejectionCount;
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
       logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
-      logEntry.materials = selectedCapProduct ? [{
-        materialName: selectedCapProduct.name,
+      logEntry.capRejection = rejectionCount;
+      logEntry.capBoxUsage = capBoxUsage;
+      logEntry.rawMaterialId = selectedCapRawMaterialId;
+      logEntry.materials = selectedCapRawMaterial ? [{
+        materialName: selectedCapRawMaterial.name,
         quantity: logEntry.capUsage,
         unit: 'Pcs',
         waste: rejectionCount,
       }] : [];
     } else if (currentStation.id === 'LABELING') {
       logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
+      logEntry.bopRejection = rejectionCount;
       logEntry.labelStickerWeight = labelStickerWeight;
       logEntry.damagedLabelWeight = damagedLabelWeight;
       logEntry.inkChanged = inkChanged;
@@ -369,6 +372,7 @@ export default function OperatorPanel() {
     } else if (currentStation.id === 'PACKING') {
       logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
       logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
+      logEntry.shrinkWeightRejected = logEntry.shrinkWasteWeight;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
@@ -388,7 +392,7 @@ export default function OperatorPanel() {
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
-      setPreformUsage(0); setCapUsage(0); setSelectedCapProductId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage('');
+      setPreformUsage(0); setCapUsage(0); setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setLabelStickerWeight(0); setDamagedLabelWeight(0);
       setInkChanged(false); setInkUsageMl(0);
@@ -557,26 +561,34 @@ export default function OperatorPanel() {
                   <>
                     <div className="space-y-2">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
-                        Caps Product
+                        Caps Raw Material
                       </label>
                       <select
-                        value={selectedCapProductId}
-                        onChange={e => setSelectedCapProductId(e.target.value)}
-                        className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500/40 transition-all"
+                        value={selectedCapRawMaterialId}
+                        onChange={e => setSelectedCapRawMaterialId(e.target.value)}
+                        className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500/40 transition-all"
                       >
-                        <option value="">Select Caps product...</option>
-                        {capProducts.map((product: any) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}{product.sku ? ` - ${product.sku}` : ''}
+                        <option value="">Select Caps raw material...</option>
+                        {capRawMaterials.map((material: any) => (
+                          <option key={material.id} value={material.id}>
+                            {material.name} ({material.categoryName})
                           </option>
                         ))}
                       </select>
-                      {capProducts.length === 0 && (
+                      {capRawMaterials.length === 0 && (
                         <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
-                          No products found with category Caps.
+                          No caps raw materials found.
                         </p>
                       )}
                     </div>
+
+                    <IndustrialNumericInput
+                      label="Cap Box Usage"
+                      value={capBoxUsage}
+                      onChange={setCapBoxUsage}
+                      suffix="Boxes"
+                      compact
+                    />
 
                     <div className="space-y-1">
                       <IndustrialNumericInput

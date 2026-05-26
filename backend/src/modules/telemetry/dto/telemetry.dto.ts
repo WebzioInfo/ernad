@@ -74,6 +74,13 @@ export class TelemetryDto {
   @IsOptional()
   @Min(0)
   @Max(100000)
+  capBoxUsage?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100000)
   capRejection?: number;
 
   @ApiProperty()

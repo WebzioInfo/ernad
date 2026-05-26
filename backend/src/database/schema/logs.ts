@@ -41,6 +41,7 @@ export const productionLogs = pgTable('production_logs', {
 
   // Material Consumption Analytics (Enterprise Upgrade)
   capUsage: integer('cap_usage').default(0),
+  capBoxUsage: integer('cap_box_usage').default(0),
   capRejection: integer('cap_rejection').default(0),
   preformUsage: integer('preform_usage').default(0),
   preformRejection: integer('preform_rejection').default(0),

@@ -176,13 +176,18 @@ export interface TelemetryLogPayload {
   loggedAt: string;        // ISO string – actual production time
   // Station-specific material fields
   preformUsage?: number;
+  preformRejection?: number;
   capUsage?: number;
+  capBoxUsage?: number;
+  capRejection?: number;
   rawMaterialId?: string;
   bagsUsed?: number;
   bopRollUsage?: number;   // label roll meters
+  bopRejection?: number;
   inkUsage?: number;
   solventUsage?: number;
   shrinkWeightUsed?: number;
+  shrinkWeightRejected?: number;
   finishedGoodsProduced?: number;
   casesProduced?: number;
   packingTypeId?: string;
