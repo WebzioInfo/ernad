@@ -47,7 +47,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
           </label>
         )}
         <div className={cn(
-          "flex items-center w-full rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#16857D]/20 focus-within:border-[#16857D]/35",
+          "flex items-center w-full rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35",
           compact ? "h-14" : "h-16",
           props.readOnly && "bg-slate-50 border-slate-150"
         )}>
@@ -55,7 +55,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             type="button"
             onClick={handleDecrement}
             disabled={props.disabled || props.readOnly}
-            className="h-full px-4 bg-slate-50 hover:bg-[#16857D]/5 text-slate-400 hover:text-[#16857D] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
+            className="h-full px-4 bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
           >
             <Minus className="w-4 h-4" />
           </button>
@@ -82,7 +82,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             type="button"
             onClick={handleIncrement}
             disabled={props.disabled || props.readOnly}
-            className="h-full px-4 bg-slate-50 hover:bg-[#16857D]/5 text-slate-400 hover:text-[#16857D] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
+            className="h-full px-4 bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
           >
             <Plus className="w-4 h-4" />
           </button>

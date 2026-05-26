@@ -48,7 +48,7 @@ export function usePushNotifications() {
               enable: true,
               position: 'bottom-right',
               colors: {
-                'circle.background': '#4f46e5',
+                'circle.background': '#1A9A91',
                 'circle.foreground': 'white',
               }
             },

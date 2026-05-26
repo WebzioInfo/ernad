@@ -26,7 +26,7 @@ export const StationWorkspace: React.FC<StationWorkspaceProps> = ({
               <h2 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-4">
                 {title}
               </h2>
-              <div className="h-1 w-20 bg-[#16857D] rounded-full mb-4" />
+              <div className="h-1 w-20 bg-[#1A9A91] rounded-full mb-4" />
               <p className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">
                 {description}
               </p>
@@ -49,7 +49,7 @@ export const StationWorkspace: React.FC<StationWorkspaceProps> = ({
       </main>
 
       {/* Sidebar Feed Area */}
-      <aside className="hidden lg:flex lg:col-span-4 border-l border-[#16857D]/15 bg-white flex-col overflow-hidden">
+      <aside className="hidden lg:flex lg:col-span-4 border-l border-[#1A9A91]/15 bg-white flex-col overflow-hidden">
         {sidebar}
       </aside>
     </div>

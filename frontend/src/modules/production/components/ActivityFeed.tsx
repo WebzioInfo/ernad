@@ -59,31 +59,31 @@ const getFriendlyEventName = (eventType: string) => {
 };
 
 const getDotColor = (eventType: string) => {
-  if (['NORMAL_PRODUCTION', 'OPERATOR_LOGIN'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
-  if (['BATCH_START', 'BATCH_END'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
-  if (['MATERIAL_ASSIGNMENT'].includes(eventType)) return 'bg-[#16857D] ring-[#16857D]/15';
+  if (['NORMAL_PRODUCTION', 'OPERATOR_LOGIN'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
+  if (['BATCH_START', 'BATCH_END'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
+  if (['MATERIAL_ASSIGNMENT'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
   if (['OPERATOR_LOGOUT', 'DOWNTIME_RESOLVED'].includes(eventType)) return 'bg-slate-400 ring-slate-100';
   return 'bg-rose-500 ring-rose-100'; // Anomalies
 };
 
 const stationStyles: Record<string, string> = {
-  BLOWING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
-  FILLING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
-  LABELING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
-  PACKING: 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20',
+  BLOWING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
+  FILLING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
+  LABELING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
+  PACKING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
   QC: 'bg-rose-50 text-rose-700 border-rose-100/60',
 };
 
 const getSourceIcon = (source?: string) => {
-  if (source === 'MACHINE') return <Activity size={10} className="text-[#16857D]" />;
-  if (source === 'SYSTEM') return <Cpu size={10} className="text-[#16857D]" />;
-  return <User size={10} className="text-[#16857D]" />;
+  if (source === 'MACHINE') return <Activity size={10} className="text-[#1A9A91]" />;
+  if (source === 'SYSTEM') return <Cpu size={10} className="text-[#1A9A91]" />;
+  return <User size={10} className="text-[#1A9A91]" />;
 };
 
 const getSourceBadgeClass = (source?: string) => {
-  if (source === 'MACHINE') return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
-  if (source === 'SYSTEM') return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
-  return 'bg-[#16857D]/5 text-[#16857D] border-[#16857D]/20';
+  if (source === 'MACHINE') return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
+  if (source === 'SYSTEM') return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
+  return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
 };
 
 const formatWastageValue = (value: string | number) => {
@@ -95,24 +95,24 @@ const formatWastageValue = (value: string | number) => {
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, isRefreshing }) => {
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="px-8 py-5 border-b border-[#16857D]/15 flex items-center justify-between bg-white/90 backdrop-blur-xl sticky top-0 z-10 shrink-0">
+      <div className="px-8 py-5 border-b border-[#1A9A91]/15 flex items-center justify-between bg-white/90 backdrop-blur-xl sticky top-0 z-10 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="w-8 h-8 rounded-[10px] bg-[#16857D]/5 hover:bg-[#16857D]/10 active:scale-95 flex items-center justify-center text-[#16857D] border border-[#16857D]/15 transition-all disabled:opacity-50"
+            className="w-8 h-8 rounded-[10px] bg-[#1A9A91]/5 hover:bg-[#1A9A91]/10 active:scale-95 flex items-center justify-center text-[#1A9A91] border border-[#1A9A91]/15 transition-all disabled:opacity-50"
             title="Refresh Uplink Feed"
           >
-            <RefreshCw size={14} className={cn("text-[#16857D]", isRefreshing && "animate-spin")} />
+            <RefreshCw size={14} className={cn("text-[#1A9A91]", isRefreshing && "animate-spin")} />
           </button>
           <div>
             <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-800">Uplink Feed</h3>
             <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Real-Time Event Stream</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#16857D]/5 rounded-full border border-[#16857D]/15">
-          <span className="text-[9px] font-black text-[#16857D] uppercase tracking-wider">Live Sync</span>
-          <div className="w-1.5 h-1.5 rounded-full bg-[#16857D] animate-pulse" />
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1A9A91]/5 rounded-full border border-[#1A9A91]/15">
+          <span className="text-[9px] font-black text-[#1A9A91] uppercase tracking-wider">Live Sync</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#1A9A91] animate-pulse" />
         </div>
       </div>
 
@@ -152,7 +152,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                   )} />
 
                   {/* Glassmorphic Event Card */}
-                  <div className="p-2.5 bg-white border border-[#16857D]/15 rounded-[12px] hover:border-[#16857D]/35 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(22,133,125,0.06)] hover:-translate-y-0.5">
+                  <div className="p-2.5 bg-white border border-[#1A9A91]/15 rounded-[12px] hover:border-[#1A9A91]/35 transition-all duration-300 shadow-[0_2px_12px_rgba(15,23,42,0.02)] hover:shadow-[0_8px_20px_rgba(26,154,145,0.06)] hover:-translate-y-0.5">
                     {/* Header: Badges & Time */}
                     <div className="flex justify-between items-center gap-2 mb-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -195,7 +195,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                       {/* Material usage assignments */}
                       {log.eventType === 'MATERIAL_ASSIGNMENT' && log.primaryCount > 0 && (
-                        <div className="mt-0.5 flex items-baseline gap-1.5 text-[#16857D]">
+                        <div className="mt-0.5 flex items-baseline gap-1.5 text-[#1A9A91]">
                           <Package size={12} className="self-center" />
                           <span className="text-sm font-black tracking-tight">
                             {log.primaryCount.toLocaleString()}
@@ -211,43 +211,43 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                         {log.rawMaterialName && (
                           <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-0.5 mb-0.5">
                             <span>Raw Material:</span>
-                            <span className="text-[#16857D] font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
+                            <span className="text-[#1A9A91] font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
                           </div>
                         )}
                         {log.bagsUsed !== undefined && Number(log.bagsUsed) > 0 && (
                           <>
                             <div className="flex justify-between">
                               <span>Bags Used:</span>
-                              <span className="text-[#16857D] font-black">{log.bagsUsed}</span>
+                              <span className="text-[#1A9A91] font-black">{log.bagsUsed}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>Bags Weight:</span>
-                              <span className="text-[#16857D] font-black">{Number(log.bagsUsed) * 25} KG</span>
+                              <span className="text-[#1A9A91] font-black">{Number(log.bagsUsed) * 25} KG</span>
                             </div>
                           </>
                         )}
                         {log.capUsage !== undefined && Number(log.capUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Caps Used:</span>
-                            <span className="text-[#16857D] font-black">{log.capUsage}</span>
+                            <span className="text-[#1A9A91] font-black">{log.capUsage}</span>
                           </div>
                         )}
                         {log.preformUsage !== undefined && Number(log.preformUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Preforms Used:</span>
-                            <span className="text-[#16857D] font-black">{log.preformUsage}</span>
+                            <span className="text-[#1A9A91] font-black">{log.preformUsage}</span>
                           </div>
                         )}
                         {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Cap Boxes:</span>
-                            <span className="text-[#16857D] font-black">{log.capBoxUsage}</span>
+                            <span className="text-[#1A9A91] font-black">{log.capBoxUsage}</span>
                           </div>
                         )}
                         {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (
                           <div className="flex justify-between">
                             <span>Secondary:</span>
-                            <span className="text-[#16857D] font-black">{log.secondaryPackagingCount}</span>
+                            <span className="text-[#1A9A91] font-black">{log.secondaryPackagingCount}</span>
                           </div>
                         )}
                         {log.station === 'FILLING' && (Number(log.bottleLeakage) > 0 || Number(log.capWastage) > 0) ? (
@@ -292,13 +292,13 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                         {log.station === 'LABELING' && (log.bopRollUsage !== undefined || log.labelStickerWeight !== undefined) && (
                           <div className="flex justify-between">
                             <span>Label Used:</span>
-                            <span className="text-[#16857D] font-black">{log.bopRollUsage || log.labelStickerWeight} KG</span>
+                            <span className="text-[#1A9A91] font-black">{log.bopRollUsage || log.labelStickerWeight} KG</span>
                           </div>
                         )}
                         {log.station !== 'LABELING' && log.labelStickerWeight && (
                           <div className="flex justify-between">
                             <span>Label Wt:</span>
-                            <span className="text-[#16857D] font-black">{log.labelStickerWeight}g</span>
+                            <span className="text-[#1A9A91] font-black">{log.labelStickerWeight}g</span>
                           </div>
                         )}
                         {log.station !== 'LABELING' && log.damagedLabelWeight && (
@@ -310,7 +310,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                         {log.station === 'LABELING' && (
                           <div className="flex justify-between col-span-2">
                             <span>Ink Used:</span>
-                            <span className={cn('font-black', log.inkChanged ? 'text-[#16857D]' : 'text-slate-400')}>
+                            <span className={cn('font-black', log.inkChanged ? 'text-[#1A9A91]' : 'text-slate-400')}>
                               {log.inkChanged ? 'Yes' : 'No'}
                             </span>
                           </div>
@@ -318,7 +318,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                         {log.station === 'LABELING' && (
                           <div className="flex justify-between col-span-2">
                             <span>Makeup Used:</span>
-                            <span className={cn('font-black', log.makeupChanged ? 'text-[#16857D]' : 'text-slate-400')}>
+                            <span className={cn('font-black', log.makeupChanged ? 'text-[#1A9A91]' : 'text-slate-400')}>
                               {log.makeupChanged ? 'Yes' : 'No'}
                             </span>
                           </div>
@@ -328,8 +328,8 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
 
                     {/* Remarks / Message Bubble */}
                     {log.remarks && (
-                      <div className="mt-1.5 p-2 rounded-lg bg-[#16857D]/5 border border-[#16857D]/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
-                        <AlertTriangle size={12} className="text-[#16857D] shrink-0 mt-0.5" />
+                      <div className="mt-1.5 p-2 rounded-lg bg-[#1A9A91]/5 border border-[#1A9A91]/10 text-[10px] font-semibold text-slate-650 italic flex gap-2 items-start leading-relaxed shadow-inner">
+                        <AlertTriangle size={12} className="text-[#1A9A91] shrink-0 mt-0.5" />
                         <span>{log.remarks}</span>
                       </div>
                     )}

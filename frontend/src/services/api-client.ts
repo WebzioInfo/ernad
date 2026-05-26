@@ -80,7 +80,7 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   }
 
   if (import.meta.env.DEV) {
-    console.debug(`%c[API_OUT] ${config.method?.toUpperCase()} ${config.url}`, 'color: #3b82f6; font-weight: bold;', { requestId });
+    console.debug(`%c[API_OUT] ${config.method?.toUpperCase()} ${config.url}`, 'color: #1A9A91; font-weight: bold;', { requestId });
   }
 
   return config;

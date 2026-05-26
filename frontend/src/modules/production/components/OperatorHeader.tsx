@@ -38,8 +38,8 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
     <header className="px-8 py-5 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4 pr-6 border-r border-gray-200/60">
-          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-white shadow-[0_4px_16px_rgba(22,133,125,0.12)] overflow-hidden shrink-0">
-            <img src="/fav.PNG" alt="Product logo" className="h-full w-full object-contain p-0.5" />
+          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-white shadow-[0_4px_16px_rgba(26,154,145,0.12)] overflow-hidden shrink-0">
+            <img src="/fav-nobg.png" alt="Product logo" className="h-full w-full object-contain" />
           </div>
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight text-gray-900 leading-none">
@@ -68,13 +68,13 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
         {/* Machine Status Pill */}
         <div className={cn(
           "px-3 py-1.5 rounded-full flex items-center gap-2 border shadow-sm transition-all duration-300",
-          machineStatus === 'RUNNING' ? "bg-[#16857D]/10 border-[#16857D]/25 text-[#16857D]" :
+          machineStatus === 'RUNNING' ? "bg-[#1A9A91]/10 border-[#1A9A91]/25 text-[#1A9A91]" :
             machineStatus === 'ERROR' ? "bg-rose-50/50 border-rose-200/60 text-rose-700" :
               "bg-gray-50 border-gray-200/60 text-gray-500"
         )}>
           <div className={cn(
             "w-1.5 h-1.5 rounded-full",
-            machineStatus === 'RUNNING' ? "bg-[#16857D] shadow-[0_0_8px_rgba(22,133,125,0.4)]" :
+            machineStatus === 'RUNNING' ? "bg-[#1A9A91] shadow-[0_0_8px_rgba(26,154,145,0.4)]" :
               machineStatus === 'ERROR' ? "bg-rose-500 animate-pulse shadow-[0_0_8px_rgba(244,63,94,0.4)]" :
                 "bg-gray-400"
           )} />
@@ -86,7 +86,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             <p className="text-[13px] font-semibold text-gray-900 tracking-tight leading-none mb-1">{operatorName}</p>
             <p className="text-[10px] font-medium text-gray-400 tracking-wider uppercase">Active Operator</p>
             {recentHandover && (
-              <p className="text-[9px] font-bold text-[#16857D] tracking-wide uppercase mt-1">
+              <p className="text-[9px] font-bold text-[#1A9A91] tracking-wide uppercase mt-1">
                 Prev: {recentHandover.outgoingOperatorName} ({new Date(recentHandover.handoverTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
               </p>
             )}
@@ -96,7 +96,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             <button
               onClick={onHandover}
               disabled={isLoggingOut}
-              className="px-3 py-2.5 bg-[#16857D] hover:bg-[#126B65] text-white font-bold text-xs uppercase tracking-wider rounded-[12px] active:scale-95 transition-all shadow-[0_2px_8px_rgba(22,133,125,0.22)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2.5 bg-[#1A9A91] hover:bg-[#157C75] text-white font-bold text-xs uppercase tracking-wider rounded-[12px] active:scale-95 transition-all shadow-[0_2px_8px_rgba(26,154,145,0.22)] disabled:opacity-50 disabled:cursor-not-allowed"
               title="Shift Handover"
             >
               Shift Handover
@@ -104,7 +104,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             <button
               onClick={onChangeStation}
               disabled={isLoggingOut}
-              className="px-3 py-2.5 bg-white text-[#16857D] font-bold text-xs uppercase tracking-wider rounded-[12px] hover:bg-[#16857D]/5 active:scale-95 transition-all border border-[#16857D]/25 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2.5 bg-white text-[#1A9A91] font-bold text-xs uppercase tracking-wider rounded-[12px] hover:bg-[#1A9A91]/5 active:scale-95 transition-all border border-[#1A9A91]/25 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed"
               title="Change Station"
             >
               Change Station

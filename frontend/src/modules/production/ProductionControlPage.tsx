@@ -330,7 +330,7 @@ function ProductionCommander({ line, onBack, brands, products, shifts, operators
                   />
                   <defs>
                     <linearGradient id="bpmGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#6366f1" />
+                      <stop offset="0%" stopColor="#1A9A91" />
                       <stop offset="100%" stopColor="#10b981" />
                     </linearGradient>
                   </defs>

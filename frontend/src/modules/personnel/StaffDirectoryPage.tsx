@@ -104,7 +104,7 @@ export default function StaffDirectoryPage() {
               <div className="col-span-1 lg:col-span-4 flex items-center gap-8">
                 <div className="w-16 h-16 rounded-[1.5rem] overflow-hidden border-2 border-white shadow-xl shadow-slate-200 shrink-0 relative group-hover:scale-110 transition-transform duration-500">
                   <img 
-                    src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=4f46e5&color=fff&bold=true`} 
+                    src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=1A9A91&color=fff&bold=true`} 
                     alt={person.name}
                     className="w-full h-full object-cover"
                   />

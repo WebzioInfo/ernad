@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import {
-  ShieldCheck, User, Loader2, ArrowRight, KeyRound, Eye, EyeOff
+  User, Loader2, ArrowRight, KeyRound, Eye, EyeOff
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import useAuthStore from './auth.store';
@@ -64,8 +64,8 @@ export default function Login() {
         <div className="p-8 lg:p-10">
           <div className="mb-8 text-center">
             <div className="flex justify-center mb-6">
-              <div className="p-4 bg-blue-600 rounded-2xl shadow-lg">
-                <ShieldCheck className="w-10 h-10 text-white" />
+              <div className="h-24 w-40 flex items-center justify-center overflow-hidden">
+                <img src="/fav-nobg.png" alt="Eranad logo" className="h-full w-full object-contain" />
               </div>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">System Login</h1>

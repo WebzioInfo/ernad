@@ -156,9 +156,9 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                     <Line
                       type="monotone"
                       dataKey="count"
-                      stroke="#6366f1"
+                      stroke="#1A9A91"
                       strokeWidth={4}
-                      dot={{ fill: '#6366f1', strokeWidth: 2, r: 4 }}
+                      dot={{ fill: '#1A9A91', strokeWidth: 2, r: 4 }}
                       activeDot={{ r: 8, strokeWidth: 0 }}
                     />
                   </LineChart>

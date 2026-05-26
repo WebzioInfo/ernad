@@ -159,7 +159,7 @@ export default function EfficiencyDashboardPage() {
                 <Tooltip
                   contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey={isLive ? "throughput" : "val"} fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
+                <Bar dataKey={isLive ? "throughput" : "val"} fill="#1A9A91" radius={[6, 6, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -181,15 +181,15 @@ export default function EfficiencyDashboardPage() {
               ] : historicalTrend}>
                 <defs>
                   <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#1A9A91" stopOpacity={0.1} />
+                    <stop offset="95%" stopColor="#1A9A91" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
                 <YAxis hide />
                 <Tooltip />
-                <Area type="monotone" dataKey="val" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
+                <Area type="monotone" dataKey="val" stroke="#1A9A91" strokeWidth={3} fillOpacity={1} fill="url(#colorVal)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

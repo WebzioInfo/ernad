@@ -100,7 +100,7 @@ const DashboardPage: React.FC = () => {
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="punches" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="punches" fill="#1A9A91" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

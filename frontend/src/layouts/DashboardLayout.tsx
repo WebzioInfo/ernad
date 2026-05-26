@@ -137,12 +137,12 @@ export default function DashboardLayout() {
           : "w-72 -translate-x-full md:w-20 md:translate-x-0"
       )}>
         <div className="h-24 flex items-center px-6">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 group">
-            <Command className="w-7 h-7" />
+          <div className="w-20 h-16 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
+            <img src="/fav-nobg.png" alt="Eranad logo" className="h-full w-full object-contain" />
           </div>
           {isSidebarOpen && (
             <div className="ml-4 animate-in fade-in slide-in-from-left-2 duration-500">
-              <span className="block font-black text-xl tracking-tight text-white">ERANAD<span className="text-indigo-400">MES</span></span>
+              <span className="block font-black text-xl tracking-tight text-white">ERANAD<span className="text-[#A7F3D0]">MES</span></span>
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System</span>
             </div>
           )}
@@ -293,7 +293,7 @@ export default function DashboardLayout() {
                 </div>
                 <div className="w-12 h-12 bg-slate-100 rounded-2xl border-2 border-white shadow-xl shadow-slate-200/50 overflow-hidden group cursor-pointer hover:ring-4 hover:ring-indigo-50 transition-all">
                   <img
-                    src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.name}&background=4f46e5&color=fff&bold=true`}
+                    src={user?.avatarUrl || `https://ui-avatars.com/api/?name=${user?.name}&background=1A9A91&color=fff&bold=true`}
                     alt="Avatar"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />

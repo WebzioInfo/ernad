@@ -108,9 +108,9 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
 
       {/* Main Industrial Counters */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <KPICard label="Today's Blowing" value={displayStats.blowing.toLocaleString()} trend="+12.4%" icon={Gauge} color="blue" chartColor="#3b82f6" delay={0.1} />
+        <KPICard label="Today's Blowing" value={displayStats.blowing.toLocaleString()} trend="+12.4%" icon={Gauge} color="blue" chartColor="#1A9A91" delay={0.1} />
         <KPICard label="Today's Filling" value={displayStats.filling.toLocaleString()} trend="+8.1%" icon={TrendingUp} color="emerald" chartColor="#10b981" delay={0.2} />
-        <KPICard label="Today's Packing" value={displayStats.packing.toLocaleString()} trend="Optimal" icon={CheckCircle2} color="indigo" chartColor="#6366f1" delay={0.3} />
+        <KPICard label="Today's Packing" value={displayStats.packing.toLocaleString()} trend="Optimal" icon={CheckCircle2} color="indigo" chartColor="#1A9A91" delay={0.3} />
         <KPICard label="Process Rejections" value={displayStats.rejection.toLocaleString()} trend="High" icon={Activity} color="rose" chartColor="#f43f5e" delay={0.4} />
       </div>
 

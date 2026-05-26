@@ -469,8 +469,8 @@ export default function BatchForensicsDashboard() {
                       <AreaChart data={telemetry}>
                         <defs>
                           <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#1A9A91" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#1A9A91" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -485,7 +485,7 @@ export default function BatchForensicsDashboard() {
                         <Tooltip
                           contentStyle={{ borderRadius: '1rem', border: 'none', backgroundColor: '#1e293b', color: '#fff' }}
                         />
-                        <Area type="monotone" dataKey="count" stroke="#6366f1" fillOpacity={1} fill="url(#colorCount)" strokeWidth={3} />
+                        <Area type="monotone" dataKey="count" stroke="#1A9A91" fillOpacity={1} fill="url(#colorCount)" strokeWidth={3} />
                         <Area type="monotone" dataKey="wastage" stroke="#f43f5e" fill="transparent" strokeWidth={2} strokeDasharray="5 5" />
                       </AreaChart>
                     </ResponsiveContainer>
