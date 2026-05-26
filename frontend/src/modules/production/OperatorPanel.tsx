@@ -461,7 +461,7 @@ export default function OperatorPanel() {
   const machineStatus = (activeEvents?.length > 0) ? 'ERROR' : (activeBatch?.batch?.status === 'RUNNING' ? 'RUNNING' : 'IDLE');
 
   return (
-    <div className="h-screen bg-white flex flex-col overflow-hidden">
+    <div className="operator-page h-screen bg-white flex flex-col overflow-hidden">
       {isLoggingOut && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-all duration-500 animate-in fade-in">
           <Loader2 className="w-16 h-16 text-[#16857D] animate-spin mb-6" />

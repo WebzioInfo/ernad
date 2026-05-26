@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Layout, Power, Loader2 } from 'lucide-react';
+import { LogOut, Power, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OperatorHeaderProps {
@@ -38,8 +38,8 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
     <header className="px-8 py-5 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-4 pr-6 border-r border-gray-200/60">
-          <div className="w-10 h-10 bg-[#16857D] rounded-[14px] flex items-center justify-center text-white shadow-[0_2px_10px_rgba(22,133,125,0.24)]">
-            <Layout size={20} />
+          <div className="w-16 h-16 rounded-[18px] flex items-center justify-center bg-white shadow-[0_4px_16px_rgba(22,133,125,0.12)] overflow-hidden shrink-0">
+            <img src="/fav.PNG" alt="Product logo" className="h-full w-full object-contain p-0.5" />
           </div>
           <div>
             <h1 className="text-[15px] font-semibold tracking-tight text-gray-900 leading-none">

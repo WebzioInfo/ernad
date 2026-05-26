@@ -1,12 +1,11 @@
 @import "tw-animate-css";
-@import "@fontsource-variable/geist";
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
 
 @theme {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-  --font-heading: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-heading: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --color-background: oklch(1 0 0);
   --color-foreground: oklch(0.145 0 0);
@@ -117,6 +116,10 @@
 }
 
 @layer utilities {
+  .operator-page .font-black {
+    font-weight: 700;
+  }
+
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
