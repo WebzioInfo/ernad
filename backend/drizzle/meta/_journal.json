@@ -5,50 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777965140008,
-      "tag": "0000_nebulous_major_mapleleaf",
+      "when": 1779709049479,
+      "tag": "0000_secret_sentry",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1778012554750,
-      "tag": "0001_gifted_tattoo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1778152936104,
-      "tag": "0002_vengeful_lady_deathstrike",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1778312925920,
-      "tag": "0003_furry_lifeguard",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1778400000000,
-      "tag": "0004_terminal_integration",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1778450000000,
-      "tag": "0005_terminal_trust_policies",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1747131000000,
-      "tag": "0006_operator_session_unique_constraint",
+      "when": 1779711183347,
+      "tag": "0001_foamy_imperial_guard",
       "breakpoints": true
     }
   ]

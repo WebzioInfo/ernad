@@ -641,7 +641,7 @@ export default function BatchForensicsDashboard() {
                             <Database className="w-5 h-5" />
                           </div>
                           <div>
-                            {/* inventoryLedger has no itemName – stockId is the reference */}
+                            {/* Inventory transactions expose stockId as the material reference. */}
                             <p className="text-sm font-black text-slate-900">
                               {material.stockId ? `Stock: ${String(material.stockId).slice(0, 8)}…` : 'Material Movement'}
                             </p>

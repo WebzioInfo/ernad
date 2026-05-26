@@ -21,7 +21,7 @@ import { MediaModule } from './providers/media/media.module';
 import { EventsModule } from './realtime/events.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OneSignalModule } from './integrations/onesignal.module';
-import { AttendanceModule } from './modules/attendance/attendance.module';
+
 import { ConfigModule } from '@nestjs/config';
 import { QueueModule } from './providers/queue/queue.module';
 import { RedisModule } from './providers/redis/redis.module';
@@ -29,9 +29,6 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { OperatorSessionsModule } from './modules/operator-sessions/operator-sessions.module';
 import { SystemModule } from './modules/system/system.module';
 import { NotesModule } from './modules/notes/notes.module';
-import { BiometricModule } from './modules/biometric/biometric.module';
-import { TallyModule } from './modules/tally/tally.module';
-import { ForensicsModule } from './modules/forensics/forensics.module';
 
 import { AppController } from './app.controller';
 
@@ -40,7 +37,6 @@ import { AppController } from './app.controller';
     ConfigModule.forRoot({ isGlobal: true }),
     RedisModule,
     QueueModule,
-    ForensicsModule,
     AuthModule, 
     UsersModule, 
     MasterDataModule, 
@@ -51,15 +47,14 @@ import { AppController } from './app.controller';
     EventsModule, 
     NotificationsModule, 
     OneSignalModule, 
-    AttendanceModule,
+  
     TelemetryModule,
     ProductionModule,
     InventoryModule,
     OperatorSessionsModule,
     SystemModule,
     NotesModule,
-    BiometricModule,
-    TallyModule,
+
     ReportsModule,
     SalesModule,
     ProcurementModule,

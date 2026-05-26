@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import {
-  productionBatches, batchTotals, productionLines, factories,
+  productionBatches, batchTotals, productionLines,
   productBrands, products, operatorSessions, billOfMaterials, inventoryStock
 } from '../../../database/schema';
 import { eq, and, sql, desc, inArray, or } from 'drizzle-orm';
@@ -17,13 +17,6 @@ export class BatchService {
     private sessionService: OperatorSessionsService
   ) { }
 
-  private async getFactoryContext(factoryId?: string): Promise<string> {
-    if (factoryId) return factoryId;
-    const [factory] = await db.select().from(factories).limit(1);
-    if (!factory) throw new BadRequestException('No factory configured in system.');
-    return factory.id;
-  }
-
   async startBatch(
     lineId: string,
     brandId: string,
@@ -36,8 +29,6 @@ export class BatchService {
     operatorIds: string[] = [],
     targetQuantity?: number
   ) {
-    const factoryId = await this.getFactoryContext();
-
     const result = await db.transaction(async (tx) => {
       const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).for('update');
       if (!line) throw new BadRequestException('Line not found.');
@@ -54,10 +45,7 @@ export class BatchService {
         for (const bom of bomItems) {
           const [stock] = await tx.select()
             .from(inventoryStock)
-            .where(and(
-              eq(inventoryStock.id, bom.stockId),
-              eq(inventoryStock.factoryId, factoryId)
-            ))
+            .where(eq(inventoryStock.id, bom.stockId))
             .limit(1);
 
           if (!stock) {
@@ -92,7 +80,6 @@ export class BatchService {
       } else {
         const [insertedBatch] = await tx.insert(productionBatches).values({
           batchCode: finalBatchCode,
-          factoryId,
           lineId,
           brandId,
           productId,
@@ -108,7 +95,6 @@ export class BatchService {
 
         await tx.insert(batchTotals).values({
           batchId: newBatch.id,
-          factoryId,
           lineId,
           blowingTotal: 0,
           fillingTotal: 0,
@@ -132,7 +118,6 @@ export class BatchService {
           batchId: newBatch.id,
           station: 'GENERAL',
           shiftId,
-          factoryId,
           isActive: true
         }));
         await tx.insert(operatorSessions).values(sessionValues);
@@ -150,8 +135,6 @@ export class BatchService {
   }
 
   async getBatches(limit = 50) {
-    const factoryId = await this.getFactoryContext();
-
     const results = await db.select({
       batch: productionBatches,
       line: productionLines,
@@ -162,7 +145,6 @@ export class BatchService {
       .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
       .leftJoin(products, eq(productionBatches.productId, products.id))
       .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
-      .where(eq(productionBatches.factoryId, factoryId))
       .orderBy(desc(productionBatches.startTime))
       .limit(limit);
 

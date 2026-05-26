@@ -14,7 +14,8 @@ import {
   productionLines,
   downtimeLogs,
   users,
-  operatorSessions
+  operatorSessions,
+  rawMaterials
 } from '../../../database/schema';
 import { billOfMaterials } from '../../../database/schema';
 import { TelemetryDto } from '../dto/telemetry.dto';
@@ -102,7 +103,6 @@ export class ProcessingService {
       }
 
       const current = totalsList[0];
-      const factoryId = current.factoryId;
 
       // 3. Batch Integrity Validation & Retrieval
       const batch = await this.validateBatchStatus(tx, dto.batchId);
@@ -149,7 +149,6 @@ export class ProcessingService {
         shiftId: dto.shiftId,
         brandId: dto.brandId,
         productId: dto.productId,
-        factoryId: factoryId,
         userId: userId,
         sessionId: sessionId,
         station: dto.station,
@@ -189,6 +188,10 @@ export class ProcessingService {
         shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
         sourceBatchNumber: dto.sourceBatchNumber || null,
 
+        // Blowing / Material Consumption Fields
+        rawMaterialId: dto.rawMaterialId || null,
+        bagsUsed: dto.bagsUsed ? String(dto.bagsUsed) : null,
+
         // QC Data
         phValue: String(dto.phValue || '0'),
         tdsValue: String(dto.tdsValue || '0'),
@@ -198,7 +201,7 @@ export class ProcessingService {
 
       if (dto.materials && dto.materials.length > 0) {
         for (const mat of dto.materials) {
-          await this.processLegacyMaterialUsage(tx, log.id, dto.batchId, factoryId, mat, log.loggedAt);
+          await this.processLegacyMaterialUsage(tx, log.id, dto.batchId, mat, log.loggedAt);
         }
       }
 
@@ -215,7 +218,7 @@ export class ProcessingService {
       }
 
       // New Enterprise Material Logic
-      await this.processEnterpriseInventory(tx, factoryId, dto, log.id);
+      await this.processEnterpriseInventory(tx, dto, log.id);
 
       // Fast-fail Redis increment
       if (this.redisService.getAvailability()) {
@@ -243,7 +246,7 @@ export class ProcessingService {
       }
       
       // ── NEW: Downtime & Production Time Tracking ──
-      await this.handleDowntime(tx, factoryId, dto);
+      await this.handleDowntime(tx, dto);
 
       this.eventsService.emitNewLog(log);
       this.eventsService.emitProductionUpdated(dto.batchId, dto.lineId);
@@ -272,7 +275,7 @@ export class ProcessingService {
     return log;
   }
 
-  private async processLegacyMaterialUsage(tx: any, logId: number, batchId: string, factoryId: string, mat: any, loggedAt: Date) {
+  private async processLegacyMaterialUsage(tx: any, logId: number, batchId: string, mat: any, loggedAt: Date) {
     await tx.insert(materialsUsage).values({
       logId,
       batchId,
@@ -284,7 +287,7 @@ export class ProcessingService {
     });
   }
 
-  private async processEnterpriseInventory(tx: any, factoryId: string, dto: TelemetryDto, logId: number) {
+  private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number) {
     const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
     if (dto.capUsage || dto.capRejection) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage || 0) + Number(dto.capRejection || 0), category: 'Caps' });
@@ -348,10 +351,9 @@ export class ProcessingService {
           })
           .from(billOfMaterials)
           .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
-          .where(and(
-            eq(billOfMaterials.productId, activeProductId),
-            eq(inventoryStock.factoryId, factoryId)
-          ))
+          .where(
+            eq(billOfMaterials.productId, activeProductId)
+          )
           .for('update');
 
           for (const row of bomStocks) {
@@ -367,10 +369,9 @@ export class ProcessingService {
       if (!stock) {
         const stockItems = await tx.select()
           .from(inventoryStock)
-          .where(and(
-            eq(inventoryStock.factoryId, factoryId),
+          .where(
             eq(inventoryStock.itemName, item.name)
-          ))
+          )
           .for('update');
         if (stockItems.length > 0) {
           stock = stockItems[0];
@@ -391,10 +392,9 @@ export class ProcessingService {
         if (searchPattern) {
           const fuzzyStocks = await tx.select()
             .from(inventoryStock)
-            .where(and(
-              eq(inventoryStock.factoryId, factoryId),
+            .where(
               sql`lower(${inventoryStock.itemName}) LIKE ${searchPattern}`
-            ))
+            )
             .for('update');
 
           if (fuzzyStocks.length > 0) {
@@ -500,7 +500,7 @@ export class ProcessingService {
     return batch[0];
   }
 
-  private async handleDowntime(tx: any, factoryId: string, dto: TelemetryDto) {
+  private async handleDowntime(tx: any, dto: TelemetryDto) {
     const station = dto.station;
     const batchId = dto.batchId;
     const lineId = dto.lineId;
@@ -523,7 +523,6 @@ export class ProcessingService {
         await tx.insert(downtimeLogs).values({
           batchId,
           lineId,
-          factoryId,
           station,
           reason: eventType,
           startTime: loggedAt,
@@ -600,6 +599,11 @@ export class ProcessingService {
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
       sourceBatchNumber: productionLogs.sourceBatchNumber,
 
+      // Blowing / Material Consumption
+      rawMaterialId: productionLogs.rawMaterialId,
+      rawMaterialName: rawMaterials.name,
+      bagsUsed: productionLogs.bagsUsed,
+
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
       updatedByName: updatedByUsers.name,
@@ -609,6 +613,7 @@ export class ProcessingService {
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
       .leftJoin(updatedByUsers, eq(productionLogs.updatedBy, updatedByUsers.id))
+      .leftJoin(rawMaterials, eq(productionLogs.rawMaterialId, rawMaterials.id))
       .where(
         and(
           eq(productionLogs.batchId, batchId),
@@ -719,6 +724,10 @@ export class ProcessingService {
         // Packing specific
         shrinkWasteWeight: l.shrinkWasteWeight,
         sourceBatchNumber: l.sourceBatchNumber,
+        // Blowing / Material Consumption
+        rawMaterialId: l.rawMaterialId,
+        rawMaterialName: l.rawMaterialName,
+        bagsUsed: l.bagsUsed,
       });
     });
 

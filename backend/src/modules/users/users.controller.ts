@@ -145,12 +145,12 @@ export class UsersController {
 
   /**
    * DELETE /api/users/:id
-   * Super Admin only — Soft delete an operator
+   * Admin only — Soft delete an operator
    */
   @Delete(':id')
   @Permissions('users:manage')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft delete operator (Super Admin only)' })
+  @ApiOperation({ summary: 'Soft delete operator (Admin only)' })
   deleteOperator(@Param('id') id: string) {
     return this.usersService.deleteOperator(id);
   }

@@ -6,7 +6,6 @@ import {
   materialCategories, 
   warehouseLocations, 
   packagingConfigurations,
-  factories 
 } from '../../database/schema';
 import { eq, sql, desc, ilike } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
@@ -14,12 +13,6 @@ import { AuditService } from '../audit/audit.service';
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
-
-  private async getFactoryContext(): Promise<string> {
-    const results = await db.select().from(factories).limit(1);
-    if (!results.length) return 'default-factory-id';
-    return results[0].id;
-  }
 
   constructor(private readonly auditService: AuditService) {}
 
@@ -163,10 +156,8 @@ export class InventoryService {
   }
 
   async createStockItem(dto: any) {
-    const factoryId = await this.getFactoryContext();
     const [item] = await db.insert(inventoryStock).values({
       ...dto,
-      factoryId,
       quantity: dto.quantity || '0',
     }).returning();
     return item;
@@ -181,10 +172,8 @@ export class InventoryService {
   }
 
   async createWarehouse(dto: { name: string; type: string }) {
-    const factoryId = await this.getFactoryContext();
     const [warehouse] = await db.insert(warehouseLocations).values({
       ...dto,
-      factoryId,
       createdAt: new Date(),
     }).returning();
     return warehouse;

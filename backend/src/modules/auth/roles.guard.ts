@@ -46,7 +46,6 @@ export class RolesGuard implements CanActivate {
     const rawRoles = user.role ? [user.role] : (user.roles || []);
     const userRoles = rawRoles.map((r: any) => {
       const roleStr = String(r).toUpperCase().trim();
-      if (roleStr.includes('SUPER')) return 'SUPER_ADMIN';
       if (roleStr.includes('ADMIN')) return 'ADMIN';
       if (roleStr.includes('MANAGER')) return 'MANAGER';
       if (roleStr.includes('OPERATOR') || roleStr.includes('USER')) return 'OPERATOR';
@@ -55,11 +54,6 @@ export class RolesGuard implements CanActivate {
     const userPermissions = user.permissions || [];
     
     this.logger.debug(`[RolesGuard] Path: ${request.method} ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)} | Required: ${JSON.stringify(requiredPermissions)}`);
-
-    // SUPER_ADMIN bypasses all role/permission checks
-    if (userRoles.includes('SUPER_ADMIN')) {
-      return true;
-    }
 
     // ── Role Check (Strict Exact Match) ──
     if (requiredRoles && requiredRoles.length > 0) {
@@ -76,6 +70,10 @@ export class RolesGuard implements CanActivate {
     if (requiredPermissions && requiredPermissions.length > 0) {
       const permissionPassed = requiredPermissions.every(p => {
         // [HARDENED] Manager Role implicit permissions for oversight
+        if (userRoles.includes('ADMIN')) {
+          return true;
+        }
+
         if (userRoles.includes('MANAGER')) {
           const managerPermissions = [
             'analytics:view', 
@@ -87,9 +85,22 @@ export class RolesGuard implements CanActivate {
             'production:close',
             'forensics:view',
             'forensics:edit',
-            'attendance:view'
+            'attendance:view',
+            'settings:view'
           ];
           if (managerPermissions.includes(p)) {
+            return true;
+          }
+        }
+
+        // [HARDENED] Operator Role implicit permissions for operations
+        if (userRoles.includes('OPERATOR')) {
+          const operatorPermissions = [
+            'telemetry:log',
+            'production:start',
+            'settings:view'
+          ];
+          if (operatorPermissions.includes(p)) {
             return true;
           }
         }

@@ -47,11 +47,11 @@ export function AppRoutes() {
         <Route path="/" element={<SmartRedirect />} />
         <Route path="/login" element={<Login />} />
 
-        {/* 1. ADMINISTRATION (SuperAdmin & Admin) */}
+        {/* 1. ADMINISTRATION (Admin) */}
         <Route
           path="/admin"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN']}>
+            <RequireAuth allowedRoles={['ADMIN']}>
               <DashboardLayout />
             </RequireAuth>
           }
@@ -91,7 +91,7 @@ export function AppRoutes() {
         <Route
           path="/operator"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }
@@ -106,7 +106,7 @@ export function AppRoutes() {
         <Route
           path="/line"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }
@@ -121,7 +121,7 @@ export function AppRoutes() {
         <Route
           path="/terminal"
           element={
-            <RequireAuth allowedRoles={['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR']}>
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'OPERATOR']}>
               <Outlet />
             </RequireAuth>
           }

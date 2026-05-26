@@ -440,6 +440,8 @@ export interface ProductionLog {
   capRejection?: number | null;
   preformUsage?: number | null;
   preformRejection?: number | null;
+  rawMaterialId?: string | null;
+  bagsUsed?: string | null;
   bopRollUsage?: string | null;
   bopRejection?: string | null;
   shrinkWeightUsed?: string | null;
@@ -480,6 +482,7 @@ export interface BatchTotal {
   scrapTotal: number;
   capTotal: number;
   preformTotal: number;
+  bagsTotal: string;
   bopRollTotal: string;
   shrinkWeightTotal: string;
   inkTotal: string;
@@ -557,6 +560,13 @@ export interface MaterialCategory {
   name: string;
   description?: string | null;
   createdAt: string;
+}
+
+export interface RawMaterial {
+  id: string;
+  name: string;
+  categoryId: string;
+  categoryName: string;
 }
 
 export interface WarehouseLocation {

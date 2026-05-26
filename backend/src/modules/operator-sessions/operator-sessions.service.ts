@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
-import { operatorSessions, productionBatches, users as usersTable, terminals, productionLines, machineStates, shiftHandovers, batchTotals, roles, userRoles, permissions, rolePermissions } from '../../database/schema';
+import { operatorSessions, productionBatches, users as usersTable, productionLines, machineStates, shiftHandovers, batchTotals, roles, userRoles, permissions, rolePermissions } from '../../database/schema';
 import { eq, and, desc, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { RedisService } from '../../providers/redis/redis.service';
@@ -13,6 +13,8 @@ import * as bcrypt from 'bcryptjs';
 @Injectable()
 export class OperatorSessionsService {
   private readonly logger = new Logger(OperatorSessionsService.name);
+  private activeSessionsCache: { data: any; expiresAt: number } | null = null;
+
   constructor(
     private readonly redis: RedisService,
     private readonly auditService: AuditService,
@@ -20,12 +22,8 @@ export class OperatorSessionsService {
     private readonly jwtService: JwtService
   ) {}
 
-  async getTerminalById(id: string) {
-    const [terminal] = await db.select().from(terminals).where(eq(terminals.id, id)).limit(1);
-    return terminal;
-  }
-
   async startSession(userId: string, lineId: string, station: string, shiftId?: string, force = false, terminalId?: string, supervisorId?: string) {
+    this.activeSessionsCache = null;
     this.logger.log(`[SESSION_TRACE] Operator Login/Start. User: ${userId}, Line: ${lineId}, Station: ${station}`);
 
     // Validate UUIDs
@@ -64,9 +62,9 @@ export class OperatorSessionsService {
         this.logger.log(`[SESSION_TRACE] Active session already exists for User: ${userId}, Line: ${lineId}, Station: ${station}. Reusing.`);
         // Update last activity timestamp
         await tx.update(operatorSessions)
-          .set({ lastActivityAt: new Date() })
+          .set({ lastActivity: new Date() })
           .where(eq(operatorSessions.id, existingActive.id));
-        return { ...existingActive, lastActivityAt: new Date() };
+        return { ...existingActive, lastActivity: new Date() };
       }
 
       // 2. Find and auto-close stale/orphan sessions on this line and station, or operator's own stale sessions
@@ -82,7 +80,7 @@ export class OperatorSessionsService {
         ));
 
       for (const occupant of activeOccupants) {
-        const lastActivity = occupant.lastActivityAt || occupant.startTime;
+        const lastActivity = occupant.lastActivity || occupant.startTime;
         if (lastActivity < staleThreshold) {
           this.logger.log(`[SESSION_TRACE] Auto-closing stale session ${occupant.id} of User ${occupant.userId}`);
           await tx.update(operatorSessions)
@@ -108,7 +106,7 @@ export class OperatorSessionsService {
         ));
 
       for (const mySession of myActiveSessions) {
-        const lastActivity = mySession.lastActivityAt || mySession.startTime;
+        const lastActivity = mySession.lastActivity || mySession.startTime;
         if (lastActivity < staleThreshold) {
           this.logger.log(`[SESSION_TRACE] Auto-closing own stale session ${mySession.id}`);
           await tx.update(operatorSessions)
@@ -160,9 +158,6 @@ export class OperatorSessionsService {
         .orderBy(desc(productionBatches.startTime))
         .limit(1);
 
-      // Determine Factory
-      const factoryId = activeBatch?.factoryId || (await tx.select({ f: usersTable.factoryId }).from(usersTable).where(eq(usersTable.id, userId)).limit(1))[0]?.f;
-
       // Create Session
       const [session] = await tx.insert(operatorSessions).values({
         userId,
@@ -170,11 +165,9 @@ export class OperatorSessionsService {
         station,
         batchId: activeBatch?.id || null,
         shiftId: shiftId || null,
-        factoryId: factoryId,
-        terminalId: terminalId || null,
         isActive: true,
         startTime: new Date(),
-        lastActivityAt: new Date()
+        lastActivity: new Date()
       }).returning();
 
       // Log LOGIN event to audit log
@@ -183,7 +176,6 @@ export class OperatorSessionsService {
         action: 'LOGIN',
         category: 'AUTH',
         payload: {
-          terminalId,
           machineId: lineId,
           station
         }
@@ -199,6 +191,7 @@ export class OperatorSessionsService {
   }
 
   async endSession(userId: string, endedBy?: string, reason = 'manual') {
+    this.activeSessionsCache = null;
     const [active] = await db.select().from(operatorSessions)
       .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)))
       .limit(1);
@@ -216,7 +209,6 @@ export class OperatorSessionsService {
       action: 'LOGOUT',
       category: 'AUTH',
       payload: {
-        terminalId: session.terminalId,
         reason
       }
     });
@@ -230,6 +222,7 @@ export class OperatorSessionsService {
   }
 
   async changeStation(userId: string, newStation: string) {
+    this.activeSessionsCache = null;
     const permittedStations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC', 'GENERAL'];
     if (!permittedStations.includes(newStation.toUpperCase())) {
       throw new BadRequestException(`Invalid station: ${newStation}`);
@@ -256,7 +249,7 @@ export class OperatorSessionsService {
     const [updatedSession] = await db.update(operatorSessions)
       .set({ 
         station: newStation,
-        lastActivityAt: new Date(),
+        lastActivity: new Date(),
       })
       .where(eq(operatorSessions.id, activeSession.id))
       .returning();
@@ -312,7 +305,12 @@ export class OperatorSessionsService {
   }
 
   async getAllActiveSessions() {
-    return await db.select({
+    const now = Date.now();
+    if (this.activeSessionsCache && this.activeSessionsCache.expiresAt > now) {
+      return this.activeSessionsCache.data;
+    }
+
+    const data = await db.select({
       id: operatorSessions.id,
       userId: operatorSessions.userId,
       userName: usersTable.name,
@@ -320,16 +318,19 @@ export class OperatorSessionsService {
       station: operatorSessions.station,
       isActive: operatorSessions.isActive,
       startTime: operatorSessions.startTime,
-      lastActivityAt: operatorSessions.lastActivityAt
+      lastActivity: operatorSessions.lastActivity
     })
     .from(operatorSessions)
     .innerJoin(usersTable, eq(operatorSessions.userId, usersTable.id))
     .where(eq(operatorSessions.isActive, true));
+
+    this.activeSessionsCache = { data, expiresAt: now + 5000 };
+    return data;
   }
 
   async heartbeat(userId: string) {
     await db.update(operatorSessions)
-      .set({ lastActivityAt: new Date() })
+      .set({ lastActivity: new Date() })
       .where(and(eq(operatorSessions.userId, userId), eq(operatorSessions.isActive, true)));
       
     if (this.redis.getAvailability()) {
@@ -345,8 +346,8 @@ export class OperatorSessionsService {
       .where(and(
         eq(operatorSessions.isActive, true),
         or(
-          isNull(operatorSessions.lastActivityAt),
-          sql`${operatorSessions.lastActivityAt} < ${staleThreshold}`
+          isNull(operatorSessions.lastActivity),
+          sql`${operatorSessions.lastActivity} < ${staleThreshold}`
         )
       ));
 
@@ -373,6 +374,7 @@ export class OperatorSessionsService {
   }
 
   async initiateHandover(outgoingUserId: string, dto: ShiftHandoverDto) {
+    this.activeSessionsCache = null;
     this.logger.log(`[HANDOVER_TRACE] Initiating shift handover. Outgoing: ${outgoingUserId}, Incoming: ${dto.incomingOperatorId}`);
 
     if (outgoingUserId === dto.incomingOperatorId) {
@@ -476,11 +478,9 @@ export class OperatorSessionsService {
         station: outgoingSession.station,
         batchId,
         shiftId: outgoingSession.shiftId,
-        factoryId: outgoingSession.factoryId,
-        terminalId: outgoingSession.terminalId,
         isActive: true,
         startTime: new Date(),
-        lastActivityAt: new Date()
+        lastActivity: new Date()
       }).returning();
 
       if (this.redis.getAvailability()) {
@@ -556,15 +556,13 @@ export class OperatorSessionsService {
         const slug = (r.slug || '').toUpperCase().trim();
         if (slug === 'GENERIC OPERATOR') return 'OPERATOR';
         if (slug === 'PRODUCTION MANAGER') return 'MANAGER';
-        if (slug === 'SYSTEM_ADMIN') return 'SUPER_ADMIN';
-        if (slug.includes('SUPER')) return 'SUPER_ADMIN';
         if (slug.includes('ADMIN')) return 'ADMIN';
         if (slug.includes('MANAGER')) return 'MANAGER';
         return 'OPERATOR';
       })));
 
       const sortedRoles = [...roleSlugs].sort((a, b) => {
-        const order = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
+        const order = ['ADMIN', 'MANAGER', 'OPERATOR'];
         let idxA = order.indexOf(a);
         let idxB = order.indexOf(b);
         if (idxA === -1) idxA = 999;
@@ -594,7 +592,6 @@ export class OperatorSessionsService {
         roles: sortedRoles,
         permissions: permissionsSlugs,
         name: incomingUser.name,
-        factoryId: incomingUser.factoryId,
         sessionId: incomingSession.id,
         deviceId: undefined
       };
@@ -612,7 +609,6 @@ export class OperatorSessionsService {
           role: effectiveRole,
           roles: sortedRoles,
           permissions: permissionsSlugs,
-          factoryId: incomingUser.factoryId,
           sessionId: incomingSession.id,
         }
       };

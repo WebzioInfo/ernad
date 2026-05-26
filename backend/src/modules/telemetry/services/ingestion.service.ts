@@ -7,9 +7,6 @@ import { RedisService } from '../../../providers/redis/redis.service';
 import { OperatorSessionsService } from '../../operator-sessions/operator-sessions.service';
 import { ProcessingService } from './processing.service';
 import { TerminalService } from '../../production/services/terminal.service';
-import { db } from '../../../database/db';
-import { productionBatches } from '../../../database/schema';
-import { eq } from 'drizzle-orm';
 
 @Injectable()
 export class IngestionService {
@@ -65,16 +62,6 @@ export class IngestionService {
 
     // 2. Pre-validate using processing service (Validates batch status and shift)
     await this.processingService.preValidateTelemetry(finalUserId, dto);
-
-    // Fetch batch for factory ID filling if missing
-    const [batch] = await db.select({ factoryId: productionBatches.factoryId })
-      .from(productionBatches)
-      .where(eq(productionBatches.id, dto.batchId))
-      .limit(1);
-    
-    if (batch && !dto.factoryId) {
-      dto.factoryId = batch.factoryId;
-    }
 
     const isServerless = process.env.VERCEL === '1' || process.env.IS_SERVERLESS === 'true';
 

@@ -1,7 +1,7 @@
 import { pgTable, uuid, varchar, text, timestamp, boolean, pgEnum, index, jsonb } from 'drizzle-orm/pg-core';
 import { users } from './users';
 import { productionLines } from './master-data';
-import { shifts } from './biometric';
+
 import { productionBatches } from './production';
 
 export const noteTypeEnum = pgEnum('note_type', [
@@ -37,7 +37,7 @@ export const notes = pgTable('notes', {
   // Relations
   departmentId: uuid('department_id'), // can be linked to a department entity if exists, or just a placeholder
   lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'set null' }),
-  shiftId: uuid('shift_id').references(() => shifts.id, { onDelete: 'set null' }),
+  
   machineId: varchar('machine_id', { length: 100 }),
   productionBatchId: uuid('production_batch_id').references(() => productionBatches.id, { onDelete: 'set null' }),
   

@@ -81,13 +81,11 @@ export class AnalyticsController {
   @Permissions('analytics:view')
   async getAggregatedKPIs(
     @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('factoryId') factoryId?: string
+    @Query('endDate') endDate: string
   ) {
     return this.analyticsService.getAggregatedKPIs(
       new Date(startDate),
-      new Date(endDate),
-      factoryId
+      new Date(endDate)
     );
   }
 

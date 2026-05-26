@@ -51,7 +51,7 @@ export class ProductionEventsService {
 
   async emitNotification(notification: any) {
     // RED TEAM FIX: Sanitize notification payload for different channels
-    const privilegedKeywords = ['ADMIN', 'SUPER', 'PASSWORD', 'PIN', 'SECRET'];
+    const privilegedKeywords = ['ADMIN', 'PASSWORD', 'PIN', 'SECRET'];
     
     const sanitize = (notif: any) => {
       let msg = notif.message;

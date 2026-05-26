@@ -18,11 +18,6 @@ export class TelemetryDto {
   lineId: string;
 
   @ApiProperty()
-  @IsUUID()
-  @IsOptional()
-  factoryId?: string;
-
-  @ApiProperty()
   @IsEnum(['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC'])
   @IsNotEmpty()
   @IsString()
@@ -94,6 +89,18 @@ export class TelemetryDto {
   @Min(0)
   @Max(100000)
   preformRejection?: number;
+
+  @ApiProperty()
+  @IsUUID()
+  @IsOptional()
+  rawMaterialId?: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100000)
+  bagsUsed?: number;
 
   @ApiProperty()
   @IsNumber()
@@ -236,6 +243,8 @@ export class TelemetryDto {
   @ApiProperty()
   @IsNumber()
   @IsOptional()
+  @Min(0)
+  @Max(100000)
   secondaryPackagingCount?: number;
 
   @ApiProperty()

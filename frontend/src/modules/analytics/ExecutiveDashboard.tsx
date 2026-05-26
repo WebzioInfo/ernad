@@ -5,12 +5,12 @@ import { ENDPOINTS } from '../../constants/endpoints';
 import useAuthStore from '../../modules/auth/auth.store';
 import {
   Activity, TrendingUp,
-  ShieldCheck, Database, HardDrive, Cpu,
+  Database, HardDrive, Cpu,
   Gauge, Clock, AlertTriangle,
   CheckCircle2, RefreshCw
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { StatusCard, KPICard } from './components/DashboardCards';
+import { KPICard } from './components/DashboardCards';
 import ManagerDashboard from './ManagerDashboard';
 import { TimeRangeSelector } from './components/TimeRangeSelector';
 import { useOutletContext } from 'react-router-dom';
@@ -19,11 +19,9 @@ export default function ExecutiveDashboard() {
   const { user } = useAuthStore();
   const { filters, setFilters } = useOutletContext<{ filters: any, setFilters: (f: any) => void }>();
   const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
-  const isSuperAdmin = userRoles.includes('SUPER_ADMIN');
   const isManager = userRoles.includes('MANAGER');
 
   const renderDashboard = () => {
-    if (isSuperAdmin) return <SuperAdminDashboard />;
     if (isManager) return <ManagerDashboard />;
     return <AdminDashboard filters={filters} />;
   };
@@ -41,164 +39,7 @@ export default function ExecutiveDashboard() {
   );
 }
 
-// ─── SUPER ADMIN: THE CORE ARCHITECT VIEW ───
-const SuperAdminDashboard = memo(() => {
-  const { data: auditLogs } = useQuery({ 
-    queryKey: ['audit-logs-summary'], 
-    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,
-    retry: false
-  });
-  const { data: salesKpis, isError: isSalesError, isLoading: isSalesLoading, refetch: refetchSales } = useQuery({
-    queryKey: ['sales-summary-global'],
-    retry: 1,
-    queryFn: async () => (await api.get(ENDPOINTS.REPORTS.SALES, {
-      params: {
-        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date().toISOString()
-      }
-    })).data
-  });
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-10"
-    >
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div>
-          <h2 className="text-5xl font-black text-slate-900 tracking-tighter flex items-center gap-5 uppercase italic">
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-indigo-900 text-white rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200">
-              <ShieldCheck className="w-9 h-9" />
-            </div>
-            Executive Control
-          </h2>
-          <p className="text-slate-500 font-bold mt-4 ml-1 text-lg">Enterprise infrastructure oversight & tactical synchronization.</p>
-        </div>
-        <div className="flex items-center gap-4 bg-white/80 backdrop-blur-xl p-3 rounded-[2.5rem] border border-slate-100 shadow-xl">
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            Core API: ONLINE
-          </div>
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-indigo-50 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-indigo-100/50">
-            <ShieldCheck className="w-3 h-3" />
-            System: Hardened
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <StatusCard label="System Integrity" value="OPTIMAL" subLabel="No threats detected" icon={ShieldCheck} color="emerald" delay={0.1} />
-        <StatusCard label="Database Health" value="STABLE" subLabel="Optimized pooling" icon={Database} color="indigo" delay={0.2} />
-        <StatusCard label="Cloud Resources" value="42%" subLabel="Storage usage" icon={HardDrive} color="blue" delay={0.3} />
-        <StatusCard label="Compute Load" value="18%" subLabel="Worker node status" icon={Cpu} color="amber" delay={0.4} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-indigo-500/20 transition-colors duration-700" />
-          <h3 className="text-2xl font-black mb-8 flex items-center gap-3 relative z-10">
-            <Activity className="w-6 h-6 text-indigo-400" />
-            Security Live-Feed
-          </h3>
-          <div className="space-y-4 relative z-10">
-            {auditLogs?.slice(0, 5).map((log: any, i: number) => (
-              <motion.div
-                key={log.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 + (i * 0.1) }}
-                className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-              >
-                <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
-                <div className="flex-1">
-                  <p className="text-sm font-bold truncate max-w-[250px]">{log.action}</p>
-                  <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{new Date(log.occurredAt).toLocaleTimeString()}</p>
-                </div>
-                <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full uppercase tracking-widest">
-                  {log.entityType}
-                </span>
-              </motion.div>
-            ))}
-          </div>
-          <button className="w-full mt-10 py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-indigo-900/40 relative z-10 active:scale-95">
-            View Full Security Ledger
-          </button>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-10 border border-slate-100 shadow-xl relative overflow-hidden group min-h-[400px]"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-transparent opacity-50" />
-          <div className="flex justify-between items-center mb-8 relative z-10">
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Financial Performance</h3>
-            <div className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">30D Matrix</div>
-          </div>
-
-          {isSalesError ? (
-            <div className="relative z-10 flex flex-col items-center justify-center py-20 text-center">
-              <AlertTriangle className="w-12 h-12 text-rose-500 mb-4" />
-              <p className="text-slate-900 font-black mb-2">Metrics Unavailable</p>
-              <p className="text-slate-500 text-xs mb-6 max-w-[200px]">The analytics engine encountered a synchronization issue.</p>
-              <button 
-                onClick={() => refetchSales()}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
-              >
-                Retry Sync
-              </button>
-            </div>
-          ) : isSalesLoading ? (
-            <div className="relative z-10 flex flex-col items-center justify-center py-20 text-center animate-pulse">
-              <RefreshCw className="w-12 h-12 text-indigo-400 mb-4 animate-spin" />
-              <p className="text-slate-400 font-black text-xs uppercase tracking-widest">Synthesizing Data...</p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-6 relative z-10">
-                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Revenue</p>
-                  <p className="text-3xl font-black text-slate-900 tracking-tighter">${(Number(salesKpis?.summary?.totalRevenue || 0) / 1000).toFixed(1)}k</p>
-                </div>
-                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg Ticket</p>
-                  <p className="text-3xl font-black text-slate-900 tracking-tighter">${Math.round(salesKpis?.summary?.avgOrderValue || 0)}</p>
-                </div>
-                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Orders</p>
-                  <p className="text-3xl font-black text-slate-900 tracking-tighter">{salesKpis?.summary?.orderCount || 0}</p>
-                </div>
-                <div className="p-6 bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-100 text-white">
-                  <p className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">Top SKU</p>
-                  <p className="text-xl font-black truncate">{salesKpis?.topProducts?.[0]?.productName || 'N/A'}</p>
-                </div>
-              </div>
-
-              <div className="mt-8 pt-8 border-t border-slate-100 relative z-10">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
-                  <span>Revenue Goal</span>
-                  <span className="text-indigo-600">72%</span>
-                </div>
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 w-[72%]" />
-                </div>
-              </div>
-            </>
-          )}
-        </motion.div>
-      </div>
-    </motion.div>
-  );
-});
-
-// ─── ADMIN: THE INDUSTRIAL WAR ROOM ───
+// Admin dashboard
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const { data: factoryLive, refetch: refetchLive } = useQuery({
     queryKey: ['factory-live-overview'],

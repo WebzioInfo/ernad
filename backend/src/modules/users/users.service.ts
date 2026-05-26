@@ -32,19 +32,15 @@ export class UsersService {
    * Updated here to keep the deny-list in one place.
    */
   private static readonly PRIVILEGED_ROLES = [
-    'SUPER_ADMIN',
-    'SUPERADMIN',
     'ADMIN',
-    'SYSTEM_ADMIN',
-    'ROOT',
-    'OWNER',
   ] as const;
+
+  private static readonly VALID_ROLE_SLUGS = ['ADMIN', 'MANAGER', 'OPERATOR'] as const;
 
   /**
    * Get all users — role-scoped with filtering and pagination.
    */
   async getAllOperators(callerId: string, callerRoles: string[] = [], queryParams?: any) {
-    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
     const isAdmin = callerRoles.includes('ADMIN');
     const isManager = callerRoles.includes('MANAGER');
 
@@ -63,10 +59,8 @@ export class UsersService {
     let hiddenRoleSlugs: string[] = [];
     let isSelfOnly = false;
 
-    if (isSuperAdmin) {
+    if (isAdmin) {
       hiddenRoleSlugs = [];
-    } else if (isAdmin) {
-      hiddenRoleSlugs = ['SUPER_ADMIN', 'SUPERADMIN', 'SYSTEM_ADMIN', 'ROOT', 'OWNER'];
     } else if (isManager) {
       hiddenRoleSlugs = [...UsersService.PRIVILEGED_ROLES];
     } else {
@@ -225,18 +219,12 @@ export class UsersService {
    * Get a single operator by ID — excludes password.
    */
   async getOperatorById(id: string, callerId: string, callerRoles: string[] = []) {
-    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
     const isAdmin      = callerRoles.includes('ADMIN');
     const isManager    = callerRoles.includes('MANAGER');
 
     const user = await this.getOperatorWithContext(id);
     if (!user) {
       throw new NotFoundException(`Operator with id "${id}" not found`);
-    }
-
-    // RBAC: Hierarchical access control
-    if (isSuperAdmin) {
-      return user; // SuperAdmin sees all
     }
 
     // Operator: Only sees themselves
@@ -247,12 +235,7 @@ export class UsersService {
       return user;
     }
 
-    // Admin: Cannot see SuperAdmin
     if (isAdmin) {
-      const isSuper = user.roles.includes('SUPER_ADMIN') || user.roles.includes('SYSTEM_ADMIN');
-      if (isSuper) {
-        throw new ForbiddenException('You do not have permission to view privileged system accounts');
-      }
       return user;
     }
 
@@ -270,8 +253,7 @@ export class UsersService {
 
   /**
    * Create a new operator with a bcrypt-hashed PIN.
-   * STRICT: Only SUPER_ADMIN can create ADMIN/MANAGER/HR_ADMIN.
-   * ADMIN can only create OPERATOR.
+   * STRICT: Only ADMIN can create users.
    */
   async createOperator(actorRoles: string[], dto: any) {
     if (!dto.name || !dto.username || !dto.pin) {
@@ -282,22 +264,17 @@ export class UsersService {
       throw new BadRequestException('Operator PIN must be exactly 4 digits');
     }
 
-    const isSuperAdmin = actorRoles.includes('SUPER_ADMIN');
     const isAdmin = actorRoles.includes('ADMIN');
 
-    if (!isSuperAdmin && !isAdmin) {
+    if (!isAdmin) {
       throw new ForbiddenException('You do not have permission to create users');
     }
 
     // Role Hierarchy Validation
     const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
-    
-    if (!isSuperAdmin) {
-      // Admin constraint: Can ONLY create OPERATOR
-      const hasNonOperatorRole = requestedRoles.some(r => r !== 'OPERATOR');
-      if (hasNonOperatorRole) {
-        throw new ForbiddenException('Admins can only create users with the OPERATOR role');
-      }
+    const invalidRole = requestedRoles.find(r => !UsersService.VALID_ROLE_SLUGS.includes(r as any));
+    if (invalidRole) {
+      throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, OPERATOR`);
     }
 
     return await db.transaction(async (tx) => {
@@ -367,15 +344,14 @@ export class UsersService {
 
   /**
    * Update operator details.
-   * STRICT: Hierarchy check to prevent role elevation by non-SuperAdmins.
+   * STRICT: Hierarchy check to prevent role elevation by non-admins.
    */
   async updateOperator(callerId: string, callerRoles: string[], id: string, dto: any) {
     this.logger.log(`[UsersService] Updating operator ${id} with DTO: ${JSON.stringify(dto)}`);
     
-    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
     const isAdmin = callerRoles.includes('ADMIN');
 
-    if (!isSuperAdmin && !isAdmin && !callerRoles.includes('MANAGER')) {
+    if (!isAdmin && !callerRoles.includes('MANAGER')) {
       throw new ForbiddenException('You do not have permission to update users');
     }
     try {
@@ -407,10 +383,14 @@ export class UsersService {
         // Hierarchy validation for role updates
         if (dto.roles || dto.role) {
           const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
-          if (!isSuperAdmin) {
+          const invalidRole = requestedRoles.find(r => !UsersService.VALID_ROLE_SLUGS.includes(r as any));
+          if (invalidRole) {
+            throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, OPERATOR`);
+          }
+          if (!isAdmin) {
             const hasNonOperatorRole = requestedRoles.some(r => r !== 'OPERATOR');
             if (hasNonOperatorRole) {
-              throw new ForbiddenException('Only SuperAdmins can assign Admin/Manager roles');
+              throw new ForbiddenException('Only admins can assign Admin/Manager roles');
             }
           }
         }
@@ -537,11 +517,10 @@ export class UsersService {
 
   async getUserAuditLogs(userId: string, callerRoles: string[] = []) {
     try {
-      const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
       const isAdmin = callerRoles.includes('ADMIN');
 
       // If not Admin, verify target user is not privileged
-      if (!isSuperAdmin && !isAdmin) {
+      if (!isAdmin) {
         const targetUser = await this.getOperatorWithContext(userId);
         if (targetUser) {
           const isPrivileged = targetUser.roles.some(r => UsersService.PRIVILEGED_ROLES.includes(r as any));
@@ -572,13 +551,12 @@ export class UsersService {
   }
 
   async getAuditLogs(callerRoles: string[] = []) {
-    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
     const isAdmin = callerRoles.includes('ADMIN');
 
-    // If not Admin/SuperAdmin, we must filter out privileged accounts from audit logs
+    // If not Admin, we must filter out privileged accounts from audit logs
     let excludedUserIds: string[] = [];
     
-    if (!isSuperAdmin && !isAdmin) {
+    if (!isAdmin) {
       const privilegedRoles = await db
         .select({ id: roles.id })
         .from(roles)
@@ -691,7 +669,7 @@ export class UsersService {
     // Find users with Manager or Admin roles
     const supervisorRoles = await db.select({ id: roles.id })
       .from(roles)
-      .where(inArray(roles.slug, ['MANAGER', 'ADMIN', 'SUPER_ADMIN']));
+      .where(inArray(roles.slug, ['MANAGER', 'ADMIN']));
     
     if (supervisorRoles.length === 0) return null;
 

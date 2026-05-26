@@ -66,6 +66,8 @@ export const telemetryLogSchema = z.object({
   // Material
   preformUsage:           z.number().int().min(0).optional(),
   capUsage:               z.number().int().min(0).optional(),
+  rawMaterialId:          z.string().uuid().optional().nullable(),
+  bagsUsed:               z.number().min(0).optional().nullable(),
   bopRollUsage:           z.number().min(0).optional(),
   inkUsage:               z.number().min(0).optional(),
   solventUsage:           z.number().min(0).optional(),

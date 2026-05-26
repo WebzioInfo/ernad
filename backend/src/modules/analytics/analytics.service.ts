@@ -3,8 +3,8 @@ import { db } from '../../database/db';
 import { 
   productionLogs, batchTotals, productionBatches, 
   materialsUsage, productBrands, products, userLines,
-  factories, productionLines, downtimeLogs, inventoryStock,
-  billOfMaterials, inventoryLedger
+  productionLines, downtimeLogs, inventoryStock,
+  billOfMaterials, inventoryTransactions
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, between, desc, inArray, isNull } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
@@ -228,9 +228,8 @@ export class AnalyticsService {
     }
   }
 
-  async getAggregatedKPIs(startDate: Date, endDate: Date, factoryId?: string) {
+  async getAggregatedKPIs(startDate: Date, endDate: Date) {
     const conditions = [between(productionLogs.loggedAt, startDate, endDate)];
-    if (factoryId) conditions.push(eq(productionLogs.factoryId, factoryId));
 
     const [stats] = await db.select({
       totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
@@ -468,15 +467,15 @@ export class AnalyticsService {
 
     // 3. Get Actual Consumption from Ledger
     const actuals = await db.select({
-      stockId: inventoryLedger.stockId,
-      totalActual: sql<number>`SUM(ABS(${inventoryLedger.quantityChange}))`
+      stockId: inventoryTransactions.stockId,
+      totalActual: sql<number>`SUM(ABS(${inventoryTransactions.quantityChange}))`
     })
-    .from(inventoryLedger)
+    .from(inventoryTransactions)
     .where(and(
-      eq(inventoryLedger.batchId, batchId),
-      inArray(inventoryLedger.type, ['CONSUMPTION', 'WASTAGE'])
+      eq(inventoryTransactions.referenceId, batchId),
+      inArray(inventoryTransactions.type, ['CONSUMPTION', 'WASTAGE'])
     ))
-    .groupBy(inventoryLedger.stockId);
+    .groupBy(inventoryTransactions.stockId);
 
     // 4. Calculate Variance
     return bom.map(item => {

@@ -105,7 +105,6 @@ export default function DashboardLayout() {
   const filterByRole = (allowedRoles?: string[]) => {
     if (!allowedRoles || allowedRoles.length === 0) return true;
     const userRoles = user?.roles || (user?.role ? [user.role] : []);
-    if (userRoles.includes('SUPER_ADMIN')) return true;
     return allowedRoles.some(role => userRoles.includes(role));
   };
 

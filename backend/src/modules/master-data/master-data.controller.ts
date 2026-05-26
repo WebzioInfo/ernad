@@ -96,4 +96,10 @@ export class MasterDataController {
   async createShift(@Body() dto: any) {
     return await this.shiftService.createShift(dto);
   }
+
+  @Get('raw-materials')
+  @Permissions('settings:view')
+  async getRawMaterials() {
+    return await this.masterDataService.getRawMaterials();
+  }
 }

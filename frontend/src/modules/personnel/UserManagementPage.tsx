@@ -32,10 +32,8 @@ interface User {
 export default function UserManagementPage() {
   const { user: currentUser } = useAuthStore();
   const callerRoles = currentUser?.roles || [];
-  const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
   const isAdmin      = callerRoles.includes('ADMIN');
-  // Only ADMIN and SUPER_ADMIN can create/manage users
-  const canAddUser    = isAdmin || isSuperAdmin;
+  const canAddUser    = isAdmin;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -172,7 +170,7 @@ export default function UserManagementPage() {
               setter: setRoleFilter,
               options: [
                 { slug: 'ALL', label: 'All Roles' },
-                ...(isSuperAdmin ? ALL_ROLES : isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES)
+                ...(isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES)
                   .map(r => ({ slug: r.slug, label: r.label })),
               ],
             },
@@ -249,7 +247,6 @@ export default function UserManagementPage() {
 function UserCard({ user, onOpen }: { user: User, onOpen: () => void }) {
   const getRoleStyle = (role: string) => {
     switch (role) {
-      case 'SUPER_ADMIN': return { icon: <ShieldCheck />, color: 'from-purple-500 to-indigo-600', bg: 'bg-purple-50 text-purple-700' };
       case 'ADMIN': return { icon: <ShieldCheck />, color: 'from-indigo-500 to-blue-600', bg: 'bg-indigo-50 text-indigo-700' };
       case 'MANAGER': return { icon: <ShieldAlert />, color: 'from-amber-500 to-orange-600', bg: 'bg-amber-50 text-amber-700' };
       default: return { icon: <UserCheck />, color: 'from-emerald-500 to-teal-600', bg: 'bg-emerald-50 text-emerald-700' };
@@ -467,51 +464,32 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { 
 
 /** Exact slugs that are platform-privileged. Used for deny-list filtering. */
 export const PRIVILEGED_ROLE_SLUGS = [
-  'SUPER_ADMIN',
-  'SUPERADMIN',
   'ADMIN',
-  'SYSTEM_ADMIN',
-  'ROOT',
-  'OWNER',
 ] as const;
 
-/** Roles only SUPER_ADMIN sees in the form and filters */
-const PRIVILEGED_ROLES_UI = [
-  { slug: 'SUPER_ADMIN', label: 'Super Admin', color: 'purple' },
-  { slug: 'ADMIN',       label: 'Administrator', color: 'indigo' },
-];
-
-/** Operational roles — visible to all management levels */
+/** Operational roles visible to managers. */
 export const OPERATIONAL_ROLES = [
-  { slug: 'MANAGER',          label: 'Plant Manager',  color: 'amber' },
-  { slug: 'OPERATOR',         label: 'General Operator', color: 'emerald' },
-  { slug: 'OPERATOR_BLOWING', label: 'Blowing Op.',    color: 'emerald' },
-  { slug: 'OPERATOR_FILLING', label: 'Filling Op.',    color: 'emerald' },
-  { slug: 'OPERATOR_LABELING',label: 'Labeling Op.',   color: 'emerald' },
-  { slug: 'OPERATOR_PACKING', label: 'Packing Op.',    color: 'emerald' },
+  { slug: 'MANAGER', label: 'Plant Manager', color: 'amber' },
+  { slug: 'OPERATOR', label: 'General Operator', color: 'emerald' },
 ];
 
-/** Roles visible to ADMIN (no SUPER_ADMIN) */
+/** Roles visible to ADMIN. */
 export const ADMIN_VISIBLE_ROLES = [
   { slug: 'ADMIN', label: 'Administrator', color: 'indigo' },
   ...OPERATIONAL_ROLES,
 ];
 
-/** Full list for SUPER_ADMIN */
+/** Full three-role list. */
 export const ALL_ROLES = [
-  ...PRIVILEGED_ROLES_UI,
-  ...OPERATIONAL_ROLES,
+  ...ADMIN_VISIBLE_ROLES,
 ];
 
 /** @deprecated Use OPERATIONAL_ROLES / ALL_ROLES based on caller role */
 function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) {
   const { user: currentUser } = useAuthStore();
-  const isSuperAdmin = currentUser?.roles.includes('SUPER_ADMIN');
   const isAdmin = currentUser?.roles.includes('ADMIN');
 
-  const allowedRoles = isSuperAdmin 
-    ? ALL_ROLES 
-    : (isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES);
+  const allowedRoles = isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES;
 
   const [formData, setFormData] = useState({
     name: user?.name || '',

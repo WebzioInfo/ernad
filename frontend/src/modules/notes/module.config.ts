@@ -11,7 +11,7 @@ export const notesConfig: ModuleConfig = {
     {
       path: 'notes',
       element: lazy(() => import('./NotesPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -24,7 +24,7 @@ export const notesConfig: ModuleConfig = {
           label: 'Operation Notes',
           icon: StickyNote,
           path: '/notes',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     }

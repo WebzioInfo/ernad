@@ -1,16 +1,9 @@
 import { LucideIcon } from 'lucide-react';
 
 export type UserRole = 
-  | 'SUPER_ADMIN' 
   | 'ADMIN' 
   | 'MANAGER' 
-  | 'OPERATOR' 
-  | 'OPERATOR_BLOWING' 
-  | 'OPERATOR_FILLING' 
-  | 'OPERATOR_LABELING' 
-  | 'OPERATOR_PACKING' 
-  | 'ACCOUNTANT'
-  | 'HR_ADMIN';
+  | 'OPERATOR';
 
 export interface RouteDefinition {
   path: string;

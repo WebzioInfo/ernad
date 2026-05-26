@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../database/db';
-import { changeoverLogs, productionBatches, productionLines, factories, batchTotals, operatorSessions } from '../../database/schema';
+import { changeoverLogs, productionBatches, productionLines, batchTotals, operatorSessions } from '../../database/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { BatchService } from './services/batch.service';
@@ -15,13 +15,6 @@ export class ChangeoverService {
     private batchService: BatchService,
     private audit: AuditService
   ) {}
-
-  private async getFactoryContext(factoryId?: string): Promise<string> {
-    if (factoryId) return factoryId;
-    const [factory] = await db.select().from(factories).limit(1);
-    if (!factory) throw new BadRequestException('No factory configured in system.');
-    return factory.id;
-  }
 
   async initiateChangeover(batchId: string, toProductId: string, userId: string, extra?: { reason?: string, notes?: string, startTime?: string }) {
     const result = await db.transaction(async (tx) => {
@@ -53,7 +46,6 @@ export class ChangeoverService {
   }
 
   async completeChangeover(batchId: string, userId: string) {
-    const factoryId = await this.getFactoryContext();
     const result = await db.transaction(async (tx) => {
       const [log] = await tx.select().from(changeoverLogs)
         .where(and(eq(changeoverLogs.batchId, batchId), isNull(changeoverLogs.endTime)))
@@ -86,7 +78,6 @@ export class ChangeoverService {
       // Create the new batch (Transitioned from changeover)
       const [newBatch] = await tx.insert(productionBatches).values({
         batchCode,
-        factoryId,
         lineId: log.lineId,
         brandId: oldBatch.brandId,
         productId: log.toProductId,
@@ -104,7 +95,6 @@ export class ChangeoverService {
       // Initialize totals for the new batch
       await tx.insert(batchTotals).values({
         batchId: newBatch.id,
-        factoryId,
         lineId: log.lineId,
         blowingTotal: 0,
         fillingTotal: 0,

@@ -11,22 +11,22 @@ export const reportsConfig: ModuleConfig = {
     {
       path: 'reports/production',
       element: lazy(() => import('./pages/ProductionReportsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'reports/sales',
       element: lazy(() => import('./pages/SalesAnalyticsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'reports/attendance',
       element: lazy(() => import('./pages/AttendanceReportsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN']
     },
     {
       path: 'reports/batch/:id',
       element: lazy(() => import('./pages/BatchForensicsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -39,14 +39,14 @@ export const reportsConfig: ModuleConfig = {
           label: 'Reports',
           icon: FileText,
           path: '/reports/production',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           id: 'sales_reports',
           label: 'Sales',
           icon: BarChart4,
           path: '/reports/sales',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     },
@@ -59,7 +59,7 @@ export const reportsConfig: ModuleConfig = {
           label: 'Attendance',
           icon: ClipboardList,
           path: '/reports/attendance',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN'],
+          allowedRoles: ['ADMIN'],
           isComingSoon: true
         }
       ]

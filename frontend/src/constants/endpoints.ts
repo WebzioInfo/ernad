@@ -96,6 +96,7 @@ export const ENDPOINTS = {
     PRODUCTS: 'master-data/products',
     SHIFTS: 'master-data/shifts',
     SHIFT: (id: string) => `master-data/shifts/${id}`,
+    RAW_MATERIALS: 'master-data/raw-materials',
   },
   BIOMETRIC: {
     DEVICES: 'biometric/devices',

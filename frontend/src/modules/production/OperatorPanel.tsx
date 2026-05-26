@@ -74,6 +74,8 @@ export default function OperatorPanel() {
 
   // Station Specific States
   const [selectedCapProductId, setSelectedCapProductId] = useState('');
+  const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
+  const [bagsUsed, setBagsUsed] = useState(0);
   const [preformUsage, setPreformUsage] = useState(0);
   const [capUsage, setCapUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
@@ -92,6 +94,7 @@ export default function OperatorPanel() {
   
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
+  const [justSubmitted, setJustSubmitted] = useState(false);
 
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
 
@@ -154,6 +157,12 @@ export default function OperatorPanel() {
   const { data: products } = useQuery({
     queryKey: ['products'],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data,
+  });
+
+  const { data: rawMaterials } = useQuery({
+    queryKey: ['raw-materials'],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.RAW_MATERIALS)).data,
+    enabled: currentStationId === 'BLOWING',
   });
 
   const capProducts = (products || []).filter((product: any) =>
@@ -244,7 +253,7 @@ export default function OperatorPanel() {
     }
   };
 
-  const { data: history, refetch: refetchHistory } = useQuery({
+  const { data: history, refetch: refetchHistory, isFetching: isFetchingHistory } = useQuery({
     queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
     queryFn: async () => {
       if (!activeBatch?.batch?.id) return [];
@@ -266,6 +275,26 @@ export default function OperatorPanel() {
     }
   }, [isLoadingBatch]);
 
+  // Automatically trigger refetch of history when submission finishes
+  useEffect(() => {
+    if (justSubmitted && activeBatch?.batch?.id) {
+      let count = 0;
+      const interval = setInterval(() => {
+        refetchHistory();
+        queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
+        queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+        
+        count++;
+        if (count >= 5) {
+          clearInterval(interval);
+          setJustSubmitted(false);
+        }
+      }, 1000); // Poll every 1 second for 5 seconds to ensure async queue completes
+      
+      return () => clearInterval(interval);
+    }
+  }, [justSubmitted, activeBatch?.batch?.id, refetchHistory, queryClient]);
+
   // Enforce Formula: Used = Production + Wastage
   useEffect(() => {
     const total = primaryCount + rejectionCount;
@@ -280,6 +309,7 @@ export default function OperatorPanel() {
 
     if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
     if (currentStation.id === 'FILLING' && !selectedCapProductId) return toast.error('Please select the Caps product.');
+    if (currentStation.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
 
     const currentBatch = activeBatch?.batch;
     const selectedCapProduct = capProducts.find((product: any) => product.id === selectedCapProductId);
@@ -309,6 +339,8 @@ export default function OperatorPanel() {
       // For Blowing, we purchase in KGs but produce in COUNT.
       // We track 'preformsUsed' as the count of preforms consumed.
       logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
+      logEntry.rawMaterialId = selectedRawMaterialId;
+      logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
       logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
       logEntry.materials = selectedCapProduct ? [{
@@ -341,12 +373,13 @@ export default function OperatorPanel() {
       setIsSubmitting(true);
       await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
       toast.success('Log Successfully Transmitted');
+      setJustSubmitted(true);
 
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
       setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
-      setPreformUsage(0); setCapUsage(0); setSelectedCapProductId(''); setLabelUsage(0); setShrinkUsage('');
+      setPreformUsage(0); setCapUsage(0); setSelectedCapProductId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage('');
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setLabelStickerWeight(0); setDamagedLabelWeight(0);
       setInkChanged(false); setInkUsageMl(0);
@@ -412,7 +445,18 @@ export default function OperatorPanel() {
       <StationWorkspace
         title={currentStation.title}
         description="Production Data Processing Node"
-        sidebar={<ActivityFeed history={history || []} />}
+        sidebar={
+          <ActivityFeed 
+            history={history || []} 
+            onRefresh={() => {
+              refetchHistory();
+              queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
+              queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+              toast.success('Uplink Feed Refreshed');
+            }} 
+            isRefreshing={isFetchingHistory} 
+          />
+        }
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Main Action Card */}
@@ -436,17 +480,54 @@ export default function OperatorPanel() {
                 )}
                 
                 {currentStation.id === 'BLOWING' && (
-                  <div className="space-y-1">
-                    <IndustrialNumericInput
-                      label="Preforms Used (This Log)"
-                      value={preformUsage}
-                      onChange={() => {}} 
-                      suffix="Pcs"
-                      readOnly
-                    />
-                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
-                      Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
-                    </p>
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                        Raw Material
+                      </label>
+                      <select
+                        value={selectedRawMaterialId}
+                        onChange={e => setSelectedRawMaterialId(e.target.value)}
+                        className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/40 transition-all"
+                      >
+                        <option value="">Select Raw Material...</option>
+                        {rawMaterials?.map((material: any) => (
+                          <option key={material.id} value={material.id}>
+                            {material.name} ({material.categoryName})
+                          </option>
+                        ))}
+                      </select>
+                      {(!rawMaterials || rawMaterials.length === 0) && (
+                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
+                          No raw materials found.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <IndustrialNumericInput
+                        label="Bags Used"
+                        value={bagsUsed}
+                        onChange={setBagsUsed}
+                        suffix="Bags"
+                      />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">
+                        (1 bag = 25KG)
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <IndustrialNumericInput
+                        label="Preforms Used (This Log)"
+                        value={preformUsage}
+                        onChange={() => {}} 
+                        suffix="Pcs"
+                        readOnly
+                      />
+                      <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest px-2">
+                        Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
+                      </p>
+                    </div>
                   </div>
                 )}
                 

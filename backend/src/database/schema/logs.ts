@@ -1,15 +1,14 @@
 import { pgTable, uuid, timestamp, integer, decimal, bigserial, index, pgEnum, varchar, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { productionBatches, operatorSessions } from './production';
 import { users } from './users';
-import { factories, productionLines, productBrands, products } from './master-data';
-import { shifts } from './biometric';
-import { terminals } from './terminals';
-import { qcStatusEnum } from './qc';
+import { productionLines, productBrands, products, shifts } from './master-data';
 import { sql } from 'drizzle-orm';
+import { rawMaterials } from './inventory';
 
 export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
 export const logStatusEnum = pgEnum('log_status', ['DRAFT', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'CORRECTED', 'OVERRIDDEN']);
+export const qcStatusEnum = pgEnum('qc_status', ['PENDING', 'PASSED', 'FAILED', 'ON_HOLD', 'RELEASED']);
 
 // The Ledger of all production activity (Enterprise Standard)
 export const productionLogs = pgTable('production_logs', {
@@ -21,9 +20,7 @@ export const productionLogs = pgTable('production_logs', {
   brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(), // New: Analytics Pivot
   userId: uuid('user_id').references(() => users.id).notNull(),
-  terminalId: uuid('terminal_id').references(() => terminals.id), // Link to physical tablet
   sessionId: uuid('session_id').references(() => operatorSessions.id),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   station: stationTypeEnum('station').notNull(),
   
   // Data Normalization (Phase 1)
@@ -47,6 +44,8 @@ export const productionLogs = pgTable('production_logs', {
   capRejection: integer('cap_rejection').default(0),
   preformUsage: integer('preform_usage').default(0),
   preformRejection: integer('preform_rejection').default(0),
+  rawMaterialId: uuid('raw_material_id').references(() => rawMaterials.id),
+  bagsUsed: decimal('bags_used', { precision: 8, scale: 2 }).default('0'),
   bopRollUsage: decimal('bop_roll_usage', { precision: 8, scale: 2 }).default('0'),
   bopRejection: decimal('bop_rejection', { precision: 8, scale: 2 }).default('0'),
   shrinkWeightUsed: decimal('shrink_weight_used', { precision: 8, scale: 2 }).default('0'),
@@ -96,7 +95,6 @@ export const productionLogs = pgTable('production_logs', {
     index('idx_production_logs_request').on(table.requestId),
     index('idx_production_logs_date').on(table.loggedAt),
     index('idx_production_logs_session').on(table.sessionId),
-    index('idx_production_logs_terminal').on(table.terminalId),
     index('idx_production_logs_deleted').on(table.deletedAt),
     index('idx_production_logs_status').on(table.status),
   ];
@@ -118,7 +116,6 @@ export const materialsUsage = pgTable('materials_usage', {
 export const batchTotals = pgTable('batch_totals', {
   batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).primaryKey(),
   lineId: uuid('line_id').references(() => productionLines.id, { onDelete: 'cascade' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   blowingTotal: integer('blowing_total').default(0).notNull(),
   fillingTotal: integer('filling_total').default(0).notNull(),
   labelingTotal: integer('labeling_total').default(0).notNull(),
@@ -128,6 +125,7 @@ export const batchTotals = pgTable('batch_totals', {
   // Material Totals (Enterprise Upgrade)
   capTotal: integer('cap_total').default(0).notNull(),
   preformTotal: integer('preform_total').default(0).notNull(),
+  bagsTotal: decimal('bags_total', { precision: 10, scale: 2 }).default('0').notNull(),
   bopRollTotal: decimal('bop_roll_total', { precision: 10, scale: 2 }).default('0').notNull(),
   shrinkWeightTotal: decimal('shrink_weight_total', { precision: 10, scale: 2 }).default('0').notNull(),
   finishedGoodsTotal: integer('finished_goods_total').default(0).notNull(),
@@ -178,7 +176,6 @@ export const deviceTokens = pgTable('device_tokens', {
 export const qualityChecks = pgTable('quality_checks', {
   id: uuid('id').defaultRandom().primaryKey(),
   batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   inspectorId: uuid('inspector_id').references(() => users.id).notNull(),
   checkType: varchar('check_type', { length: 100 }).notNull(), // e.g., 'Bottle Integrity', 'PH Level'
   result: varchar('result', { length: 20 }).notNull(), // 'PASS', 'FAIL'
@@ -191,7 +188,6 @@ export const qualityChecks = pgTable('quality_checks', {
 export const packagingLogs = pgTable('packaging_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   operatorId: uuid('operator_id').references(() => users.id).notNull(),
   packType: varchar('pack_type', { length: 50 }).notNull(), // e.g., 'Crate', 'Box'
   quantity: integer('quantity').notNull(),
@@ -201,14 +197,12 @@ export const packagingLogs = pgTable('packaging_logs', {
 }, (table) => {
   return [
     index('idx_packaging_batch').on(table.batchId),
-    index('idx_packaging_factory').on(table.factoryId),
   ];
 });
 
 export const dispatchLogs = pgTable('dispatch_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'cascade' }).notNull(),
   dispatchManagerId: uuid('dispatch_manager_id').references(() => users.id).notNull(),
   destination: varchar('destination', { length: 255 }).notNull(),
   quantity: integer('quantity').notNull(),
@@ -218,7 +212,6 @@ export const dispatchLogs = pgTable('dispatch_logs', {
 }, (table) => {
   return [
     index('idx_dispatch_batch').on(table.batchId),
-    index('idx_dispatch_factory').on(table.factoryId),
   ];
 });
 

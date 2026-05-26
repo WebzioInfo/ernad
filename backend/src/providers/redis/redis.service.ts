@@ -8,6 +8,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis | null = null;
   private isAvailable = false;
   private memoryFallback = new Map<string, any>();
+  private localCache = new Map<string, { value: any; expiresAt: number }>();
 
   constructor(private configService: ConfigService) {}
 
@@ -27,7 +28,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       this.client = new Redis(redisUrl, {
         lazyConnect: true,
         maxRetriesPerRequest: 0,
-        connectTimeout: 5000,
+        connectTimeout: 2000,
+        commandTimeout: 1000,
         enableOfflineQueue: false,
         tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
         retryStrategy: (times) => {
@@ -77,6 +79,18 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   // --- Resilient API ---
 
   async set(key: string, value: string, mode?: 'EX', duration?: number) {
+    const now = Date.now();
+    let ttl = 10000; // default 10s local cache
+    if (mode === 'EX' && duration) {
+      ttl = duration * 1000;
+    } else if (key.startsWith('user:status:')) {
+      ttl = 30000; // 30s local cache
+    } else if (key.startsWith('operator_session:')) {
+      ttl = 10000; // 10s local cache
+    }
+
+    this.localCache.set(key, { value, expiresAt: now + ttl });
+
     if (this.isAvailable && this.client) {
       try {
         if (mode === 'EX' && duration) {
@@ -92,17 +106,38 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
+    const now = Date.now();
+    const cached = this.localCache.get(key);
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
+    }
+
+    let value: string | null = null;
     if (this.isAvailable && this.client) {
       try {
-        return await this.client.get(key);
+        value = await this.client.get(key);
       } catch {
         this.isAvailable = false;
       }
     }
-    return this.memoryFallback.get(key) || null;
+
+    if (value === null) {
+      value = this.memoryFallback.get(key) || null;
+    }
+
+    let ttl = 5000; // default 5s local cache for get
+    if (key.startsWith('user:status:')) {
+      ttl = 30000; // 30s
+    } else if (key.startsWith('operator_session:')) {
+      ttl = 10000; // 10s
+    }
+
+    this.localCache.set(key, { value, expiresAt: now + ttl });
+    return value;
   }
 
   async del(key: string) {
+    this.localCache.delete(key);
     if (this.isAvailable && this.client) {
       try {
         return await this.client.del(key);

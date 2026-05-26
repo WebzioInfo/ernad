@@ -57,14 +57,14 @@ export class NotificationsService {
   }
 
   /**
-   * Target all users with role SUPER_ADMIN, ADMIN, or MANAGER
+   * Target all users with role ADMIN or MANAGER
    */
   private async broadcastOneSignalPush(title: string, body: string, data: Record<string, string>) {
     const targetUsers = await db.select({ id: users.id })
       .from(users)
       .innerJoin(userRoles, eq(users.id, userRoles.userId))
       .innerJoin(roles, eq(userRoles.roleId, roles.id))
-      .where(inArray(roles.slug, ['SUPER_ADMIN', 'ADMIN', 'MANAGER']));
+      .where(inArray(roles.slug, ['ADMIN', 'MANAGER']));
 
     const userIds = Array.from(new Set(targetUsers.map((u) => u.id)));
     if (userIds.length === 0) return;

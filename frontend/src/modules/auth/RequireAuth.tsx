@@ -12,26 +12,21 @@ export default function RequireAuth({ children, allowedRoles, requiredPermission
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const rawRoles = user?.roles || (user?.role ? [user.role] : []);
-  const canonicalRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
-  const hasInvalidRole = rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
+  const rawRoles = user.roles || (user.role ? [user.role] : []);
+  const canonicalRoles = ['ADMIN', 'MANAGER', 'OPERATOR'];
+  const hasInvalidRole = rawRoles.length === 0 || rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
 
   if (hasInvalidRole) {
     // Clear stale auth state immediately
     useAuthStore.getState().logout();
-    return null;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   const userRoles = rawRoles.map((r: string) => r.toUpperCase().trim());
-  
-  // SUPER_ADMIN bypass
-  if (userRoles.includes('SUPER_ADMIN')) {
-    return children;
-  }
 
   // ── Role Check ──
   let rolePassed = true;

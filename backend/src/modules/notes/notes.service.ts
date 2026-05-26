@@ -17,7 +17,6 @@ export class NotesService {
 
   private getHierarchyRoles(role: string): string[] {
     const r = role.toUpperCase();
-    if (r === 'SUPER_ADMIN') return []; // Special case: see all
     if (r === 'ADMIN') return ['ADMIN', 'MANAGER', 'OPERATOR'];
     if (r === 'MANAGER') return ['MANAGER', 'OPERATOR'];
     return []; // Operators only see their own
@@ -66,9 +65,7 @@ export class NotesService {
     let conditions = and(isNull(notes.deletedAt));
 
     // Hierarchical Visibility
-    if (userRole.toUpperCase() === 'SUPER_ADMIN') {
-      // Sees everything
-    } else if (['ADMIN', 'MANAGER'].includes(userRole.toUpperCase())) {
+    if (['ADMIN', 'MANAGER'].includes(userRole.toUpperCase())) {
       conditions = and(conditions, inArray(notes.createdByRole, roleHierarchy));
     } else {
       // Operators see logs contextually based on line/batch filters
@@ -123,7 +120,7 @@ export class NotesService {
     // Only owner or higher hierarchy can edit? 
     // Usually only owner can edit content, but admin can pin/archive.
     const isOwner = note.createdById === userId;
-    const isHigher = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(userRole.toUpperCase()) && this.getHierarchyRoles(userRole).includes(note.createdByRole);
+    const isHigher = ['ADMIN', 'MANAGER'].includes(userRole.toUpperCase()) && this.getHierarchyRoles(userRole).includes(note.createdByRole);
 
     if (!isOwner && !isHigher) {
        throw new ForbiddenException('You cannot edit this note');
@@ -141,10 +138,10 @@ export class NotesService {
     const note = await this.findOne(id, userId, userRole);
     
     const isOwner = note.createdById === userId;
-    const isSuperAdmin = userRole.toUpperCase() === 'SUPER_ADMIN';
+    const isAdmin = userRole.toUpperCase() === 'ADMIN';
 
-    if (!isOwner && !isSuperAdmin) {
-      throw new ForbiddenException('Only the owner or Super Admin can delete notes');
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('Only the owner or Admin can delete notes');
     }
 
     await db.update(notes).set({ deletedAt: new Date() }).where(eq(notes.id, id));

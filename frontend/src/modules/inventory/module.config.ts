@@ -11,7 +11,7 @@ export const inventoryConfig: ModuleConfig = {
     {
       path: 'inventory',
       element: lazy(() => import('./InventoryPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -24,7 +24,7 @@ export const inventoryConfig: ModuleConfig = {
           label: 'Materials',
           icon: Package,
           path: '/inventory',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     }

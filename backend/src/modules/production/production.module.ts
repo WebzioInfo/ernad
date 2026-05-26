@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { ProductionController } from './production.controller';
-import { TerminalsController } from './terminals.controller';
 import { ChangeoverController } from './changeover.controller';
 import { BatchService } from './services/batch.service';
 import { LineService } from './services/line.service';
@@ -18,7 +17,7 @@ import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [EventsModule, OperatorSessionsModule, forwardRef(() => AuthModule), forwardRef(() => UsersModule)],
-  controllers: [ProductionController, ChangeoverController, TerminalsController],
+  controllers: [ProductionController, ChangeoverController],
   providers: [
     BatchService, 
     LineService, 

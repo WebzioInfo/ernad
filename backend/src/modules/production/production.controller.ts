@@ -17,11 +17,7 @@ import {
 } from './dto/production.dto';
 
 import { ChangeoverService } from './changeover.service';
-import { TerminalService } from './services/terminal.service';
 import { VerificationService } from './services/verification.service';
-import { terminals, factories, productionLines } from '../../database/schema';
-import { eq } from 'drizzle-orm';
-import { db } from '../../database/db';
 
 @ApiTags('Production')
 @ApiBearerAuth()
@@ -35,7 +31,6 @@ export class ProductionController {
     private readonly lineService: LineService,
     private readonly lifecycleService: LifecycleService,
     private readonly changeoverService: ChangeoverService,
-    private readonly terminalService: TerminalService,
     private readonly verificationService: VerificationService
   ) {}
 

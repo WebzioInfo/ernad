@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum } from 'drizzle-orm/pg-core';
-import { products, factories } from './master-data';
+import { products } from './master-data';
 import { users } from './users';
 import { productionBatches } from './production';
 
@@ -22,7 +22,6 @@ export const salesOrders = pgTable('sales_orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   orderNumber: varchar('order_number', { length: 50 }).notNull().unique(),
   customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'restrict' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   status: orderStatusEnum('status').default('DRAFT').notNull(),
   paymentStatus: paymentStatusEnum('payment_status').default('PENDING').notNull(),
   totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull().default('0'),

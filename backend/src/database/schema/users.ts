@@ -1,13 +1,13 @@
 import { pgTable, uuid, varchar, timestamp, boolean, pgEnum, index } from 'drizzle-orm/pg-core';
-import { factories, productionLines } from './master-data';
-import { shifts } from './biometric';
+import { productionLines } from './master-data';
+
 
 // ── RBAC SYSTEM (Phase 3 Redesign) ──
 
 export const roles = pgTable('roles', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 50 }).notNull().unique(), // e.g. "Plant Manager"
-  slug: varchar('slug', { length: 50 }).notNull().unique(), // e.g. "SUPER_ADMIN"
+  slug: varchar('slug', { length: 50 }).notNull().unique(), // e.g. "ADMIN"
   description: varchar('description', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
@@ -42,7 +42,6 @@ export const users = pgTable('users', {
   operatorType: varchar('operator_type', { length: 50 }), // @deprecated - Use operator_sessions.station
   isActive: boolean('is_active').default(true).notNull(),
   avatarUrl: varchar('avatar_url', { length: 255 }),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   deletedAt: timestamp('deleted_at'),
@@ -71,19 +70,4 @@ export const userLines = pgTable('user_lines', {
   ];
 });
 
-export const attendanceLogs = pgTable('attendance_logs', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  clockIn: timestamp('clock_in').defaultNow().notNull(),
-  clockOut: timestamp('clock_out'),
-  shiftId: uuid('shift_id').references(() => shifts.id), // New: Link to master shift data
-  shiftName: varchar('shift_name', { length: 50 }), // @deprecated - Use shiftId
-  status: varchar('status', { length: 20 }).default('PRESENT').notNull(), // PRESENT, LATE, ON_LEAVE
-  externalSyncId: varchar('external_sync_id', { length: 255 }), // ID from biometric device
-  remarks: varchar('remarks', { length: 255 }),
-}, (table) => {
-  return [
-    index('idx_attendance_user_date').on(table.userId, table.clockIn),
-    index('idx_attendance_sync_id').on(table.externalSyncId),
-  ];
-});
+

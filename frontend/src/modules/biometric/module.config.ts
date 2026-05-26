@@ -11,37 +11,37 @@ export const biometricConfig: ModuleConfig = {
     {
       path: 'attendance',
       element: lazy(() => import('./pages/AttendancePage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'biometric',
       element: lazy(() => import('./pages/DashboardPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+      allowedRoles: ['ADMIN', 'MANAGER'],
       children: [
         {
           path: 'devices',
           element: lazy(() => import('./pages/DevicesPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['ADMIN']
         },
         {
           path: 'logs',
           element: lazy(() => import('./pages/LiveLogsPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           path: 'unmapped',
           element: lazy(() => import('./pages/UnmappedLogsPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           path: 'shifts',
           element: lazy(() => import('./pages/ShiftsPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           path: 'reports',
           element: lazy(() => import('./pages/ReportsPage')),
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     }
@@ -56,7 +56,7 @@ export const biometricConfig: ModuleConfig = {
           label: 'Attendance',
           icon: ClipboardCheck,
           path: '/attendance',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          allowedRoles: ['ADMIN', 'MANAGER'],
           isComingSoon: true
         },
         {
@@ -64,7 +64,7 @@ export const biometricConfig: ModuleConfig = {
           label: 'Biometric',
           icon: Fingerprint,
           path: '/biometric',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     },
@@ -77,7 +77,7 @@ export const biometricConfig: ModuleConfig = {
           label: 'Attendance Reports',
           icon: FileText,
           path: '/biometric/reports',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER'],
+          allowedRoles: ['ADMIN', 'MANAGER'],
           isComingSoon: true
         }
       ]

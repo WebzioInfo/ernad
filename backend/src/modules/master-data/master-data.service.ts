@@ -2,18 +2,17 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, products, productBrands, factories, productionBatches } from '../../database/schema';
+import { productionLines, products, productBrands, productionBatches, rawMaterials, materialCategories } from '../../database/schema';
 
 @Injectable()
 export class MasterDataService {
-  private async getFactoryContext(): Promise<string> {
-    const [factory] = await db.select().from(factories).limit(1);
-    if (!factory) throw new BadRequestException('No factory configured in system.');
-    return factory.id;
-  }
+  private linesCache: { data: any; expiresAt: number } | null = null;
 
   async getLines() {
-    const factoryId = await this.getFactoryContext();
+    const now = Date.now();
+    if (this.linesCache && this.linesCache.expiresAt > now) {
+      return this.linesCache.data;
+    }
     const results = await db.select({
       line: productionLines,
       batch: {
@@ -32,13 +31,15 @@ export class MasterDataService {
       inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
     ))
     .leftJoin(products, eq(productionBatches.productId, products.id))
-    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
-    .where(eq(productionLines.factoryId, factoryId));
+    .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id));
 
-    return results.map(r => ({
+    const mappedResults = results.map(r => ({
       ...r.line,
       batch: r.batch.id ? r.batch : null
     }));
+
+    this.linesCache = { data: mappedResults, expiresAt: now + 5000 };
+    return mappedResults;
   }
 
   async getLine(id: string) {
@@ -68,12 +69,11 @@ export class MasterDataService {
   }
 
   async createLine(dto: { name: string; description?: string }) {
+    this.linesCache = null;
     try {
-      const factoryId = await this.getFactoryContext();
       const [line] = await db.insert(productionLines).values({
         name: dto.name,
         description: dto.description,
-        factoryId,
         status: 'IDLE',
       }).returning();
       return line;
@@ -84,6 +84,7 @@ export class MasterDataService {
   }
 
   async updateLine(id: string, dto: { name?: string; description?: string; status?: string }) {
+    this.linesCache = null;
     const [line] = await db.update(productionLines)
       .set({ ...dto, updatedAt: new Date() })
       .where(eq(productionLines.id, id))
@@ -92,13 +93,13 @@ export class MasterDataService {
   }
 
   async deleteLine(id: string) {
+    this.linesCache = null;
     await db.delete(productionLines).where(eq(productionLines.id, id));
     return { success: true };
   }
 
   async getProducts() {
-    const factoryId = await this.getFactoryContext();
-    return await db.select().from(products).where(eq(products.factoryId, factoryId));
+    return await db.select().from(products);
   }
 
   async getBrands() {
@@ -106,8 +107,7 @@ export class MasterDataService {
   }
 
   async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string }) {
-    const factoryId = await this.getFactoryContext();
-    const [product] = await db.insert(products).values({ ...dto, factoryId }).returning();
+    const [product] = await db.insert(products).values({ ...dto }).returning();
     return product;
   }
 
@@ -140,5 +140,16 @@ export class MasterDataService {
   async deleteProduct(id: string) {
     await db.delete(products).where(eq(products.id, id));
     return { success: true };
+  }
+
+  async getRawMaterials() {
+    return await db.select({
+      id: rawMaterials.id,
+      name: rawMaterials.name,
+      categoryId: rawMaterials.categoryId,
+      categoryName: materialCategories.name,
+    })
+    .from(rawMaterials)
+    .innerJoin(materialCategories, eq(rawMaterials.categoryId, materialCategories.id));
   }
 }

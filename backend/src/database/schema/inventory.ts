@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, integer, boolean, decimal, uniqueIndex, text } from 'drizzle-orm/pg-core';
-import { factories, products } from './master-data';
+import { products } from './master-data';
 import { users } from './users';
 
 export const materialCategories = pgTable('material_categories', {
@@ -9,9 +9,16 @@ export const materialCategories = pgTable('material_categories', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+export const rawMaterials = pgTable('raw_materials', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: varchar('name', { length: 150 }).notNull(),
+  categoryId: uuid('category_id').references(() => materialCategories.id, { onDelete: 'cascade' }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const warehouseLocations = pgTable('warehouse_locations', {
   id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   name: varchar('name', { length: 100 }).notNull(),
   type: varchar('type', { length: 50 }).notNull().default('RAW_MATERIAL'), // RAW_MATERIAL, FINISHED_GOODS, QUARANTINE
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -27,7 +34,6 @@ export const supplierBatches = pgTable('supplier_batches', {
 
 export const inventoryStock = pgTable('inventory_stock', {
   id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   warehouseId: uuid('warehouse_id').references(() => warehouseLocations.id, { onDelete: 'restrict' }).notNull(),
   categoryId: uuid('category_id').references(() => materialCategories.id, { onDelete: 'restrict' }),
   itemName: varchar('item_name', { length: 150 }).notNull(),
@@ -57,7 +63,6 @@ export const inventoryTransactions = pgTable('inventory_transactions', {
 
 export const finishedGoodsInventory = pgTable('finished_goods_inventory', {
   id: uuid('id').defaultRandom().primaryKey(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
   warehouseId: uuid('warehouse_id').references(() => warehouseLocations.id, { onDelete: 'restrict' }).notNull(),
   status: varchar('status', { length: 50 }).default('AVAILABLE').notNull(), // AVAILABLE, QUARANTINED, DISPATCHED

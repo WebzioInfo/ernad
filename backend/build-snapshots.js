@@ -24,7 +24,6 @@ snap004.tables['public.terminals'] = {
     code: { name: 'code', type: 'varchar(20)', primaryKey: false, notNull: true },
     name: { name: 'name', type: 'varchar(100)', primaryKey: false, notNull: true },
     type: { name: 'type', type: 'terminal_type', primaryKey: false, notNull: true },
-    factory_id: { name: 'factory_id', type: 'uuid', primaryKey: false, notNull: true },
     line_id: { name: 'line_id', type: 'uuid', primaryKey: false, notNull: false },
     department: { name: 'department', type: 'varchar(50)', primaryKey: false, notNull: false },
     mac_address: { name: 'mac_address', type: 'varchar(50)', primaryKey: false, notNull: false },
@@ -37,7 +36,6 @@ snap004.tables['public.terminals'] = {
   },
   indexes: {},
   foreignKeys: {
-    terminals_factory_id_factories_id_fk: { name: 'terminals_factory_id_factories_id_fk', tableFrom: 'terminals', columnsFrom: ['factory_id'], tableTo: 'factories', columnsTo: ['id'], onDelete: 'no action', onUpdate: 'no action' },
     terminals_line_id_production_lines_id_fk: { name: 'terminals_line_id_production_lines_id_fk', tableFrom: 'terminals', columnsFrom: ['line_id'], tableTo: 'production_lines', columnsTo: ['id'], onDelete: 'no action', onUpdate: 'no action' }
   },
   uniqueConstraints: { terminals_code_unique: { name: 'terminals_code_unique', nullsNotDistinct: false, columns: ['code'] } },

@@ -11,17 +11,17 @@ export const personnelConfig: ModuleConfig = {
     {
       path: 'users',
       element: lazy(() => import('./UserManagementPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN']
     },
     {
       path: 'staffs',
       element: lazy(() => import('./StaffDirectoryPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'audit',
       element: lazy(() => import('./AuditLogsPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -34,14 +34,14 @@ export const personnelConfig: ModuleConfig = {
           label: 'System Access',
           icon: Users,
           path: '/users',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['ADMIN']
         },
         {
           id: 'staffs',
           label: 'Operators',
           icon: UserCog,
           path: '/staffs',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     },
@@ -54,7 +54,7 @@ export const personnelConfig: ModuleConfig = {
           label: 'History',
           icon: History,
           path: '/audit',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     }

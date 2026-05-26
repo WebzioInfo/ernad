@@ -15,7 +15,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const client = postgres(env.DATABASE_URL, { 
     prepare: false,
     ssl: isProduction ? { rejectUnauthorized: false } : (process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false),
-    max: isProduction ? 3 : 5, // Prevent connection exhaustion in production serverless environments
+    max: isProduction ? 3 : 30, // Prevent connection exhaustion in local persistent NestJS process
     idle_timeout: 20,
     connect_timeout: 30,
 });

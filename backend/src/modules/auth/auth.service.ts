@@ -1,13 +1,12 @@
 import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { db } from '../../database/db';
-import { users, operatorSessions, roles, permissions, rolePermissions, userRoles, terminals } from '../../database/schema';
+import { users, operatorSessions, roles, permissions, rolePermissions, userRoles } from '../../database/schema';
 import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { OperatorSessionsService } from '../operator-sessions/operator-sessions.service';
 
 const ROLE_PRECEDENCE = [
-  'SUPER_ADMIN',
   'ADMIN',
   'MANAGER',
   'OPERATOR'
@@ -18,9 +17,6 @@ function normalizeRole(roleSlug: string): string {
   
   if (r === 'GENERIC OPERATOR') return 'OPERATOR';
   if (r === 'PRODUCTION MANAGER') return 'MANAGER';
-  if (r === 'SYSTEM_ADMIN') return 'SUPER_ADMIN';
-
-  if (r.includes('SUPER')) return 'SUPER_ADMIN';
   if (r.includes('ADMIN')) return 'ADMIN';
   if (r.includes('MANAGER')) return 'MANAGER';
   
@@ -83,7 +79,7 @@ export class AuthService {
       const roleSlugs = Array.from(new Set(userRolesResult.map(r => normalizeRole(r.slug))));
       const sortedRoles = sortRoles(roleSlugs);
       const effectiveRole = sortedRoles[0] || 'OPERATOR';
-      const isManagerOrAdmin = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(effectiveRole);
+      const isManagerOrAdmin = ['ADMIN', 'MANAGER'].includes(effectiveRole);
 
       this.logger.debug(`[AUTH_TRACE] 4. Starting credential verification (bcrypt) for role: ${effectiveRole}...`);
       let isMatch = false;
@@ -143,7 +139,6 @@ export class AuthService {
         roles: sortedRoles,
         permissions: permissionsSlugs,
         name: user.name,
-        factoryId: user.factoryId,
       };
 
       const token = await this.jwtService.signAsync(payload);
@@ -162,7 +157,6 @@ export class AuthService {
           jobTitle: user.jobTitle,
           department: user.department,
           avatarUrl: user.avatarUrl,
-          factoryId: user.factoryId,
         },
       };
     } catch (err: any) {
@@ -173,36 +167,9 @@ export class AuthService {
   }
 
   async startOperatorSession(userId: string, lineId: string, shiftId: string) {
-    this.logger.log(`Starting session for user ${userId} on line ${lineId}`);
-    
-    // Fetch user to get factoryId
-    const [user] = await db.select({ factoryId: users.factoryId }).from(users).where(eq(users.id, userId)).limit(1);
-    
-    if (!user || !user.factoryId) {
-      throw new BadRequestException('User does not have an assigned factory.');
-    }
-
-    // Close existing open sessions for the SAME USER and SAME LINE
-    await db.update(operatorSessions)
-      .set({ endTime: new Date(), isActive: false, endReason: 'superseded' })
-      .where(and(
-        eq(operatorSessions.userId, userId), 
-        eq(operatorSessions.lineId, lineId),
-        eq(operatorSessions.isActive, true)
-      ));
-
-    const result = await db.insert(operatorSessions).values({
-      userId,
-      lineId,
-      shiftId,
-      factoryId: user.factoryId,
-      station: 'UNKNOWN', // Legacy session
-      startTime: new Date(),
-      isActive: true,
-    }).returning();
-
-    return result[0];
+    return this.sessionService.startSession(userId, lineId, 'GENERAL', shiftId, true);
   }
+
 
   async logoutOperatorSession(userId: string) {
     await db.update(operatorSessions)
@@ -213,7 +180,6 @@ export class AuthService {
   }
 
   async resetCredentialById(adminRoles: string[], userId: string, newCredential: string, type: 'PASSWORD' | 'PIN') {
-    const isSuperAdmin = adminRoles.includes('SUPER_ADMIN');
     const isAdmin = adminRoles.includes('ADMIN');
     const isManager = adminRoles.includes('MANAGER');
 
@@ -228,15 +194,11 @@ export class AuthService {
     const targetRoles = targetRolesResult.map(r => r.slug);
 
     if (isManager) {
-      const isPrivileged = targetRoles.some(r => ['ADMIN', 'SUPER_ADMIN', 'SYSTEM_ADMIN'].includes(r));
+      const isPrivileged = targetRoles.some(r => r === 'ADMIN');
       if (isPrivileged) throw new ForbiddenException('Managers cannot reset administrative credentials');
     }
 
-    if (isAdmin && !isSuperAdmin) {
-      if (targetRoles.includes('SUPER_ADMIN')) throw new ForbiddenException('Admins cannot reset SuperAdmin credentials');
-    }
-
-    if (!isSuperAdmin && !isAdmin && !isManager) {
+    if (!isAdmin && !isManager) {
       throw new ForbiddenException('Unauthorized to reset credentials');
     }
 
@@ -326,7 +288,6 @@ export class AuthService {
     // Explicit list of authorized operator roles (No substring matching)
     const allowedOperatorRoles = [
       'OPERATOR', 
-      'SUPER_ADMIN', // Keep emergency override
       'ADMIN',        // Keep emergency override
       'MANAGER'       // Allow managers to access terminal
     ];
@@ -367,7 +328,6 @@ export class AuthService {
         roles: sortedRoles,
         permissions: permissionsSlugs,
         name: user.name,
-        factoryId: user.factoryId,
         sessionId: session.id,
         deviceId: undefined
       };
@@ -385,7 +345,6 @@ export class AuthService {
           role: effectiveRole,
           roles: sortedRoles,
           permissions: permissionsSlugs,
-          factoryId: user.factoryId,
           sessionId: session.id,
         },
         operator: {

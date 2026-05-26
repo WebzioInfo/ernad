@@ -4,18 +4,18 @@ import useAuthStore from '../modules/auth/auth.store';
 export default function SmartRedirect() {
   const { isAuthenticated, user } = useAuthStore();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
   // Determine home based on role
-  const rawRoles = user?.roles || (user?.role ? [user.role] : []);
-  const canonicalRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR'];
-  const hasInvalidRole = rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
+  const rawRoles = user.roles || (user.role ? [user.role] : []);
+  const canonicalRoles = ['ADMIN', 'MANAGER', 'OPERATOR'];
+  const hasInvalidRole = rawRoles.length === 0 || rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
 
   if (hasInvalidRole) {
     useAuthStore.getState().logout();
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   const userRoles = rawRoles.map((r: string) => r.toUpperCase().trim());
@@ -30,6 +30,6 @@ export default function SmartRedirect() {
     return <Navigate to="/operator/select" replace />;
   }
 
-  // Default for Admin/SuperAdmin
+  // Default for Admin
   return <Navigate to="/admin/overview" replace />;
 }

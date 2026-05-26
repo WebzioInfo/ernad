@@ -29,10 +29,10 @@ async function migrate() {
     // 4. Drop unique batch code index and create non-unique index
     try {
       await db.execute(sql`DROP INDEX IF EXISTS "idx_batches_code_factory"`);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_batches_code_factory" ON "production_batches" ("batch_code", "factory_id")`);
-      console.log('Successfully updated idx_batches_code_factory to non-unique index.');
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_batches_code" ON "production_batches" ("batch_code")`);
+      console.log('Successfully updated idx_batches_code index.');
     } catch (e: any) {
-      console.error('Failed to update idx_batches_code_factory:', e.message);
+      console.error('Failed to update idx_batches_code:', e.message);
     }
 
     // 5. Update operator_sessions unique index

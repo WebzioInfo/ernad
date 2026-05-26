@@ -132,7 +132,7 @@ export default function LineSelectionPage() {
 
         {step === 'line' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
-            {lines?.filter((line: any) => line.status === 'RUNNING' || line.status === 'CHANGEOVER').map((line: any) => (
+            {lines?.map((line: any) => (
               <button
                 key={line.id}
                 onClick={() => handleLineSelect(line)}

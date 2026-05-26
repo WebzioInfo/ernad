@@ -22,6 +22,7 @@ import type {
   InventoryLedger,
   PackagingConfiguration,
   MaterialCategory,
+  RawMaterial,
   WarehouseLocation,
   StockTransfer,
   ProductionLine,
@@ -176,6 +177,8 @@ export interface TelemetryLogPayload {
   // Station-specific material fields
   preformUsage?: number;
   capUsage?: number;
+  rawMaterialId?: string;
+  bagsUsed?: number;
   bopRollUsage?: number;   // label roll meters
   inkUsage?: number;
   solventUsage?: number;
@@ -250,6 +253,9 @@ export const MasterDataService = {
 
   getShift: (shiftId: string) =>
     api.get<Shift>(ENDPOINTS.MASTER_DATA.SHIFT(shiftId)).then(r => r.data),
+
+  getRawMaterials: () =>
+    api.get<RawMaterial[]>(ENDPOINTS.MASTER_DATA.RAW_MATERIALS).then(r => r.data),
 };
 
 // ─── USERS ────────────────────────────────────────────────────────────────────

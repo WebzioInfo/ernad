@@ -39,7 +39,7 @@ export class NotificationsController {
 
   // ── OneSignal token management ──
   @Post('tokens')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR')
+  @Roles('ADMIN', 'MANAGER', 'OPERATOR')
   async registerToken(@Body() dto: RegisterTokenDto) {
     try {
       const record = await this.notificationsService.registerToken(dto.userId, dto.token, dto.platform);
@@ -53,7 +53,7 @@ export class NotificationsController {
   }
 
   @Delete('tokens/:token')
-  @Roles('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATOR')
+  @Roles('ADMIN', 'MANAGER', 'OPERATOR')
   async removeToken(@Param('token') token: string) {
     await this.notificationsService.removeToken(token);
     return { success: true };

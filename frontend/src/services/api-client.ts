@@ -6,6 +6,18 @@ import { v4 as uuidv4 } from 'uuid';
 // ── INDUSTRIAL SYNC QUEUE (Offline-First) ──
 const SYNC_QUEUE_KEY = 'mes-sync-queue';
 
+const isBackgroundPollUrl = (url: string | undefined): boolean => {
+  if (!url) return false;
+  return url.includes('/analytics/factory/live') || 
+         url.includes('/analytics/factory/efficiency') ||
+         url.includes('/production/active-batch') ||
+         url.includes('/telemetry/active-events') ||
+         url.includes('/telemetry/history') ||
+         url.includes('/operator-sessions/handover/recent') ||
+         url.includes('/operator-sessions/active') ||
+         url.includes('/master-data/lines');
+};
+
 const getSyncQueue = (): any[] => {
   try {
     return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY) || '[]');
@@ -96,10 +108,11 @@ api.interceptors.response.use(
         });
       }
 
+      // Helper isBackgroundPollUrl is defined at module level
+
       if (isTimeout) {
         // Skip global toast for high-frequency polling analytics to prevent "toast spam"
-        const isBackgroundPoll = config?.url?.includes('/analytics/factory/live') || 
-                                config?.url?.includes('/analytics/factory/efficiency');
+        const isBackgroundPoll = isBackgroundPollUrl(config?.url);
         
         if (!isBackgroundPoll) {
           toast.error('Network Latency Detected', {
@@ -174,8 +187,7 @@ api.interceptors.response.use(
       const skipGlobalToast = (config as any)?.skipGlobalToast;
 
       // Suppress 404 toasts for specific background queries that handle nulls gracefully
-      const isBackgroundPoll = config?.url?.includes('/analytics/factory/live') || 
-                              config?.url?.includes('/production/active-batch');
+      const isBackgroundPoll = isBackgroundPollUrl(config?.url);
 
       if (!skipGlobalToast && !(error.response.status === 404 && isBackgroundPoll)) {
         toast.error(message, {

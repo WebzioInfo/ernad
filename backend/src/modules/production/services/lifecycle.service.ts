@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import { 
-  productionBatches, batchTotals, productionLines, factories,
+  productionBatches, batchTotals, productionLines,
   qualityChecks, packagingLogs, dispatchLogs, userRoles, roles, operatorSessions,
   finishedGoodsInventory, inventoryStock, warehouseLocations, inventoryTransactions
 } from '../../../database/schema';
@@ -18,19 +18,10 @@ export class LifecycleService {
     private sessionService: OperatorSessionsService
   ) {}
 
-  private async getFactoryContext(factoryId?: string): Promise<string> {
-    if (factoryId) return factoryId;
-    const [factory] = await db.select().from(factories).limit(1);
-    if (!factory) throw new BadRequestException('No factory configured in system.');
-    return factory.id;
-  }
-
   async closeBatch(batchId: string, reqUserId: string, remarks?: string, endTime?: string, materialReturn?: any) {
-    const factoryId = await this.getFactoryContext();
-
     const result = await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches)
-        .where(and(eq(productionBatches.id, batchId), eq(productionBatches.factoryId, factoryId)))
+        .where(eq(productionBatches.id, batchId))
         .for('update');
       
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -148,13 +139,12 @@ export class LifecycleService {
       .returning();
   }
 
-  async closeShift(factoryId: string, shiftId: string, userId: string) {
+  async closeShift(shiftId: string, userId: string) {
     return await db.transaction(async (tx) => {
       // 1. Find all active batches for this shift
       const activeBatchesList = await tx.select()
         .from(productionBatches)
         .where(and(
-          eq(productionBatches.factoryId, factoryId),
           eq(productionBatches.shiftId, shiftId),
           sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
         ));
@@ -172,7 +162,6 @@ export class LifecycleService {
   }
 
   async submitQualityCheck(batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
-    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -182,7 +171,6 @@ export class LifecycleService {
 
       const check = await tx.insert(qualityChecks).values({
         batchId,
-        factoryId,
         inspectorId,
         checkType: 'PRODUCTION_SAMPLE',
         result,
@@ -199,12 +187,11 @@ export class LifecycleService {
         // ── GENERATE FINISHED GOODS ──
         const [totals] = await tx.select().from(batchTotals).where(eq(batchTotals.batchId, batchId));
         const [warehouse] = await tx.select().from(warehouseLocations)
-          .where(and(eq(warehouseLocations.factoryId, factoryId), eq(warehouseLocations.type, 'FINISHED_GOODS')))
+          .where(eq(warehouseLocations.type, 'FINISHED_GOODS'))
           .limit(1);
 
         if (warehouse && totals.packingTotal > 0) {
           await tx.insert(finishedGoodsInventory).values({
-            factoryId,
             productId: batch.productId,
             warehouseId: warehouse.id,
             quantity: totals.packingTotal,
@@ -225,8 +212,6 @@ export class LifecycleService {
   }
 
   async logPackaging(batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
-    const factoryId = await this.getFactoryContext();
-    
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -236,7 +221,6 @@ export class LifecycleService {
 
       const res = await tx.insert(packagingLogs).values({
         batchId,
-        factoryId,
         operatorId,
         packType,
         quantity,
@@ -254,8 +238,6 @@ export class LifecycleService {
   }
 
   async logDispatch(batchId: string, managerId: string, destination: string, quantity: number, vehicle: string, remarks?: string) {
-    const factoryId = await this.getFactoryContext();
-    
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -265,7 +247,6 @@ export class LifecycleService {
 
       const res = await tx.insert(dispatchLogs).values({
         batchId,
-        factoryId,
         dispatchManagerId: managerId,
         destination,
         quantity,
@@ -279,10 +260,9 @@ export class LifecycleService {
   }
 
   async reopenBatch(batchId: string, userId: string, reason: string) {
-    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches)
-        .where(and(eq(productionBatches.id, batchId), eq(productionBatches.factoryId, factoryId)))
+        .where(eq(productionBatches.id, batchId))
         .for('update');
       
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -309,7 +289,6 @@ export class LifecycleService {
   }
 
   async reassignOperators(batchId: string, userId: string, operatorIds: string[]) {
-    const factoryId = await this.getFactoryContext();
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).limit(1);
       if (!batch) throw new BadRequestException('Batch not found.');
@@ -327,7 +306,6 @@ export class LifecycleService {
           batchId,
           station: 'GENERAL',
           shiftId: batch.shiftId,
-          factoryId,
           isActive: true
         }));
         await tx.insert(operatorSessions).values(sessionValues);
@@ -338,18 +316,14 @@ export class LifecycleService {
   }
 
   async getLifecycleLogs(type?: 'qc' | 'packaging' | 'dispatch') {
-    const factoryId = await this.getFactoryContext();
     if (type === 'qc') {
       return await db.select().from(qualityChecks)
-        .where(eq(qualityChecks.factoryId, factoryId))
         .orderBy(desc(qualityChecks.checkedAt)).limit(50);
     } else if (type === 'packaging') {
       return await db.select().from(packagingLogs)
-        .where(eq(packagingLogs.factoryId, factoryId))
         .orderBy(desc(packagingLogs.createdAt)).limit(50);
     } else {
       return await db.select().from(dispatchLogs)
-        .where(eq(dispatchLogs.factoryId, factoryId))
         .orderBy(desc(dispatchLogs.dispatchedAt)).limit(50);
     }
   }

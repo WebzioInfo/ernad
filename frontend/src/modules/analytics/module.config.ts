@@ -11,12 +11,12 @@ export const analyticsConfig: ModuleConfig = {
     {
       path: 'overview',
       element: lazy(() => import('./ExecutiveDashboard')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'analytics',
       element: lazy(() => import('./EfficiencyDashboardPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
   sidebarGroups: [
@@ -29,7 +29,7 @@ export const analyticsConfig: ModuleConfig = {
           label: 'Dashboard',
           icon: Globe,
           path: '/overview',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     },
@@ -42,7 +42,7 @@ export const analyticsConfig: ModuleConfig = {
           label: 'Efficiency',
           icon: BarChart3,
           path: '/analytics',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     }

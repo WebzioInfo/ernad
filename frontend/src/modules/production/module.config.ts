@@ -11,32 +11,32 @@ export const productionConfig: ModuleConfig = {
     {
       path: 'production',
       element: lazy(() => import('./ProductionControlPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'management',
       element: lazy(() => import('./ProductionManagementDashboard')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'forensics/:batchId',
       element: lazy(() => import('./BatchForensicsDashboard')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
       path: 'terminal',
       element: lazy(() => import('./TerminalDashboard')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN']
     },
     {
       path: 'production-logs',
       element: lazy(() => import('./ProductionLogsManager')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     },
     /* {
       path: 'quality',
       element: lazy(() => import('./QualityManagementPage')),
-      allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER']
     } */
   ],
   sidebarGroups: [
@@ -49,35 +49,35 @@ export const productionConfig: ModuleConfig = {
           label: 'Live Production',
           icon: Activity,
           path: '/production',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           id: 'production_dashboard',
           label: 'Batches',
           icon: LayoutDashboard,
           path: '/management',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         },
         {
           id: 'terminal',
           label: 'Terminal',
           icon: Monitor,
           path: '/terminal',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN']
+          allowedRoles: ['ADMIN']
         },
         {
           id: 'operator_workspace',
           label: 'Workspace',
           icon: Layout,
           path: '/operator/select',
-          allowedRoles: ['OPERATOR', 'OPERATOR_BLOWING', 'OPERATOR_FILLING', 'OPERATOR_LABELING', 'OPERATOR_PACKING']
+          allowedRoles: ['OPERATOR']
         },
         {
           id: 'production_logs',
           label: 'Production Logs',
           icon: Database,
           path: '/production-logs',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     },
@@ -90,7 +90,7 @@ export const productionConfig: ModuleConfig = {
           label: 'Quality Checks',
           icon: ShieldCheck,
           path: '/quality',
-          allowedRoles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER']
+          allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
     } */

@@ -8,13 +8,9 @@ datasource db {
 }
 
 enum user_role {
-  SUPER_ADMIN
   ADMIN
   MANAGER
-  BLOWING_OPERATOR
-  FILLING_OPERATOR
-  LABELING_OPERATOR
-  PACKING_OPERATOR
+  OPERATOR
 }
 
 model users {
@@ -69,7 +65,6 @@ model production_batches {
   brand_id        String            @db.Uuid
   product_id      String            @db.Uuid
   shift_id        String            @db.Uuid
-  factory_id      String            @db.Uuid
   start_time      DateTime          @default(now()) @db.Timestamp(6)
   end_time        DateTime?         @db.Timestamp(6)
   status          batch_status      @default(RUNNING)

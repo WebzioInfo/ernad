@@ -1,6 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum } from 'drizzle-orm/pg-core';
 import { users } from './users';
-import { factories } from './master-data';
 
 export const poStatusEnum = pgEnum('po_status', ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED', 'CLOSED']);
 export const grnStatusEnum = pgEnum('grn_status', ['DRAFT', 'COMPLETED', 'CANCELLED']);
@@ -23,7 +22,6 @@ export const purchaseOrders = pgTable('purchase_orders', {
   id: uuid('id').defaultRandom().primaryKey(),
   poNumber: varchar('po_number', { length: 50 }).notNull().unique(),
   vendorId: uuid('vendor_id').references(() => vendors.id, { onDelete: 'restrict' }).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id, { onDelete: 'restrict' }).notNull(),
   status: poStatusEnum('status').default('DRAFT').notNull(),
   orderDate: timestamp('order_date').defaultNow().notNull(),
   expectedDelivery: timestamp('expected_delivery'),
@@ -56,7 +54,6 @@ export const goodsReceipts = pgTable('goods_receipts', {
   grnNumber: varchar('grn_number', { length: 50 }).notNull().unique(),
   poId: uuid('po_id').references(() => purchaseOrders.id),
   vendorId: uuid('vendor_id').references(() => vendors.id).notNull(),
-  factoryId: uuid('factory_id').references(() => factories.id).notNull(),
   receivedDate: timestamp('received_date').defaultNow().notNull(),
   status: grnStatusEnum('status').default('COMPLETED').notNull(),
   receivedBy: uuid('received_by').references(() => users.id),

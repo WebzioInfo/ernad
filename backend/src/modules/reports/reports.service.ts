@@ -3,8 +3,8 @@ import { db } from '../../database/db';
 import { 
   productionLogs, productionBatches, batchTotals, 
   salesOrders, salesOrderItems, customers,
-  products, productBrands, productionLines, shifts,
-  dailyAttendance, users, roles, userRoles
+  products, productBrands, productionLines,
+  users, roles, userRoles
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
 
@@ -13,12 +13,7 @@ export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
 
   private static readonly PRIVILEGED_ROLES = [
-    'SUPER_ADMIN',
-    'SUPERADMIN',
     'ADMIN',
-    'SYSTEM_ADMIN',
-    'ROOT',
-    'OWNER',
   ];
 
   private async getExcludedUserIds() {
@@ -45,7 +40,6 @@ export class ReportsService {
     lineId?: string; 
     brandId?: string; 
     productId?: string;
-    factoryId?: string;
   }) {
     try {
       const conditions = [between(productionLogs.loggedAt, filters.startDate, filters.endDate)];
@@ -53,7 +47,6 @@ export class ReportsService {
       if (filters.lineId && filters.lineId !== 'all') conditions.push(eq(productionLogs.lineId, filters.lineId));
       if (filters.brandId && filters.brandId !== 'all') conditions.push(eq(productionLogs.brandId, filters.brandId));
       if (filters.productId && filters.productId !== 'all') conditions.push(eq(productionLogs.productId, filters.productId));
-      if (filters.factoryId) conditions.push(eq(productionLogs.factoryId, filters.factoryId));
 
       const results = await db.select({
         lineName: productionLines.name,
@@ -116,7 +109,6 @@ export class ReportsService {
 
   async getBatchDossier(batchId: string, callerRoles: string[] = []) {
     try {
-      const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
       const isAdmin = callerRoles.includes('ADMIN');
 
       let query = db.select({
@@ -133,7 +125,7 @@ export class ReportsService {
       .leftJoin(users, eq(productionBatches.createdBy, users.id))
       .$dynamic();
 
-      if (!isSuperAdmin && !isAdmin) {
+      if (!isAdmin) {
         const excludedIds = await this.getExcludedUserIds();
         if (excludedIds.length > 0) {
           // If the creator is privileged, we hide their name by making the join result null
@@ -148,7 +140,7 @@ export class ReportsService {
       if (!batchData) return null;
 
       // Filter privileged names post-query for safety
-      if (!isSuperAdmin && !isAdmin) {
+      if (!isAdmin) {
         const excludedIds = await this.getExcludedUserIds();
         if (excludedIds.includes(batchData.batch.createdBy)) {
           batchData.creator = 'SYSTEM';
@@ -184,12 +176,11 @@ export class ReportsService {
 
   // ─── SALES REPORTS ───
 
-  async getSalesReport(filters: { startDate: Date; endDate: Date; factoryId?: string }, callerRoles: string[] = []) {
+  async getSalesReport(filters: { startDate: Date; endDate: Date }, callerRoles: string[] = []) {
     try {
       this.logger.log(`[SALES_REPORT] Aggregating range: ${filters.startDate.toISOString()} - ${filters.endDate.toISOString()}`);
       
       const conditions = [between(salesOrders.orderDate, filters.startDate, filters.endDate)];
-      if (filters.factoryId) conditions.push(eq(salesOrders.factoryId, filters.factoryId));
 
       const summaryResults = await db.select({
         totalRevenue: sql<string>`COALESCE(SUM(${salesOrders.totalAmount}), '0')`,
@@ -235,36 +226,6 @@ export class ReportsService {
   // ─── ATTENDANCE REPORTS ───
 
   async getAttendanceReport(filters: { startDate: string; endDate: string }, callerRoles: string[] = []) {
-    try {
-      const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
-      const isAdmin = callerRoles.includes('ADMIN');
-
-      const conditions = [between(dailyAttendance.date, filters.startDate, filters.endDate)];
-      
-      if (!isSuperAdmin && !isAdmin) {
-        const excludedIds = await this.getExcludedUserIds();
-        if (excludedIds.length > 0) {
-          conditions.push(notInArray(dailyAttendance.userId, excludedIds));
-        }
-      }
-
-      return await db.select({
-        userName: users.name,
-        department: users.department,
-        date: dailyAttendance.date,
-        checkIn: dailyAttendance.checkIn,
-        checkOut: dailyAttendance.checkOut,
-        workedHours: dailyAttendance.workedHours,
-        status: dailyAttendance.status,
-        lateMinutes: dailyAttendance.lateMinutes
-      })
-      .from(dailyAttendance)
-      .innerJoin(users, eq(dailyAttendance.userId, users.id))
-      .where(and(...conditions))
-      .orderBy(desc(dailyAttendance.date), users.name);
-    } catch (error: any) {
-      this.logger.error(`[ATTENDANCE_REPORT_FAILED] ${error.message}`);
-      throw error;
-    }
+    return [];
   }
 }

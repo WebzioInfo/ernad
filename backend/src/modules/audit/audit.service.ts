@@ -18,16 +18,11 @@ export class AuditService {
   private readonly logger = new Logger(AuditService.name);
 
   private static readonly PRIVILEGED_ROLES = [
-    'SUPER_ADMIN',
-    'SUPERADMIN',
     'ADMIN',
-    'SYSTEM_ADMIN',
-    'ROOT',
-    'OWNER',
+
   ];
 
   async getLogs(filters: { category?: string; actorId?: string; startDate?: Date; endDate?: Date }, callerRoles: string[] = []) {
-    const isSuperAdmin = callerRoles.includes('SUPER_ADMIN');
     const isAdmin = callerRoles.includes('ADMIN');
 
     const conditions = [];
@@ -38,7 +33,7 @@ export class AuditService {
     if (filters.endDate) conditions.push(lte(auditLogs.occurredAt, filters.endDate));
 
     // RBAC: Filter out logs of privileged accounts if caller is not an admin
-    if (!isSuperAdmin && !isAdmin) {
+    if (!isAdmin) {
       const privilegedRoles = await db
         .select({ id: roles.id })
         .from(roles)

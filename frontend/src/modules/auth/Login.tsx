@@ -46,7 +46,7 @@ export default function Login() {
       toast.success(`Welcome back, ${res.data.user.name.split(' ')[0]}`);
 
       const role = res.data.user.role;
-      if (role === 'SUPER_ADMIN' || role === 'ADMIN') navigate('/admin');
+      if (role === 'ADMIN') navigate('/admin');
       else if (role === 'MANAGER') navigate('/manager');
       else if (role === 'OPERATOR') navigate('/operator/select');
       else navigate('/admin'); // Fallback

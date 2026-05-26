@@ -50,7 +50,7 @@ const DevicesPage: React.FC = () => {
     location: ''
   });
 
-  const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN') || user?.role === 'SUPER_ADMIN';
+  const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
 
   const handleTest = async (id: string) => {
     try {
@@ -89,7 +89,7 @@ const DevicesPage: React.FC = () => {
           <p className="text-muted-foreground">Manage hardware devices connected over LAN</p>
         </div>
         
-        {isSuperAdmin && (
+        {isAdmin && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 bg-indigo-600 hover:bg-indigo-700">
