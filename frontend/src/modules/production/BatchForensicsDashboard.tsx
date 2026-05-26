@@ -15,6 +15,13 @@ import {
 } from 'recharts';
 import { api } from '@/services/api-client';
 
+const formatDecimal = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined) return '0';
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return num % 1 === 0 ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function BatchForensicsDashboard() {
   const { batchId } = useParams();
   const navigate = useNavigate();
@@ -254,14 +261,14 @@ export default function BatchForensicsDashboard() {
                         </div>
                         <div className="text-right">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Wastage</p>
-                          <p className={`font-black ${entry.wastageCount > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                            {entry.wastageCount} <span className="text-[10px] text-slate-400 font-bold">UNITS</span>
+                          <p className={`font-black ${Number(entry.wastageCount) > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                            {formatDecimal(entry.wastageCount)} <span className="text-[10px] text-slate-400 font-bold">UNITS</span>
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Used</p>
                           <p className="font-black text-indigo-600">
-                            {Number(entry.primaryCount) + Number(entry.wastageCount)} <span className="text-[10px] text-indigo-400 font-bold">UNITS</span>
+                            {formatDecimal(Number(entry.primaryCount) + Number(entry.wastageCount))} <span className="text-[10px] text-indigo-400 font-bold">UNITS</span>
                           </p>
                         </div>
                         <div className="flex items-center gap-2 ml-8">

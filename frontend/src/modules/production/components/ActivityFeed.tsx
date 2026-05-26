@@ -83,6 +83,12 @@ const getSourceBadgeClass = (source?: string) => {
   return 'bg-emerald-50 text-emerald-700 border-emerald-150';
 };
 
+const formatWastageValue = (value: string | number) => {
+  const num = Number(value);
+  if (isNaN(num)) return value;
+  return num % 1 === 0 ? num.toString() : num.toFixed(2);
+};
+
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, isRefreshing }) => {
   return (
     <div className="flex flex-col h-full bg-slate-50/30">
@@ -254,12 +260,12 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                                 ? 'Shrink Reject:'
                                 : 'Rejects:'}
                             </span>
-                            <span className="text-rose-500 font-black">
+                             <span className="text-rose-500 font-black">
                               {log.station === 'LABELING'
-                                ? `${log.wastageCount} KG`
+                                ? `${formatWastageValue(log.wastageCount)} KG`
                                 : log.station === 'PACKING'
-                                ? `${log.wastageCount}g`
-                                : log.wastageCount}
+                                ? `${formatWastageValue(log.wastageCount)}g`
+                                : formatWastageValue(log.wastageCount)}
                             </span>
                           </div>
                         )}

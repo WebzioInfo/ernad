@@ -45,6 +45,13 @@ const Badge = ({ children, variant = 'default' }: any) => {
   );
 };
 
+const formatDecimal = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined) return '0';
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return num % 1 === 0 ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function ProductionLogsManager() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -306,13 +313,13 @@ export default function ProductionLogsManager() {
                             <p className="text-[8px] font-black text-slate-400 uppercase">Production</p>
                           </div>
                           <div>
-                            <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{(log.wastageCount || 0).toLocaleString()}</p>
+                            <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{formatDecimal(log.wastageCount)}</p>
                             <p className="text-[8px] font-black text-slate-400 uppercase">Wastage</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <p className="text-sm font-black text-indigo-600 tabular-nums font-mono">{(log.primaryCount + log.wastageCount).toLocaleString()}</p>
+                        <p className="text-sm font-black text-indigo-600 tabular-nums font-mono">{formatDecimal(log.primaryCount + Number(log.wastageCount))}</p>
                         <p className="text-[8px] font-black text-slate-400 uppercase">Total Used</p>
                       </td>
                       <td className="px-8 py-6">

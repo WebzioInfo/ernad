@@ -14,6 +14,13 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
+const formatDecimal = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined) return '0';
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return num % 1 === 0 ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function BatchForensicsPage() {
   const { id: batchId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -237,7 +244,7 @@ export default function BatchForensicsPage() {
                             onChange={(e) => setEditForm(prev => ({ ...prev, wastageCount: Number(e.target.value) }))}
                           />
                         ) : (
-                          <span className="text-sm font-black text-rose-600 tabular-nums">{log.wastageCount.toLocaleString()}</span>
+                          <span className="text-sm font-black text-rose-600 tabular-nums">{formatDecimal(log.wastageCount)}</span>
                         )}
                       </td>
                       <td className="px-8 py-6">
@@ -299,7 +306,7 @@ export default function BatchForensicsPage() {
               <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Total Scrap</p>
-                  <p className="text-3xl font-black tabular-nums text-rose-400">{(totals?.scrapTotal || 0).toLocaleString()}</p>
+                  <p className="text-3xl font-black tabular-nums text-rose-400">{formatDecimal(totals?.scrapTotal)}</p>
                 </div>
                 <div className="w-12 h-12 bg-rose-500/20 text-rose-500 rounded-2xl flex items-center justify-center">
                   <AlertCircle className="w-6 h-6" />

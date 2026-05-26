@@ -848,9 +848,9 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
                         </div>
                         <p className="text-xs font-black text-slate-800 mt-1">
                           {log.primaryCount} <span className="text-[10px] text-slate-400 font-bold">Yield</span>
-                          {log.wastageCount > 0 && (
+                          {Number(log.wastageCount) > 0 && (
                             <span className="text-rose-600 ml-2">
-                              • {log.wastageCount} <span className="text-[10px] text-rose-400 font-bold">Scrap</span>
+                              • {Number(log.wastageCount) % 1 === 0 ? Number(log.wastageCount) : Number(log.wastageCount).toFixed(2)} <span className="text-[10px] text-rose-400 font-bold">Scrap</span>
                             </span>
                           )}
                         </p>

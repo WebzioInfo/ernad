@@ -14,6 +14,13 @@ import {
   CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 
+const formatDecimal = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined) return '0';
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return num % 1 === 0 ? num.toLocaleString() : num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 interface BatchDossierModalProps {
   batchId: string;
   onClose: () => void;
@@ -200,7 +207,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                 </div>
                 <div className="bg-rose-50/50 p-6 rounded-3xl border border-rose-100">
                   <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Total Waste</p>
-                  <p className="text-2xl font-black text-rose-700 tracking-tighter">{(totals?.scrapTotal || 0).toLocaleString()}</p>
+                  <p className="text-2xl font-black text-rose-700 tracking-tighter">{formatDecimal(totals?.scrapTotal)}</p>
                 </div>
               </div>
             </div>
@@ -289,7 +296,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                             value={editForm.wastageCount}
                             onChange={(e) => setEditForm(prev => ({ ...prev, wastageCount: Number(e.target.value) }))}
                           />
-                        ) : log.wastageCount.toLocaleString()}
+                        ) : formatDecimal(log.wastageCount)}
                       </td>
                       <td className="px-8 py-5">
                         <div className="flex justify-center gap-2">
