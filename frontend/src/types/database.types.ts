@@ -432,6 +432,8 @@ export interface ProductionLog {
   primaryCount: number;
   splitValues: number[];
   wastageCount: number | string;
+  bottleLeakage?: number | null;
+  capWastage?: number | null;
   eventType: EventType;
   isRework: boolean;
   remarks?: string | null;

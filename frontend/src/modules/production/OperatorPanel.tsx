@@ -76,6 +76,12 @@ export default function OperatorPanel() {
   const [secondaryPackagingCount, setSecondaryPackagingCount] = useState(0); // Bag/Box Count
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
+  // Filling station wastage toggle & inputs
+  const [productionWastages, setProductionWastages] = useState(false);
+  const [bottleLeakage, setBottleLeakage] = useState(0);
+  const [capWastage, setCapWastage] = useState(0);
+  const [rawProductionCount, setRawProductionCount] = useState(0);
+
   // Station Specific States
   const [selectedCapRawMaterialId, setSelectedCapRawMaterialId] = useState('');
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
@@ -304,22 +310,47 @@ export default function OperatorPanel() {
 
   // Enforce Formula: Used = Production + Wastage
   useEffect(() => {
-    const total = primaryCount + rejectionCount;
-    if (currentStationId === 'BLOWING') setPreformUsage(total);
-    if (currentStationId === 'FILLING') setCapUsage(total);
-    if (currentStationId === 'LABELING') setLabelUsage(total);
-  }, [primaryCount, rejectionCount, currentStationId]);
+    if (currentStationId === 'FILLING' && productionWastages) {
+      const netProd = Math.max(0, rawProductionCount - bottleLeakage);
+      setCapUsage(netProd + capWastage);
+    } else {
+      const total = primaryCount + rejectionCount;
+      if (currentStationId === 'BLOWING') setPreformUsage(total);
+      if (currentStationId === 'FILLING') setCapUsage(total);
+      if (currentStationId === 'LABELING') setLabelUsage(total);
+    }
+  }, [primaryCount, rejectionCount, rawProductionCount, bottleLeakage, capWastage, productionWastages, currentStationId]);
 
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
 
-    if (type === 'COUNT' && primaryCount === 0 && currentStation.id !== 'QC') return toast.error('Enter production count');
+    const isCountEmpty = (currentStation.id === 'FILLING' && productionWastages)
+      ? rawProductionCount === 0
+      : primaryCount === 0;
+
+    if (type === 'COUNT' && isCountEmpty && currentStation.id !== 'QC') {
+      return toast.error(currentStation.id === 'FILLING' && productionWastages ? 'Enter raw production count' : 'Enter production count');
+    }
+    if (currentStation.id === 'FILLING' && productionWastages && bottleLeakage > rawProductionCount) {
+      return toast.error('Filled bottle leakage cannot exceed raw production count');
+    }
     if (currentStation.id === 'FILLING' && !selectedCapRawMaterialId) return toast.error('Please select the Caps raw material.');
     if (currentStation.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
 
     const currentBatch = activeBatch?.batch;
     const selectedCapRawMaterial = capRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
+
+    const calculatedPrimaryCount = (currentStation.id === 'FILLING' && productionWastages)
+      ? Math.max(0, rawProductionCount - bottleLeakage)
+      : Math.floor(primaryCount);
+
+    const calculatedWastageCount = (currentStation.id === 'FILLING' && productionWastages)
+      ? (bottleLeakage + capWastage)
+      : (currentStation.id === 'PACKING'
+        ? (parseFloat(shrinkWasteWeight) || 0)
+        : rejectionCount);
+
     const logEntry: any = {
       requestId: uuidv4(),
       batchId: currentBatch?.id,
@@ -331,10 +362,8 @@ export default function OperatorPanel() {
       operatorId: activeOperator.id,
       operatorPin: activeOperator.currentPin,
       station: currentStation.id,
-      primaryCount: Math.floor(primaryCount),
-      wastageCount: currentStation.id === 'PACKING'
-        ? (parseFloat(shrinkWasteWeight) || 0)
-        : rejectionCount, // Rejection and wastage consolidated
+      primaryCount: calculatedPrimaryCount,
+      wastageCount: calculatedWastageCount,
       secondaryPackagingCount: Math.floor(secondaryPackagingCount),
       eventType: type === 'EVENT' ? eventType : 'NORMAL_PRODUCTION',
       isRework: false,
@@ -344,6 +373,11 @@ export default function OperatorPanel() {
       loggedAt: new Date().toISOString()
     };
 
+    if (currentStation.id === 'FILLING') {
+      logEntry.bottleLeakage = productionWastages ? bottleLeakage : 0;
+      logEntry.capWastage = productionWastages ? capWastage : 0;
+    }
+
     if (currentStation.id === 'BLOWING') {
       // For Blowing, we purchase in KGs but produce in COUNT.
       // We track 'preformsUsed' as the count of preforms consumed.
@@ -351,14 +385,14 @@ export default function OperatorPanel() {
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
-      logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
+      logEntry.capUsage = capUsage || (calculatedPrimaryCount + (productionWastages ? capWastage : calculatedWastageCount));
       logEntry.capBoxUsage = capBoxUsage;
       logEntry.rawMaterialId = selectedCapRawMaterialId;
       logEntry.materials = selectedCapRawMaterial ? [{
         materialName: selectedCapRawMaterial.name,
         quantity: logEntry.capUsage,
         unit: 'Pcs',
-        waste: rejectionCount,
+        waste: (productionWastages ? capWastage : rejectionCount),
       }] : [];
     } else if (currentStation.id === 'LABELING') {
       logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
@@ -396,6 +430,10 @@ export default function OperatorPanel() {
       setInkChanged(false); setInkUsageMl(0);
       setMakeupChanged(false); setMakeupUsageMl(0);
       setShrinkWasteWeight('');
+      setRawProductionCount(0);
+      setBottleLeakage(0);
+      setCapWastage(0);
+      setProductionWastages(false);
     } catch (err: any) {
       toast.error('Failed to transmit log. Node error.');
     } finally { setIsSubmitting(false); }
@@ -481,26 +519,88 @@ export default function OperatorPanel() {
         <div className="grid grid-cols-1 gap-6">
           {/* Main Action Card */}
           <div className="bg-white border border-slate-200 rounded-[2rem] p-5 md:p-6 shadow-sm space-y-6">
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6">
-              <IndustrialNumericInput
-                label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production Unit'} Count`}
-                value={primaryCount}
-                onChange={setPrimaryCount}
-                suffix="Units"
-                compact
-              />
+            {currentStation.id === 'FILLING' && (
+              <div className="space-y-4">
+                {/* Production Wastages Toggle */}
+                <div className="flex items-center justify-between p-4 bg-emerald-50/50 border border-emerald-100/60 rounded-2xl">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">Production Wastages</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Track bottle leaks and damaged caps</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setProductionWastages(!productionWastages)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      productionWastages ? "bg-emerald-600" : "bg-slate-200"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        productionWastages ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
 
-              <div className="contents">
-                {currentStation.id !== 'PACKING' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6">
+              {currentStation.id === 'FILLING' && productionWastages ? (
+                <>
                   <IndustrialNumericInput
-                    label={currentStation.id === 'LABELING' ? "Rejects / Waste (KG)" : "Rejects / Waste"}
-                    value={rejectionCount}
-                    onChange={setRejectionCount}
-                    suffix={currentStation.id === 'LABELING' ? "KG" : "Units"}
-                    step={currentStation.id === 'LABELING' ? 0.01 : 1}
+                    label="Raw Production Count"
+                    value={rawProductionCount}
+                    onChange={setRawProductionCount}
+                    suffix="Units"
                     compact
                   />
-                )}
+                  <IndustrialNumericInput
+                    label="Filled Bottle Leak / Yield Waste"
+                    value={bottleLeakage}
+                    onChange={setBottleLeakage}
+                    suffix="Units"
+                    compact
+                  />
+                  <IndustrialNumericInput
+                    label="Cap Damaged Count"
+                    value={capWastage}
+                    onChange={setCapWastage}
+                    suffix="Units"
+                    compact
+                  />
+                  <div className="xl:col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+                    <div>
+                      Net Production: <span className="text-emerald-600 font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
+                    </div>
+                    <div>
+                      Total Wastage: <span className="text-rose-500 font-bold">{bottleLeakage + capWastage} Units</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <IndustrialNumericInput
+                    label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production Unit'} Count`}
+                    value={primaryCount}
+                    onChange={setPrimaryCount}
+                    suffix="Units"
+                    compact
+                  />
+
+                  {currentStation.id !== 'PACKING' && (
+                    <IndustrialNumericInput
+                      label={currentStation.id === 'LABELING' ? "Rejects / Waste (KG)" : "Rejects / Waste"}
+                      value={rejectionCount}
+                      onChange={setRejectionCount}
+                      suffix={currentStation.id === 'LABELING' ? "KG" : "Units"}
+                      step={currentStation.id === 'LABELING' ? 0.01 : 1}
+                      compact
+                    />
+                  )}
+                </>
+              )}
+
+              <div className="contents">
                 
                 {currentStation.id === 'BLOWING' && (
                   <>

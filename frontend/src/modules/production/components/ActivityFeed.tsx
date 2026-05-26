@@ -28,6 +28,8 @@ interface LogEntry {
   capBoxUsage?: number | string;
   capUsage?: number | string;
   preformUsage?: number | string;
+  bottleLeakage?: number | string;
+  capWastage?: number | string;
 }
 
 interface ActivityFeedProps {
@@ -247,27 +249,44 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                             <span className="text-indigo-600 font-black">{log.secondaryPackagingCount}</span>
                           </div>
                         )}
-                        {(Number(log.wastageCount) || 0) > 0 && (
-                          <div className="flex justify-between">
-                            <span>
-                              {log.station === 'BLOWING'
-                                ? 'Preform Rejects:'
-                                : log.station === 'FILLING'
-                                ? 'Cap Rejects:'
-                                : log.station === 'LABELING'
-                                ? 'Label Rejects:'
-                                : log.station === 'PACKING'
-                                ? 'Shrink Reject:'
-                                : 'Rejects:'}
-                            </span>
-                             <span className="text-rose-500 font-black">
-                              {log.station === 'LABELING'
-                                ? `${formatWastageValue(log.wastageCount)} KG`
-                                : log.station === 'PACKING'
-                                ? `${formatWastageValue(log.wastageCount)}g`
-                                : formatWastageValue(log.wastageCount)}
-                            </span>
-                          </div>
+                        {log.station === 'FILLING' && (Number(log.bottleLeakage) > 0 || Number(log.capWastage) > 0) ? (
+                          <>
+                            {Number(log.bottleLeakage) > 0 && (
+                              <div className="flex justify-between">
+                                <span>Bottle Leakage:</span>
+                                <span className="text-rose-500 font-black">{log.bottleLeakage}</span>
+                              </div>
+                            )}
+                            {Number(log.capWastage) > 0 && (
+                              <div className="flex justify-between">
+                                <span>Cap Wastage:</span>
+                                <span className="text-rose-500 font-black">{log.capWastage}</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          (Number(log.wastageCount) || 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span>
+                                {log.station === 'BLOWING'
+                                  ? 'Preform Rejects:'
+                                  : log.station === 'FILLING'
+                                  ? 'Cap Rejects:'
+                                  : log.station === 'LABELING'
+                                  ? 'Label Rejects:'
+                                  : log.station === 'PACKING'
+                                  ? 'Shrink Reject:'
+                                  : 'Rejects:'}
+                              </span>
+                               <span className="text-rose-500 font-black">
+                                {log.station === 'LABELING'
+                                  ? `${formatWastageValue(log.wastageCount)} KG`
+                                  : log.station === 'PACKING'
+                                  ? `${formatWastageValue(log.wastageCount)}g`
+                                  : formatWastageValue(log.wastageCount)}
+                              </span>
+                            </div>
+                          )
                         )}
                         {log.labelStickerWeight && (
                           <div className="flex justify-between">

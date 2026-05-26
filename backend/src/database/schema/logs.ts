@@ -27,6 +27,8 @@ export const productionLogs = pgTable('production_logs', {
   primaryCount: integer('primary_count').notNull().default(0),
   splitValues: jsonb('split_values').$type<number[]>().default([]), // Handle 35785 + 30
   wastageCount: decimal('wastage_count', { precision: 12, scale: 4 }).notNull().default('0'),
+  bottleLeakage: integer('bottle_leakage').default(0),
+  capWastage: integer('cap_wastage').default(0),
   
   // Event System (Phase 7)
   eventType: eventTypeEnum('event_type').default('NORMAL_PRODUCTION').notNull(),

@@ -66,6 +66,20 @@ export class TelemetryDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
+  @Max(100000)
+  bottleLeakage?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100000)
+  capWastage?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
   @Max(1000000)
   capUsage?: number;
 

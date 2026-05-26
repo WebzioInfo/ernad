@@ -157,6 +157,8 @@ export class ProcessingService {
         primaryCount: finalPrimaryCount,
         splitValues: dto.splitValues || [],
         wastageCount: String(wastageCount),
+        bottleLeakage: dto.bottleLeakage || 0,
+        capWastage: dto.capWastage || 0,
         isRework: dto.isRework || false,
         eventType: (dto.eventType || 'NORMAL_PRODUCTION') as any,
         remarks: dto.remarks,
@@ -289,7 +291,9 @@ export class ProcessingService {
   private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number) {
     const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
-    const capRejection = dto.station === 'FILLING' ? Number(dto.wastageCount || 0) : 0;
+    const capRejection = dto.station === 'FILLING' && !dto.capUsage
+      ? Number(dto.capWastage ?? dto.wastageCount ?? 0)
+      : 0;
     const preformRejection = dto.station === 'BLOWING' ? Number(dto.wastageCount || 0) : 0;
     const bopRejection = dto.station === 'LABELING' ? Number(dto.wastageCount || 0) : 0;
     const shrinkWeightRejected = dto.station === 'PACKING' ? Number(dto.wastageCount || 0) : 0;
@@ -587,6 +591,8 @@ export class ProcessingService {
       id: productionLogs.id,
       primaryCount: productionLogs.primaryCount,
       wastageCount: productionLogs.wastageCount,
+      bottleLeakage: productionLogs.bottleLeakage,
+      capWastage: productionLogs.capWastage,
       eventType: productionLogs.eventType,
       secondaryPackagingCount: productionLogs.secondaryPackagingCount,
       remarks: productionLogs.remarks,
@@ -719,6 +725,8 @@ export class ProcessingService {
         id: `prod_log_${l.id}`,
         primaryCount: l.primaryCount,
         wastageCount: l.wastageCount,
+        bottleLeakage: l.bottleLeakage,
+        capWastage: l.capWastage,
         eventType: l.eventType,
         secondaryPackagingCount: l.secondaryPackagingCount,
         remarks: l.remarks,
@@ -946,6 +954,8 @@ export class ProcessingService {
       station: productionLogs.station,
       primaryCount: productionLogs.primaryCount,
       wastageCount: productionLogs.wastageCount,
+      bottleLeakage: productionLogs.bottleLeakage,
+      capWastage: productionLogs.capWastage,
       eventType: productionLogs.eventType,
       remarks: productionLogs.remarks,
 
