@@ -143,17 +143,6 @@ export class ProcessingService {
       }
 
       const wastageCount = Number(dto.wastageCount || 0);
-      const capRejection = dto.capRejection ?? (dto.station === 'FILLING' ? wastageCount : 0);
-      const preformRejection = dto.preformRejection ?? (dto.station === 'BLOWING' ? wastageCount : 0);
-      const bopRejection = dto.bopRejection ?? (dto.station === 'LABELING' ? wastageCount : 0);
-      const shrinkWeightRejected = dto.shrinkWeightRejected ?? (dto.station === 'PACKING' ? Number(dto.shrinkWasteWeight || 0) : 0);
-      const normalizedDto = {
-        ...dto,
-        capRejection,
-        preformRejection,
-        bopRejection,
-        shrinkWeightRejected,
-      };
 
       const [log] = await tx.insert(productionLogs).values({
         requestId: dto.requestId,
@@ -167,19 +156,15 @@ export class ProcessingService {
         station: dto.station,
         primaryCount: finalPrimaryCount,
         splitValues: dto.splitValues || [],
-        wastageCount,
+        wastageCount: String(wastageCount),
         isRework: dto.isRework || false,
         eventType: (dto.eventType || 'NORMAL_PRODUCTION') as any,
         remarks: dto.remarks,
         capUsage: dto.capUsage || 0,
         capBoxUsage: dto.capBoxUsage || 0,
-        capRejection,
         preformUsage: dto.preformUsage || 0,
-        preformRejection,
         bopRollUsage: String(dto.bopRollUsage || 0),
-        bopRejection: String(bopRejection || 0),
         shrinkWeightUsed: String(dto.shrinkWeightUsed || 0),
-        shrinkWeightRejected: String(shrinkWeightRejected || 0),
         inkUsage: String(dto.inkUsage || 0),
         solventUsage: String(dto.solventUsage || 0),
         labelUsage: dto.bopRollUsage || 0,
@@ -232,7 +217,7 @@ export class ProcessingService {
       }
 
       // New Enterprise Material Logic
-      await this.processEnterpriseInventory(tx, normalizedDto, log.id);
+      await this.processEnterpriseInventory(tx, dto, log.id);
 
       // Fast-fail Redis increment
       if (this.redisService.getAvailability()) {
@@ -304,10 +289,15 @@ export class ProcessingService {
   private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number) {
     const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
 
-    if (dto.capUsage || dto.capRejection) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage || 0) + Number(dto.capRejection || 0), category: 'Caps' });
-    if (dto.preformUsage || dto.preformRejection) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage || 0) + Number(dto.preformRejection || 0), category: 'Preforms' });
-    if (dto.bopRollUsage || dto.bopRejection) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage || 0) + Number(dto.bopRejection || 0), category: 'Labels' });
-    if (dto.shrinkWeightUsed || dto.shrinkWeightRejected) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed || 0) + Number(dto.shrinkWeightRejected || 0), category: 'Shrink Rolls' });
+    const capRejection = dto.station === 'FILLING' ? Number(dto.wastageCount || 0) : 0;
+    const preformRejection = dto.station === 'BLOWING' ? Number(dto.wastageCount || 0) : 0;
+    const bopRejection = dto.station === 'LABELING' ? Number(dto.wastageCount || 0) : 0;
+    const shrinkWeightRejected = dto.station === 'PACKING' ? Number(dto.wastageCount || 0) : 0;
+
+    if (dto.capUsage || capRejection) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage || 0) + capRejection, category: 'Caps' });
+    if (dto.preformUsage || preformRejection) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage || 0) + preformRejection, category: 'Preforms' });
+    if (dto.bopRollUsage || bopRejection) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage || 0) + bopRejection, category: 'Labels' });
+    if (dto.shrinkWeightUsed || shrinkWeightRejected) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed || 0) + shrinkWeightRejected, category: 'Shrink Rolls' });
     if (dto.inkUsage) consumptionMap.push({ name: 'Ink', qty: Number(dto.inkUsage), category: 'Chemicals' });
     if (dto.solventUsage) consumptionMap.push({ name: 'Solvent', qty: Number(dto.solventUsage), category: 'Chemicals' });
 
@@ -620,10 +610,6 @@ export class ProcessingService {
       preformUsage: productionLogs.preformUsage,
       capUsage: productionLogs.capUsage,
       capBoxUsage: productionLogs.capBoxUsage,
-      capRejection: productionLogs.capRejection,
-      preformRejection: productionLogs.preformRejection,
-      bopRejection: productionLogs.bopRejection,
-      shrinkWeightRejected: productionLogs.shrinkWeightRejected,
 
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
@@ -757,10 +743,6 @@ export class ProcessingService {
         preformUsage: l.preformUsage,
         capUsage: l.capUsage,
         capBoxUsage: l.capBoxUsage,
-        capRejection: l.capRejection,
-        preformRejection: l.preformRejection,
-        bopRejection: l.bopRejection,
-        shrinkWeightRejected: l.shrinkWeightRejected,
       });
     });
 
@@ -889,19 +871,10 @@ export class ProcessingService {
     // Validate Batch Status (Don't allow editing completed/closed batches)
     await this.validateBatchStatus(db, existing.batchId);
 
-    const materialRejectionPatch: Partial<typeof productionLogs.$inferInsert> = {};
-    if (dto.wastageCount !== undefined) {
-      if (existing.station === 'BLOWING') materialRejectionPatch.preformRejection = dto.wastageCount;
-      if (existing.station === 'FILLING') materialRejectionPatch.capRejection = dto.wastageCount;
-      if (existing.station === 'LABELING') materialRejectionPatch.bopRejection = String(dto.wastageCount);
-      if (existing.station === 'PACKING') materialRejectionPatch.shrinkWeightRejected = String(dto.wastageCount);
-    }
-
     const [updated] = await db.update(productionLogs)
       .set({
         ...(dto.primaryCount !== undefined && { primaryCount: dto.primaryCount }),
-        ...(dto.wastageCount !== undefined && { wastageCount: dto.wastageCount }),
-        ...materialRejectionPatch,
+        ...(dto.wastageCount !== undefined && { wastageCount: String(dto.wastageCount) }),
         ...(dto.remarks !== undefined && { remarks: dto.remarks }),
         updatedBy: userId,
         updatedAt: new Date()
@@ -911,7 +884,7 @@ export class ProcessingService {
 
     // Calculate deltas to apply atomically
     const primaryDelta = (dto.primaryCount !== undefined ? dto.primaryCount : existing.primaryCount) - existing.primaryCount;
-    const wastageDelta = (dto.wastageCount !== undefined ? dto.wastageCount : existing.wastageCount) - existing.wastageCount;
+    const wastageDelta = (dto.wastageCount !== undefined ? dto.wastageCount : Number(existing.wastageCount)) - Number(existing.wastageCount);
 
     if (primaryDelta !== 0 || wastageDelta !== 0) {
       const updateField = this.getFieldName(existing.station);

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 interface LogEntry {
   id: string | number;
   primaryCount: number;
-  wastageCount: number;
+  wastageCount: number | string;
   eventType: string;
   secondaryPackagingCount?: number;
   loggedAt: string | Date;
@@ -28,10 +28,6 @@ interface LogEntry {
   capBoxUsage?: number | string;
   capUsage?: number | string;
   preformUsage?: number | string;
-  capRejection?: number | string;
-  preformRejection?: number | string;
-  bopRejection?: number | string;
-  shrinkWeightRejected?: number | string;
 }
 
 interface ActivityFeedProps {
@@ -201,7 +197,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                     </div>
 
                     {/* Technical Parameter Details */}
-                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || log.wastageCount > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.shrinkWasteWeight || log.bagsUsed || log.capBoxUsage || log.capUsage || log.preformUsage || log.capRejection || log.preformRejection || log.bopRejection || log.shrinkWeightRejected || log.rawMaterialName) && (
+                    {(log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 || (Number(log.wastageCount) || 0) > 0 || log.labelStickerWeight || log.damagedLabelWeight || log.inkChanged || log.makeupChanged || log.bagsUsed || log.capBoxUsage || log.capUsage || log.preformUsage || log.rawMaterialName) && (
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 py-1 px-2 bg-slate-50/70 border border-slate-100 rounded-lg my-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                         {log.rawMaterialName && (
                           <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-0.5 mb-0.5">
@@ -227,22 +223,10 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                             <span className="text-indigo-600 font-black">{log.capUsage}</span>
                           </div>
                         )}
-                        {log.capRejection !== undefined && Number(log.capRejection) > 0 && (
-                          <div className="flex justify-between">
-                            <span>Cap Rejects:</span>
-                            <span className="text-rose-500 font-black">{log.capRejection}</span>
-                          </div>
-                        )}
                         {log.preformUsage !== undefined && Number(log.preformUsage) > 0 && (
                           <div className="flex justify-between">
                             <span>Preforms Used:</span>
                             <span className="text-indigo-600 font-black">{log.preformUsage}</span>
-                          </div>
-                        )}
-                        {log.preformRejection !== undefined && Number(log.preformRejection) > 0 && (
-                          <div className="flex justify-between">
-                            <span>Preform Rejects:</span>
-                            <span className="text-rose-500 font-black">{log.preformRejection}</span>
                           </div>
                         )}
                         {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
@@ -257,26 +241,26 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                             <span className="text-indigo-600 font-black">{log.secondaryPackagingCount}</span>
                           </div>
                         )}
-                        {log.wastageCount > 0 && 
-                         !(log.station === 'BLOWING' && Number(log.preformRejection) > 0) &&
-                         !(log.station === 'FILLING' && Number(log.capRejection) > 0) &&
-                         !(log.station === 'LABELING' && Number(log.bopRejection) > 0) &&
-                         !(log.station === 'PACKING' && Number(log.shrinkWeightRejected) > 0) && (
+                        {(Number(log.wastageCount) || 0) > 0 && (
                           <div className="flex justify-between">
-                            <span>Rejects:</span>
-                            <span className="text-rose-500 font-black">{log.wastageCount}</span>
-                          </div>
-                        )}
-                        {log.bopRejection !== undefined && Number(log.bopRejection) > 0 && (
-                          <div className="flex justify-between">
-                            <span>Label Rejects:</span>
-                            <span className="text-rose-500 font-black">{log.bopRejection}</span>
-                          </div>
-                        )}
-                        {log.shrinkWeightRejected !== undefined && Number(log.shrinkWeightRejected) > 0 && (
-                          <div className="flex justify-between">
-                            <span>Shrink Reject:</span>
-                            <span className="text-rose-500 font-black">{log.shrinkWeightRejected}g</span>
+                            <span>
+                              {log.station === 'BLOWING'
+                                ? 'Preform Rejects:'
+                                : log.station === 'FILLING'
+                                ? 'Cap Rejects:'
+                                : log.station === 'LABELING'
+                                ? 'Label Rejects:'
+                                : log.station === 'PACKING'
+                                ? 'Shrink Reject:'
+                                : 'Rejects:'}
+                            </span>
+                            <span className="text-rose-500 font-black">
+                              {log.station === 'LABELING'
+                                ? `${log.wastageCount} KG`
+                                : log.station === 'PACKING'
+                                ? `${log.wastageCount}g`
+                                : log.wastageCount}
+                            </span>
                           </div>
                         )}
                         {log.labelStickerWeight && (
@@ -301,12 +285,6 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                           <div className="flex justify-between col-span-2">
                             <span>Makeup Consumable:</span>
                             <span className="text-emerald-600 font-black">Replaced ({log.makeupUsageMl}ml)</span>
-                          </div>
-                        )}
-                        {log.shrinkWasteWeight && (
-                          <div className="flex justify-between col-span-2">
-                            <span>Shrink Waste:</span>
-                            <span className="text-rose-500 font-black">{log.shrinkWasteWeight}g</span>
                           </div>
                         )}
                       </div>

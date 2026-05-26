@@ -67,7 +67,7 @@ export class OeeService {
 
     // 6. Quality = Good Pieces / Total Pieces
     const goodProduced = totals?.packingTotal || 0; // Final packed pieces
-    const rejections = totals?.scrapTotal || 0;
+    const rejections = totals?.scrapTotal ? Number(totals.scrapTotal) : 0;
     const quality = totalProduced > 0 ? goodProduced / totalProduced : 0;
 
     // 7. Final OEE

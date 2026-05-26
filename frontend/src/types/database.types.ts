@@ -431,21 +431,17 @@ export interface ProductionLog {
   station: StationType;
   primaryCount: number;
   splitValues: number[];
-  wastageCount: number;
+  wastageCount: number | string;
   eventType: EventType;
   isRework: boolean;
   remarks?: string | null;
   // Material consumption
   capUsage?: number | null;
-  capRejection?: number | null;
   preformUsage?: number | null;
-  preformRejection?: number | null;
   rawMaterialId?: string | null;
   bagsUsed?: string | null;
   bopRollUsage?: string | null;
-  bopRejection?: string | null;
   shrinkWeightUsed?: string | null;
-  shrinkWeightRejected?: string | null;
   inkUsage?: string | null;
   solventUsage?: string | null;
   labelUsage?: number | null;
@@ -479,7 +475,7 @@ export interface BatchTotal {
   fillingTotal: number;
   labelingTotal: number;
   packingTotal: number;
-  scrapTotal: number;
+  scrapTotal: string;
   capTotal: number;
   preformTotal: number;
   bagsTotal: string;

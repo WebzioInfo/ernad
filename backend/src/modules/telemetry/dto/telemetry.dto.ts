@@ -76,12 +76,7 @@ export class TelemetryDto {
   @Max(100000)
   capBoxUsage?: number;
 
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  @Max(100000)
-  capRejection?: number;
+
 
   @ApiProperty()
   @IsNumber()
@@ -90,12 +85,7 @@ export class TelemetryDto {
   @Max(1000000)
   preformUsage?: number;
 
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  @Max(100000)
-  preformRejection?: number;
+
 
   @ApiProperty()
   @IsUUID()
@@ -116,12 +106,7 @@ export class TelemetryDto {
   @Max(10000)
   bopRollUsage?: number;
 
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  @Max(10000)
-  bopRejection?: number;
+
 
   @ApiProperty()
   @IsNumber()
@@ -130,12 +115,7 @@ export class TelemetryDto {
   @Max(100000)
   shrinkWeightUsed?: number;
 
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  @Max(100000)
-  shrinkWeightRejected?: number;
+
 
   @ApiProperty()
   @IsNumber()

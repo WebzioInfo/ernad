@@ -445,7 +445,7 @@ export class OperatorSessionsService {
         } else if (stationUpper === 'PACKING') {
           productionCount = totals.packingTotal;
         }
-        wasteCount = totals.scrapTotal;
+        wasteCount = Number(totals.scrapTotal) || 0;
       }
 
       // 5. Retrieve current machine state

@@ -100,7 +100,7 @@ export class ChangeoverService {
         fillingTotal: 0,
         labelingTotal: 0,
         packingTotal: 0,
-        scrapTotal: 0,
+        scrapTotal: '0',
         capTotal: 0,
         preformTotal: 0,
         bopRollTotal: '0',

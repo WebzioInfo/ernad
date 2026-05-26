@@ -332,7 +332,9 @@ export default function OperatorPanel() {
       operatorPin: activeOperator.currentPin,
       station: currentStation.id,
       primaryCount: Math.floor(primaryCount),
-      wastageCount: Math.floor(rejectionCount), // Rejection and wastage consolidated
+      wastageCount: currentStation.id === 'PACKING'
+        ? (parseFloat(shrinkWasteWeight) || 0)
+        : rejectionCount, // Rejection and wastage consolidated
       secondaryPackagingCount: Math.floor(secondaryPackagingCount),
       eventType: type === 'EVENT' ? eventType : 'NORMAL_PRODUCTION',
       isRework: false,
@@ -346,12 +348,10 @@ export default function OperatorPanel() {
       // For Blowing, we purchase in KGs but produce in COUNT.
       // We track 'preformsUsed' as the count of preforms consumed.
       logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
-      logEntry.preformRejection = rejectionCount;
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
       logEntry.capUsage = capUsage || (primaryCount + rejectionCount);
-      logEntry.capRejection = rejectionCount;
       logEntry.capBoxUsage = capBoxUsage;
       logEntry.rawMaterialId = selectedCapRawMaterialId;
       logEntry.materials = selectedCapRawMaterial ? [{
@@ -362,7 +362,6 @@ export default function OperatorPanel() {
       }] : [];
     } else if (currentStation.id === 'LABELING') {
       logEntry.bopRollUsage = labelUsage || (primaryCount + rejectionCount);
-      logEntry.bopRejection = rejectionCount;
       logEntry.labelStickerWeight = labelStickerWeight;
       logEntry.damagedLabelWeight = damagedLabelWeight;
       logEntry.inkChanged = inkChanged;
@@ -372,7 +371,6 @@ export default function OperatorPanel() {
     } else if (currentStation.id === 'PACKING') {
       logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
       logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
-      logEntry.shrinkWeightRejected = logEntry.shrinkWasteWeight;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
@@ -495,10 +493,11 @@ export default function OperatorPanel() {
               <div className="contents">
                 {currentStation.id !== 'PACKING' && (
                   <IndustrialNumericInput
-                    label="Rejects / Waste"
+                    label={currentStation.id === 'LABELING' ? "Rejects / Waste (KG)" : "Rejects / Waste"}
                     value={rejectionCount}
                     onChange={setRejectionCount}
-                    suffix="Units"
+                    suffix={currentStation.id === 'LABELING' ? "KG" : "Units"}
+                    step={currentStation.id === 'LABELING' ? 0.01 : 1}
                     compact
                   />
                 )}

@@ -26,7 +26,7 @@ export const productionLogs = pgTable('production_logs', {
   // Data Normalization (Phase 1)
   primaryCount: integer('primary_count').notNull().default(0),
   splitValues: jsonb('split_values').$type<number[]>().default([]), // Handle 35785 + 30
-  wastageCount: integer('wastage_count').notNull().default(0),
+  wastageCount: decimal('wastage_count', { precision: 12, scale: 4 }).notNull().default('0'),
   
   // Event System (Phase 7)
   eventType: eventTypeEnum('event_type').default('NORMAL_PRODUCTION').notNull(),
@@ -42,15 +42,11 @@ export const productionLogs = pgTable('production_logs', {
   // Material Consumption Analytics (Enterprise Upgrade)
   capUsage: integer('cap_usage').default(0),
   capBoxUsage: integer('cap_box_usage').default(0),
-  capRejection: integer('cap_rejection').default(0),
   preformUsage: integer('preform_usage').default(0),
-  preformRejection: integer('preform_rejection').default(0),
   rawMaterialId: uuid('raw_material_id').references(() => rawMaterials.id),
   bagsUsed: decimal('bags_used', { precision: 8, scale: 2 }).default('0'),
   bopRollUsage: decimal('bop_roll_usage', { precision: 8, scale: 2 }).default('0'),
-  bopRejection: decimal('bop_rejection', { precision: 8, scale: 2 }).default('0'),
   shrinkWeightUsed: decimal('shrink_weight_used', { precision: 8, scale: 2 }).default('0'),
-  shrinkWeightRejected: decimal('shrink_weight_rejected', { precision: 8, scale: 2 }).default('0'),
   inkUsage: decimal('ink_usage', { precision: 8, scale: 2 }).default('0'),
   solventUsage: decimal('solvent_usage', { precision: 8, scale: 2 }).default('0'),
   labelUsage: integer('label_usage').default(0), // Normalized from bopRollUsage
@@ -121,7 +117,7 @@ export const batchTotals = pgTable('batch_totals', {
   fillingTotal: integer('filling_total').default(0).notNull(),
   labelingTotal: integer('labeling_total').default(0).notNull(),
   packingTotal: integer('packing_total').default(0).notNull(),
-  scrapTotal: integer('scrap_total').default(0).notNull(), // New: Tracking waste/rejects
+  scrapTotal: decimal('scrap_total', { precision: 12, scale: 4 }).default('0').notNull(), // New: Tracking waste/rejects
   
   // Material Totals (Enterprise Upgrade)
   capTotal: integer('cap_total').default(0).notNull(),

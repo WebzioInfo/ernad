@@ -31,7 +31,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
     }
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value === '' ? 0 : parseInt(e.target.value, 10)
+      const val = e.target.value === '' ? 0 : parseFloat(e.target.value)
       if (!isNaN(val)) {
         if ((min === undefined || val >= min) && (max === undefined || val <= max)) {
           onChange(val)

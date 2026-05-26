@@ -104,7 +104,7 @@ export class VerificationService {
 
       // Apply deltas to totals
       const primaryDelta = (newData.primaryCount !== undefined ? newData.primaryCount : oldLog.primaryCount) - oldLog.primaryCount;
-      const wastageDelta = (newData.wastageCount !== undefined ? newData.wastageCount : oldLog.wastageCount) - oldLog.wastageCount;
+      const wastageDelta = Number(newData.wastageCount !== undefined ? newData.wastageCount : oldLog.wastageCount) - Number(oldLog.wastageCount);
 
       if (primaryDelta !== 0 || wastageDelta !== 0) {
         const updateField = this.getFieldName(oldLog.station);

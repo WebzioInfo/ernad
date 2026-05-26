@@ -1,5 +1,5 @@
 const postgres = require('postgres');
-require('dotenv').config({ path: 'd:/Webzio/ernad/backend/.env' });
+require('dotenv').config();
 
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 
