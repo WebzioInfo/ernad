@@ -82,64 +82,65 @@ export default function ProductsPage() {
 
   const uniqueBrandNames = ['All', ...Array.from(new Set(brands?.map((b: any) => b.name) || [])) as string[]];
 
-  if (isLoading) return (
-    <div className="h-96 flex flex-col items-center justify-center gap-6">
-      <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin shadow-2xl" />
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">Syncing Products Database...</p>
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#1A9A91]" />
+        <p className="font-semibold uppercase tracking-wider text-[10px]">Syncing Products Database...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-10 pb-20">
-      {/* Header */}
-      <div className="bg-slate-950 p-12 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
-          <div className="flex items-center gap-8">
-            <div className="w-20 h-20 bg-indigo-600 text-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-indigo-500/20">
-              <Package className="w-10 h-10" />
+    <div className="space-y-6">
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
+              <Package className="w-5 h-5 text-[#1A9A91]" />
             </div>
-            <div>
-              <h1 className="text-4xl font-black text-white tracking-tighter flex items-center gap-4">
-                Products Database
-                <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-indigo-400 uppercase tracking-widest">Master Data</span>
-              </h1>
-              <p className="text-slate-400 font-bold mt-2 text-sm">Industrial product configurations and speed parameters.</p>
-            </div>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+              Products Database
+            </h2>
+            <span className="bg-slate-100 text-[#1A9A91] text-xs px-2 py-0.5 rounded-full border border-emerald-100 font-semibold">
+              Master Data
+            </span>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-5 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-2xl transition-all whitespace-nowrap self-start md:self-auto"
-          >
-            <Plus className="w-5 h-5" />
-            Register Product
-          </motion.button>
+          <p className="text-slate-500 text-xs mt-1">Configure physical product parameters, custom SKU assignments, and target bottling speeds.</p>
         </div>
+
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="bg-[#1A9A91] hover:bg-[#157C75] text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 text-xs uppercase tracking-wider sm:self-center"
+        >
+          <Plus className="w-4 h-4" />
+          Register Product
+        </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white/50 backdrop-blur-md p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 items-center">
-        <div className="relative flex-1 group w-full">
-          <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+      {/* Filters strip */}
+      <div className="bg-white border border-slate-200 p-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
           <input
             type="text"
             placeholder="Query products by SKU or Name..."
-            className="w-full bg-white border border-slate-100 rounded-[1.5rem] py-5 pl-16 pr-8 font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-50/5 transition-all text-sm"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-2 md:pb-0 no-scrollbar w-full md:w-auto">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar">
           {uniqueBrandNames.map(brand => (
             <button
               key={brand}
               onClick={() => setSelectedBrand(brand)}
-              className={`px-8 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedBrand === brand
-                ? 'bg-slate-900 text-white shadow-xl translate-y-[-2px]'
-                : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'
-                }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap border ${
+                selectedBrand === brand
+                  ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
+                  : 'bg-white text-slate-500 hover:bg-slate-50 border-slate-200'
+              }`}
             >
               {brand}
             </button>
@@ -148,25 +149,25 @@ export default function ProductsPage() {
       </div>
 
       {/* List View (Table) */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Product Name</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Brand</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Target BPM</th>
-                <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center font-extrabold">Actions</th>
+              <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="px-6 py-3.5">Product Name</th>
+                <th className="px-6 py-3.5">SKU</th>
+                <th className="px-6 py-3.5">Brand</th>
+                <th className="px-6 py-3.5">Category</th>
+                <th className="px-6 py-3.5 text-center">Target BPM</th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100 text-sm">
               <AnimatePresence mode="popLayout">
                 {filteredProducts?.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-10 py-16 text-center text-sm font-bold text-slate-400 uppercase tracking-wider">
-                      No products registered.
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                      No products registered matching current query filters.
                     </td>
                   </tr>
                 ) : (
@@ -175,59 +176,55 @@ export default function ProductsPage() {
                     return (
                       <motion.tr 
                         layout
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: idx * 0.03 }}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98 }}
+                        transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
                         key={product.id} 
-                        className="hover:bg-slate-50/50 transition-colors group"
+                        className="hover:bg-slate-50/45 transition-colors group"
                       >
-                        <td className="px-10 py-8 font-black text-slate-900 tracking-tight text-lg">
+                        <td className="px-6 py-3.5 font-semibold text-slate-800 group-hover:text-[#1A9A91] transition-colors">
                           {product.name}
                         </td>
-                        <td className="px-10 py-8">
-                          <div className="flex items-center gap-2">
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-1">
                             <Hash className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{product.sku || 'NO-SKU'}</span>
+                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{product.sku || 'NO-SKU'}</span>
                           </div>
                         </td>
-                        <td className="px-10 py-8">
-                          <span className="px-3 py-1 bg-indigo-50 border border-indigo-100/60 text-indigo-700 rounded-lg text-[9px] font-black uppercase tracking-[0.1em]">
+                        <td className="px-6 py-3.5">
+                          <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-[#1A9A91] rounded text-[10px] font-semibold uppercase tracking-wide">
                             {brandObj?.name || 'Unknown Brand'}
                           </span>
                         </td>
-                        <td className="px-10 py-8">
-                          <div className="flex items-center gap-2">
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-1.5">
                             <Tag className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">{product.category || 'General'}</span>
+                            <span className="text-xs text-slate-600 font-medium">{product.category || 'General'}</span>
                           </div>
                         </td>
-                        <td className="px-10 py-8 text-center font-bold text-slate-700">
-                          <div className="flex items-center justify-center gap-1.5">
+                        <td className="px-6 py-3.5 text-center">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium">
                             <Activity className="w-3.5 h-3.5 text-emerald-500" />
                             <span>{product.targetBPM} BPM</span>
                           </div>
                         </td>
-                        <td className="px-10 py-8">
-                          <div className="flex items-center justify-center gap-3">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                        <td className="px-6 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
                               onClick={() => setEditingProduct(product)}
-                              className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 transition-all shadow-sm cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#1A9A91] hover:bg-slate-105 rounded-lg transition-colors"
                               title="Edit Product"
                             >
                               <PenLine className="w-4 h-4" />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
+                            </button>
+                            <button
                               onClick={() => handleDelete(product.id)}
-                              className="p-3 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 transition-all shadow-sm cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-slate-105 rounded-lg transition-colors"
                               title="Delete Product"
                             >
                               <Trash2 className="w-4 h-4" />
-                            </motion.button>
+                            </button>
                           </div>
                         </td>
                       </motion.tr>
@@ -271,98 +268,110 @@ function ProductFormModal({ product, brands, onClose, onSubmit, isPending }: any
   const [targetBPM, setTargetBPM] = useState(product?.targetBPM || 120);
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xl z-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-lg rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
-        <div className="p-12">
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight mb-8">
-            {product ? 'Edit Product' : 'Register Product'}
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200 animate-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            {product ? 'Modify Product Specifications' : 'Register New Product'}
           </h3>
-
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmit({ name, sku, brandId, category, targetBPM: Number(targetBPM) });
-            }}
-            className="space-y-6"
-          >
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Product Commercial Name</label>
-              <input 
-                required 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all text-slate-700" 
-                placeholder="e.g. Kenby Water 500ml" 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">SKU / Product Code</label>
-              <input 
-                required 
-                value={sku} 
-                onChange={(e) => setSku(e.target.value)} 
-                className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all text-slate-700" 
-                placeholder="e.g. KB-WAT-500" 
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Brand</label>
-                <select 
-                  required 
-                  value={brandId} 
-                  onChange={(e) => setBrandId(e.target.value)} 
-                  className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-none outline-none text-slate-700"
-                >
-                  <option value="">Select Brand...</option>
-                  {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Category</label>
-                <input 
-                  value={category} 
-                  onChange={(e) => setCategory(e.target.value)} 
-                  className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all text-slate-700" 
-                  placeholder="e.g. Water" 
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block font-extrabold">Target Speed (BPM)</label>
-              <input 
-                type="number" 
-                required 
-                value={targetBPM} 
-                onChange={(e) => setTargetBPM(Number(e.target.value))} 
-                className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-2 border-transparent focus:border-indigo-600/20 focus:bg-white outline-none transition-all text-slate-700" 
-                placeholder="120"
-              />
-            </div>
-
-            <div className="pt-8 flex gap-4">
-              <button 
-                type="button" 
-                onClick={onClose} 
-                className="flex-1 py-6 bg-slate-100 text-slate-600 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="flex-[2] py-6 bg-slate-950 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-indigo-600 shadow-2xl transition-all cursor-pointer flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-                {product ? 'Save Changes' : 'Register Product'}
-              </button>
-            </div>
-          </form>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-200/80 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
         </div>
+
+        <form 
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit({ name, sku, brandId, category, targetBPM: Number(targetBPM) });
+          }}
+          className="p-6 space-y-4"
+        >
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600">Product Commercial Name</label>
+            <input 
+              required 
+              value={name} 
+              onChange={(e) => setName(e.target.value)} 
+              className="w-full bg-slate-50 border border-slate-250 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all outline-none" 
+              placeholder="e.g. Kenby Water 500ml" 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600">SKU / Product Code</label>
+            <input 
+              required 
+              value={sku} 
+              onChange={(e) => setSku(e.target.value)} 
+              className="w-full bg-slate-50 border border-slate-250 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all outline-none" 
+              placeholder="e.g. KB-WAT-500" 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Brand</label>
+              <select 
+                required 
+                value={brandId} 
+                onChange={(e) => setBrandId(e.target.value)} 
+                className="w-full bg-slate-50 border border-slate-250 rounded-lg px-3 py-1.5 text-sm font-medium outline-none text-slate-750 cursor-pointer"
+              >
+                <option value="">Select Brand...</option>
+                {brands?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Category</label>
+              <input 
+                value={category} 
+                onChange={(e) => setCategory(e.target.value)} 
+                className="w-full bg-slate-50 border border-slate-250 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all outline-none" 
+                placeholder="e.g. Water" 
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-600">Target Speed (BPM)</label>
+            <input 
+              type="number" 
+              required 
+              value={targetBPM} 
+              onChange={(e) => setTargetBPM(Number(e.target.value))} 
+              className="w-full bg-slate-50 border border-slate-250 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all outline-none" 
+              placeholder="120"
+            />
+          </div>
+
+          {/* Footer Actions */}
+          <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-4 py-1.5 bg-slate-105 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending}
+              className="px-5 py-1.5 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm"
+            >
+              {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              {product ? 'Save Changes' : 'Register Product'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
+  );
+}
+
+// Inline fallback close indicator
+function X({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
   );
 }

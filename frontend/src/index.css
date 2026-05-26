@@ -291,7 +291,11 @@
   }
 
   .font-black {
-    font-weight: 700;
+    font-weight: 600 !important;
+  }
+
+  .font-extrabold {
+    font-weight: 600 !important;
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -303,8 +307,110 @@
     scrollbar-width: none;
   }
 
+  /* --- Enterprise ERP Styling Reset --- */
+  
+  /* Flatten Glassmorphism */
   .glass {
-    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* Over-curving Overrides */
+  .rounded-\[3\.5rem\] {
+    border-radius: 0.75rem !important; /* rounded-xl */
+  }
+  .rounded-\[3rem\] {
+    border-radius: 0.75rem !important;
+  }
+  .rounded-\[2\.5rem\] {
+    border-radius: 0.5rem !important; /* rounded-lg */
+  }
+  .rounded-\[2rem\] {
+    border-radius: 0.5rem !important;
+  }
+  .rounded-\[1\.5rem\] {
+    border-radius: 0.375rem !important; /* rounded-md */
+  }
+  .rounded-2xl {
+    border-radius: 0.5rem !important;
+  }
+  .rounded-3xl {
+    border-radius: 0.75rem !important;
+  }
+  .rounded-t-\[3rem\] {
+    border-top-left-radius: 0.75rem !important;
+    border-top-right-radius: 0.75rem !important;
+  }
+  .rounded-t-\[2\.5rem\] {
+    border-top-left-radius: 0.5rem !important;
+    border-top-right-radius: 0.5rem !important;
+  }
+
+  /* Oversized Padding Overrides */
+  .p-12 {
+    padding: 1.5rem !important; /* p-6 */
+  }
+  .p-10 {
+    padding: 1.25rem !important; /* p-5 */
+  }
+  .p-8 {
+    padding: 1rem !important; /* p-4 */
+  }
+  .px-12 {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+  .px-10 {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+  .px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  .py-12 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+  .py-10 {
+    padding-top: 1.25rem !important;
+    padding-bottom: 1.25rem !important;
+  }
+  .py-6 {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+  .py-5 {
+    padding-top: 0.625rem !important;
+    padding-bottom: 0.625rem !important;
+  }
+  .pl-16 {
+    padding-left: 2.25rem !important;
+  }
+  .pl-14 {
+    padding-left: 2.25rem !important;
+  }
+
+  /* Font Weight & Size Scale-Down */
+  .text-4xl {
+    font-size: 1.5rem !important; /* text-2xl */
+    line-height: 2rem !important;
+    letter-spacing: -0.025em !important;
+  }
+  .text-3xl {
+    font-size: 1.25rem !important; /* text-xl */
+    line-height: 1.75rem !important;
+    letter-spacing: -0.025em !important;
+  }
+  .text-2xl {
+    font-size: 1.125rem !important; /* text-lg */
+    line-height: 1.5rem !important;
+  }
+  .text-xl {
+    font-size: 1rem !important; /* text-base */
+    line-height: 1.5rem !important;
   }
 
   .custom-scrollbar::-webkit-scrollbar {

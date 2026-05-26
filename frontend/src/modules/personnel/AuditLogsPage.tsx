@@ -5,7 +5,7 @@ import {
   ClipboardList, Clock, 
   Database, Info, Download,
   Search, AlertCircle, ShieldAlert,
-  ArrowRight
+  ArrowRight, Filter
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -111,58 +111,62 @@ export default function AuditLogsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 font-bold animate-pulse">Loading logs...</p>
-        </div>
+      <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[#1A9A91]" />
+        <p className="font-semibold uppercase tracking-wider text-[10px]">Loading Compliance Logs...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/80 backdrop-blur-xl p-10 rounded-[3.5rem] border border-white shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-        <div className="relative z-10">
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-            <div className="w-14 h-14 bg-indigo-600 text-white rounded-[1.5rem] flex items-center justify-center shadow-2xl shadow-indigo-200">
-              <ClipboardList className="w-8 h-8" />
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
+              <ClipboardList className="w-5 h-5 text-[#1A9A91]" />
             </div>
-            Audit Intelligence
-          </h2>
-          <p className="text-slate-500 font-bold mt-2 ml-1">Advanced operational oversight and compliance forensics.</p>
+            <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center gap-4">
+              Audit Intelligence
+            </h2>
+          </div>
+          <p className="text-slate-500 text-xs mt-1">Operational ledger tracking configuration changes, security events, and compliance logs.</p>
         </div>
 
-        <div className="flex items-center gap-4 relative z-10">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 border border-slate-200 text-slate-650 rounded-lg text-xs font-semibold shadow-sm justify-center">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            Live Sync
+          </div>
           <button 
             onClick={exportToCSV}
-            className="flex items-center gap-3 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+            className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-sm"
           >
             <Download className="w-4 h-4" /> Export Ledger
           </button>
-          <div className="bg-emerald-50 text-emerald-700 px-6 py-4 rounded-2xl text-[10px] font-black flex items-center gap-2 border border-emerald-100">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            Live Sync
-          </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white/50 backdrop-blur-md p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[300px]">
-           <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Filters Strip */}
+      <div className="bg-white border border-slate-200 p-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-400 pr-2 border-r border-slate-200">
+          <Filter className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Refine</span>
+        </div>
+
+        <div className="relative flex-1 min-w-[200px]">
+           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
            <input 
              type="text" 
-             placeholder="Search by actor or action..." 
-             className="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-6 py-4 text-sm font-bold text-slate-700 focus:ring-4 focus:ring-indigo-50 transition-all outline-none"
+             placeholder="Search by operator, username, or action..." 
+             className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs font-medium text-slate-700 focus:ring-2 focus:ring-[#1A9A91] focus:bg-white transition-all outline-none"
              value={searchTerm}
              onChange={(e) => setSearchTerm(e.target.value)}
            />
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
            <FilterSelect 
              value={severityFilter} 
              onChange={setSeverityFilter} 
@@ -178,78 +182,78 @@ export default function AuditLogsPage() {
         </div>
       </div>
 
-      {/* Activity List */}
-      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+      {/* Audit Table Ledger */}
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-50">
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Time & Date</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Performed By</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Action Taken</th>
-                <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Entity Type</th>
+              <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="px-6 py-3.5">Time & Date</th>
+                <th className="px-6 py-3.5">Performed By</th>
+                <th className="px-6 py-3.5">Action Taken</th>
+                <th className="px-6 py-3.5 text-right">Entity Type</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100 text-sm">
               <AnimatePresence mode="popLayout">
                 {filteredLogs?.map((log, idx) => {
                   const severity = getSeverity(log);
                   return (
                     <motion.tr 
                       layout
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ delay: idx * 0.05 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
                       key={log.id} 
-                      className="hover:bg-slate-50/50 transition-colors group"
+                      className="hover:bg-slate-50/45 transition-colors group"
                     >
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-3 rounded-2xl border ${
-                            severity === 'SECURITY' ? 'bg-rose-50 text-rose-600 border-rose-100 shadow-rose-50' :
-                            severity === 'CRITICAL' ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-amber-50' :
-                            'bg-slate-50 text-slate-400 border-slate-100 shadow-slate-50'
-                          } shadow-inner group-hover:scale-110 transition-transform`}>
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-1.5 rounded border ${
+                            severity === 'SECURITY' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                            severity === 'CRITICAL' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                            'bg-slate-50 text-slate-400 border-slate-200'
+                          } group-hover:scale-105 transition-transform`}>
                             {severity === 'SECURITY' ? <ShieldAlert className="w-4 h-4" /> : 
                              severity === 'CRITICAL' ? <AlertCircle className="w-4 h-4" /> : 
                              <Info className="w-4 h-4" />}
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-900 leading-none mb-1.5">
+                            <p className="font-semibold text-slate-800 leading-none mb-1">
                               {format(new Date(log.occurredAt), 'MMM dd, yyyy')}
                             </p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                            <p className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
                               <Clock className="w-3 h-3" /> {format(new Date(log.occurredAt), 'hh:mm:ss a')}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shadow-lg">
+                      <td className="px-6 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded bg-slate-800 text-white flex items-center justify-center font-bold text-xs uppercase shadow-sm">
                             {log.actorName ? log.actorName.charAt(0) : 'S'}
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">{log.actorName || 'System'}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {log.actorId?.slice(0, 8) || 'N/A'}</p>
+                            <p className="font-semibold text-slate-800 leading-tight">{log.actorName || 'System'}</p>
+                            <p className="text-[10px] text-slate-400">ID: {log.actorId?.slice(0, 8) || 'System'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-3.5">
                         <div className="flex flex-col gap-1">
-                           <span className={`text-[11px] font-black uppercase tracking-widest self-start px-3 py-1.5 rounded-lg border flex items-center gap-2 ${
-                              severity === 'SECURITY' ? 'bg-rose-600 text-white border-rose-600 shadow-xl shadow-rose-100' :
-                              severity === 'CRITICAL' ? 'bg-amber-500 text-white border-amber-500 shadow-xl shadow-amber-100' :
-                              'bg-white text-slate-600 border-slate-100 shadow-sm'
+                           <span className={`text-[11px] font-semibold uppercase tracking-wider self-start px-2 py-0.5 rounded border flex items-center gap-1.5 ${
+                              severity === 'SECURITY' ? 'bg-rose-50 text-rose-700 border-rose-200 shadow-sm' :
+                              severity === 'CRITICAL' ? 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm' :
+                              'bg-slate-50 text-slate-600 border-slate-200 shadow-sm'
                            }`}>
                             {humanize(log.action)}
-                            <ArrowRight className="w-3 h-3 opacity-50" />
+                            <ArrowRight className="w-3 h-3 opacity-40 group-hover:translate-x-0.5 transition-transform" />
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-right">
-                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-[0.1em] border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all cursor-pointer">
+                      <td className="px-6 py-3.5 text-right">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-600 text-[10px] font-semibold uppercase tracking-wide group-hover:bg-[#1A9A91] group-hover:text-white group-hover:border-[#1A9A91] transition-all cursor-pointer">
                           <Database className="w-3 h-3" /> {log.entityType}
                         </span>
                       </td>
@@ -257,13 +261,13 @@ export default function AuditLogsPage() {
                   );
                 })}
               </AnimatePresence>
-              {logs?.length === 0 && (
+              {filteredLogs?.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-4 text-slate-300">
-                      <Info className="w-12 h-12" />
-                      <p className="text-lg font-black tracking-tight">No activities recorded yet</p>
-                      <p className="text-sm font-medium text-slate-400">All system changes will appear here as they occur.</p>
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <Info className="w-8 h-8 text-slate-300" />
+                      <p className="font-bold tracking-tight text-slate-700 text-sm">No compliance logs recorded</p>
+                      <p className="text-xs text-slate-450">All platform operations and events appear here as they occur.</p>
                     </div>
                   </td>
                 </tr>
@@ -278,10 +282,10 @@ export default function AuditLogsPage() {
 
 function FilterSelect({ value, onChange, options, label }: any) {
   return (
-    <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-2 shadow-sm">
-       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}:</span>
+    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 shadow-sm">
+       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}:</span>
        <select 
-         className="bg-transparent text-xs font-black text-indigo-600 outline-none cursor-pointer pr-2"
+         className="bg-transparent text-xs font-semibold text-[#1A9A91] outline-none cursor-pointer pr-1"
          value={value}
          onChange={(e) => onChange(e.target.value)}
        >
@@ -290,5 +294,12 @@ function FilterSelect({ value, onChange, options, label }: any) {
          ))}
        </select>
     </div>
+  );
+}
+
+// Local fallback Loader2 svg
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`animate-spin ${className}`}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
   );
 }
