@@ -169,7 +169,7 @@ export class ProcessingService {
         shrinkWeightUsed: String(dto.shrinkWeightUsed || 0),
         inkUsage: String(dto.inkUsage || 0),
         solventUsage: String(dto.solventUsage || 0),
-        labelUsage: dto.bopRollUsage || 0,
+        labelUsage: Math.round(Number(dto.bopRollUsage || 0)),
         casesProduced: dto.casesProduced || 0,
         packingTypeId: dto.packingTypeId,
         finishedGoodsProduced: dto.finishedGoodsProduced || 0,
@@ -228,21 +228,26 @@ export class ProcessingService {
 
       const updateField = this.getFieldName(dto.station);
       if (updateField) {
+        const setClause: any = {
+          scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageCount}`,
+
+          // Enterprise Material Totals
+          capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
+          preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
+          bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.bopRollUsage || 0}`,
+          shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
+          finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
+          casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
+
+          updatedAt: new Date()
+        };
+
+        if (updateField !== 'scrapTotal') {
+          setClause[updateField] = sql`${batchTotals[updateField]} + ${finalPrimaryCount} + ROUND(${wastageCount})::integer`;
+        }
+
         await tx.update(batchTotals)
-          .set({
-            [updateField]: sql`${batchTotals[updateField]} + ${finalPrimaryCount} + ${wastageCount}`,
-            scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageCount}`,
-
-            // Enterprise Material Totals
-            capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
-            preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
-            bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.bopRollUsage || 0}`,
-            shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
-            finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
-            casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
-
-            updatedAt: new Date()
-          })
+          .set(setClause)
           .where(eq(batchTotals.batchId, dto.batchId));
       }
       
@@ -898,12 +903,15 @@ export class ProcessingService {
 
     if (primaryDelta !== 0 || wastageDelta !== 0) {
       const updateField = this.getFieldName(existing.station);
+      const setClause: any = {
+        scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
+        updatedAt: new Date()
+      };
+      if (updateField && updateField !== 'scrapTotal') {
+        setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta} + ROUND(${wastageDelta})::integer`;
+      }
       await db.update(batchTotals)
-        .set({
-          [updateField]: sql`${batchTotals[updateField]} + ${primaryDelta} + ${wastageDelta}`,
-          scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
-          updatedAt: new Date()
-        })
+        .set(setClause)
         .where(eq(batchTotals.batchId, existing.batchId));
     }
 
@@ -1006,12 +1014,15 @@ export class ProcessingService {
 
       // 2. Reconcile Totals (Subtract counts)
       const updateField = this.getFieldName(existing.station);
+      const setClause: any = {
+        scrapTotal: sql`${batchTotals.scrapTotal} - ${existing.wastageCount}`,
+        updatedAt: new Date()
+      };
+      if (updateField && updateField !== 'scrapTotal') {
+        setClause[updateField] = sql`${batchTotals[updateField]} - ${existing.primaryCount} - ROUND(${existing.wastageCount})::integer`;
+      }
       await tx.update(batchTotals)
-        .set({
-          [updateField]: sql`${batchTotals[updateField]} - ${existing.primaryCount}`,
-          scrapTotal: sql`${batchTotals.scrapTotal} - ${existing.wastageCount}`,
-          updatedAt: new Date()
-        })
+        .set(setClause)
         .where(eq(batchTotals.batchId, existing.batchId));
 
       // 3. Audit Log

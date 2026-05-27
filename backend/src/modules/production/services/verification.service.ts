@@ -63,12 +63,15 @@ export class VerificationService {
 
       // Subtract from totals
       const updateField = this.getFieldName(log.station);
+      const setClause: any = {
+        scrapTotal: sql`${batchTotals.scrapTotal} - ${log.wastageCount}`,
+        updatedAt: new Date()
+      };
+      if (updateField && updateField !== 'scrapTotal') {
+        setClause[updateField] = sql`${batchTotals[updateField]} - ${log.primaryCount} - ROUND(${log.wastageCount})::integer`;
+      }
       await tx.update(batchTotals)
-        .set({
-          [updateField]: sql`${batchTotals[updateField]} - ${log.primaryCount}`,
-          scrapTotal: sql`${batchTotals.scrapTotal} - ${log.wastageCount}`,
-          updatedAt: new Date()
-        })
+        .set(setClause)
         .where(eq(batchTotals.batchId, log.batchId));
 
       await this.audit.logAction({
@@ -108,12 +111,15 @@ export class VerificationService {
 
       if (primaryDelta !== 0 || wastageDelta !== 0) {
         const updateField = this.getFieldName(oldLog.station);
+        const setClause: any = {
+          scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
+          updatedAt: new Date()
+        };
+        if (updateField && updateField !== 'scrapTotal') {
+          setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta} + ROUND(${wastageDelta})::integer`;
+        }
         await tx.update(batchTotals)
-          .set({
-            [updateField]: sql`${batchTotals[updateField]} + ${primaryDelta} + ${wastageDelta}`,
-            scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
-            updatedAt: new Date()
-          })
+          .set(setClause)
           .where(eq(batchTotals.batchId, oldLog.batchId));
       }
 

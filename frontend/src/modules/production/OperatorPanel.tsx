@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../auth/auth.store';
 import {
@@ -13,7 +13,6 @@ import { api } from '../../services/api-client';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import { IndustrialNumericInput } from '../../components/ui/industrial-numeric-input';
 import { TerminalLogin } from './components/TerminalLogin';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -25,6 +24,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "../../components/ui/button";
 import { Wind, PackageOpen, Zap, Box } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
+
+const bottleConfigs = [
+  { id: '6_2L', label: '6 - 2L', multiplier: 6 },
+  { id: '12_1L', label: '12 - 1L', multiplier: 12 },
+  { id: '24_500ML', label: '24 - 500ML', multiplier: 24 },
+  { id: '35_300ML', label: '35 - 300ML', multiplier: 35 },
+];
 
 export default function OperatorPanel() {
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
@@ -101,6 +107,7 @@ export default function OperatorPanel() {
   
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
+  const [selectedBottleConfig, setSelectedBottleConfig] = useState<string>('');
   const [justSubmitted, setJustSubmitted] = useState(false);
 
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
@@ -316,6 +323,15 @@ export default function OperatorPanel() {
     }
   }, [primaryCount, rejectionCount, rawProductionCount, bottleLeakage, capWastage, productionWastages, currentStationId]);
 
+  // Auto-calculate primaryCount (Production Unit Count) in Packing Station based on casesProduced and selected bottle config multiplier
+  useEffect(() => {
+    if (currentStation.id === 'PACKING') {
+      const activeConfig = bottleConfigs.find(c => c.id === selectedBottleConfig);
+      const multiplier = activeConfig ? activeConfig.multiplier : 0;
+      setPrimaryCount(casesProduced * multiplier);
+    }
+  }, [casesProduced, selectedBottleConfig, currentStation.id]);
+
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
@@ -424,6 +440,7 @@ export default function OperatorPanel() {
       setInkChanged(false);
       setMakeupChanged(false);
       setShrinkWasteWeight('');
+      setSelectedBottleConfig('');
       setRawProductionCount(0);
       setBottleLeakage(0);
       setCapWastage(0);
@@ -580,26 +597,25 @@ export default function OperatorPanel() {
                   step={0.01}
                   compact
                 />
+              ) : currentStation.id === 'PACKING' ? (
+                null
               ) : (
                 <>
                   <IndustrialNumericInput
-                    label={`${currentStation.id === 'PACKING' ? 'Finished Goods' : 'Production Unit'} Count`}
+                    label="Production Unit Count"
                     value={primaryCount}
                     onChange={setPrimaryCount}
                     suffix="Units"
                     compact
                   />
 
-                  {currentStation.id !== 'PACKING' && (
-                    <IndustrialNumericInput
-                      label={currentStation.id === 'LABELING' ? "Rejects / Waste (KG)" : "Rejects / Waste"}
-                      value={rejectionCount}
-                      onChange={setRejectionCount}
-                      suffix={currentStation.id === 'LABELING' ? "KG" : "Units"}
-                      step={currentStation.id === 'LABELING' ? 0.01 : 1}
-                      compact
-                    />
-                  )}
+                  <IndustrialNumericInput
+                    label="Rejects / Waste"
+                    value={rejectionCount}
+                    onChange={setRejectionCount}
+                    suffix="Units"
+                    compact
+                  />
                 </>
               )}
 
@@ -738,48 +754,88 @@ export default function OperatorPanel() {
                 )}
                 
                 {currentStation.id === 'PACKING' && (
-                  <>
-                    <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5">
+                  <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 xl:gap-6">
+                    {/* Row 1 */}
+                    <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 flex flex-col justify-center">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
                       <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
                     </div>
-                    
-                    <IndustrialNumericInput label="Cases Produced" value={casesProduced} onChange={setCasesProduced} suffix="Cases" compact />
-                    <div className="opacity-50 pointer-events-none">
-                      <IndustrialNumericInput label="Total Bottles (Calculated)" value={primaryCount} onChange={() => {}} suffix="Bottles" readOnly compact />
+
+                    <div className="flex flex-col justify-center">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none mb-2">
+                        Bottle Configuration
+                      </label>
+                      <select
+                        value={selectedBottleConfig}
+                        onChange={e => setSelectedBottleConfig(e.target.value)}
+                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all shadow-sm"
+                      >
+                        <option value="">Select Configuration...</option>
+                        {bottleConfigs.map(config => (
+                          <option key={config.id} value={config.id}>
+                            {config.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Shrink Material Used (g)</label>
-                      <div className="relative">
+
+                    {/* Row 2 */}
+                    <IndustrialNumericInput 
+                      label="Cases Produced" 
+                      value={casesProduced} 
+                      onChange={setCasesProduced} 
+                      suffix="Cases" 
+                      compact 
+                    />
+
+                    <div className="opacity-75">
+                      <IndustrialNumericInput 
+                        label="Production Unit Count" 
+                        value={primaryCount} 
+                        onChange={() => {}} 
+                        suffix="Bottles" 
+                        readOnly 
+                        compact 
+                      />
+                    </div>
+
+                    {/* Row 3 */}
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
+                        Shrink Material Used (g)
+                      </label>
+                      <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
                         <input
                           type="number"
-                          step="0.001"
+                          step="any"
                           min="0"
                           value={shrinkUsage}
                           onChange={e => setShrinkUsage(e.target.value)}
                           placeholder="e.g. 1.256"
-                          className="w-full h-14 bg-white border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/35 transition-all"
+                          className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Shrink Material Waste (g)</label>
-                      <div className="relative">
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
+                        Shrink Material Waste (g)
+                      </label>
+                      <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
                         <input
                           type="number"
-                          step="0.001"
+                          step="any"
                           min="0"
                           value={shrinkWasteWeight}
                           onChange={e => setShrinkWasteWeight(e.target.value)}
                           placeholder="e.g. 0.124"
-                          className="w-full h-14 bg-white border border-slate-200 rounded-xl px-6 pr-12 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/35 transition-all"
+                          className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
                         />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-widest">g</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>

@@ -15,16 +15,17 @@ export interface IndustrialNumericInputProps
 }
 
 const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNumericInputProps>(
-  ({ className, value, onChange, label, suffix, step = 1, min = 0, max, compact = false, ...props }, ref) => {
+  ({ className, value, onChange, label, suffix, step, min = 0, max, compact = false, ...props }, ref) => {
+    const btnStep = step || 1
     const handleIncrement = () => {
-      const newValue = value + step
+      const newValue = value + btnStep
       if (max === undefined || newValue <= max) {
         onChange(newValue)
       }
     }
 
     const handleDecrement = () => {
-      const newValue = value - step
+      const newValue = value - btnStep
       if (min === undefined || newValue >= min) {
         onChange(newValue)
       }
@@ -62,6 +63,7 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
           
           <input
             type="number"
+            step="any"
             value={value || ''}
             onChange={handleInputChange}
             className={cn(

@@ -54,7 +54,7 @@ export const telemetryLogSchema = z.object({
   productId:              z.string().uuid(),
   station:                z.enum(['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']),
   primaryCount:           z.number().int().min(0),
-  wastageCount:           z.number().int().min(0),
+  wastageCount:           z.number().min(0),
   secondaryPackagingCount: z.number().int().min(0).default(0),
   eventType:              z.enum([
     'POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE',
