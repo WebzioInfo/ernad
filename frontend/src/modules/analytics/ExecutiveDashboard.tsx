@@ -234,9 +234,12 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
               )}
             </div>
 
+            {/* TEMP DISABLED - Future Admin Feature
+            // Preserved for future implementation
             <button className="w-full mt-10 py-5 bg-white text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95">
               View Inventory Ledger
             </button>
+            */}
           </div>
 
           <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl">
@@ -265,9 +268,12 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
                 ))
               )}
             </div>
+            {/* TEMP DISABLED - Future Admin Feature
+            // Preserved for future implementation
             <button className="w-full mt-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
               Full Downtime Analysis
             </button>
+            */}
           </div>
         </div>
       </div>

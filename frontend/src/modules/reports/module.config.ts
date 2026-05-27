@@ -1,5 +1,7 @@
 import { lazy } from 'react';
-import { FileText, BarChart4, ClipboardList } from 'lucide-react';
+import { FileText, BarChart4 } from 'lucide-react';
+// TEMP DISABLED - Future Admin Feature
+// import { ClipboardList } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const reportsConfig: ModuleConfig = {
@@ -18,11 +20,14 @@ export const reportsConfig: ModuleConfig = {
       element: lazy(() => import('./pages/SalesAnalyticsPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
     },
+    /* TEMP DISABLED - Future Admin Feature
+    // Preserved for future implementation
     {
       path: 'reports/attendance',
       element: lazy(() => import('./pages/AttendanceReportsPage')),
       allowedRoles: ['ADMIN']
     },
+    */
     {
       path: 'reports/batch/:id',
       element: lazy(() => import('./pages/BatchForensicsPage')),
@@ -50,6 +55,8 @@ export const reportsConfig: ModuleConfig = {
         }
       ]
     },
+    /* TEMP DISABLED - Future Admin Feature
+    // Preserved for future implementation
     {
       id: 'team',
       label: 'Team',
@@ -64,5 +71,6 @@ export const reportsConfig: ModuleConfig = {
         }
       ]
     }
+    */
   ]
 };

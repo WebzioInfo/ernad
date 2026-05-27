@@ -4,8 +4,9 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import Login from '../modules/auth/Login';
 import RequireAuth from '../modules/auth/RequireAuth';
 import SmartRedirect from './SmartRedirect';
-import ComingSoonPage from '../components/common/ComingSoonPage';
-import { Sparkle, Sparkles, Bell, Database, Command, Users } from 'lucide-react';
+// TEMP DISABLED - Future Admin Feature
+// import ComingSoonPage from '../components/common/ComingSoonPage';
+// import { Sparkle, Sparkles, Bell, Database, Command, Users } from 'lucide-react';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 
 // Optimized Module Loading
@@ -60,11 +61,21 @@ export function AppRoutes() {
           {renderRoutes(dynamicRoutes)}
           
           {/* Static / Compatibility Routes (Coming Soon) */}
+          {/* 
           <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkle} />} />
           <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />
           <Route path="tally" element={<ComingSoonPage title="Tally ERP Integration" description="Bi-directional synchronization with Tally ERP for automated accounting and voucher generation." icon={Database} />} />
           <Route path="billing" element={<ComingSoonPage title="Payments & Billing" description="Integrated payment gateway and customer invoicing system for streamlined financial operations." icon={Command} />} />
           <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
+          */}
+          
+          {/* Redirects for disabled/commented-out routes */}
+          <Route path="ai-advices" element={<Navigate to="/admin/overview" replace />} />
+          <Route path="quality" element={<Navigate to="/admin/overview" replace />} />
+          <Route path="tally" element={<Navigate to="/admin/overview" replace />} />
+          <Route path="billing" element={<Navigate to="/admin/overview" replace />} />
+          <Route path="distributors" element={<Navigate to="/admin/overview" replace />} />
+          <Route path="reports/attendance" element={<Navigate to="/admin/overview" replace />} />
         </Route>
 
         {/* 2. MANAGEMENT (Managers) */}
@@ -80,11 +91,20 @@ export function AppRoutes() {
           {renderRoutes(dynamicRoutes)}
 
           {/* Static / Compatibility Routes (Coming Soon) */}
+          {/* 
           <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />
           <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkles} />} />
           <Route path="tally" element={<ComingSoonPage title="Tally ERP Integration" description="Bi-directional synchronization with Tally ERP for automated accounting and voucher generation." icon={Database} />} />
           <Route path="billing" element={<ComingSoonPage title="Payments & Billing" description="Integrated payment gateway and customer invoicing system for streamlined financial operations." icon={Command} />} />
           <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
+          */}
+
+          {/* Redirects for disabled/commented-out routes */}
+          <Route path="quality" element={<Navigate to="/manager/overview" replace />} />
+          <Route path="ai-advices" element={<Navigate to="/manager/overview" replace />} />
+          <Route path="tally" element={<Navigate to="/manager/overview" replace />} />
+          <Route path="billing" element={<Navigate to="/manager/overview" replace />} />
+          <Route path="distributors" element={<Navigate to="/manager/overview" replace />} />
         </Route>
 
         {/* 3. OPERATOR PORTAL (Authenticated via Login) */}

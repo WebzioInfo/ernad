@@ -79,7 +79,10 @@ const ManagerDashboard = memo(() => {
               <ActionTile icon={Play} label="Start New Batch" path={`${roleBase}/production?action=start`} color="emerald" />
               <ActionTile icon={BarChart3} label="OEE Analytics" path={`${roleBase}/analytics`} color="violet" />
               <ActionTile icon={Package} label="Raw Materials" path={`${roleBase}/raw-materials`} color="amber" />
+              {/* TEMP DISABLED - Future Admin Feature
+              // Preserved for future implementation
               <ActionTile icon={ShieldCheck} label="Quality Control" path={`${roleBase}/quality`} color="rose" />
+              */}
               <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
               <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/users`} color="cyan" />
             </div>
