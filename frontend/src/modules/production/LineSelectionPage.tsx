@@ -104,7 +104,7 @@ export default function LineSelectionPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 p-8 md:p-20 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-16 pb-8 px-8 md:pt-32 md:pb-20 md:px-20 font-sans relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.05]"
         style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
@@ -179,12 +179,24 @@ export default function LineSelectionPage() {
           </div>
         ) : (
           <div className="space-y-12 animate-in slide-in-from-right-8 duration-500">
-            <button
-              onClick={() => setStep('line')}
-              className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-colors font-black uppercase tracking-widest text-[10px] group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Line Selection
-            </button>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <button
+                onClick={() => setStep('line')}
+                className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-colors font-black uppercase tracking-widest text-[10px] group"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Line Selection
+              </button>
+
+              <div className="flex items-center gap-3 bg-white border border-slate-200 p-3 px-5 rounded-[2rem] shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Focus:</span>
+                <span className="text-xs font-black text-slate-900 uppercase tracking-tight font-mono">{selectedLine?.name}</span>
+                <span className={cn(
+                  "w-2 h-2 rounded-full",
+                  selectedLine?.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                )} />
+                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">{selectedLine?.status || 'IDLE'}</span>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {stations.map(station => {
