@@ -98,6 +98,7 @@ export class RolesGuard implements CanActivate {
           const operatorPermissions = [
             'telemetry:log',
             'production:start',
+            'production:close',
             'settings:view'
           ];
           if (operatorPermissions.includes(p)) {

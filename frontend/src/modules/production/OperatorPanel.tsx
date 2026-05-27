@@ -7,7 +7,9 @@ import {
   AlertTriangle,
   Layers,
   History,
-  X
+  X,
+  Play,
+  RefreshCcw
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { toast } from 'sonner';
@@ -117,6 +119,27 @@ export default function OperatorPanel() {
   const [fromTime] = useState('');
   const [toTime] = useState('');
 
+  // Line Control modal and form states
+  const [showLineControl, setShowLineControl] = useState(false);
+  const [lineControlTab, setLineControlTab] = useState<'START' | 'STOP' | 'CHANGEOVER'>('START');
+
+  // Start batch sub-form states
+  const [startShift, setStartShift] = useState('');
+  const [startBrand, setStartBrand] = useState('');
+  const [startProduct, setStartProduct] = useState('');
+  const [startBatchCode, setStartBatchCode] = useState('');
+  const [startRemarks, setStartRemarks] = useState('');
+  const [startStartTime, setStartStartTime] = useState(new Date().toISOString().slice(0, 16));
+
+  // End batch sub-form states
+  const [endRemarks, setEndRemarks] = useState('');
+  const [endEndTime, setEndEndTime] = useState(new Date().toISOString().slice(0, 16));
+
+  // Changeover sub-form states
+  const [changeoverBrand, setChangeoverBrand] = useState('');
+  const [changeoverProduct, setChangeoverProduct] = useState('');
+  const [changeoverStartTime, setChangeoverStartTime] = useState(new Date().toISOString().slice(0, 16));
+
   const { data: batchData, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['active-batch', lineId],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(lineId!))).data,
@@ -181,6 +204,21 @@ export default function OperatorPanel() {
     retry: 1
   });
 
+  const { data: brands } = useQuery({
+    queryKey: ['brands'],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data
+  });
+
+  const { data: products } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data
+  });
+
+  const { data: shifts } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data
+  });
+
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials'],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.RAW_MATERIALS)).data,
@@ -202,6 +240,85 @@ export default function OperatorPanel() {
   const { data: operatorsList } = useQuery({
     queryKey: ['operators-list'],
     queryFn: async () => (await api.get(ENDPOINTS.TERMINALS.OPERATORS)).data,
+  });
+
+  // Line Control Mutations
+  const startBatchMutation = useMutation({
+    mutationFn: (payload: {
+      shiftId: string;
+      brandId: string;
+      productId: string;
+      batchCode?: string;
+      remarks?: string;
+      startTime: string;
+    }) => api.post(ENDPOINTS.PRODUCTION.START_BATCH, {
+      lineId: lineId!,
+      ...payload
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
+      toast.success('Production batch started successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to start production batch');
+    }
+  });
+
+  const stopBatchMutation = useMutation({
+    mutationFn: (payload: { remarks?: string; endTime?: string }) => {
+      if (!activeBatch?.batch?.id) {
+        throw new Error('No active batch found to close');
+      }
+      return api.patch(ENDPOINTS.PRODUCTION.CLOSE_BATCH(activeBatch.batch.id), {
+        remarks: payload.remarks,
+        endTime: payload.endTime ? new Date(payload.endTime).toISOString() : undefined,
+        materialReturn: undefined
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
+      queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
+      toast.success('Production batch closed successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to close production batch');
+    }
+  });
+
+  const initiateChangeoverMutation = useMutation({
+    mutationFn: (payload: { productId: string; startTime: string; reason?: string; notes?: string }) => {
+      if (!activeBatch?.batch?.id) {
+        throw new Error('No active batch found for changeover');
+      }
+      return api.post(ENDPOINTS.PRODUCTION.LINE_CHANGEOVER(lineId!), {
+        productId: payload.productId,
+        batchId: activeBatch.batch.id,
+        startTime: new Date(payload.startTime).toISOString()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
+      toast.success('Changeover initiated successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to initiate changeover');
+    }
+  });
+
+  const completeChangeoverMutation = useMutation({
+    mutationFn: () => {
+      if (!activeBatch?.batch?.id) {
+        throw new Error('No active batch found to complete changeover');
+      }
+      return api.post(ENDPOINTS.PRODUCTION.COMPLETE_CHANGEOVER(activeBatch.batch.id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
+      toast.success('Changeover completed. Line is now RUNNING.');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to complete changeover');
+    }
   });
 
   // Fetch recent handover details
@@ -519,13 +636,30 @@ export default function OperatorPanel() {
         title={currentStation.title}
         description="Production Data Processing Node"
         headerActions={
-          <button
-            onClick={() => setIsHistoryDrawerOpen(true)}
-            className="lg:hidden px-5 py-3 bg-[#1A9A91] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#157C75] active:scale-95 transition-all shadow-lg shadow-[#1A9A91]/15 flex items-center gap-2 cursor-pointer animate-in fade-in"
-          >
-            <History size={14} />
-            {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsHistoryDrawerOpen(true)}
+              className="lg:hidden px-5 py-3 bg-[#1A9A91] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#157C75] active:scale-95 transition-all shadow-lg shadow-[#1A9A91]/15 flex items-center gap-2 cursor-pointer animate-in fade-in"
+            >
+              <History size={14} />
+              {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
+            </button>
+            <button
+              onClick={() => {
+                if (!activeBatch?.batch) {
+                  setLineControlTab('START');
+                } else if (activeBatch?.batch?.status === 'CHANGEOVER') {
+                  setLineControlTab('CHANGEOVER');
+                } else {
+                  setLineControlTab('STOP');
+                }
+                setShowLineControl(true);
+              }}
+              className="px-5 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 active:scale-95 transition-all shadow-lg shadow-slate-950/15 flex items-center gap-2 cursor-pointer animate-in fade-in"
+            >
+              Line Control
+            </button>
+          </div>
         }
         sidebar={
           <ActivityFeed 
@@ -540,9 +674,32 @@ export default function OperatorPanel() {
           />
         }
       >
-        <div className="grid grid-cols-1 gap-6">
-          {/* Main Action Card */}
-          <div className="bg-white border border-[#1A9A91]/15 rounded-[2rem] p-5 md:p-6 shadow-sm shadow-[#1A9A91]/5 space-y-6">
+        {!activeBatch?.batch ? (
+          <div className="bg-white border border-[#1A9A91]/15 rounded-[2rem] p-8 md:p-12 shadow-sm shadow-[#1A9A91]/5 flex flex-col items-center justify-center text-center space-y-6 min-h-[400px]">
+            <div className="w-20 h-20 bg-[#1A9A91]/10 rounded-[2rem] flex items-center justify-center border border-[#1A9A91]/25 animate-pulse">
+              <Zap className="w-10 h-10 text-[#1A9A91]" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Line Standby Mode</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2 max-w-md mx-auto leading-relaxed">
+                There is no active production batch running on {line?.name || 'this line'}. Please start a batch to enable telemetry logging.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setLineControlTab('START');
+                setShowLineControl(true);
+              }}
+              className="px-8 py-4 bg-[#1A9A91] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:bg-[#157C75] active:scale-95 transition-all shadow-xl shadow-[#1A9A91]/20 flex items-center gap-2 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-white" />
+              Start Production Batch
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {/* Main Action Card */}
+            <div className="bg-white border border-[#1A9A91]/15 rounded-[2rem] p-5 md:p-6 shadow-sm shadow-[#1A9A91]/5 space-y-6">
             {currentStation.id === 'FILLING' && (
               <div className="space-y-4">
                 {/* Production Wastages Toggle */}
@@ -885,6 +1042,7 @@ export default function OperatorPanel() {
             </button>
           </div>
         </div>
+        )}
       </StationWorkspace>
 
       <AnimatePresence>
@@ -1104,6 +1262,342 @@ export default function OperatorPanel() {
               {isSubmittingHandover ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Handover'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Line Control Dialog */}
+      <Dialog open={showLineControl} onOpenChange={setShowLineControl}>
+        <DialogContent className="sm:max-w-2xl bg-white rounded-[2rem] border-none shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-4 mb-6">
+            <DialogTitle className="text-3xl font-black tracking-tighter uppercase leading-none text-slate-900">
+              Line <span className="text-[#1A9A91]">Control</span>
+            </DialogTitle>
+            <DialogDescription className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+              Manage the active production run and changeovers for {line?.name || 'this line'}.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Tab Selector (only visible if batch exists and status is not CHANGEOVER) */}
+          {activeBatch?.batch && activeBatch?.batch?.status !== 'CHANGEOVER' && (
+            <div className="flex border-b border-slate-200 mb-6">
+              <button
+                onClick={() => setLineControlTab('STOP')}
+                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+                  lineControlTab === 'STOP' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
+                }`}
+              >
+                End Production
+              </button>
+              <button
+                onClick={() => setLineControlTab('CHANGEOVER')}
+                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
+                  lineControlTab === 'CHANGEOVER' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
+                }`}
+              >
+                SKU Changeover
+              </button>
+            </div>
+          )}
+
+          {/* 1. START BATCH VIEW */}
+          {(!activeBatch?.batch || lineControlTab === 'START') && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl">
+                <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest mb-1">Start New Batch</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Enter the details to initialize the line.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Active Shift</label>
+                <select
+                  value={startShift}
+                  onChange={e => setStartShift(e.target.value)}
+                  className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all"
+                >
+                  <option value="">-- Select Shift --</option>
+                  {shifts?.map((s: any) => (
+                    <option key={s.id} value={s.id}>{s.name} ({s.startTime} – {s.endTime})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Brand</label>
+                  <select
+                    value={startBrand}
+                    onChange={e => { setStartBrand(e.target.value); setStartProduct(''); }}
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all"
+                  >
+                    <option value="">-- Select Brand --</option>
+                    {brands?.map((b: any) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Product SKU</label>
+                  <select
+                    value={startProduct}
+                    onChange={e => setStartProduct(e.target.value)}
+                    disabled={!startBrand}
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all disabled:opacity-40"
+                  >
+                    <option value="">-- Select Product --</option>
+                    {products?.filter((p: any) => p.brandId === startBrand).map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Batch Code (Optional)</label>
+                  <input
+                    type="text"
+                    value={startBatchCode}
+                    onChange={e => setStartBatchCode(e.target.value)}
+                    placeholder="e.g. EB26001 (Blank for Auto)"
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all font-mono"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Start Time</label>
+                  <input
+                    type="datetime-local"
+                    value={startStartTime}
+                    onChange={e => setStartStartTime(e.target.value)}
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Start Remarks</label>
+                <textarea
+                  value={startRemarks}
+                  onChange={e => setStartRemarks(e.target.value)}
+                  placeholder="Notes about product lines, starting pre-checks, etc..."
+                  className="w-full h-20 bg-white border border-slate-200 rounded-xl p-4 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] transition-all resize-none"
+                />
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLineControl(false)}
+                  className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={startBatchMutation.isPending || !startShift || !startBrand || !startProduct}
+                  onClick={() => {
+                    startBatchMutation.mutate({
+                      shiftId: startShift,
+                      brandId: startBrand,
+                      productId: startProduct,
+                      batchCode: startBatchCode || undefined,
+                      remarks: startRemarks || undefined,
+                      startTime: new Date(startStartTime).toISOString()
+                    }, {
+                      onSuccess: () => {
+                        setShowLineControl(false);
+                        setStartShift('');
+                        setStartBrand('');
+                        setStartProduct('');
+                        setStartBatchCode('');
+                        setStartRemarks('');
+                      }
+                    });
+                  }}
+                  className="h-12 bg-[#1A9A91] hover:bg-[#157C75] text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
+                >
+                  {startBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Launch Batch'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. STOP BATCH VIEW */}
+          {activeBatch?.batch && activeBatch?.batch?.status !== 'CHANGEOVER' && lineControlTab === 'STOP' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-700">
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1">Finalize Production</p>
+                <p className="text-xs font-bold uppercase tracking-wide">Closing batch will trigger inventory deduction and lock logging.</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">End Time</label>
+                <input
+                  type="datetime-local"
+                  value={endEndTime}
+                  onChange={e => setEndEndTime(e.target.value)}
+                  className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-rose-400 transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Ending Remarks / Audit Reason</label>
+                <textarea
+                  value={endRemarks}
+                  onChange={e => setEndRemarks(e.target.value)}
+                  placeholder="Describe final counts confirmation, reasons for end..."
+                  className="w-full h-24 bg-white border border-slate-200 rounded-xl p-4 text-xs font-bold text-slate-700 outline-none focus:border-rose-400 transition-all resize-none"
+                />
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLineControl(false)}
+                  className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={stopBatchMutation.isPending || !endRemarks}
+                  onClick={() => {
+                    stopBatchMutation.mutate({
+                      remarks: endRemarks,
+                      endTime: new Date(endEndTime).toISOString()
+                    }, {
+                      onSuccess: () => {
+                        setShowLineControl(false);
+                        setEndRemarks('');
+                      }
+                    });
+                  }}
+                  className="h-12 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
+                >
+                  {stopBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Authorize Stop'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 3. SKU CHANGEOVER VIEW */}
+          {activeBatch?.batch && activeBatch?.batch?.status !== 'CHANGEOVER' && lineControlTab === 'CHANGEOVER' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800">
+                <p className="text-[10px] font-black uppercase tracking-widest mb-1">Initiate SKU Changeover</p>
+                <p className="text-xs font-bold uppercase tracking-wide">This will transition the line to CHANGEOVER status for product swap.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Next Brand</label>
+                  <select
+                    value={changeoverBrand}
+                    onChange={e => { setChangeoverBrand(e.target.value); setChangeoverProduct(''); }}
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-amber-400 transition-all"
+                  >
+                    <option value="">-- Select Brand --</option>
+                    {brands?.map((b: any) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Next Product SKU</label>
+                  <select
+                    value={changeoverProduct}
+                    onChange={e => setChangeoverProduct(e.target.value)}
+                    disabled={!changeoverBrand}
+                    className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-amber-400 transition-all disabled:opacity-40"
+                  >
+                    <option value="">-- Select Product --</option>
+                    {products?.filter((p: any) => p.brandId === changeoverBrand).map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest block ml-1">Changeover Start Time</label>
+                <input
+                  type="datetime-local"
+                  value={changeoverStartTime}
+                  onChange={e => setChangeoverStartTime(e.target.value)}
+                  className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-xs font-bold text-slate-700 outline-none focus:border-amber-400 transition-all"
+                />
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLineControl(false)}
+                  className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={initiateChangeoverMutation.isPending || !changeoverProduct}
+                  onClick={() => {
+                    initiateChangeoverMutation.mutate({
+                      productId: changeoverProduct,
+                      startTime: new Date(changeoverStartTime).toISOString()
+                    }, {
+                      onSuccess: () => {
+                        setShowLineControl(false);
+                        setChangeoverBrand('');
+                        setChangeoverProduct('');
+                      }
+                    });
+                  }}
+                  className="h-12 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
+                >
+                  {initiateChangeoverMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Start Changeover'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. CHANGEOVER ACTIVE VIEW */}
+          {activeBatch?.batch && activeBatch?.batch?.status === 'CHANGEOVER' && (
+            <div className="space-y-5 text-center py-6">
+              <div className="w-16 h-16 bg-amber-50 text-amber-500 border border-amber-100 rounded-full flex items-center justify-center mx-auto animate-spin mb-4">
+                <RefreshCcw className="w-8 h-8" />
+              </div>
+              <div>
+                <h4 className="text-lg font-black uppercase text-slate-800">Changeover in Progress</h4>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">
+                  Target Product: {activeBatch?.productName || activeBatch?.batch?.productName || 'New SKU'}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-4 leading-relaxed max-w-md mx-auto">
+                  Click below once the physical lines mechanical adjustments (heater zones, labeling rails, filling guides) are completed and the new SKU run is ready to start.
+                </p>
+              </div>
+
+              <div className="pt-6 flex justify-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowLineControl(false)}
+                  className="h-12 border-slate-200 text-slate-400 hover:text-slate-900 font-black uppercase tracking-widest rounded-xl transition-all"
+                >
+                  Close Window
+                </Button>
+                <Button
+                  disabled={completeChangeoverMutation.isPending}
+                  onClick={() => {
+                    completeChangeoverMutation.mutate(undefined, {
+                      onSuccess: () => {
+                        setShowLineControl(false);
+                      }
+                    });
+                  }}
+                  className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
+                >
+                  {completeChangeoverMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Complete Changeover & Start'}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
