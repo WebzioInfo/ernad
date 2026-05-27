@@ -68,7 +68,7 @@ export class VerificationService {
         updatedAt: new Date()
       };
       if (updateField && updateField !== 'scrapTotal') {
-        setClause[updateField] = sql`${batchTotals[updateField]} - ${log.primaryCount} - ROUND(${log.wastageCount})::integer`;
+        setClause[updateField] = sql`${batchTotals[updateField]} - ${log.primaryCount}`;
       }
       await tx.update(batchTotals)
         .set(setClause)
@@ -116,7 +116,7 @@ export class VerificationService {
           updatedAt: new Date()
         };
         if (updateField && updateField !== 'scrapTotal') {
-          setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta} + ROUND(${wastageDelta})::integer`;
+          setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta}`;
         }
         await tx.update(batchTotals)
           .set(setClause)

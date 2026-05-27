@@ -243,7 +243,7 @@ export class ProcessingService {
         };
 
         if (updateField !== 'scrapTotal') {
-          setClause[updateField] = sql`${batchTotals[updateField]} + ${finalPrimaryCount} + ROUND(${wastageCount})::integer`;
+          setClause[updateField] = sql`${batchTotals[updateField]} + ${finalPrimaryCount}`;
         }
 
         await tx.update(batchTotals)
@@ -908,7 +908,7 @@ export class ProcessingService {
         updatedAt: new Date()
       };
       if (updateField && updateField !== 'scrapTotal') {
-        setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta} + ROUND(${wastageDelta})::integer`;
+        setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta}`;
       }
       await db.update(batchTotals)
         .set(setClause)
@@ -1019,7 +1019,7 @@ export class ProcessingService {
         updatedAt: new Date()
       };
       if (updateField && updateField !== 'scrapTotal') {
-        setClause[updateField] = sql`${batchTotals[updateField]} - ${existing.primaryCount} - ROUND(${existing.wastageCount})::integer`;
+        setClause[updateField] = sql`${batchTotals[updateField]} - ${existing.primaryCount}`;
       }
       await tx.update(batchTotals)
         .set(setClause)
