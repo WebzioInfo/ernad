@@ -589,14 +589,23 @@ export default function OperatorPanel() {
                   </div>
                 </>
               ) : currentStation.id === 'LABELING' ? (
-                <IndustrialNumericInput
-                  label="Label Wastage"
-                  value={rejectionCount}
-                  onChange={setRejectionCount}
-                  suffix="KG"
-                  step={0.01}
-                  compact
-                />
+                <>
+                  <IndustrialNumericInput
+                    label="Production Unit Count"
+                    value={primaryCount}
+                    onChange={setPrimaryCount}
+                    suffix="Units"
+                    compact
+                  />
+                  <IndustrialNumericInput
+                    label="Label Wastage"
+                    value={rejectionCount}
+                    onChange={setRejectionCount}
+                    suffix="KG"
+                    step={0.01}
+                    compact
+                  />
+                </>
               ) : currentStation.id === 'PACKING' ? (
                 null
               ) : (
