@@ -104,28 +104,28 @@ export default function LineSelectionPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-16 pb-8 px-8 md:pt-32 md:pb-20 md:px-20 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-10 pb-8 px-6 sm:pt-16 sm:pb-12 sm:px-12 md:pt-20 md:pb-16 md:px-16 lg:pt-28 lg:pb-20 lg:px-20 font-sans relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.05]"
         style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
       />
 
       <div className="max-w-6xl mx-auto relative z-10">
-        <header className="flex justify-between items-center mb-20">
+        <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-6 mb-12 sm:mb-16 md:mb-20">
           <div>
-            <h1 className="text-5xl font-black tracking-tighter uppercase">Factory <span className="text-indigo-600">Portal</span></h1>
-            <p className="text-slate-500 font-bold flex items-center gap-2 mt-4 uppercase tracking-widest text-xs">
+            <h1 className="text-4xl sm:text-5xl font-black tracking-tighter uppercase">Factory <span className="text-indigo-600">Portal</span></h1>
+            <p className="text-slate-500 font-bold flex items-center gap-2 mt-3 sm:mt-4 uppercase tracking-widest text-[10px] sm:text-xs">
               <Activity className="w-4 h-4 text-indigo-600" />
               Production Workspace Initialization
             </p>
           </div>
-          <div className="flex items-center gap-6 bg-white border border-slate-200 p-4 rounded-[2rem] shadow-sm">
+          <div className="flex items-center gap-4 sm:gap-6 bg-white border border-slate-200 p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] shadow-sm self-end sm:self-auto">
             <div className="text-right">
-              <p className="text-sm font-black text-slate-900">{user?.name}</p>
-              <p className="text-[10px] text-indigo-600 font-black uppercase tracking-widest">{user?.roles?.[0]?.replace('_', ' ')}</p>
+              <p className="text-xs sm:text-sm font-black text-slate-900">{user?.name}</p>
+              <p className="text-[9px] sm:text-[10px] text-indigo-600 font-black uppercase tracking-widest">{user?.roles?.[0]?.replace('_', ' ')}</p>
             </div>
-            <button onClick={() => logout()} className="p-4 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-2xl transition-all border border-slate-100">
-              <LogOut className="w-5 h-5" />
+            <button onClick={() => logout()} className="p-3 sm:p-4 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl sm:rounded-2xl transition-all border border-slate-100">
+              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </header>
@@ -136,7 +136,7 @@ export default function LineSelectionPage() {
               <button
                 key={line.id}
                 onClick={() => handleLineSelect(line)}
-                className="group bg-white border border-slate-200 p-10 rounded-[3rem] text-left hover:border-indigo-300 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 flex flex-col h-[320px] justify-between relative overflow-hidden"
+                className="group bg-white border border-slate-200 p-6 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] text-left hover:border-indigo-300 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 flex flex-col h-[280px] sm:h-[320px] justify-between relative overflow-hidden"
               >
                 <div className="relative z-10">
                   <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
@@ -218,7 +218,7 @@ export default function LineSelectionPage() {
                     }}
                     disabled={startSessionMutation.isPending}
                     className={cn(
-                      "group p-10 rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[340px] w-full",
+                      "group p-6 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[280px] sm:h-[320px] lg:h-[340px] w-full",
                       occupant
                         ? (isMySession ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100')
                         : 'bg-white border-slate-200 hover:border-indigo-300 hover:-translate-y-2'

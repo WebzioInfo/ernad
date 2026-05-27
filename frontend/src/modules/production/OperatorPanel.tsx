@@ -725,7 +725,7 @@ export default function OperatorPanel() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 xl:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {currentStation.id === 'FILLING' && productionWastages ? (
                 <>
                   <IndustrialNumericInput
@@ -749,7 +749,7 @@ export default function OperatorPanel() {
                     suffix="Units"
                     compact
                   />
-                  <div className="xl:col-span-2 p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+                  <div className="md:col-span-2 p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
                     <div>
                       Net Production: <span className="text-[#1A9A91] font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
                     </div>
@@ -933,7 +933,7 @@ export default function OperatorPanel() {
                 )}
                 
                 {currentStation.id === 'PACKING' && (
-                  <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5 xl:gap-6">
+                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Row 1 */}
                     <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 flex flex-col justify-center">
                       <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
