@@ -55,7 +55,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
           <div className="flex flex-col">
             <span className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none mb-1 sm:mb-1.5">Active Batch</span>
             <div className="flex items-center gap-1.5 sm:gap-2.5">
-              <span className="text-xs sm:text-[13px] font-semibold text-gray-900 tracking-tight truncate max-w-[120px] sm:max-w-none">{productName || 'No Product'}</span>
+              <span className="text-xs sm:text-[13px] font-semibold text-gray-900 tracking-tight truncate max-w-[100px] sm:max-w-[140px] md:max-w-[180px] lg:max-w-none">{productName || 'No Product'}</span>
               <span className="text-[8px] sm:text-[10px] font-mono font-medium text-gray-500 bg-gray-100/80 px-1.5 py-0.5 rounded border border-gray-200/50">
                 {batchCode || '---'}
               </span>
@@ -99,7 +99,8 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
               className="px-2 py-2 sm:px-3 sm:py-2.5 bg-[#1A9A91] hover:bg-[#157C75] text-white font-bold text-[10px] sm:text-xs uppercase tracking-wider rounded-lg sm:rounded-[12px] active:scale-95 transition-all shadow-[0_2px_8px_rgba(26,154,145,0.22)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               title="Shift Handover"
             >
-              Shift Handover
+              <span className="hidden lg:inline">Shift Handover</span>
+              <span className="lg:hidden">Handover</span>
             </button>
             <button
               onClick={onChangeStation}
@@ -107,7 +108,8 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
               className="px-2 py-2 sm:px-3 sm:py-2.5 bg-white text-[#1A9A91] font-bold text-[10px] sm:text-xs uppercase tracking-wider rounded-lg sm:rounded-[12px] hover:bg-[#1A9A91]/5 active:scale-95 transition-all border border-[#1A9A91]/25 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
               title="Change Station"
             >
-              Change Station
+              <span className="hidden lg:inline">Change Station</span>
+              <span className="lg:hidden">Change</span>
             </button>
             <button
               onClick={onDowntime}

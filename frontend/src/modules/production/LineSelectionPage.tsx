@@ -131,32 +131,32 @@ export default function LineSelectionPage() {
         </header>
 
         {step === 'line' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
             {lines?.map((line: any) => (
               <button
                 key={line.id}
                 onClick={() => handleLineSelect(line)}
-                className="group bg-white border border-slate-200 p-6 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] text-left hover:border-indigo-300 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 flex flex-col h-[280px] sm:h-[320px] justify-between relative overflow-hidden"
+                className="group bg-white border border-slate-200 p-5 sm:p-6 lg:p-8 rounded-[2rem] sm:rounded-[3rem] text-left hover:border-indigo-300 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 flex flex-col h-[220px] sm:h-[260px] lg:h-[280px] justify-between relative overflow-hidden"
               >
                 <div className="relative z-10">
-                  <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                    <Cpu className="w-8 h-8 text-indigo-600" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform">
+                    <Cpu className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600" />
                   </div>
-                  <h3 className="text-3xl font-black tracking-tighter uppercase text-slate-900 leading-none mb-2">{line.name}</h3>
-                  <p className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">{line.department || 'Production Unit'}</p>
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight uppercase text-slate-900 leading-none mb-1.5">{line.name}</h3>
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-[8px] sm:text-[9px]">{line.department || 'Production Unit'}</p>
                 </div>
 
                 <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <div className={cn(
-                      "w-2 h-2 rounded-full animate-pulse",
+                      "w-1.5 h-1.5 rounded-full animate-pulse",
                       line.status === 'RUNNING' ? 'bg-emerald-500' :
                       line.status === 'IDLE' ? 'bg-slate-400' :
                       line.status === 'BREAKDOWN' ? 'bg-rose-500' :
                       'bg-amber-500'
                     )} />
                     <span className={cn(
-                      "text-[10px] font-black uppercase tracking-widest",
+                      "text-[8px] sm:text-[9px] font-black uppercase tracking-widest",
                       line.status === 'RUNNING' ? 'text-emerald-600' :
                       line.status === 'IDLE' ? 'text-slate-500' :
                       line.status === 'BREAKDOWN' ? 'text-rose-600' :
@@ -165,40 +165,40 @@ export default function LineSelectionPage() {
                       {line.status || 'IDLE'}
                     </span>
                   </div>
-                  <ArrowRight className="w-6 h-6 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
+                  <ArrowRight className="w-5 h-5 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0" />
                 </div>
 
                 <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-[100px] opacity-0 group-hover:opacity-40 transition-opacity duration-700" />
               </button>
             ))}
 
-            <div className="bg-slate-50 border border-dashed border-slate-200 p-10 rounded-[3rem] flex flex-col items-center justify-center text-center opacity-60">
-              <ShieldCheck className="w-12 h-12 text-slate-300 mb-4" />
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Additional units offline</p>
+            <div className="bg-slate-50 border border-dashed border-slate-200 p-6 sm:p-8 rounded-[2rem] sm:rounded-[3rem] flex flex-col items-center justify-center text-center opacity-60 h-[220px] sm:h-[260px] lg:h-[280px]">
+              <ShieldCheck className="w-10 h-10 text-slate-300 mb-3" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Additional units offline</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-12 animate-in slide-in-from-right-8 duration-500">
+          <div className="space-y-8 sm:space-y-12 animate-in slide-in-from-right-8 duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <button
                 onClick={() => setStep('line')}
-                className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-colors font-black uppercase tracking-widest text-[10px] group"
+                className="flex items-center gap-3 text-slate-400 hover:text-slate-900 transition-colors font-black uppercase tracking-widest text-[9px] sm:text-[10px] group"
               >
                 <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Line Selection
               </button>
 
-              <div className="flex items-center gap-3 bg-white border border-slate-200 p-3 px-5 rounded-[2rem] shadow-sm animate-in fade-in zoom-in-95 duration-300">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Focus:</span>
+              <div className="flex items-center gap-2.5 bg-white border border-slate-200 p-2 sm:p-3 px-4 sm:px-5 rounded-[2rem] shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Focus:</span>
                 <span className="text-xs font-black text-slate-900 uppercase tracking-tight font-mono">{selectedLine?.name}</span>
                 <span className={cn(
-                  "w-2 h-2 rounded-full",
+                  "w-1.5 h-1.5 rounded-full",
                   selectedLine?.status === 'RUNNING' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
                 )} />
-                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">{selectedLine?.status || 'IDLE'}</span>
+                <span className="text-[8px] sm:text-[9px] font-black uppercase text-slate-500 tracking-wider">{selectedLine?.status || 'IDLE'}</span>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {stations.map(station => {
                 const occupant = activeSessions?.find((s: any) => s.lineId === selectedLine.id && s.station === station.id);
                 const isMySession = occupant && occupant.userId === user?.id;
@@ -218,26 +218,26 @@ export default function LineSelectionPage() {
                     }}
                     disabled={startSessionMutation.isPending}
                     className={cn(
-                      "group p-6 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[280px] sm:h-[320px] lg:h-[340px] w-full",
+                      "group p-5 sm:p-6 lg:p-8 rounded-[2rem] sm:rounded-[3rem] border transition-all duration-300 text-left relative overflow-hidden flex flex-col justify-between h-[220px] sm:h-[260px] lg:h-[280px] w-full",
                       occupant
                         ? (isMySession ? 'bg-indigo-50 border-indigo-100' : 'bg-rose-50 border-rose-100')
-                        : 'bg-white border-slate-200 hover:border-indigo-300 hover:-translate-y-2'
+                        : 'bg-white border-slate-200 hover:border-indigo-300 hover:-translate-y-2 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5'
                     )}
                   >
                     <div className="relative z-10">
-                      <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-8 border", station.bg, station.border)}>
-                        <station.icon className={cn("w-8 h-8", station.color)} />
+                      <div className={cn("w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 transition-transform group-hover:scale-110 duration-500 border", station.bg, station.border)}>
+                        <station.icon className={cn("w-6 h-6 sm:w-8 sm:h-8", station.color)} />
                       </div>
-                      <h3 className="text-3xl font-black tracking-tighter uppercase text-slate-900 leading-none mb-3">{station.title}</h3>
+                      <h3 className="text-xl sm:text-2xl font-black tracking-tight uppercase text-slate-900 leading-none mb-1.5">{station.title}</h3>
                       {occupant ? (
                         <div className="flex items-center gap-2">
                           <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMySession ? "bg-indigo-500" : "bg-rose-500")} />
-                          <p className={cn("text-[9px] font-black uppercase tracking-widest", isMySession ? "text-indigo-600" : "text-rose-600")}>
+                          <p className={cn("text-[8px] sm:text-[9px] font-black uppercase tracking-widest", isMySession ? "text-indigo-600" : "text-rose-600")}>
                             {isMySession ? 'Your Active Session' : `Occupied: ${occupant.userName}`}
                           </p>
                         </div>
                       ) : (
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+                        <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
                           Initialize {station.title.toLowerCase()} process node
                         </p>
                       )}
@@ -247,14 +247,14 @@ export default function LineSelectionPage() {
                       {isStarting ? (
                         <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
                       ) : occupant ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", isMySession ? "bg-indigo-500" : "bg-rose-500")} />
-                          <span className={cn("text-[9px] font-black uppercase tracking-widest", isMySession ? "text-indigo-600" : "text-rose-600")}>
+                          <span className={cn("text-[8px] sm:text-[9px] font-black uppercase tracking-widest", isMySession ? "text-indigo-600" : "text-rose-600")}>
                             {isMySession ? 'Resume Session' : 'Force Takeover'}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[8px] sm:text-[9px] font-black text-indigo-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
                           Initialize Workspace
                         </span>
                       )}
