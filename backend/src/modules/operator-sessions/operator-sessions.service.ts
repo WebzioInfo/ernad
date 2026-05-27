@@ -32,12 +32,12 @@ export class OperatorSessionsService {
       throw new BadRequestException('Invalid User ID or Line ID format.');
     }
 
-    // Validate Line is active (RUNNING or CHANGEOVER)
+    // Validate Line status is permitted (IDLE, RUNNING, or CHANGEOVER)
     const [line] = await db.select({ status: productionLines.status }).from(productionLines).where(eq(productionLines.id, lineId)).limit(1);
     if (!line) {
       throw new BadRequestException('Production line not found.');
     }
-    if (line.status !== 'RUNNING' && line.status !== 'CHANGEOVER') {
+    if (line.status !== 'RUNNING' && line.status !== 'CHANGEOVER' && line.status !== 'IDLE') {
       throw new BadRequestException('Line is not active for operator session');
     }
 
@@ -152,9 +152,12 @@ export class OperatorSessionsService {
         }
       }
 
-      // 4. Bind to active batch (Global)
+      // 4. Bind to active batch (Line-specific)
       const [activeBatch] = await tx.select().from(productionBatches)
-        .where(or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER')))
+        .where(and(
+          eq(productionBatches.lineId, lineId),
+          or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER'))
+        ))
         .orderBy(desc(productionBatches.startTime))
         .limit(1);
 
