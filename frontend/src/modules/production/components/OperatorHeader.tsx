@@ -45,13 +45,18 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             <h1 className="text-xs sm:text-[15px] font-bold sm:font-semibold tracking-tight text-gray-900 leading-none">
               {lineName}
             </h1>
-            <p className="text-[9px] sm:text-[11px] font-bold sm:font-medium text-gray-500 tracking-wider uppercase mt-1 sm:mt-1.5">
-              {stationName}
+            <p className="text-[9px] sm:text-[11px] font-bold sm:font-medium text-gray-500 tracking-wider uppercase mt-1 sm:mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>{stationName}</span>
+              {batchCode && (
+                <span className="lg:hidden text-[8px] font-mono font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200/50 normal-case tracking-normal shrink-0">
+                  Batch: {batchCode}
+                </span>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="hidden sm:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           <div className="flex flex-col">
             <span className="text-[9px] sm:text-[10px] font-medium text-gray-400 uppercase tracking-wider leading-none mb-1 sm:mb-1.5">Active Batch</span>
             <div className="flex items-center gap-1.5 sm:gap-2.5">
@@ -82,7 +87,7 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 border-l border-gray-200/60 pl-2 sm:pl-5 ml-0.5 sm:ml-1">
-          <div className="text-right mr-1 sm:mr-2 hidden md:block">
+          <div className="text-right mr-1 sm:mr-2 hidden lg:block">
             <p className="text-xs sm:text-[13px] font-semibold text-gray-900 tracking-tight leading-none mb-1">{operatorName}</p>
             <p className="text-[9px] sm:text-[10px] font-medium text-gray-400 tracking-wider uppercase">Active Operator</p>
             {recentHandover && (
