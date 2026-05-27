@@ -229,16 +229,54 @@ export class OperatorSessionsService {
     }
 
     // Get the current active session
-    const [activeSession] = await db.select().from(operatorSessions)
+    let [activeSession] = await db.select().from(operatorSessions)
       .where(and(
         eq(operatorSessions.userId, userId),
         eq(operatorSessions.isActive, true)
       ))
       .limit(1);
 
+    // STRUCTURED LOGGING FOR TROUBLESHOOTING
+    this.logger.log(
+      `[CHANGE_STATION_REQ] operatorId: ${userId}, ` +
+      `currentSessionId: ${activeSession?.id || 'none'}, ` +
+      `currentStation: ${activeSession?.station || 'none'}, ` +
+      `requestedStation: ${newStation}, ` +
+      `lineId: ${activeSession?.lineId || 'none'}`
+    );
+
     if (!activeSession) {
-      throw new BadRequestException('No active session found to change station.');
+      this.logger.warn(`[CHANGE_STATION_FAIL] No active session found for operator ${userId}. Attempting auto-healing...`);
+      
+      const [lastSession] = await db.select().from(operatorSessions)
+        .where(eq(operatorSessions.userId, userId))
+        .orderBy(desc(operatorSessions.startTime))
+        .limit(1);
+
+      this.logger.log(
+        `[CHANGE_STATION_HEAL_LOOKUP] matched_rows: ${lastSession ? 1 : 0}, ` +
+        `lastSessionId: ${lastSession?.id || 'none'}, ` +
+        `rejection_reason: ${lastSession ? 'none' : 'No prior session history found for operator'}`
+      );
+
+      if (!lastSession) {
+        throw new BadRequestException('No active session found to change station.');
+      }
+
+      this.logger.log(`[CHANGE_STATION_HEAL] Healing session by starting new session on line ${lastSession.lineId}, station ${newStation}`);
+      
+      activeSession = await this.startSession(
+        userId,
+        lastSession.lineId,
+        newStation,
+        lastSession.shiftId || undefined,
+        true
+      );
+
+      return activeSession;
     }
+
+    this.logger.log(`[CHANGE_STATION_SUCCESS] Session ${activeSession.id} found active. Updating station to ${newStation}`);
 
     // Check if the user is changing to the station they are already on
     if (activeSession.station === newStation) {

@@ -127,19 +127,18 @@ export class ProcessingService {
       }
 
       let sessionId = dto.sessionId;
-      if (!sessionId) {
-        const [activeSession] = await tx.select({ id: operatorSessions.id })
-          .from(operatorSessions)
-          .where(and(
-            eq(operatorSessions.userId, userId),
-            eq(operatorSessions.lineId, dto.lineId),
-            eq(operatorSessions.station, dto.station),
-            eq(operatorSessions.isActive, true)
-          ))
-          .limit(1);
-        if (activeSession) {
-          sessionId = activeSession.id;
-        }
+      const [activeSession] = await tx.select({ id: operatorSessions.id })
+        .from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.userId, userId),
+          eq(operatorSessions.lineId, dto.lineId),
+          eq(operatorSessions.station, dto.station),
+          eq(operatorSessions.isActive, true)
+        ))
+        .limit(1);
+
+      if (activeSession) {
+        sessionId = activeSession.id;
       }
 
       const wastageCount = Number(dto.wastageCount || 0);

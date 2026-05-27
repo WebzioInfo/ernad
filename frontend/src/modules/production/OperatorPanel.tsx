@@ -151,8 +151,21 @@ export default function OperatorPanel() {
 
   const changeStationMutation = useMutation({
     mutationFn: (station: string) => api.post(ENDPOINTS.OPERATOR_SESSIONS.CHANGE_STATION, { station }),
-    onSuccess: (_, newStation) => {
+    onSuccess: (response: any, newStation) => {
       setShowStationModal(false);
+      const sessionData = response.data || response;
+      if (sessionData && sessionData.id) {
+        const authStore = useAuthStore.getState();
+        if (authStore.user) {
+          authStore.setAuth(authStore.token || '', {
+            ...authStore.user,
+            sessionId: sessionData.id
+          });
+        }
+        if (activeOperator) {
+          setActiveOperator((prev: any) => prev ? { ...prev, sessionId: sessionData.id } : null);
+        }
+      }
       navigate(`/operator/workspace/${lineId}/${newStation.toLowerCase()}`, { replace: true });
       toast.success(`Station switched to ${newStation}`);
     },
