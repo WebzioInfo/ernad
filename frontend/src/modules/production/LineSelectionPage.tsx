@@ -104,7 +104,7 @@ export default function LineSelectionPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-10 pb-8 px-6 sm:pt-16 sm:pb-12 sm:px-12 md:pt-20 md:pb-16 md:px-16 lg:pt-28 lg:pb-20 lg:px-20 font-sans relative overflow-hidden">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-16 pb-8 px-6 sm:pt-24 sm:pb-12 sm:px-12 md:pt-28 md:pb-16 md:px-16 lg:pt-36 lg:pb-20 lg:px-20 font-sans relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.05]"
         style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
