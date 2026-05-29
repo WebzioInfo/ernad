@@ -7,6 +7,7 @@ export * from './archive';
 // export * from './sessions';
 export * from './inventory';
 export * from './notes';
+export * from './incidents';
 
 export * from './sales';
 

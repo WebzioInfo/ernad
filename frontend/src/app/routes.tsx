@@ -14,6 +14,7 @@ const OperatorPanel = lazy(() => import('../modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('../modules/production/LineSelectionPage'));
 const StationSelectionPage = lazy(() => import('../modules/production/StationSelectionPage'));
 const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
+const IncidentsDashboard = lazy(() => import('../modules/incidents/pages/IncidentsDashboard'));
 
 
 
@@ -120,6 +121,7 @@ export function AppRoutes() {
           <Route path="select" element={<LineSelectionPage />} />
           <Route path="select/:id" element={<StationSelectionPage />} />
           <Route path="workspace/:id/:station" element={<OperatorPanel />} />
+          <Route path="incidents" element={<IncidentsDashboard />} />
         </Route>
 
         {/* 4. SHARED TERMINAL (Public/Kiosk Access) */}

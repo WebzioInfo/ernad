@@ -657,6 +657,13 @@ export default function OperatorPanel() {
               {currentStation.id === 'BLOWING' ? 'Blowing History' : `${currentStation.title.replace(' Station', '')} History`}
             </button>
             <button
+              onClick={() => navigate(`/operator/incidents?lineId=${lineId || ''}&stationId=${currentStation.id}&report=1`)}
+              className="px-5 py-3 bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-700 active:scale-95 transition-all shadow-lg shadow-rose-950/15 flex items-center gap-2 cursor-pointer animate-in fade-in"
+            >
+              <AlertTriangle size={14} />
+              Report Issue
+            </button>
+            <button
               onClick={() => {
                 if (!activeBatch?.batch) {
                   setLineControlTab('START');

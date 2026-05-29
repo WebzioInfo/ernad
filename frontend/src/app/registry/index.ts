@@ -6,12 +6,14 @@ import { inventoryConfig } from '../../modules/inventory/module.config';
 import { notesConfig } from '../../modules/notes/module.config';
 import { settingsConfig } from '../../modules/settings/module.config';
 import { reportsConfig } from '../../modules/reports/module.config';
+import { incidentsConfig } from '../../modules/incidents/module.config';
 
 export const registerModules = () => {
   moduleRegistry.register(analyticsConfig);
   
   moduleRegistry.register(personnelConfig);
   moduleRegistry.register(productionConfig);
+  moduleRegistry.register(incidentsConfig);
   moduleRegistry.register(inventoryConfig);
   moduleRegistry.register(notesConfig);
   moduleRegistry.register(settingsConfig);

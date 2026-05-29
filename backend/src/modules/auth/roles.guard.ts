@@ -88,7 +88,10 @@ export class RolesGuard implements CanActivate {
             'attendance:view',
             'settings:view',
             'users:view',
-            'notifications:view'
+            'notifications:view',
+            'incidents:view',
+            'incidents:create',
+            'incidents:update'
           ];
           if (managerPermissions.includes(p)) {
             return true;
@@ -101,7 +104,10 @@ export class RolesGuard implements CanActivate {
             'telemetry:log',
             'production:start',
             'production:close',
-            'settings:view'
+            'settings:view',
+            'incidents:view',
+            'incidents:create',
+            'incidents:update'
           ];
           if (operatorPermissions.includes(p)) {
             return true;

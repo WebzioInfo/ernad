@@ -50,6 +50,18 @@ export const ENDPOINTS = {
     LOGS_REJECT: 'production/logs/:id/reject',
     LOGS_CORRECT: 'production/logs/:id/correct',
   },
+  INCIDENTS: {
+    LIST: 'incidents',
+    GET: (id: string) => `incidents/${id}`,
+    CREATE: 'incidents',
+    UPDATE: (id: string) => `incidents/${id}`,
+    STATUS: (id: string) => `incidents/${id}/status`,
+    COMMENTS: (id: string) => `incidents/${id}/comments`,
+    ATTACHMENTS: (id: string) => `incidents/${id}/attachments`,
+    TYPES: 'incidents/types',
+    CREATE_TYPE: 'incidents/types',
+    ANALYTICS: 'incidents/analytics',
+  },
   TELEMETRY: {
     LOGS: 'telemetry/logs',
     OPERATOR_LOGS: 'telemetry/logs',

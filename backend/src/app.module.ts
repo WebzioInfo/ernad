@@ -29,6 +29,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { OperatorSessionsModule } from './modules/operator-sessions/operator-sessions.module';
 import { SystemModule } from './modules/system/system.module';
 import { NotesModule } from './modules/notes/notes.module';
+import { IncidentsModule } from './modules/incidents/incidents.module';
 
 import { AppController } from './app.controller';
 
@@ -54,6 +55,7 @@ import { AppController } from './app.controller';
     OperatorSessionsModule,
     SystemModule,
     NotesModule,
+    IncidentsModule,
 
     ReportsModule,
     SalesModule,
