@@ -110,8 +110,6 @@ export default function OperatorPanel() {
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
   const [selectedBottleConfig, setSelectedBottleConfig] = useState<string>('');
-  const [justSubmitted, setJustSubmitted] = useState(false);
-
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
 
   const [eventType] = useState('NORMAL_PRODUCTION');
@@ -399,14 +397,16 @@ export default function OperatorPanel() {
     }
   };
 
+  const historyQueryKey = ['station-log-history', activeBatch?.batch?.id, currentStation.id] as const;
+
   const { data: history, refetch: refetchHistory, isFetching: isFetchingHistory } = useQuery({
-    queryKey: ['station-log-history', activeBatch?.batch?.id, currentStation.id],
+    queryKey: historyQueryKey,
     queryFn: async () => {
       if (!activeBatch?.batch?.id) return [];
       return (await api.get(`${ENDPOINTS.TELEMETRY.HISTORY(activeBatch.batch.id, currentStation.id)}?operatorView=true`)).data;
     },
     enabled: !!activeBatch?.batch?.id,
-    refetchInterval: 5000,
+    staleTime: 30000,
   });
 
   useEffect(() => {
@@ -420,26 +420,6 @@ export default function OperatorPanel() {
       setLoading(false);
     }
   }, [isLoadingBatch]);
-
-  // Automatically trigger refetch of history when submission finishes
-  useEffect(() => {
-    if (justSubmitted && activeBatch?.batch?.id) {
-      let count = 0;
-      const interval = setInterval(() => {
-        refetchHistory();
-        queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
-        queryClient.invalidateQueries({ queryKey: ['active-batch'] });
-        
-        count++;
-        if (count >= 5) {
-          clearInterval(interval);
-          setJustSubmitted(false);
-        }
-      }, 1000); // Poll every 1 second for 5 seconds to ensure async queue completes
-      
-      return () => clearInterval(interval);
-    }
-  }, [justSubmitted, activeBatch?.batch?.id, refetchHistory, queryClient]);
 
   // Enforce Formula: Used = Production + Wastage
   useEffect(() => {
@@ -557,10 +537,42 @@ export default function OperatorPanel() {
 
     try {
       setIsSubmitting(true);
-      await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
-      toast.success('Log Successfully Transmitted');
-      setJustSubmitted(true);
+      const response = await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
+      const committedLog = response.data?.log;
+      const rawMaterialName = currentStation.id === 'BLOWING'
+        ? rawMaterials?.find((material: any) => material.id === selectedRawMaterialId)?.name
+        : selectedCapRawMaterial?.name;
 
+      queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
+        const newHistoryEntry = {
+          id: `prod_log_${committedLog?.id || logEntry.requestId}`,
+          primaryCount: committedLog?.primaryCount ?? logEntry.primaryCount,
+          wastageCount: committedLog?.wastageCount ?? logEntry.wastageCount,
+          bottleLeakage: committedLog?.bottleLeakage ?? logEntry.bottleLeakage,
+          capWastage: committedLog?.capWastage ?? logEntry.capWastage,
+          eventType: committedLog?.eventType ?? logEntry.eventType,
+          secondaryPackagingCount: committedLog?.secondaryPackagingCount ?? logEntry.secondaryPackagingCount,
+          remarks: committedLog?.remarks ?? logEntry.remarks,
+          loggedAt: committedLog?.loggedAt ?? logEntry.loggedAt,
+          userName: activeOperator?.name || user?.name || 'Operator',
+          source: ['MACHINE_BREAKDOWN', 'POWER_FAILURE', 'LOW_SPEED'].includes(logEntry.eventType) ? 'MACHINE' : 'OPERATOR',
+          station: committedLog?.station ?? logEntry.station,
+          rawMaterialId: committedLog?.rawMaterialId ?? logEntry.rawMaterialId,
+          rawMaterialName,
+          bagsUsed: committedLog?.bagsUsed ?? logEntry.bagsUsed,
+          preformUsage: committedLog?.preformUsage ?? logEntry.preformUsage,
+          capUsage: committedLog?.capUsage ?? logEntry.capUsage,
+          capBoxUsage: committedLog?.capBoxUsage ?? logEntry.capBoxUsage,
+          bopRollUsage: committedLog?.bopRollUsage ?? logEntry.bopRollUsage,
+          shrinkWasteWeight: committedLog?.shrinkWasteWeight ?? logEntry.shrinkWasteWeight,
+          sourceBatchNumber: committedLog?.sourceBatchNumber ?? logEntry.sourceBatchNumber,
+        };
+
+        const withoutDuplicate = previous.filter((entry: any) => entry.id !== newHistoryEntry.id);
+        return [newHistoryEntry, ...withoutDuplicate].slice(0, 50);
+      });
+
+      toast.success('Log Successfully Transmitted');
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
