@@ -19,6 +19,11 @@ export const productionConfig: ModuleConfig = {
       allowedRoles: ['ADMIN', 'MANAGER']
     },
     {
+      path: 'batch-logs/:batchId',
+      element: lazy(() => import('./BatchLogsPage')),
+      allowedRoles: ['ADMIN', 'MANAGER']
+    },
+    {
       path: 'forensics/:batchId',
       element: lazy(() => import('./BatchForensicsDashboard')),
       allowedRoles: ['ADMIN', 'MANAGER']

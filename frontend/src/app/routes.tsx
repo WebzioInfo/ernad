@@ -16,6 +16,7 @@ const StationSelectionPage = lazy(() => import('../modules/production/StationSel
 const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
 
 
+
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
 
@@ -89,7 +90,6 @@ export function AppRoutes() {
         >
           <Route index element={<Navigate to="/manager/overview" replace />} />
           {renderRoutes(dynamicRoutes)}
-
           {/* Static / Compatibility Routes (Coming Soon) */}
           {/* 
           <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />

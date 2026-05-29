@@ -7,7 +7,7 @@ import { Logger } from '@nestjs/common';
 @Injectable()
 export class RolesGuard implements CanActivate {
   private readonly logger = new Logger('RolesGuard');
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const isPublic = this.reflector.getAllAndOverride<boolean>('isPublic', [
@@ -30,7 +30,7 @@ export class RolesGuard implements CanActivate {
     ]);
 
     const request = context.switchToHttp().getRequest();
-    
+
     // STRICT BYPASS for preflight requests
     if (request.method === 'OPTIONS') {
       return true;
@@ -52,12 +52,12 @@ export class RolesGuard implements CanActivate {
       return 'OPERATOR'; // Fallback
     });
     const userPermissions = user.permissions || [];
-    
+
     this.logger.debug(`[RolesGuard] Path: ${request.method} ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)} | Required: ${JSON.stringify(requiredPermissions)}`);
 
     // ── Role Check (Strict Exact Match) ──
     if (requiredRoles && requiredRoles.length > 0) {
-      const rolePassed = requiredRoles.some(reqRole => 
+      const rolePassed = requiredRoles.some(reqRole =>
         userRoles.includes(reqRole.toUpperCase())
       );
       if (!rolePassed) {
@@ -76,17 +76,19 @@ export class RolesGuard implements CanActivate {
 
         if (userRoles.includes('MANAGER')) {
           const managerPermissions = [
-            'analytics:view', 
-            'reports:view', 
-            'inventory:view', 
+            'analytics:view',
+            'reports:view',
+            'inventory:view',
             'inventory:edit',
-            'telemetry:log', 
-            'production:start', 
+            'telemetry:log',
+            'production:start',
             'production:close',
             'forensics:view',
             'forensics:edit',
             'attendance:view',
-            'settings:view'
+            'settings:view',
+            'users:view',
+            'notifications:view'
           ];
           if (managerPermissions.includes(p)) {
             return true;
@@ -105,7 +107,7 @@ export class RolesGuard implements CanActivate {
             return true;
           }
         }
-        
+
         return userPermissions.includes(p);
       });
 

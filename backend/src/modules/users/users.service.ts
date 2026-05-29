@@ -62,7 +62,8 @@ export class UsersService {
     if (isAdmin) {
       hiddenRoleSlugs = [];
     } else if (isManager) {
-      hiddenRoleSlugs = [...UsersService.PRIVILEGED_ROLES];
+      // MANAGER: Must ONLY see OPERATORs. Exclude both ADMIN and MANAGER roles.
+      hiddenRoleSlugs = ['admin', 'manager', 'ADMIN', 'MANAGER'];
     } else {
       // OPERATOR or other roles: only see themselves
       isSelfOnly = true;
@@ -77,13 +78,16 @@ export class UsersService {
 
     if (hiddenRoleSlugs.length > 0) {
       // Exclude users who have ANY of the hidden roles
-      const privilegedSubquery = db
+      const privilegedUserRoles = await db
         .select({ userId: userRoles.userId })
         .from(userRoles)
         .innerJoin(roles, eq(roles.id, userRoles.roleId))
         .where(inArray(roles.slug, hiddenRoleSlugs));
 
-      conditions.push(notInArray(users.id, privilegedSubquery));
+      const privilegedUserIds = privilegedUserRoles.map(pur => pur.userId);
+      if (privilegedUserIds.length > 0) {
+        conditions.push(notInArray(users.id, privilegedUserIds));
+      }
     }
 
     // Apply Search
@@ -114,7 +118,7 @@ export class UsersService {
         .select({ userId: userRoles.userId })
         .from(userRoles)
         .innerJoin(roles, eq(roles.id, userRoles.roleId))
-        .where(eq(roles.slug, role.toUpperCase()));
+        .where(ilike(roles.slug, role));
       
       conditions.push(inArray(users.id, roleSubquery));
     }
@@ -146,23 +150,55 @@ export class UsersService {
       .limit(limit)
       .offset(offset);
 
-    // 4. Attach roles and lines
-    const usersWithData = await Promise.all(rows.map(async (user) => {
-      const userRolesResult = await db.select({ slug: roles.slug })
+    // 4. Attach roles and lines in bulk queries (avoiding N+1 roundtrips)
+    let usersWithData = rows.map(user => ({
+      ...user,
+      roles: [] as string[],
+      assignedLines: [] as string[]
+    }));
+
+    if (rows.length > 0) {
+      const userIds = rows.map(u => u.id);
+
+      // Fetch all roles for all fetched users in a single query
+      const allUserRoles = await db
+        .select({
+          userId: userRoles.userId,
+          slug: roles.slug
+        })
         .from(roles)
         .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
-        .where(eq(userRoles.userId, user.id));
+        .where(inArray(userRoles.userId, userIds));
 
-      const userLinesResult = await db.select({ lineId: userLines.lineId })
+      // Fetch all assigned lines for all fetched users in a single query
+      const allUserLines = await db
+        .select({
+          userId: userLines.userId,
+          lineId: userLines.lineId
+        })
         .from(userLines)
-        .where(eq(userLines.userId, user.id));
+        .where(inArray(userLines.userId, userIds));
 
-      return {
+      // Group roles by userId
+      const rolesByUserId = allUserRoles.reduce((acc, curr) => {
+        if (!acc[curr.userId]) acc[curr.userId] = [];
+        acc[curr.userId].push(curr.slug);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // Group lines by userId
+      const linesByUserId = allUserLines.reduce((acc, curr) => {
+        if (!acc[curr.userId]) acc[curr.userId] = [];
+        acc[curr.userId].push(curr.lineId);
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      usersWithData = rows.map((user) => ({
         ...user,
-        roles: userRolesResult.map(r => r.slug),
-        assignedLines: userLinesResult.map(l => l.lineId),
-      };
-    }));
+        roles: rolesByUserId[user.id] || [],
+        assignedLines: linesByUserId[user.id] || [],
+      }));
+    }
 
     return {
       data: usersWithData,

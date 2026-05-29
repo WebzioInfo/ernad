@@ -84,7 +84,7 @@ const ManagerDashboard = memo(() => {
               <ActionTile icon={ShieldCheck} label="Quality Control" path={`${roleBase}/quality`} color="rose" />
               */}
               <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
-              <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/users`} color="cyan" />
+              <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/${user?.role?.toLowerCase() === 'manager' ? 'operators' : 'users'}`} color="cyan" />
             </div>
           </section>
 

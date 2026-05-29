@@ -14,7 +14,7 @@ export const personnelConfig: ModuleConfig = {
       allowedRoles: ['ADMIN']
     },
     {
-      path: 'staffs',
+      path: 'operators',
       element: lazy(() => import('./StaffDirectoryPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
     },
@@ -37,10 +37,10 @@ export const personnelConfig: ModuleConfig = {
           allowedRoles: ['ADMIN']
         },
         {
-          id: 'staffs',
+          id: 'operators',
           label: 'Operators',
           icon: UserCog,
-          path: '/staffs',
+          path: '/operators',
           allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]

@@ -410,6 +410,7 @@ export default function UserManagementPage() {
             setDeleteConfirmation({ isOpen: true, userId: viewingUser.id, userName: viewingUser.name });
             setViewingUser(null);
           }}
+          isAdmin={isAdmin}
         />
       )}
 
@@ -426,7 +427,7 @@ export default function UserManagementPage() {
   );
 }
 
-function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void }) {
+function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAdmin }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void, isAdmin: boolean }) {
   const { data: logs } = useQuery({
     queryKey: ['user-audit-logs', user.id],
     queryFn: async () => (await api.get(ENDPOINTS.USERS.USER_AUDIT_LOGS(user.id))).data,
@@ -531,42 +532,46 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete }: { 
           </div>
 
           {/* Modify Actions */}
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onToggleActive}
-              className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
-                user.isActive
-                  ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
-              }`}
-            >
-              {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-              {user.isActive ? 'Suspend User' : 'Restore User'}
-            </button>
-            <button
-              onClick={onEdit}
-              className="flex-1 h-9 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-colors flex items-center justify-center gap-1 shadow-sm"
-            >
-              <Edit2 className="w-3.5 h-3.5" /> Modify Profile
-            </button>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="pt-3 border-t border-slate-100">
-            <div className="flex items-center justify-between bg-rose-50/20 p-3 rounded-lg border border-rose-100/50">
-              <div className="text-left">
-                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Danger Zone</p>
-                <p className="text-[11px] text-slate-500 font-medium">Permanently delete user profile.</p>
-              </div>
+          {isAdmin && (
+            <div className="flex gap-3 pt-2">
               <button
-                onClick={onDelete}
-                className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-rose-200 flex items-center gap-1"
+                onClick={onToggleActive}
+                className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
+                  user.isActive
+                    ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                }`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                Delete Account
+                {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                {user.isActive ? 'Suspend User' : 'Restore User'}
+              </button>
+              <button
+                onClick={onEdit}
+                className="flex-1 h-9 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-colors flex items-center justify-center gap-1 shadow-sm"
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Modify Profile
               </button>
             </div>
-          </div>
+          )}
+
+          {/* Danger Zone */}
+          {isAdmin && (
+            <div className="pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between bg-rose-50/20 p-3 rounded-lg border border-rose-100/50">
+                <div className="text-left">
+                  <p className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">Danger Zone</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Permanently delete user profile.</p>
+                </div>
+                <button
+                  onClick={onDelete}
+                  className="bg-white hover:bg-rose-600 text-rose-600 hover:text-white px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider transition-all border border-rose-200 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Account
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

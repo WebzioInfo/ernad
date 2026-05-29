@@ -53,7 +53,7 @@ export class UsersController {
    * Admin only — Get system audit logs
    */
   @Get('audit-logs')
-  @Permissions('users:manage')
+  @Permissions('users:view')
   @ApiOperation({ summary: 'Get system audit logs (Admin only)' })
   getAuditLogs(@Req() req: any) {
     const roles = req.user?.roles || [];

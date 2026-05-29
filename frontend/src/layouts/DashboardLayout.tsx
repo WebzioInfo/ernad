@@ -110,7 +110,13 @@ export default function DashboardLayout() {
 
   const getModulePath = (path: string) => {
     // Only /line or /operator (operator workflows) should stay top-level/external
-    if (path.startsWith('/line') || path.startsWith('/operator')) return path;
+    const isTopLevelWorkflow =
+      path === '/line' ||
+      path.startsWith('/line/') ||
+      path === '/operator' ||
+      path.startsWith('/operator/');
+
+    if (isTopLevelWorkflow) return path;
     
     const userRole = String(user?.role || '').toUpperCase();
     const base = (userRole === 'MANAGER') ? '/manager' : '/admin';

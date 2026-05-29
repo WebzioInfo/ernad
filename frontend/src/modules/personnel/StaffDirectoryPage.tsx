@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
-import { 
-  Users, Search, Filter, Mail, 
+import {
+  Users, Search, Filter, Mail,
   ShieldCheck, Loader2, MoreHorizontal
 } from 'lucide-react';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -12,6 +12,7 @@ interface Staff {
   name: string;
   email: string;
   role: string;
+  roles?: string[];
   jobTitle: string;
   department: string;
   status: 'ACTIVE' | 'INACTIVE';
@@ -20,19 +21,30 @@ interface Staff {
 
 export default function StaffDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const { data: staffData, isLoading } = useQuery({
     queryKey: ['staff-directory', searchTerm],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
+      params.append('role', 'OPERATOR');
+      params.append('isActive', 'true');
       return (await api.get(`${ENDPOINTS.USERS.LIST}?${params.toString()}`)).data;
     }
   });
 
-  const staff = (staffData?.data || []) as Staff[];
+  const staffRows = Array.isArray(staffData) ? staffData : (staffData?.data || []);
 
-  const filteredStaff = staff; // Already filtered by backend
+  const staff = (staffRows as any[]).map(person => ({
+    ...person,
+    status: person.isActive ? 'ACTIVE' : 'INACTIVE',
+  })) as Staff[];
+
+  const filteredStaff = staff.filter(person => {
+    const rolesList = person.roles || (person.role ? [person.role] : []);
+    const normalizedRoles = rolesList.map(role => String(role).toUpperCase().trim());
+    return normalizedRoles.includes('OPERATOR') && person.status === 'ACTIVE';
+  });
 
   if (isLoading) {
     return (
@@ -80,8 +92,8 @@ export default function StaffDirectoryPage() {
 
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by operator name, email, title..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -115,7 +127,10 @@ export default function StaffDirectoryPage() {
               {filteredStaff?.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-6 py-10 text-center text-slate-400">
-                    No operator accounts found matching "{searchTerm}"
+                    {searchTerm
+                      ? `No operator accounts found matching "${searchTerm}"`
+                      : "No operators found. Create an operator account to assign production lines."
+                    }
                   </td>
                 </tr>
               )}
@@ -125,14 +140,13 @@ export default function StaffDirectoryPage() {
                   <td className="px-6 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg overflow-hidden border border-slate-200 shrink-0 relative group-hover:scale-105 transition-transform duration-300">
-                        <img 
-                          src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=1A9A91&color=fff&bold=true`} 
+                        <img
+                          src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=1A9A91&color=fff&bold=true`}
                           alt={person.name}
                           className="w-full h-full object-cover"
                         />
-                        <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${
-                          person.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'
-                        }`} />
+                        <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white shadow-sm ${person.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`} />
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-800 leading-tight group-hover:text-[#1A9A91] transition-colors">{person.name}</h3>
@@ -152,7 +166,9 @@ export default function StaffDirectoryPage() {
                         <ShieldCheck className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-slate-700 uppercase tracking-tight">{person.role}</p>
+                        <p className="text-xs font-semibold text-slate-700 uppercase tracking-tight">
+                          {person.roles?.join(', ') || person.role}
+                        </p>
                         <p className="text-[10px] text-slate-400 font-medium">Factory Protocol Access</p>
                       </div>
                     </div>
@@ -174,14 +190,13 @@ export default function StaffDirectoryPage() {
                   {/* Status & Actions */}
                   <td className="px-6 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                        person.status === 'ACTIVE' 
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
-                          : 'bg-slate-55 bg-slate-100 text-slate-400 border border-slate-200'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${person.status === 'ACTIVE'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                        : 'bg-slate-55 bg-slate-100 text-slate-400 border border-slate-200'
+                        }`}>
                         {person.status}
                       </span>
-                      
+
                       <button className="p-1 text-slate-400 hover:text-slate-650 hover:bg-slate-100 rounded transition-all">
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
@@ -198,21 +213,23 @@ export default function StaffDirectoryPage() {
       <div className="md:hidden grid grid-cols-1 gap-4">
         {filteredStaff?.length === 0 && (
           <div className="text-center py-10 text-slate-400 text-sm">
-            No operator accounts found.
+            {searchTerm
+              ? `No operator accounts found matching "${searchTerm}"`
+              : "No operators found. Create an operator account to assign production lines."
+            }
           </div>
         )}
         {filteredStaff?.map((person) => (
           <div key={person.id} className="bg-white border border-slate-200 rounded-lg p-4 hover:border-slate-350 transition-all relative">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shrink-0 relative">
-                <img 
-                  src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=1A9A91&color=fff&bold=true`} 
+                <img
+                  src={person.avatarUrl || `https://ui-avatars.com/api/?name=${person.name}&background=1A9A91&color=fff&bold=true`}
                   alt={person.name}
                   className="w-full h-full object-cover"
                 />
-                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                  person.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'
-                }`} />
+                <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${person.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`} />
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-slate-800 truncate">{person.name}</h3>
@@ -222,15 +239,16 @@ export default function StaffDirectoryPage() {
                     {person.jobTitle || 'Operator'}
                   </span>
                   <span className="text-xs text-slate-300">•</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight">{person.role}</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight">
+                    {person.roles?.join(', ') || person.role}
+                  </span>
                 </div>
               </div>
               <div className="text-right shrink-0">
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                  person.status === 'ACTIVE' 
-                    ? 'bg-emerald-50 text-emerald-700' 
-                    : 'bg-slate-100 text-slate-400'
-                }`}>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase ${person.status === 'ACTIVE'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-slate-100 text-slate-400'
+                  }`}>
                   {person.status}
                 </span>
               </div>
