@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Wind, PackageOpen, Zap, Box, 
   ArrowLeft, Loader2, Activity,
-  ChevronRight, Shield
+  ChevronRight, Shield, AlertTriangle
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -127,14 +127,23 @@ export default function StationSelectionPage() {
             </p>
           </motion.div>
 
-          <div className="flex items-center gap-4 bg-white border border-slate-200 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-sm backdrop-blur-xl self-start sm:self-auto">
-             <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl sm:rounded-2xl flex items-center justify-center">
-                <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
-             </div>
-             <div className="pr-4 sm:pr-6">
-                <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Line Status</p>
-                <p className="text-xs sm:text-sm font-black text-emerald-600 uppercase tracking-tight">{currentLine?.status || 'ONLINE'}</p>
-             </div>
+          <div className="flex items-center gap-4 sm:gap-6 self-start sm:self-auto">
+            <button
+              onClick={() => navigate(`/operator/incidents?lineId=${lineId || ''}&report=1`)}
+              className="px-4 py-3 bg-rose-600 text-white rounded-[1.5rem] text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-rose-700 active:scale-95 transition-all shadow-lg shadow-rose-950/15 flex items-center gap-2"
+            >
+              <AlertTriangle size={16} />
+              Report Issue
+            </button>
+            <div className="flex items-center gap-4 bg-white border border-slate-200 p-3 sm:p-4 rounded-2xl sm:rounded-3xl shadow-sm backdrop-blur-xl">
+               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-50 rounded-xl sm:rounded-2xl flex items-center justify-center">
+                  <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
+               </div>
+               <div className="pr-4 sm:pr-6">
+                  <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Line Status</p>
+                  <p className="text-xs sm:text-sm font-black text-emerald-600 uppercase tracking-tight">{currentLine?.status || 'ONLINE'}</p>
+               </div>
+            </div>
           </div>
         </header>
 

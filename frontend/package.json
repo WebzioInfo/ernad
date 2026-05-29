@@ -19,6 +19,8 @@
     "dexie": "^4.4.2",
     "dexie-react-hooks": "^4.4.0",
     "framer-motion": "^12.38.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.344.0",
     "pusher-js": "^8.5.0",
     "radix-ui": "^1.4.3",

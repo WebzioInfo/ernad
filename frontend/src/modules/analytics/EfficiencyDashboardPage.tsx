@@ -27,7 +27,7 @@ export default function EfficiencyDashboardPage() {
       });
       return res.data;
     },
-    enabled: !!filters.lineId && filters.lineId !== 'all' && isLive,
+    enabled: !!filters.lineId && isLive,
     refetchInterval: 5000
   });
 
@@ -54,7 +54,7 @@ export default function EfficiencyDashboardPage() {
       });
       return res.data;
     },
-    enabled: !!filters.lineId && filters.lineId !== 'all' && !isLive
+    enabled: !!filters.lineId && !isLive
   });
 
   const { data: historicalTrend } = useQuery({
@@ -73,7 +73,7 @@ export default function EfficiencyDashboardPage() {
         val: Number(d.totalProduction)
       }));
     },
-    enabled: !!filters.lineId && filters.lineId !== 'all' && !isLive
+    enabled: !!filters.lineId && !isLive
   });
 
   if (isLoading) return <div className="h-96 flex items-center justify-center text-slate-400">Synchronizing factory telemetry...</div>;

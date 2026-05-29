@@ -8,7 +8,7 @@ export const noteTypeEnum = pgEnum('note_type', [
   'GENERAL',
   'PRODUCTION',
   'MAINTENANCE',
-  'QUALITY',
+
   'SHIFT_HANDOVER',
   'INCIDENT',
   'BREAKDOWN',

@@ -178,6 +178,7 @@ const ManagerDashboard = memo(() => {
                   type="DOWNTIME"
                   title={`Stop: ${stop.reason?.replace('_', ' ')}`}
                   sub={`${stop.line} • ${stop.station}`}
+                  onClick={() => navigate(`${roleBase}/production`)}
                 />
               ))}
 
@@ -187,6 +188,7 @@ const ManagerDashboard = memo(() => {
                   type="STOCK"
                   title={`Low Stock: ${item.itemName}`}
                   sub={`${item.quantity} ${item.unit} left`}
+                  onClick={() => navigate(`${roleBase}/raw-materials`)}
                 />
               ))}
             </div>
@@ -341,8 +343,8 @@ const PipelineCard = ({ batch, machines, i, machineError, isLoading }: any) => {
   );
 };
 
-const AlertItem = ({ type, title, sub }: any) => (
-  <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-50 rounded-2xl hover:bg-white hover:border-slate-200 transition-all group cursor-pointer">
+const AlertItem = ({ type, title, sub, onClick }: any) => (
+  <div onClick={onClick} className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-50 rounded-2xl hover:bg-white hover:border-slate-200 transition-all group cursor-pointer">
     <div className={cn(
       "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
       type === 'DOWNTIME' ? "bg-rose-500 text-white" : "bg-amber-500 text-white"

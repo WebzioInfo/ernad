@@ -118,13 +118,6 @@ export function useReopenBatch() {
   });
 }
 
-export function useSubmitQualityCheck() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ProductionService.submitQualityCheck,
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.BATCHES }),
-  });
-}
 
 export function useInitiateChangeover() {
   const qc = useQueryClient();

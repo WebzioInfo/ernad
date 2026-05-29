@@ -9,12 +9,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrand, setSelectedBrand] = useState<string>('All');
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -67,9 +69,7 @@ export default function ProductsPage() {
   });
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      deleteProductMutation.mutate(id);
-    }
+    setProductToDelete(id);
   };
 
   const filteredProducts = products?.filter((p: any) => {
@@ -256,6 +256,21 @@ export default function ProductsPage() {
           isPending={createProductMutation.isPending || updateProductMutation.isPending}
         />
       )}
+      
+      <ConfirmationModal
+        isOpen={!!productToDelete}
+        onClose={() => setProductToDelete(null)}
+        onConfirm={() => {
+          if (productToDelete) {
+            deleteProductMutation.mutate(productToDelete);
+            setProductToDelete(null);
+          }
+        }}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+        variant="danger"
+        confirmText="Yes, Delete"
+      />
     </div>
   );
 }

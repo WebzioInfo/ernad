@@ -4,7 +4,8 @@ import {
   productionLogs, productionBatches, batchTotals, 
   salesOrders, salesOrderItems, customers,
   products, productBrands, productionLines,
-  users, roles, userRoles
+  users, roles, userRoles,
+  incidents, finishedGoodsInventory
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
 
@@ -49,6 +50,7 @@ export class ReportsService {
       if (filters.productId && filters.productId !== 'all') conditions.push(eq(productionLogs.productId, filters.productId));
 
       const results = await db.select({
+        lineId: productionLines.id,
         lineName: productionLines.name,
         brandName: productBrands.name,
         productName: products.name,
@@ -61,14 +63,28 @@ export class ReportsService {
       .leftJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
       .leftJoin(products, eq(productionLogs.productId, products.id))
       .where(and(...conditions))
-      .groupBy(productionLines.name, productBrands.name, products.name);
+      .groupBy(productionLines.id, productionLines.name, productBrands.name, products.name);
 
-      return results.map(r => ({
-        ...r,
-        totalOutput: Number(r.totalOutput),
-        totalWastage: Number(r.totalWastage),
-        rejectionRate: Number(r.rejectionRate)
-      }));
+      const incidentCounts = await db.select({
+        lineId: incidents.lineId,
+        totalIncidents: sql<string>`COUNT(*)`,
+        criticalIncidents: sql<string>`SUM(CASE WHEN ${incidents.priority} = 'CRITICAL' THEN 1 ELSE 0 END)`
+      })
+      .from(incidents)
+      .where(between(incidents.openedAt, filters.startDate, filters.endDate))
+      .groupBy(incidents.lineId);
+
+      return results.map(r => {
+        const lineIncidents = incidentCounts.find(i => i.lineId === r.lineId);
+        return {
+          ...r,
+          totalOutput: Number(r.totalOutput),
+          totalWastage: Number(r.totalWastage),
+          rejectionRate: Number(r.rejectionRate),
+          totalIncidents: Number(lineIncidents?.totalIncidents || 0),
+          criticalIncidents: Number(lineIncidents?.criticalIncidents || 0)
+        };
+      });
     } catch (error: any) {
       this.logger.error(`[PRODUCTION_REPORT_FAILED] ${error.message}`);
       throw error;
@@ -197,6 +213,7 @@ export class ReportsService {
       } : { totalRevenue: 0, orderCount: 0, avgOrderValue: 0 };
 
       const topProductsResults = await db.select({
+        productId: products.id,
         productName: products.name,
         quantity: sql<string>`COALESCE(SUM(${salesOrderItems.quantity}), '0')`,
         revenue: sql<string>`COALESCE(SUM(${salesOrderItems.totalPrice}), '0')`
@@ -205,17 +222,28 @@ export class ReportsService {
       .innerJoin(salesOrders, eq(salesOrderItems.orderId, salesOrders.id))
       .innerJoin(products, eq(salesOrderItems.productId, products.id))
       .where(and(...conditions))
-      .groupBy(products.name)
+      .groupBy(products.id, products.name)
       .orderBy(desc(sql`SUM(${salesOrderItems.totalPrice})`))
       .limit(10);
 
+      const stockResults = await db.select({
+        productId: finishedGoodsInventory.productId,
+        totalStock: sql<string>`SUM(${finishedGoodsInventory.quantity})`
+      })
+      .from(finishedGoodsInventory)
+      .groupBy(finishedGoodsInventory.productId);
+
       return {
         summary,
-        topProducts: topProductsResults.map(p => ({
-          ...p,
-          quantity: Number(p.quantity),
-          revenue: Number(p.revenue)
-        }))
+        topProducts: topProductsResults.map(p => {
+          const stock = stockResults.find(s => s.productId === p.productId);
+          return {
+            ...p,
+            quantity: Number(p.quantity),
+            revenue: Number(p.revenue),
+            currentStock: Number(stock?.totalStock || 0)
+          };
+        })
       };
     } catch (error: any) {
       this.logger.error(`[SALES_REPORT_FAILED] ${error.message}`, error.stack);

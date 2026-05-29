@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   History, User, Clock, AlertTriangle, CheckCircle2,
   Search, ArrowLeft, Download, Shield,
-  Database, Zap, Beaker, ClipboardList, Edit3, Trash2,
+  Database, Zap, ClipboardList, Edit3, Trash2,
   Activity, Users, Package, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,7 +26,7 @@ export default function BatchForensicsDashboard() {
   const { batchId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'timeline' | 'telemetry' | 'accountability' | 'downtime' | 'inventory' | 'qc' | 'sales' | 'audit' | 'insights'>('timeline');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'telemetry' | 'accountability' | 'downtime' | 'inventory' | 'sales' | 'audit' | 'insights'>('timeline');
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const [correctionReason, setCorrectionReason] = useState('');
   const [correctionPrimary, setCorrectionPrimary] = useState(0);
@@ -103,15 +103,11 @@ export default function BatchForensicsDashboard() {
     timeline = [],
     auditTrail = [],
     materialUsage = [],
-    qcRecords = [],
     telemetry = [],
     accountability = [],
     salesMapping = [],
-    inventoryVariance = [],
-    metadata = {},
+    inventoryVariance = []
   } = forensics ?? {};
-
-  const sections = (metadata as any)?.sectionsAvailable ?? {};
 
   return (
     <div className="space-y-8">
@@ -184,7 +180,6 @@ export default function BatchForensicsDashboard() {
               { id: 'accountability', label: 'Accountability', icon: Users },
               { id: 'downtime', label: 'Downtime Log', icon: AlertTriangle },
               { id: 'inventory', label: 'Material DNA', icon: Database },
-              { id: 'qc', label: 'Quality Parameters', icon: Beaker },
               { id: 'sales', label: 'Sales Traceability', icon: Package },
               { id: 'insights', label: 'Anomaly & Variance', icon: Layers },
               { id: 'audit', label: 'Change History', icon: Shield },
@@ -648,7 +643,6 @@ export default function BatchForensicsDashboard() {
                             <Database className="w-5 h-5" />
                           </div>
                           <div>
-                            {/* Inventory transactions expose stockId as the material reference. */}
                             <p className="text-sm font-black text-slate-900">
                               {material.stockId ? `Stock: ${String(material.stockId).slice(0, 8)}…` : 'Material Movement'}
                             </p>
@@ -673,52 +667,9 @@ export default function BatchForensicsDashboard() {
                 </div>
                 {materialUsage.length === 0 && (
                   <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
-                    {sections.materialUsage === false
-                      ? 'No inventory ledger entries linked to this batch.'
-                      : 'No material movements attributed to this batch.'}
+                    No material movements attributed to this batch.
                   </div>
                 )}
-              </motion.div>
-            )}
-
-
-            {activeTab === 'qc' && (
-              <motion.div
-                key="qc"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="space-y-6"
-              >
-                <div className="space-y-4">
-                  {qcRecords.map((qc: any) => (
-                    <div key={qc.id} className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm flex items-center justify-between">
-                      <div className="flex items-center gap-6">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${qc.result === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                          <Beaker className="w-7 h-7" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-slate-900">Quality Check - {qc.checkType}</p>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inspector: {qc.userName || 'System Auto-QC'}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">•</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(qc.checkedAt).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${qc.result === 'PASS' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-rose-500 text-white shadow-lg shadow-rose-100'}`}>
-                          {qc.result}
-                        </span>
-                        <p className="text-[10px] font-bold text-slate-400 max-w-[200px] text-right truncate">{qc.remarks}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {qcRecords.length === 0 && (
-                    <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs bg-slate-50 rounded-[2rem] border border-dashed">
-                      No quality inspections recorded for this batch.
-                    </div>
-                  )}
-                </div>
               </motion.div>
             )}
           </AnimatePresence>

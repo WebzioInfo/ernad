@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
-import { 
-  Truck, 
-  Clock, 
-  CheckCircle2, 
-  XCircle,
+import {
+  Truck,
+  Clock,
+  CheckCircle2,
   Package,
   MapPin,
   Calendar
@@ -48,8 +47,7 @@ export function BatchTrackingView() {
               <td className="px-8 py-6">
                 <span className={`
                   px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest
-                  ${item?.batch?.status === 'RUNNING' ? 'bg-emerald-50 text-emerald-600' : 
-                    item?.batch?.status === 'QC_PENDING' ? 'bg-amber-50 text-amber-600' :
+                  ${item?.batch?.status === 'RUNNING' ? 'bg-emerald-50 text-emerald-600' :
                     item?.batch?.status === 'COMPLETED' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-500'}
                 `}>
                   {item?.batch?.status || 'UNKNOWN'}
@@ -77,38 +75,6 @@ export function BatchTrackingView() {
   );
 }
 
-export function QualityCheckView() {
-  const { data: logs, isLoading } = useQuery({
-    queryKey: ['qc-logs'],
-    queryFn: async () => {
-      const res = await api.get(ENDPOINTS.PRODUCTION.LOGS('qc'));
-      return res.data;
-    },
-  });
-
-  if (isLoading) return <div className="p-10 text-center text-slate-400">Loading QC data...</div>;
-
-  return (
-    <div className="p-8 space-y-6">
-      {logs?.map((log: any) => (
-        <div key={log.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-[1.5rem] border border-slate-100">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${log.result === 'PASS' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-              {log.result === 'PASS' ? <CheckCircle2 className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-            </div>
-            <div>
-              <div className="text-sm font-black text-slate-900">QC Inspection: {log.result}</div>
-              <div className="text-xs font-medium text-slate-500">Inspector ID: {log.inspectorId} • {format(new Date(log.checkedAt), 'MMM d, HH:mm')}</div>
-            </div>
-          </div>
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-slate-100">
-            Batch Reference: {log?.batchId?.slice(0, 8) || 'N/A'}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function PackagingView() {
   const { data: logs, isLoading } = useQuery({

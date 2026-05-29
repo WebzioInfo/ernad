@@ -34,6 +34,8 @@ const bottleConfigs = [
   { id: '35_300ML', label: '35 - 300ML', multiplier: 35 },
 ];
 
+import ConfirmationModal from '../../components/common/ConfirmationModal';
+
 export default function OperatorPanel() {
   const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
   const navigate = useNavigate();
@@ -67,6 +69,15 @@ export default function OperatorPanel() {
   const [activeOperator, setActiveOperator] = useState<any>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showStationModal, setShowStationModal] = useState(false);
+
+  // Confirmation Modal States
+  const [pendingLogout, setPendingLogout] = useState(false);
+  const [pendingHandover, setPendingHandover] = useState(false);
+  const [pendingStartBatch, setPendingStartBatch] = useState(false);
+  const [pendingStopBatch, setPendingStopBatch] = useState(false);
+  const [pendingChangeover, setPendingChangeover] = useState(false);
+  const [pendingCompleteChangeover, setPendingCompleteChangeover] = useState(false);
+  const [pendingTelemetry, setPendingTelemetry] = useState(false);
 
   // Shift Handover States
   const [showHandoverModal, setShowHandoverModal] = useState(false);
@@ -102,11 +113,11 @@ export default function OperatorPanel() {
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
-  
+
   // Label station states
   const [inkChanged, setInkChanged] = useState(false);
   const [makeupChanged, setMakeupChanged] = useState(false);
-  
+
   // New Packing Station States
   const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
   const [selectedBottleConfig, setSelectedBottleConfig] = useState<string>('');
@@ -163,7 +174,7 @@ export default function OperatorPanel() {
     onMutate: () => setIsLoggingOut(true),
     onSuccess: () => {
       api.post(ENDPOINTS.AUTH.LOGOUT)
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => {
           setTimeout(() => authLogout(), 1200);
         });
@@ -450,7 +461,7 @@ export default function OperatorPanel() {
       ? rawProductionCount === 0
       : primaryCount === 0;
 
-    if (type === 'COUNT' && isCountEmpty && currentStation.id !== 'QC') {
+    if (type === 'COUNT' && isCountEmpty) {
       return toast.error(currentStation.id === 'FILLING' && productionWastages ? 'Enter raw production count' : 'Enter production count');
     }
     if (currentStation.id === 'FILLING' && productionWastages && bottleLeakage > rawProductionCount) {
@@ -572,7 +583,9 @@ export default function OperatorPanel() {
         return [newHistoryEntry, ...withoutDuplicate].slice(0, 50);
       });
 
-      toast.success('Log Successfully Transmitted');
+      toast.success(`${currentStation.title} Data Committed!`, {
+        description: `Logged production telemetry to the ledger.`,
+      });
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
 
@@ -638,8 +651,7 @@ export default function OperatorPanel() {
         machineStatus={machineStatus}
         isLoggingOut={isLoggingOut}
         onChangeStation={() => setShowStationModal(true)}
-        onLogout={() => endSessionMutation.mutate()}
-        onDowntime={() => toast.info('Downtime Modal: Coming Soon')}
+        onLogout={() => setPendingLogout(true)}
         onHandover={() => setShowHandoverModal(true)}
         recentHandover={recentHandover}
       />
@@ -681,15 +693,15 @@ export default function OperatorPanel() {
           </div>
         }
         sidebar={
-          <ActivityFeed 
-            history={history || []} 
+          <ActivityFeed
+            history={history || []}
             onRefresh={() => {
               refetchHistory();
               queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
               queryClient.invalidateQueries({ queryKey: ['active-batch'] });
               toast.success('Uplink Feed Refreshed');
-            }} 
-            isRefreshing={isFetchingHistory} 
+            }}
+            isRefreshing={isFetchingHistory}
           />
         }
       >
@@ -719,348 +731,346 @@ export default function OperatorPanel() {
           <div className="grid grid-cols-1 gap-6">
             {/* Main Action Card */}
             <div className="bg-white border border-[#1A9A91]/15 rounded-[2rem] p-5 md:p-6 shadow-sm shadow-[#1A9A91]/5 space-y-6">
-            {currentStation.id === 'FILLING' && (
-              <div className="space-y-4">
-                {/* Production Wastages Toggle */}
-                <div className="flex items-center justify-between p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-700">Production Wastages</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Track bottle leaks and damaged caps</span>
+              {currentStation.id === 'FILLING' && (
+                <div className="space-y-4">
+                  {/* Production Wastages Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-700">Production Wastages</span>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Track bottle leaks and damaged caps</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProductionWastages(!productionWastages)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${productionWastages ? "bg-[#1A9A91]" : "bg-slate-200"
+                        }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${productionWastages ? "translate-x-5" : "translate-x-0"
+                          }`}
+                      />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setProductionWastages(!productionWastages)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      productionWastages ? "bg-[#1A9A91]" : "bg-slate-200"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        productionWastages ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
                 </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {currentStation.id === 'FILLING' && productionWastages ? (
-                <>
-                  <IndustrialNumericInput
-                    label="Raw Production Count"
-                    value={rawProductionCount}
-                    onChange={setRawProductionCount}
-                    suffix="Units"
-                    compact
-                  />
-                  <IndustrialNumericInput
-                    label="Filled Bottle Leak / Yield Waste"
-                    value={bottleLeakage}
-                    onChange={setBottleLeakage}
-                    suffix="Units"
-                    compact
-                  />
-                  <IndustrialNumericInput
-                    label="Cap Damaged Count"
-                    value={capWastage}
-                    onChange={setCapWastage}
-                    suffix="Units"
-                    compact
-                  />
-                  <div className="md:col-span-2 p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
-                    <div>
-                      Net Production: <span className="text-[#1A9A91] font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
-                    </div>
-                    <div>
-                      Total Wastage: <span className="text-rose-500 font-bold">{bottleLeakage + capWastage} Units</span>
-                    </div>
-                  </div>
-                </>
-              ) : currentStation.id === 'LABELING' ? (
-                <>
-                  <IndustrialNumericInput
-                    label="Production Unit Count"
-                    value={primaryCount}
-                    onChange={setPrimaryCount}
-                    suffix="Units"
-                    compact
-                  />
-                  <IndustrialNumericInput
-                    label="Label Wastage"
-                    value={rejectionCount}
-                    onChange={setRejectionCount}
-                    suffix="KG"
-                    step={0.01}
-                    compact
-                  />
-                </>
-              ) : currentStation.id === 'PACKING' ? (
-                null
-              ) : (
-                <>
-                  <IndustrialNumericInput
-                    label="Production Unit Count"
-                    value={primaryCount}
-                    onChange={setPrimaryCount}
-                    suffix="Units"
-                    compact
-                  />
-
-                  <IndustrialNumericInput
-                    label="Rejects / Waste"
-                    value={rejectionCount}
-                    onChange={setRejectionCount}
-                    suffix="Units"
-                    compact
-                  />
-                </>
               )}
 
-              <div className="contents">
-                
-                {currentStation.id === 'BLOWING' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {currentStation.id === 'FILLING' && productionWastages ? (
                   <>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
-                        Raw Material
-                      </label>
-                      <select
-                        value={selectedRawMaterialId}
-                        onChange={e => setSelectedRawMaterialId(e.target.value)}
-                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
-                      >
-                        <option value="">Select Raw Material...</option>
-                        {preformRawMaterials.map((material: any) => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} ({material.categoryName})
-                          </option>
-                        ))}
-                      </select>
-                      {preformRawMaterials.length === 0 && (
-                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
-                          No preform raw materials found.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      <IndustrialNumericInput
-                        label="Bags Used"
-                        value={bagsUsed}
-                        onChange={setBagsUsed}
-                        suffix="Bags"
-                        compact
-                      />
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">
-                        (1 bag = 25KG)
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <IndustrialNumericInput
-                        label="Preforms Used (This Log)"
-                        value={preformUsage}
-                        onChange={() => {}} 
-                        suffix="Pcs"
-                        readOnly
-                        compact
-                      />
-                      <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
-                        Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
-                      </p>
+                    <IndustrialNumericInput
+                      label="Raw Production Count"
+                      value={rawProductionCount}
+                      onChange={setRawProductionCount}
+                      suffix="Units"
+                      compact
+                    />
+                    <IndustrialNumericInput
+                      label="Bottle Damage Count"
+                      value={bottleLeakage}
+                      onChange={setBottleLeakage}
+                      suffix="Units"
+                      compact
+                    />
+                    <IndustrialNumericInput
+                      label="Cap Damaged Count"
+                      value={capWastage}
+                      onChange={setCapWastage}
+                      suffix="Units"
+                      compact
+                    />
+                    <div className="md:col-span-2 p-4 bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl flex justify-between text-xs font-black uppercase tracking-wider text-slate-500">
+                      <div>
+                        Net Production: <span className="text-[#1A9A91] font-bold">{Math.max(0, rawProductionCount - bottleLeakage)} Units</span>
+                      </div>
+                      <div>
+                        Total Wastage: <span className="text-rose-500 font-bold">{bottleLeakage + capWastage} Units</span>
+                      </div>
                     </div>
                   </>
-                )}
-                
-                {currentStation.id === 'FILLING' && (
+                ) : currentStation.id === 'LABELING' ? (
                   <>
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
-                        Caps Raw Material
-                      </label>
-                      <select
-                        value={selectedCapRawMaterialId}
-                        onChange={e => setSelectedCapRawMaterialId(e.target.value)}
-                        className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
-                      >
-                        <option value="">Select Caps raw material...</option>
-                        {capRawMaterials.map((material: any) => (
-                          <option key={material.id} value={material.id}>
-                            {material.name} ({material.categoryName})
-                          </option>
-                        ))}
-                      </select>
-                      {capRawMaterials.length === 0 && (
-                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
-                          No caps raw materials found.
-                        </p>
-                      )}
-                    </div>
-
                     <IndustrialNumericInput
-                      label="Cap Box Usage"
-                      value={capBoxUsage}
-                      onChange={setCapBoxUsage}
-                      suffix="Boxes"
+                      label="Production Unit Count"
+                      value={primaryCount}
+                      onChange={setPrimaryCount}
+                      suffix="Units"
+                      compact
+                    />
+                    <IndustrialNumericInput
+                      label="Label Wastage"
+                      value={rejectionCount}
+                      onChange={setRejectionCount}
+                      suffix="KG"
+                      step={0.01}
+                      compact
+                    />
+                  </>
+                ) : currentStation.id === 'PACKING' ? (
+                  null
+                ) : (
+                  <>
+                    <IndustrialNumericInput
+                      label="Production Unit Count"
+                      value={primaryCount}
+                      onChange={setPrimaryCount}
+                      suffix="Units"
                       compact
                     />
 
-                    <div className="space-y-1">
-                      <IndustrialNumericInput
-                        label="Caps Used (This Log)"
-                        value={capUsage}
-                        onChange={() => {}}
-                        suffix="Pcs"
-                        readOnly
-                        compact
-                      />
-                      <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
-                        Batch Total: <span className="text-slate-900">
-                          {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
-                        </span>
-                      </p>
-                    </div>
-                  </>
-                )}
-                
-                {currentStation.id === 'LABELING' && (
-                  <>
-                    <div className="space-y-1">
-                      <IndustrialNumericInput
-                        label="Label Used"
-                        value={labelUsage}
-                        onChange={setLabelUsage}
-                        suffix="KG"
-                        step={0.01}
-                        compact
-                      />
-                    </div>
-                    
-                    <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 space-y-4">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-[#1A9A91] focus:ring-[#1A9A91]" />
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Used</span>
-                      </label>
-                      
-                      <label className="flex items-center gap-3 cursor-pointer pt-2">
-                        <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-[#1A9A91] focus:ring-[#1A9A91]" />
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-700">Makeup Used</span>
-                      </label>
-                    </div>
-                  </>
-                )}
-                
-                {currentStation.id === 'PACKING' && (
-                  <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {/* Row 1 */}
-                    <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 flex flex-col justify-center">
-                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
-                      <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
-                    </div>
-
-                    <div className="flex flex-col justify-center">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none mb-2">
-                        Bottle Configuration
-                      </label>
-                      <select
-                        value={selectedBottleConfig}
-                        onChange={e => setSelectedBottleConfig(e.target.value)}
-                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all shadow-sm"
-                      >
-                        <option value="">Select Configuration...</option>
-                        {bottleConfigs.map(config => (
-                          <option key={config.id} value={config.id}>
-                            {config.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Row 2 */}
-                    <IndustrialNumericInput 
-                      label="Cases Produced" 
-                      value={casesProduced} 
-                      onChange={setCasesProduced} 
-                      suffix="Cases" 
-                      compact 
+                    <IndustrialNumericInput
+                      label="Rejects / Waste"
+                      value={rejectionCount}
+                      onChange={setRejectionCount}
+                      suffix="Units"
+                      compact
                     />
-
-                    <div className="opacity-75">
-                      <IndustrialNumericInput 
-                        label="Production Unit Count" 
-                        value={primaryCount} 
-                        onChange={() => {}} 
-                        suffix="Bottles" 
-                        readOnly 
-                        compact 
-                      />
-                    </div>
-
-                    {/* Row 3 */}
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
-                        Shrink Material Used (g)
-                      </label>
-                      <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          value={shrinkUsage}
-                          onChange={e => setShrinkUsage(e.target.value)}
-                          placeholder="e.g. 1.256"
-                          className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
-                        />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
-                        Shrink Material Waste (g)
-                      </label>
-                      <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          value={shrinkWasteWeight}
-                          onChange={e => setShrinkWasteWeight(e.target.value)}
-                          placeholder="e.g. 0.124"
-                          className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
-                        />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
-                      </div>
-                    </div>
-                  </div>
+                  </>
                 )}
-              </div>
-            </div>
 
-            <div className="bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl p-4 md:p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <AlertTriangle className="text-[#1A9A91]" size={18} />
-                <h4 className="text-xs font-black text-[#1A9A91] uppercase tracking-widest">Anomaly Signature</h4>
-              </div>
-              <textarea
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Describe machine event or stop reason..."
-                className="w-full h-20 bg-white border border-[#1A9A91]/20 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-[#1A9A91]/35 outline-none focus:border-[#1A9A91]/50 transition-all resize-none"
-              />
-            </div>
+                <div className="contents">
 
-            <button
-              onClick={() => handleSaveTelemetry('ALL')}
-              disabled={isSubmitting}
-              className="w-full h-16 bg-[#1A9A91] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-[#1A9A91]/15 hover:bg-[#157C75] transition-all active:scale-[0.98]"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
-              Commit to Ledger
-            </button>
+                  {currentStation.id === 'BLOWING' && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                          Raw Material
+                        </label>
+                        <select
+                          value={selectedRawMaterialId}
+                          onChange={e => setSelectedRawMaterialId(e.target.value)}
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
+                        >
+                          <option value="">Select Raw Material...</option>
+                          {preformRawMaterials.map((material: any) => (
+                            <option key={material.id} value={material.id}>
+                              {material.name} ({material.categoryName})
+                            </option>
+                          ))}
+                        </select>
+                        {preformRawMaterials.length === 0 && (
+                          <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
+                            No preform raw materials found.
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <IndustrialNumericInput
+                          label="Bags Used"
+                          value={bagsUsed}
+                          onChange={setBagsUsed}
+                          suffix="Bags"
+                          compact
+                        />
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">
+                          (1 bag = 25KG)
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <IndustrialNumericInput
+                          label="Preforms Used (This Log)"
+                          value={preformUsage}
+                          onChange={() => { }}
+                          suffix="Pcs"
+                          readOnly
+                          compact
+                        />
+                        <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
+                          Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {currentStation.id === 'FILLING' && (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                          Caps Raw Material
+                        </label>
+                        <select
+                          value={selectedCapRawMaterialId}
+                          onChange={e => setSelectedCapRawMaterialId(e.target.value)}
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
+                        >
+                          <option value="">Select Caps raw material...</option>
+                          {capRawMaterials.map((material: any) => (
+                            <option key={material.id} value={material.id}>
+                              {material.name} ({material.categoryName})
+                            </option>
+                          ))}
+                        </select>
+                        {capRawMaterials.length === 0 && (
+                          <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
+                            No caps raw materials found.
+                          </p>
+                        )}
+                      </div>
+
+                      <IndustrialNumericInput
+                        label="Cap Box Usage"
+                        value={capBoxUsage}
+                        onChange={setCapBoxUsage}
+                        suffix="Boxes"
+                        compact
+                      />
+
+                      <div className="space-y-1">
+                        <IndustrialNumericInput
+                          label="Caps Used (This Log)"
+                          value={capUsage}
+                          onChange={() => { }}
+                          suffix="Pcs"
+                          readOnly
+                          compact
+                        />
+                        <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
+                          Batch Total: <span className="text-slate-900">
+                            {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
+                          </span>
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {currentStation.id === 'LABELING' && (
+                    <>
+                      <div className="space-y-1">
+                        <IndustrialNumericInput
+                          label="Label Used"
+                          value={labelUsage}
+                          onChange={setLabelUsage}
+                          suffix="KG"
+                          step={0.01}
+                          compact
+                        />
+                      </div>
+
+                      <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 space-y-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input type="checkbox" checked={inkChanged} onChange={e => setInkChanged(e.target.checked)} className="w-5 h-5 rounded text-[#1A9A91] focus:ring-[#1A9A91]" />
+                          <span className="text-xs font-black uppercase tracking-widest text-slate-700">Ink Changed</span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer pt-2">
+                          <input type="checkbox" checked={makeupChanged} onChange={e => setMakeupChanged(e.target.checked)} className="w-5 h-5 rounded text-[#1A9A91] focus:ring-[#1A9A91]" />
+                          <span className="text-xs font-black uppercase tracking-widest text-slate-700">Makeup Changed</span>
+                        </label>
+                      </div>
+                    </>
+                  )}
+
+                  {currentStation.id === 'PACKING' && (
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Row 1 */}
+                      <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 flex flex-col justify-center">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">Production Source Batch</label>
+                        <input type="text" value={activeBatch?.batch?.batchCode || 'N/A'} readOnly className="w-full bg-slate-200 border-none rounded-lg px-4 py-3 text-slate-500 font-bold font-mono outline-none cursor-not-allowed" />
+                      </div>
+
+                      <div className="flex flex-col justify-center">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none mb-2">
+                          Bottle Configuration
+                        </label>
+                        <select
+                          value={selectedBottleConfig}
+                          onChange={e => setSelectedBottleConfig(e.target.value)}
+                          className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all shadow-sm"
+                        >
+                          <option value="">Select Configuration...</option>
+                          {bottleConfigs.map(config => (
+                            <option key={config.id} value={config.id}>
+                              {config.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Row 2 */}
+                      <IndustrialNumericInput
+                        label="Cases Produced"
+                        value={casesProduced}
+                        onChange={setCasesProduced}
+                        suffix="Cases"
+                        compact
+                      />
+
+                      <div className="opacity-75">
+                        <IndustrialNumericInput
+                          label="Production Unit Count"
+                          value={primaryCount}
+                          onChange={() => { }}
+                          suffix="Bottles"
+                          readOnly
+                          compact
+                        />
+                      </div>
+
+                      {/* Row 3 */}
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
+                          Shrink Material Used (g)
+                        </label>
+                        <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={shrinkUsage}
+                            onChange={e => setShrinkUsage(e.target.value)}
+                            placeholder="e.g. 1.256"
+                            className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
+                          />
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
+                          Shrink Material Waste (g)
+                        </label>
+                        <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            value={shrinkWasteWeight}
+                            onChange={e => setShrinkWasteWeight(e.target.value)}
+                            placeholder="e.g. 0.124"
+                            className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
+                          />
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl p-4 md:p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <AlertTriangle className="text-[#1A9A91]" size={18} />
+                  <h4 className="text-xs font-black text-[#1A9A91] uppercase tracking-widest">Anomaly Signature</h4>
+                </div>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Describe machine event or stop reason..."
+                  className="w-full h-20 bg-white border border-[#1A9A91]/20 rounded-xl p-4 text-xs font-bold text-slate-700 placeholder:text-[#1A9A91]/35 outline-none focus:border-[#1A9A91]/50 transition-all resize-none"
+                />
+              </div>
+
+              <button
+                onClick={() => setPendingTelemetry(true)}
+                disabled={isSubmitting}
+                className="w-full h-16 bg-[#1A9A91] text-white rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 shadow-xl shadow-[#1A9A91]/15 hover:bg-[#157C75] transition-all active:scale-[0.98]"
+              >
+                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Layers size={20} />}
+                Commit to Ledger
+              </button>
+            </div>
           </div>
-        </div>
         )}
       </StationWorkspace>
 
@@ -1098,15 +1108,15 @@ export default function OperatorPanel() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar">
-                <ActivityFeed 
-                  history={history || []} 
+                <ActivityFeed
+                  history={history || []}
                   onRefresh={() => {
                     refetchHistory();
                     queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
                     queryClient.invalidateQueries({ queryKey: ['active-batch'] });
                     toast.success('Uplink Feed Refreshed');
-                  }} 
-                  isRefreshing={isFetchingHistory} 
+                  }}
+                  isRefreshing={isFetchingHistory}
                 />
               </div>
             </motion.div>
@@ -1128,17 +1138,16 @@ export default function OperatorPanel() {
             {stations.map(station => {
               const isActive = station.id === currentStationId;
               const isSwitching = changeStationMutation.isPending && changeStationMutation.variables === station.id;
-              
+
               return (
                 <button
                   key={station.id}
                   disabled={isActive || changeStationMutation.isPending}
                   onClick={() => changeStationMutation.mutate(station.id)}
-                  className={`group p-6 rounded-2xl border transition-all text-left flex items-center gap-4 ${
-                    isActive 
-                      ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
-                      : 'bg-white border-slate-200 hover:border-[#1A9A91]/35 hover:shadow-md cursor-pointer'
-                  }`}
+                  className={`group p-6 rounded-2xl border transition-all text-left flex items-center gap-4 ${isActive
+                    ? 'bg-slate-50 border-slate-200 opacity-50 cursor-not-allowed'
+                    : 'bg-white border-slate-200 hover:border-[#1A9A91]/35 hover:shadow-md cursor-pointer'
+                    }`}
                 >
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${station.bg} ${station.border}`}>
                     <station.icon className={`w-6 h-6 ${station.color}`} />
@@ -1205,7 +1214,7 @@ export default function OperatorPanel() {
             {/* Incoming Operator Identification */}
             <div className="space-y-4">
               <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Incoming Operator Auth</h4>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Select Operator</label>
@@ -1275,7 +1284,7 @@ export default function OperatorPanel() {
             </Button>
             <Button
               disabled={isSubmittingHandover}
-              onClick={handleHandoverSubmit}
+              onClick={() => setPendingHandover(true)}
               className="h-12 bg-[#1A9A91] hover:bg-[#157C75] text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
             >
               {isSubmittingHandover ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirm Handover'}
@@ -1301,17 +1310,15 @@ export default function OperatorPanel() {
             <div className="flex border-b border-slate-200 mb-6">
               <button
                 onClick={() => setLineControlTab('STOP')}
-                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
-                  lineControlTab === 'STOP' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
-                }`}
+                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${lineControlTab === 'STOP' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
+                  }`}
               >
                 End Production
               </button>
               <button
                 onClick={() => setLineControlTab('CHANGEOVER')}
-                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${
-                  lineControlTab === 'CHANGEOVER' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
-                }`}
+                className={`flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all border-b-2 ${lineControlTab === 'CHANGEOVER' ? 'border-[#1A9A91] text-[#1A9A91]' : 'border-transparent text-slate-400'
+                  }`}
               >
                 SKU Changeover
               </button>
@@ -1414,25 +1421,7 @@ export default function OperatorPanel() {
                 </Button>
                 <Button
                   disabled={startBatchMutation.isPending || !startShift || !startBrand || !startProduct}
-                  onClick={() => {
-                    startBatchMutation.mutate({
-                      shiftId: startShift,
-                      brandId: startBrand,
-                      productId: startProduct,
-                      batchCode: startBatchCode || undefined,
-                      remarks: startRemarks || undefined,
-                      startTime: new Date(startStartTime).toISOString()
-                    }, {
-                      onSuccess: () => {
-                        setShowLineControl(false);
-                        setStartShift('');
-                        setStartBrand('');
-                        setStartProduct('');
-                        setStartBatchCode('');
-                        setStartRemarks('');
-                      }
-                    });
-                  }}
+                  onClick={() => setPendingStartBatch(true)}
                   className="h-12 bg-[#1A9A91] hover:bg-[#157C75] text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
                 >
                   {startBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Launch Batch'}
@@ -1479,17 +1468,7 @@ export default function OperatorPanel() {
                 </Button>
                 <Button
                   disabled={stopBatchMutation.isPending || !endRemarks}
-                  onClick={() => {
-                    stopBatchMutation.mutate({
-                      remarks: endRemarks,
-                      endTime: new Date(endEndTime).toISOString()
-                    }, {
-                      onSuccess: () => {
-                        setShowLineControl(false);
-                        setEndRemarks('');
-                      }
-                    });
-                  }}
+                  onClick={() => setPendingStopBatch(true)}
                   className="h-12 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
                 >
                   {stopBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Authorize Stop'}
@@ -1557,18 +1536,7 @@ export default function OperatorPanel() {
                 </Button>
                 <Button
                   disabled={initiateChangeoverMutation.isPending || !changeoverProduct}
-                  onClick={() => {
-                    initiateChangeoverMutation.mutate({
-                      productId: changeoverProduct,
-                      startTime: new Date(changeoverStartTime).toISOString()
-                    }, {
-                      onSuccess: () => {
-                        setShowLineControl(false);
-                        setChangeoverBrand('');
-                        setChangeoverProduct('');
-                      }
-                    });
-                  }}
+                  onClick={() => setPendingChangeover(true)}
                   className="h-12 bg-amber-500 hover:bg-amber-600 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
                 >
                   {initiateChangeoverMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Start Changeover'}
@@ -1603,13 +1571,7 @@ export default function OperatorPanel() {
                 </Button>
                 <Button
                   disabled={completeChangeoverMutation.isPending}
-                  onClick={() => {
-                    completeChangeoverMutation.mutate(undefined, {
-                      onSuccess: () => {
-                        setShowLineControl(false);
-                      }
-                    });
-                  }}
+                  onClick={() => setPendingCompleteChangeover(true)}
                   className="h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6"
                 >
                   {completeChangeoverMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Complete Changeover & Start'}
@@ -1619,6 +1581,48 @@ export default function OperatorPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmationModal isOpen={pendingLogout} onClose={() => setPendingLogout(false)} onConfirm={() => { setPendingLogout(false); endSessionMutation.mutate(); }} title="Confirm Logout" message="Are you sure you want to end your shift session and log out?" variant="danger" confirmText="Yes, Logout" />
+      <ConfirmationModal isOpen={pendingHandover} onClose={() => setPendingHandover(false)} onConfirm={() => { setPendingHandover(false); handleHandoverSubmit(); }} title="Confirm Handover" message="Are you sure you want to submit this shift handover?" variant="primary" confirmText="Yes, Handover" />
+      <ConfirmationModal isOpen={pendingTelemetry} onClose={() => setPendingTelemetry(false)} onConfirm={() => { setPendingTelemetry(false); handleSaveTelemetry('ALL'); }} title="Commit Telemetry Log" message="Are you sure you want to commit this telemetry log to the ledger? Ensure all numbers are correct." variant="primary" confirmText="Yes, Commit" />
+      <ConfirmationModal isOpen={pendingStartBatch} onClose={() => setPendingStartBatch(false)} onConfirm={() => {
+        setPendingStartBatch(false);
+        startBatchMutation.mutate({
+          shiftId: startShift, brandId: startBrand, productId: startProduct,
+          batchCode: startBatchCode || undefined, remarks: startRemarks || undefined,
+          startTime: new Date(startStartTime).toISOString()
+        }, {
+          onSuccess: () => {
+            setShowLineControl(false);
+            setStartShift(''); setStartBrand(''); setStartProduct('');
+            setStartBatchCode(''); setStartRemarks('');
+          }
+        });
+      }} title="Start Production Batch" message="Are you sure you want to launch a new batch?" variant="primary" confirmText="Yes, Start" />
+
+      <ConfirmationModal isOpen={pendingStopBatch} onClose={() => setPendingStopBatch(false)} onConfirm={() => {
+        setPendingStopBatch(false);
+        stopBatchMutation.mutate({
+          remarks: endRemarks,
+          endTime: new Date(endEndTime).toISOString()
+        }, {
+          onSuccess: () => { setShowLineControl(false); setEndRemarks(''); }
+        });
+      }} title="Stop Production Batch" message="Are you sure you want to finalize this production batch? This cannot be undone." variant="danger" confirmText="Yes, Stop" />
+
+      <ConfirmationModal isOpen={pendingChangeover} onClose={() => setPendingChangeover(false)} onConfirm={() => {
+        setPendingChangeover(false);
+        initiateChangeoverMutation.mutate({
+          productId: changeoverProduct, startTime: new Date(changeoverStartTime).toISOString()
+        }, {
+          onSuccess: () => { setShowLineControl(false); setChangeoverBrand(''); setChangeoverProduct(''); }
+        });
+      }} title="Initiate Changeover" message="Are you sure you want to initiate SKU changeover?" variant="primary" confirmText="Yes, Initiate" />
+
+      <ConfirmationModal isOpen={pendingCompleteChangeover} onClose={() => setPendingCompleteChangeover(false)} onConfirm={() => {
+        setPendingCompleteChangeover(false);
+        completeChangeoverMutation.mutate(undefined, { onSuccess: () => { setShowLineControl(false); } });
+      }} title="Complete Changeover" message="Are you sure changeover is complete and ready to run?" variant="primary" confirmText="Yes, Complete" />
     </div>
   );
 }

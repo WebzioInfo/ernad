@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Power, Loader2 } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface OperatorHeaderProps {
@@ -10,7 +10,6 @@ interface OperatorHeaderProps {
   productName?: string;
   onLogout: () => void;
   onChangeStation: () => void;
-  onDowntime: () => void;
   onHandover: () => void;
   isLoggingOut?: boolean;
   machineStatus: 'RUNNING' | 'IDLE' | 'ERROR';
@@ -27,7 +26,6 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
   batchCode,
   productName,
   onLogout,
-  onDowntime,
   onChangeStation,
   onHandover,
   isLoggingOut,
@@ -115,14 +113,6 @@ export const OperatorHeader: React.FC<OperatorHeaderProps> = ({
             >
               <span className="hidden lg:inline">Change Station</span>
               <span className="lg:hidden">Change</span>
-            </button>
-            <button
-              onClick={onDowntime}
-              disabled={isLoggingOut}
-              className="p-2 sm:p-2.5 bg-white text-gray-700 rounded-lg sm:rounded-[12px] hover:bg-gray-50 active:scale-95 transition-all border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-              title="Report Downtime"
-            >
-              <Power size={16} className="sm:w-[18px] sm:h-[18px]" strokeWidth={2.5} />
             </button>
             <button
               onClick={onLogout}

@@ -10,8 +10,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { 
   StartBatchDto, 
-  ChangeoverDto, 
-  QualityCheckDto, 
+  LogDowntimeDto,
   PackagingLogDto, 
   DispatchLogDto 
 } from './dto/production.dto';
@@ -72,19 +71,6 @@ export class ProductionController {
     @Body() body: { operatorIds: string[] }
   ) {
     return await this.lifecycleService.reassignOperators(batchId, req.user.sub, body.operatorIds);
-  }
-
-  @Post('quality-checks')
-  @Permissions('production:start')
-  @ApiOperation({ summary: 'Submit a quality check for a batch' })
-  async submitQC(@Req() req: any, @Body() dto: QualityCheckDto) {
-    return await this.lifecycleService.submitQualityCheck(
-      dto.batchId,
-      req.user.sub,
-      dto.result,
-      dto.parameters || {},
-      dto.remarks
-    );
   }
 
   @Post('packaging-logs')

@@ -5,7 +5,7 @@ import { api } from '../../services/api-client';
 import {
   Cpu, ArrowRight, Loader2,
   Activity, ShieldCheck, LogOut,
-  Wind, PackageOpen, Zap, Box, ArrowLeft
+  Wind, PackageOpen, Zap, Box, ArrowLeft, AlertTriangle
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
 import { toast } from 'sonner';
@@ -119,14 +119,23 @@ export default function LineSelectionPage() {
               Production Workspace Initialization
             </p>
           </div>
-          <div className="flex items-center gap-4 sm:gap-6 bg-white border border-slate-200 p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] shadow-sm self-end sm:self-auto">
-            <div className="text-right">
-              <p className="text-xs sm:text-sm font-black text-slate-900">{user?.name}</p>
-              <p className="text-[9px] sm:text-[10px] text-indigo-600 font-black uppercase tracking-widest">{user?.roles?.[0]?.replace('_', ' ')}</p>
-            </div>
-            <button onClick={() => logout()} className="p-3 sm:p-4 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl sm:rounded-2xl transition-all border border-slate-100">
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="flex items-center gap-4 sm:gap-6 self-end sm:self-auto">
+            <button
+              onClick={() => navigate('/operator/incidents?report=1')}
+              className="px-4 py-3 bg-rose-600 text-white rounded-[1.5rem] text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-rose-700 active:scale-95 transition-all shadow-lg shadow-rose-950/15 flex items-center gap-2"
+            >
+              <AlertTriangle size={16} />
+              Report Issue
             </button>
+            <div className="flex items-center gap-4 sm:gap-6 bg-white border border-slate-200 p-3 sm:p-4 rounded-[1.5rem] sm:rounded-[2rem] shadow-sm">
+              <div className="text-right">
+                <p className="text-xs sm:text-sm font-black text-slate-900">{user?.name}</p>
+                <p className="text-[9px] sm:text-[10px] text-indigo-600 font-black uppercase tracking-widest">{user?.roles?.[0]?.replace('_', ' ')}</p>
+              </div>
+              <button onClick={() => logout()} className="p-3 sm:p-4 bg-slate-50 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl sm:rounded-2xl transition-all border border-slate-100">
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+            </div>
           </div>
         </header>
 

@@ -73,7 +73,6 @@ export function AppRoutes() {
           
           {/* Redirects for disabled/commented-out routes */}
           <Route path="ai-advices" element={<Navigate to="/admin/overview" replace />} />
-          <Route path="quality" element={<Navigate to="/admin/overview" replace />} />
           <Route path="tally" element={<Navigate to="/admin/overview" replace />} />
           <Route path="billing" element={<Navigate to="/admin/overview" replace />} />
           <Route path="distributors" element={<Navigate to="/admin/overview" replace />} />
@@ -101,7 +100,6 @@ export function AppRoutes() {
           */}
 
           {/* Redirects for disabled/commented-out routes */}
-          <Route path="quality" element={<Navigate to="/manager/overview" replace />} />
           <Route path="ai-advices" element={<Navigate to="/manager/overview" replace />} />
           <Route path="tally" element={<Navigate to="/manager/overview" replace />} />
           <Route path="billing" element={<Navigate to="/manager/overview" replace />} />

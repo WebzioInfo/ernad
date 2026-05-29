@@ -7,6 +7,7 @@ import {
   Settings, Tags, Box, Factory, Clock,
   Plus, Trash2, Loader2
 } from 'lucide-react';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 // --- Shared Types ---
 type Brand = { id: string; name: string; description: string; isActive: boolean };
@@ -226,6 +227,7 @@ const LinesTab = () => {
   const { data: lines, isLoading } = useQuery<Line[]>({ queryKey: ['lines'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data });
   const [isAdding, setIsAdding] = useState(false);
   const [newLine, setNewLine] = useState({ id: '', name: '' });
+  const [lineToDelete, setLineToDelete] = useState<Line | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.LINES, data),
@@ -313,11 +315,7 @@ const LinesTab = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button onClick={() => {
-                    if (confirm(`Are you sure you want to delete Line ${l.id}?`)) {
-                      deleteMutation.mutate(l.id);
-                    }
-                  }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                  <button onClick={() => setLineToDelete(l)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -326,6 +324,21 @@ const LinesTab = () => {
           </tbody>
         </table>
       </div>
+      
+      <ConfirmationModal
+        isOpen={!!lineToDelete}
+        onClose={() => setLineToDelete(null)}
+        onConfirm={() => {
+          if (lineToDelete) {
+            deleteMutation.mutate(lineToDelete.id);
+            setLineToDelete(null);
+          }
+        }}
+        title="Delete Production Line"
+        message={`Are you sure you want to delete Line ${lineToDelete?.id}? This action cannot be undone.`}
+        variant="danger"
+        confirmText="Yes, Delete"
+      />
     </div>
   );
 };
@@ -335,6 +348,7 @@ const ShiftsTab = () => {
   const { data: shifts, isLoading } = useQuery<Shift[]>({ queryKey: ['shifts'], queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data });
   const [isAdding, setIsAdding] = useState(false);
   const [newShift, setNewShift] = useState({ name: '', startTime: '08:00', endTime: '16:00' });
+  const [shiftToDelete, setShiftToDelete] = useState<Shift | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => await api.post(ENDPOINTS.MASTER_DATA.SHIFTS, data),
@@ -355,6 +369,8 @@ const ShiftsTab = () => {
     },
     onError: () => toast.error('Failed to delete shift')
   });
+
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -418,9 +434,7 @@ const ShiftsTab = () => {
                   {s.startTime} - {s.endTime}
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button onClick={() => {
-                    if (confirm(`Delete Shift ${s.name}?`)) deleteMutation.mutate(s.id);
-                  }} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+                  <button onClick={() => setShiftToDelete(s)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -429,6 +443,21 @@ const ShiftsTab = () => {
           </tbody>
         </table>
       </div>
+
+      <ConfirmationModal
+        isOpen={!!shiftToDelete}
+        onClose={() => setShiftToDelete(null)}
+        onConfirm={() => {
+          if (shiftToDelete) {
+            deleteMutation.mutate(shiftToDelete.id);
+            setShiftToDelete(null);
+          }
+        }}
+        title="Delete Shift"
+        message={`Are you sure you want to delete ${shiftToDelete?.name}? This action cannot be undone.`}
+        variant="danger"
+        confirmText="Yes, Delete"
+      />
     </div>
   );
 };

@@ -5,10 +5,9 @@ import { productionLines, productBrands, products, shifts } from './master-data'
 import { sql } from 'drizzle-orm';
 import { rawMaterials } from './inventory';
 
-export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']);
+export const stationTypeEnum = pgEnum('station_type', ['BLOWING', 'FILLING', 'LABELING', 'PACKING']);
 export const eventTypeEnum = pgEnum('event_type', ['POWER_FAILURE', 'MACHINE_BREAKDOWN', 'LOW_SPEED', 'MATERIAL_SHORTAGE', 'NORMAL_PRODUCTION', 'BATCH_START', 'BATCH_END', 'DOWNTIME_PAUSE']);
 export const logStatusEnum = pgEnum('log_status', ['DRAFT', 'SUBMITTED', 'VERIFIED', 'REJECTED', 'CORRECTED', 'OVERRIDDEN']);
-export const qcStatusEnum = pgEnum('qc_status', ['PENDING', 'PASSED', 'FAILED', 'ON_HOLD', 'RELEASED']);
 
 // The Ledger of all production activity (Enterprise Standard)
 export const productionLogs = pgTable('production_logs', {
@@ -71,10 +70,7 @@ export const productionLogs = pgTable('production_logs', {
   makeupChanged: boolean('makeup_changed').default(false),
   makeupUsageMl: decimal('makeup_usage_ml', { precision: 8, scale: 2 }),
 
-  // QC Parameters (Laboratory Telemetry)
-  phValue: decimal('ph_value', { precision: 4, scale: 2 }),
-  tdsValue: decimal('tds_value', { precision: 6, scale: 2 }),
-  testResult: qcStatusEnum('test_result'),
+
   
   loggedAt: timestamp('logged_at').notNull(),
   receivedAt: timestamp('received_at').defaultNow().notNull(),
@@ -172,17 +168,7 @@ export const deviceTokens = pgTable('device_tokens', {
 
 // ── NEW PRODUCTION MODULES (Phase 2 Redesign) ──
 
-export const qualityChecks = pgTable('quality_checks', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  batchId: uuid('batch_id').references(() => productionBatches.id, { onDelete: 'cascade' }).notNull(),
-  inspectorId: uuid('inspector_id').references(() => users.id).notNull(),
-  checkType: varchar('check_type', { length: 100 }).notNull(), // e.g., 'Bottle Integrity', 'PH Level'
-  result: varchar('result', { length: 20 }).notNull(), // 'PASS', 'FAIL'
-  parameters: jsonb('parameters').notNull(), // e.g., { "ph": 7.2, "weight": "500g" }
-  reportUrl: varchar('report_url', { length: 255 }),
-  remarks: varchar('remarks', { length: 500 }),
-  checkedAt: timestamp('checked_at').defaultNow().notNull(),
-});
+
 
 export const packagingLogs = pgTable('packaging_logs', {
   id: uuid('id').defaultRandom().primaryKey(),

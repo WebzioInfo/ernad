@@ -41,7 +41,7 @@ export default function FactoryControlCenter() {
   });
 
   const activeBatches = batches?.filter((b: any) => b.status === 'RUNNING' || b.status === 'ACTIVE') || [];
-  const pendingApproval = batches?.filter((b: any) => b.status === 'WAITING_APPROVAL' || b.status === 'QC_PENDING') || [];
+  const pendingApproval = batches?.filter((b: any) => b.status === 'WAITING_APPROVAL') || [];
   const recentlyClosed = batches?.filter((b: any) => b.status === 'CLOSED' || b.status === 'COMPLETED').slice(0, 5) || [];
 
   return (

@@ -37,12 +37,7 @@ export const productionConfig: ModuleConfig = {
       path: 'production-logs',
       element: lazy(() => import('./ProductionLogsManager')),
       allowedRoles: ['ADMIN', 'MANAGER']
-    },
-    /* {
-      path: 'quality',
-      element: lazy(() => import('./QualityManagementPage')),
-      allowedRoles: ['ADMIN', 'MANAGER']
-    } */
+    }
   ],
   sidebarGroups: [
     {
@@ -85,19 +80,6 @@ export const productionConfig: ModuleConfig = {
           allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]
-    },
-    /* {
-      id: 'quality',
-      label: 'Quality',
-      items: [
-        {
-          id: 'quality_qc',
-          label: 'Quality Checks',
-          icon: ShieldCheck,
-          path: '/quality',
-          allowedRoles: ['ADMIN', 'MANAGER']
-        }
-      ]
-    } */
+    }
   ]
 };

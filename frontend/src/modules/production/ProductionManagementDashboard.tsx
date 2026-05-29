@@ -17,7 +17,7 @@ import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
 import useAuthStore from '../auth/auth.store';
 
-type BatchStatus = 'RUNNING' | 'CHANGEOVER' | 'QC_PENDING' | 'COMPLETED' | 'CLOSED' | string;
+type BatchStatus = 'RUNNING' | 'CHANGEOVER' | 'COMPLETED' | 'CLOSED' | string;
 
 interface ProductionLine {
   id: string;
@@ -43,8 +43,6 @@ const statusClass = (status: BatchStatus) => {
       return 'bg-emerald-50 text-emerald-700 border-emerald-100';
     case 'CHANGEOVER':
       return 'bg-sky-50 text-sky-700 border-sky-100';
-    case 'QC_PENDING':
-      return 'bg-amber-50 text-amber-700 border-amber-100';
     case 'COMPLETED':
     case 'CLOSED':
       return 'bg-slate-100 text-slate-600 border-slate-200';

@@ -51,8 +51,7 @@ const stations: { id: StationId; label: string }[] = [
   { id: 'BLOWING', label: 'Blowing' },
   { id: 'FILLING', label: 'Filling' },
   { id: 'LABELING', label: 'Labeling' },
-  { id: 'PACKING', label: 'Packing' },
-  { id: 'QC', label: 'QC' },
+  { id: 'PACKING', label: 'Packing' }
 ];
 
 const formatDate = (value?: string | null) => {

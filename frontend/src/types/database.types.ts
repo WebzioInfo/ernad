@@ -11,12 +11,11 @@ export type BatchStatus =
   | 'RUNNING'
   | 'CHANGEOVER'
   | 'WAITING_APPROVAL'
-  | 'QC_PENDING'
   | 'APPROVED'
   | 'COMPLETED'
   | 'CLOSED';
 
-export type StationType = 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING' | 'QC';
+export type StationType = 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING';
 
 export type EventType =
   | 'POWER_FAILURE'
@@ -28,9 +27,8 @@ export type EventType =
   | 'BATCH_END'
   | 'DOWNTIME_PAUSE';
 
-export type QcStatus = 'PENDING' | 'PASSED' | 'FAILED' | 'ON_HOLD' | 'RELEASED';
 
-export type TerminalType = 'PRODUCTION' | 'QC' | 'MAINTENANCE' | 'SUPERVISOR' | 'KIOSK';
+export type TerminalType = 'PRODUCTION' | 'MAINTENANCE' | 'SUPERVISOR' | 'KIOSK';
 export type TerminalStatus = 'OFFLINE' | 'ONLINE' | 'MAINTENANCE' | 'LOCKED';
 export type TerminalTrustMode =
   | 'STRICT_KIOSK'
@@ -42,7 +40,6 @@ export type NoteType =
   | 'GENERAL'
   | 'PRODUCTION'
   | 'MAINTENANCE'
-  | 'QUALITY'
   | 'SHIFT_HANDOVER'
   | 'INCIDENT'
   | 'BREAKDOWN'
@@ -453,10 +450,6 @@ export interface ProductionLog {
   materialCost?: string | null;
   boxCount?: number | null;
   secondaryPackagingCount: number;
-  // QC inline
-  phValue?: string | null;
-  tdsValue?: string | null;
-  testResult?: QcStatus | null;
   // Timestamps
   loggedAt: string;
   receivedAt: string;
@@ -490,18 +483,6 @@ export interface BatchTotal {
   updatedAt: string;
 }
 
-export interface QualityCheck {
-  id: string;
-  batchId: string;
-  factoryId: string;
-  inspectorId: string;
-  checkType: string;
-  result: 'PASS' | 'FAIL';
-  parameters: Record<string, any>;
-  reportUrl?: string | null;
-  remarks?: string | null;
-  checkedAt: string;
-}
 
 export interface PackagingLog {
   id: string;
@@ -533,7 +514,7 @@ export interface AuditLog {
   action: string;
   entityType?: string | null;
   entityId?: string | null;
-  /** AUTH | PRODUCTION | TELEMETRY | INVENTORY | QC | SALES | SECURITY | GENERAL */
+  /** AUTH | PRODUCTION | TELEMETRY | INVENTORY | SALES | SECURITY | GENERAL */
   category: string;
   requestId?: string | null;
   payload?: Record<string, any> | null;
@@ -832,9 +813,6 @@ export interface ProductionLogExpanded extends ProductionLog {
   user?: Pick<User, 'id' | 'name' | 'username'>;
 }
 
-export interface QualityCheckExpanded extends QualityCheck {
-  inspector?: Pick<User, 'id' | 'name'>;
-}
 
 export interface SalesOrderExpanded extends SalesOrder {
   customer?: Pick<Customer, 'id' | 'name' | 'code'>;

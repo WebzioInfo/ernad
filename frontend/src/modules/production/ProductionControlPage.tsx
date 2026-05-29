@@ -266,7 +266,7 @@ function ProductionCommander({ line, onBack, brands, products, shifts, operators
 
   const { data: batchHistory } = useQuery({
     queryKey: ['line-batch-history', line.id],
-    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES, { params: { lineId: line.id, status: 'COMPLETED,CLOSED,QC_PENDING' } })).data,
+    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES, { params: { lineId: line.id, status: 'COMPLETED,CLOSED' } })).data,
   });
 
   return (
@@ -627,7 +627,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
     onSuccess: () => {
       invalidate();
       setStopConfirmOpen(false);
-      toast.success('Production moved to QC_PENDING');
+      toast.success('Production moved to CLOSED');
     },
     onError: (error: any) => {
       const msg = error.response?.data?.message || error.message;
@@ -736,7 +736,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
         )}
       </div>
 
-      {['QC_PENDING', 'COMPLETED', 'CLOSED'].includes(line.batch?.status) && (
+      {['COMPLETED', 'CLOSED'].includes(line.batch?.status) && (
         <button
           onClick={() => setReopenModalOpen(true)}
           className="w-full py-5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-[2rem] font-black uppercase tracking-widest text-[10px] hover:bg-indigo-100 transition-all flex items-center justify-center gap-3"
@@ -782,7 +782,7 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
               <ShieldAlert className="w-10 h-10" />
             </div>
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">Finalize Production?</h3>
-            <p className="text-slate-500 font-medium mt-2">Closing batch will trigger inventory deduction and move state to QC Pending.</p>
+            <p className="text-slate-500 font-medium mt-2">Closing batch will trigger inventory deduction and complete the batch.</p>
           </div>
 
           <div className="mb-4">

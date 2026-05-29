@@ -35,8 +35,8 @@ export default function AuditLogsPage() {
   });
 
   const getSeverity = (log: AuditLog) => {
-    const action = log.action.toUpperCase();
-    const entity = log.entityType.toUpperCase();
+    const action = (log.action || '').toUpperCase();
+    const entity = (log.entityType || '').toUpperCase();
     
     if (action.includes('DELETE') || action.includes('RESET-PIN') || entity === 'AUTH') return 'SECURITY';
     if (action.includes('POST') || action.includes('PATCH')) return 'CRITICAL';
@@ -99,7 +99,7 @@ export default function AuditLogsPage() {
   const filteredLogs = logs?.filter(log => {
     const matchesSearch = !searchTerm || 
       log.actorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.action || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesSeverity = severityFilter === 'ALL' || getSeverity(log) === severityFilter;
     const matchesModule = moduleFilter === 'ALL' || log.entityType === moduleFilter;

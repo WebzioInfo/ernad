@@ -11,11 +11,13 @@ import {
   ShieldAlert,
   TimerReset,
   Wrench,
+  Activity,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../../services/api-client';
 import { ENDPOINTS } from '../../../constants/endpoints';
 import useAuthStore from '../../auth/auth.store';
+import ConfirmationModal from '../../../components/common/ConfirmationModal';
 
 type Category = 'FACTORY' | 'LINE' | 'STATION';
 type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
@@ -50,7 +52,7 @@ interface Incident {
   productionImpact: boolean;
 }
 
-const stations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC'];
+const stations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'];
 const statusFlow: Status[] = ['ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
 
 const priorityClass: Record<Priority, string> = {
@@ -93,6 +95,9 @@ export default function IncidentsDashboard() {
     beforeImageUrl: '',
   });
 
+  const [pendingStatusChange, setPendingStatusChange] = useState<{id: string, status: Status} | null>(null);
+  const [pendingIncidentCreate, setPendingIncidentCreate] = useState(false);
+
   const { data: incidentTypes = [] } = useQuery<IncidentType[]>({
     queryKey: ['incident-types', form.category],
     queryFn: async () => (await api.get(ENDPOINTS.INCIDENTS.TYPES, { params: { category: form.category } })).data,
@@ -111,6 +116,12 @@ export default function IncidentsDashboard() {
   const { data: analytics } = useQuery<any>({
     queryKey: ['incident-analytics', filters.lineId, filters.stationId],
     queryFn: async () => (await api.get(ENDPOINTS.INCIDENTS.ANALYTICS, { params: { lineId: filters.lineId, stationId: filters.stationId } })).data,
+  });
+
+  const factoryQuery = useQuery({
+    queryKey: ['factory-live-incidents'],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,
+    refetchInterval: 30000,
   });
 
   const selectedType = incidentTypes.find((type) => type.id === form.incidentTypeId);
@@ -224,9 +235,31 @@ export default function IncidentsDashboard() {
               </div>
             )}
             <div className="flex justify-end">
-              <button disabled={!form.incidentTypeId || createMutation.isPending} onClick={() => createMutation.mutate()} className="h-10 w-full rounded-lg bg-slate-900 px-4 text-xs font-black uppercase tracking-widest text-white transition hover:bg-slate-800 disabled:opacity-50 sm:w-auto">
+              <button disabled={!form.incidentTypeId || createMutation.isPending} onClick={() => setPendingIncidentCreate(true)} className="h-10 w-full rounded-lg bg-slate-900 px-4 text-xs font-black uppercase tracking-widest text-white transition hover:bg-slate-800 disabled:opacity-50 sm:w-auto">
                 {createMutation.isPending ? 'Reporting...' : 'Commit Incident'}
               </button>
+            </div>
+          </section>
+        )}
+
+        {factoryQuery.data?.activeDowntimes?.length > 0 && (
+          <section className="rounded-lg border border-rose-200 bg-rose-50 p-4 shadow-sm animate-in fade-in">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="h-5 w-5 text-rose-600 animate-pulse" />
+              <h3 className="text-sm font-black uppercase tracking-widest text-rose-900">Critical Active Machine Stops</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {factoryQuery.data.activeDowntimes.map((stop: any) => (
+                <div key={stop.id} className="bg-white p-3 rounded-lg border border-rose-100 flex items-center gap-3 shadow-sm hover:border-rose-300 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-slate-900 uppercase truncate">Stop: {stop.reason?.replace('_', ' ')}</p>
+                    <p className="text-[10px] font-bold text-slate-500 mt-0.5 truncate">{stop.line || 'Unknown Line'} • {stop.station}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         )}
@@ -267,7 +300,7 @@ export default function IncidentsDashboard() {
                     </div>
                     <div className="flex w-full flex-wrap gap-2 xl:w-auto xl:justify-end">
                       {visibleNextStatuses(incident).map(status => (
-                        <button key={status} disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ id: incident.id, status })} className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
+                        <button key={status} disabled={statusMutation.isPending} onClick={() => setPendingStatusChange({ id: incident.id, status })} className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-600 transition hover:bg-slate-50 disabled:opacity-50">
                           {status.replace('_', ' ')}
                         </button>
                       ))}
@@ -296,6 +329,34 @@ export default function IncidentsDashboard() {
           ))}
         </section>
       </div>
+
+      <ConfirmationModal
+        isOpen={pendingIncidentCreate}
+        onClose={() => setPendingIncidentCreate(false)}
+        onConfirm={() => {
+          createMutation.mutate();
+          setPendingIncidentCreate(false);
+        }}
+        title="Report Incident"
+        message="Are you sure you want to report this incident? Please ensure all details are accurate."
+        confirmText="Yes, Report"
+        variant="primary"
+      />
+
+      <ConfirmationModal
+        isOpen={!!pendingStatusChange}
+        onClose={() => setPendingStatusChange(null)}
+        onConfirm={() => {
+          if (pendingStatusChange) {
+            statusMutation.mutate(pendingStatusChange);
+            setPendingStatusChange(null);
+          }
+        }}
+        title="Update Incident Status"
+        message={`Are you sure you want to change the status to ${pendingStatusChange?.status.replace('_', ' ')}?`}
+        confirmText="Yes, Update"
+        variant="primary"
+      />
     </div>
   );
 }

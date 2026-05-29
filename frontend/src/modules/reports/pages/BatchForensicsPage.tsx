@@ -5,8 +5,9 @@ import { api } from '../../../services/api-client';
 import {
   X, Activity, Edit3,
   Check, AlertCircle, User, Clock,
-  TrendingUp, Layers, Tag, MapPin, ChevronLeft
+  TrendingUp, Layers, Tag, MapPin, ChevronLeft, Loader2
 } from 'lucide-react';
+import { generateBatchAuditPDF } from '../../../utils/pdfExport';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -27,6 +28,7 @@ export default function BatchForensicsPage() {
   const queryClient = useQueryClient();
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ primaryCount: 0, wastageCount: 0, remarks: '' });
+  const [isExporting, setIsExporting] = useState(false);
 
   // 1. Fetch Dossier (Metadata + Totals + Trend)
   const { data: dossier, isLoading: loadingDossier } = useQuery({
@@ -64,6 +66,17 @@ export default function BatchForensicsPage() {
       wastageCount: log.wastageCount,
       remarks: log.remarks || ''
     });
+  };
+
+  const downloadAuditPDF = async () => {
+    if (!dossier) return;
+    setIsExporting(true);
+    await new Promise(r => setTimeout(r, 800));
+    try {
+      await generateBatchAuditPDF(dossier.metadata, dossier.totals, logs || [], station);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (loadingDossier) return (
@@ -115,7 +128,14 @@ export default function BatchForensicsPage() {
           </div>
 
           <div className="flex gap-4">
-            <button className="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all">Download Audit PDF</button>
+            <button 
+              onClick={downloadAuditPDF}
+              disabled={isExporting || loadingDossier || loadingLogs}
+              className="px-8 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {isExporting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isExporting ? 'Generating...' : 'Download Audit PDF'}
+            </button>
             <button className="px-8 py-4 bg-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-500/20">Archive Batch</button>
           </div>
         </div>

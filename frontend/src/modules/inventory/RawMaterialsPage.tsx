@@ -8,12 +8,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 export default function RawMaterialsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [materialToDelete, setMaterialToDelete] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -66,9 +68,7 @@ export default function RawMaterialsPage() {
   });
 
   const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this raw material?')) {
-      deleteMaterialMutation.mutate(id);
-    }
+    setMaterialToDelete(id);
   };
 
   const filteredMaterials = rawMaterials?.filter((m: any) => {
@@ -234,6 +234,21 @@ export default function RawMaterialsPage() {
           isPending={createMaterialMutation.isPending || updateMaterialMutation.isPending}
         />
       )}
+      
+      <ConfirmationModal
+        isOpen={!!materialToDelete}
+        onClose={() => setMaterialToDelete(null)}
+        onConfirm={() => {
+          if (materialToDelete) {
+            deleteMaterialMutation.mutate(materialToDelete);
+            setMaterialToDelete(null);
+          }
+        }}
+        title="Delete Raw Material"
+        message="Are you sure you want to delete this raw material? This action cannot be undone."
+        variant="danger"
+        confirmText="Yes, Delete"
+      />
     </div>
   );
 }

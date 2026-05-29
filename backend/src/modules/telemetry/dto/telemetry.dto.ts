@@ -18,10 +18,10 @@ export class TelemetryDto {
   lineId: string;
 
   @ApiProperty()
-  @IsEnum(['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC'])
+  @IsEnum(['BLOWING', 'FILLING', 'LABELING', 'PACKING'])
   @IsNotEmpty()
   @IsString()
-  station: 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING' | 'QC';
+  station: 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING';
 
   @ApiProperty()
   @IsUUID()
@@ -206,20 +206,7 @@ export class TelemetryDto {
   @IsOptional()
   materials?: any[];
   
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  phValue?: number;
 
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  tdsValue?: number;
-
-  @ApiProperty()
-  @IsEnum(['PASSED', 'FAILED', 'PENDING'])
-  @IsOptional()
-  testResult?: 'PASSED' | 'FAILED' | 'PENDING';
 
   @ApiProperty()
   @IsString()

@@ -40,7 +40,6 @@ export const ENDPOINTS = {
     REASSIGN_OPERATORS: (id: string) => `production/batches/${id}/reassign-operators`,
     ADJUST_TIME: (id: string) => `production/batches/${id}/adjust-time`,
     COMPLETE_CHANGEOVER: (id: string) => `production/batches/${id}/complete-changeover`,
-    QUALITY_CHECKS: 'production/quality-checks',
     PACKAGING_LOGS: 'production/packaging-logs',
     DISPATCH_LOGS: 'production/dispatch-logs',
     LINE_CHANGEOVER: (id: string) => `production/lines/${id}/changeover`,

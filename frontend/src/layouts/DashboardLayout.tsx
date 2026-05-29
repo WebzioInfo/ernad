@@ -88,10 +88,10 @@ export default function DashboardLayout() {
 
     // Define canonical order for groups
     const userRole = String(user?.role || '').toUpperCase();
-    const order = userRole === 'MANAGER' 
-      ? ['overview', 'production', 'quality', 'inventory', 'team', 'reports']
-      : ['overview', 'production', 'team', 'inventory', 'quality', 'reports', 'system'];
-      
+    const order = userRole === 'MANAGER'
+      ? ['overview', 'production', 'inventory', 'team', 'reports']
+      : ['overview', 'production', 'team', 'inventory', 'reports', 'system'];
+
     return Object.values(merged).sort((a, b) => {
       const idxA = order.indexOf(a.id);
       const idxB = order.indexOf(b.id);
@@ -117,7 +117,7 @@ export default function DashboardLayout() {
       path.startsWith('/operator/');
 
     if (isTopLevelWorkflow) return path;
-    
+
     const userRole = String(user?.role || '').toUpperCase();
     const base = (userRole === 'MANAGER') ? '/manager' : '/admin';
     return `${base}${path}`;
@@ -129,7 +129,7 @@ export default function DashboardLayout() {
 
       {/* Mobile Sidebar Backdrop Overlay */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-30 md:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
@@ -138,11 +138,11 @@ export default function DashboardLayout() {
       {/* Sidebar */}
       <aside className={cn(
         "bg-slate-900 transition-all duration-300 ease-in-out flex flex-col z-40 fixed md:relative inset-y-0 left-0 h-full",
-        isSidebarOpen 
-          ? "w-72 translate-x-0" 
+        isSidebarOpen
+          ? "w-72 translate-x-0"
           : "w-72 -translate-x-full md:w-20 md:translate-x-0"
       )}>
-        <div className="h-24 flex items-center px-6">
+        <div className="h-24 flex items-center px-0">
           <div className="w-20 h-16 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
             <img src="/fav-nobg.png" alt="Eranad logo" className="h-full w-full object-contain" />
           </div>

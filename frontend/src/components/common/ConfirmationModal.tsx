@@ -8,7 +8,7 @@ interface ConfirmationModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'info';
+  variant?: 'danger' | 'warning' | 'info' | 'primary';
 }
 
 export default function ConfirmationModal({
@@ -26,13 +26,15 @@ export default function ConfirmationModal({
   const colors = {
     danger: 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white',
     warning: 'bg-amber-500 hover:bg-amber-600 shadow-amber-200 text-white',
-    info: 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 text-white'
+    info: 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 text-white',
+    primary: 'bg-[#1A9A91] hover:bg-[#157C75] shadow-[#1A9A91]/20 text-white'
   };
 
   const iconColors = {
     danger: 'text-rose-600 bg-rose-50',
     warning: 'text-amber-500 bg-amber-50',
-    info: 'text-indigo-600 bg-indigo-50'
+    info: 'text-indigo-600 bg-indigo-50',
+    primary: 'text-[#1A9A91] bg-[#1A9A91]/10'
   };
 
   return (

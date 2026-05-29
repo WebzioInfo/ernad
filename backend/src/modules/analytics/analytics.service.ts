@@ -17,21 +17,22 @@ export class AnalyticsService {
 
   async getLinePerformance(lineId: string, shiftId?: string, brandId?: string, productId?: string) {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(lineId)) {
+    if (lineId !== 'all' && !uuidRegex.test(lineId)) {
       throw new NotFoundException('Invalid production line identifier.');
     }
     // 1. Find the relevant batch(es)
     const conditions = [
-      eq(productionBatches.lineId, lineId),
       eq(productionBatches.status, 'RUNNING')
     ];
 
+    if (lineId !== 'all') conditions.push(eq(productionBatches.lineId, lineId));
     if (brandId) conditions.push(eq(productionBatches.brandId, brandId));
     if (productId) conditions.push(eq(productionBatches.productId, productId));
 
     const batches = await db.select({ 
       id: productionBatches.id,
-      targetBPM: products.targetBPM
+      targetBPM: products.targetBPM,
+      lineId: productionBatches.lineId
     })
     .from(productionBatches)
     .leftJoin(products, eq(productionBatches.productId, products.id))
@@ -39,51 +40,47 @@ export class AnalyticsService {
     
     if (!batches.length) return null;
 
-    const activeBatchId = batches[0].id;
-    const targetBPM = batches[0].targetBPM || 120;
+    let totalBlowing = 0, totalFilling = 0, totalLabeling = 0, totalPacking = 0;
+    let totalCurrentBPM = 0;
+    let targetBPM = 0;
+    let activeOperators = 0;
 
-    // 1.5 Fetch active operators count
-    const [{ count: activeOperators }] = await db.select({ 
-      count: sql<number>`count(*)` 
-    })
-    .from(userLines)
-    .where(eq(userLines.lineId, lineId));
-
-    // 2. Try Speed Layer (Redis) First
-    const redisTotals = await this.redisService.getBatchTotals(activeBatchId);
-    let data: any;
-
-    if (redisTotals && Object.keys(redisTotals).length > 0) {
-      data = {
-        blowingTotal: parseInt(String(redisTotals.blowing || '0')),
-        fillingTotal: parseInt(String(redisTotals.filling || '0')),
-        labelingTotal: parseInt(String(redisTotals.labeling || '0')),
-        packingTotal: parseInt(String(redisTotals.packing || '0')),
-      };
-    } else {
-      // Fallback to PostgreSQL (Primary Source of Truth)
-      const totals = await db.select().from(batchTotals)
-        .where(eq(batchTotals.batchId, activeBatchId));
+    for (const batch of batches) {
+      targetBPM += batch.targetBPM || 120;
       
-      if (!totals.length) return null;
-      data = totals[0];
+      const [{ count }] = await db.select({ count: sql<number>`count(*)` })
+        .from(userLines).where(eq(userLines.lineId, batch.lineId as string));
+      activeOperators += Number(count || 0);
 
-      // Re-populate Speed Layer if missing
-      await this.redisService.setBatchTotals(activeBatchId, {
-        blowing: data.blowingTotal,
-        filling: data.fillingTotal,
-        labeling: data.labelingTotal,
-        packing: data.packingTotal,
-      });
+      const redisTotals = await this.redisService.getBatchTotals(batch.id);
+      if (redisTotals && Object.keys(redisTotals).length > 0) {
+        totalBlowing += parseInt(String(redisTotals.blowing || '0'));
+        totalFilling += parseInt(String(redisTotals.filling || '0'));
+        totalLabeling += parseInt(String(redisTotals.labeling || '0'));
+        totalPacking += parseInt(String(redisTotals.packing || '0'));
+      } else {
+        const totals = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batch.id));
+        if (totals.length) {
+          totalBlowing += totals[0].blowingTotal || 0;
+          totalFilling += totals[0].fillingTotal || 0;
+          totalLabeling += totals[0].labelingTotal || 0;
+          totalPacking += totals[0].packingTotal || 0;
+        }
+      }
+
+      totalCurrentBPM += await this.calculateCurrentBPM(batch.lineId as string);
+    }
+
+    if (lineId === 'all') {
+      targetBPM = targetBPM / batches.length; // Average target BPM
     }
 
     // 2. Real OEE Calculation (Phase 5)
     // Quality = (Total Packed - Rework) / Total Blowing
-    const quality = data.blowingTotal > 0 ? (data.packingTotal / data.blowingTotal) : 0;
+    const quality = totalBlowing > 0 ? (totalPacking / totalBlowing) : 0;
     
     // Performance = Actual Throughput / Target Throughput
-    const currentBPM = await this.calculateCurrentBPM(lineId);
-    const performance = Math.min(currentBPM / targetBPM, 1);
+    const performance = Math.min(totalCurrentBPM / targetBPM, 1);
     
     // Availability = Operating Time / Planned Production Time (Assume 8h shift)
     const availability = 0.92; // Calculated via shift logs in future phase
@@ -96,15 +93,15 @@ export class AnalyticsService {
       availability: Math.round(availability * 100),
       performance: Math.round(performance * 100),
       quality: Math.round(quality * 100),
-      bpm: Math.round(currentBPM),
+      bpm: Math.round(totalCurrentBPM),
       stats: [
-        { station: 'BLOWING', total: data.blowingTotal },
-        { station: 'FILLING', total: data.fillingTotal },
-        { station: 'LABELING', total: data.labelingTotal },
-        { station: 'PACKING', total: data.packingTotal }
+        { station: 'BLOWING', total: totalBlowing },
+        { station: 'FILLING', total: totalFilling },
+        { station: 'LABELING', total: totalLabeling },
+        { station: 'PACKING', total: totalPacking }
       ],
       generatedAt: new Date(),
-      activeOperators: Number(activeOperators || 0),
+      activeOperators: activeOperators,
       yesterday: {
         oee: 84, // Placeholder for historical data
         totalOutput: 42000,
@@ -326,10 +323,16 @@ export class AnalyticsService {
         .where(sql`${inventoryStock.quantity} <= ${inventoryStock.minimumStock}`)
         .limit(5);
 
-      const activeDowntimes = await db.select()
-        .from(downtimeLogs)
-        .where(and(isNull(downtimeLogs.endTime), isNull(downtimeLogs.deletedAt)))
-        .limit(5);
+      const activeDowntimes = await db.select({
+        id: downtimeLogs.id,
+        reason: downtimeLogs.reason,
+        station: downtimeLogs.station,
+        line: productionLines.name,
+      })
+      .from(downtimeLogs)
+      .leftJoin(productionLines, eq(downtimeLogs.lineId, productionLines.id))
+      .where(and(isNull(downtimeLogs.endTime), isNull(downtimeLogs.deletedAt)))
+      .limit(5);
 
       const latestStops = await db.select({
         id: downtimeLogs.id,

@@ -7,14 +7,16 @@ import {
   FileText, Download, Filter,
   Calendar, Layers, Tag, ChevronRight,
   AlertTriangle, CheckCircle2, History,
-  Clock, MapPin
+  Clock, MapPin, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateProductionPDF } from '../../../utils/pdfExport';
 
 export default function ProductionReportsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'summaries' | 'batches'>('summaries');
+  const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState({
     start: format(new Date().setDate(new Date().getDate() - 7), 'yyyy-MM-dd'),
     end: format(new Date(), 'yyyy-MM-dd')
@@ -42,8 +44,14 @@ export default function ProductionReportsPage() {
     enabled: activeTab === 'batches'
   });
 
-  const exportPDF = () => {
-    window.print();
+  const exportPDF = async () => {
+    setIsExporting(true);
+    await new Promise(r => setTimeout(r, 800));
+    try {
+      await generateProductionPDF(dateRange, reportData || [], batchesData || []);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -108,10 +116,11 @@ export default function ProductionReportsPage() {
         </div>
         <button
           onClick={exportPDF}
-          className="h-[60px] px-8 bg-white text-slate-900 border border-slate-100 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+          disabled={isExporting}
+          className="h-[60px] px-8 bg-white text-slate-900 border border-slate-100 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm active:scale-95 disabled:opacity-50"
         >
-          <Download className="w-4 h-4" />
-          Export PDF
+          {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {isExporting ? 'Generating...' : 'Export PDF'}
         </button>
         <button className="h-[60px] w-[60px] bg-slate-900 text-white rounded-2xl shadow-lg hover:bg-slate-800 transition-all active:scale-90 flex items-center justify-center">
           <Filter className="w-5 h-5" />

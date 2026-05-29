@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import { 
   productionBatches, batchTotals, productionLines,
-  qualityChecks, packagingLogs, dispatchLogs, userRoles, roles, operatorSessions,
+  packagingLogs, dispatchLogs, userRoles, roles, operatorSessions,
   finishedGoodsInventory, inventoryStock, warehouseLocations, inventoryTransactions
 } from '../../../database/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
@@ -161,56 +161,6 @@ export class LifecycleService {
     });
   }
 
-  async submitQualityCheck(batchId: string, inspectorId: string, result: 'PASS' | 'FAIL', params: Record<string, any>, remarks?: string) {
-    return await db.transaction(async (tx) => {
-      const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
-      if (!batch) throw new BadRequestException('Batch not found.');
-      if (batch.status !== 'QC_PENDING') {
-        throw new BadRequestException(`Invalid state for QC: ${batch.status}. Batch must be QC_PENDING.`);
-      }
-
-      const check = await tx.insert(qualityChecks).values({
-        batchId,
-        inspectorId,
-        checkType: 'PRODUCTION_SAMPLE',
-        result,
-        parameters: params,
-        remarks: remarks,
-        checkedAt: new Date(),
-      }).returning();
-
-      if (result === 'PASS') {
-        await tx.update(productionBatches)
-          .set({ status: 'COMPLETED' })
-          .where(and(eq(productionBatches.id, batchId), eq(productionBatches.status, 'QC_PENDING')));
-
-        // ── GENERATE FINISHED GOODS ──
-        const [totals] = await tx.select().from(batchTotals).where(eq(batchTotals.batchId, batchId));
-        const [warehouse] = await tx.select().from(warehouseLocations)
-          .where(eq(warehouseLocations.type, 'FINISHED_GOODS'))
-          .limit(1);
-
-        if (warehouse && totals.packingTotal > 0) {
-          await tx.insert(finishedGoodsInventory).values({
-            productId: batch.productId,
-            warehouseId: warehouse.id,
-            quantity: totals.packingTotal,
-            status: 'AVAILABLE',
-            updatedAt: new Date(),
-          }).onConflictDoUpdate({
-            target: [finishedGoodsInventory.productId, finishedGoodsInventory.warehouseId],
-            set: { 
-              quantity: sql`${finishedGoodsInventory.quantity} + ${totals.packingTotal}`,
-              updatedAt: new Date()
-            }
-          });
-        }
-      }
-
-      return check[0];
-    });
-  }
-
   async logPackaging(batchId: string, operatorId: string, packType: string, quantity: number, unitsPerPack: number, remarks?: string) {
     return await db.transaction(async (tx) => {
       const [batch] = await tx.select().from(productionBatches).where(eq(productionBatches.id, batchId)).for('update');
@@ -316,10 +266,7 @@ export class LifecycleService {
   }
 
   async getLifecycleLogs(type?: 'qc' | 'packaging' | 'dispatch') {
-    if (type === 'qc') {
-      return await db.select().from(qualityChecks)
-        .orderBy(desc(qualityChecks.checkedAt)).limit(50);
-    } else if (type === 'packaging') {
+    if (type === 'packaging') {
       return await db.select().from(packagingLogs)
         .orderBy(desc(packagingLogs.createdAt)).limit(50);
     } else {

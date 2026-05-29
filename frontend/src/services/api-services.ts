@@ -14,7 +14,6 @@ import type {
   ProductionLog,
   OperatorSession,
   DowntimeLog,
-  QualityCheck,
   PackagingLog,
   DispatchLog,
   BatchTotal,
@@ -118,16 +117,6 @@ export const ProductionService = {
   toggleMaintenance: (lineId: string) =>
     api.post(ENDPOINTS.PRODUCTION.TOGGLE_MAINTENANCE(lineId)).then(r => r.data),
 
-  submitQualityCheck: (payload: {
-    batchId: string;
-    inspectorId: string;
-    checkType: string;
-    result: 'PASS' | 'FAIL';
-    parameters: Record<string, any>;
-    remarks?: string;
-  }) =>
-    api.post<QualityCheck>(ENDPOINTS.PRODUCTION.QUALITY_CHECKS, payload).then(r => r.data),
-
   logPackaging: (payload: {
     batchId: string;
     operatorId: string;
@@ -148,7 +137,7 @@ export const ProductionService = {
   }) =>
     api.post<DispatchLog>(ENDPOINTS.PRODUCTION.DISPATCH_LOGS, payload).then(r => r.data),
 
-  getLifecycleLogs: (type: 'qc' | 'packaging' | 'dispatch') =>
+  getLifecycleLogs: (type: 'packaging' | 'dispatch') =>
     api.get(ENDPOINTS.PRODUCTION.LOGS(type)).then(r => r.data),
 
   reassignOperators: (batchId: string, operatorIds: string[]) =>
@@ -166,7 +155,7 @@ export interface TelemetryLogPayload {
   brandId: string;
   productId: string;
   shiftId: string;
-  station: 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING' | 'QC';
+  station: 'BLOWING' | 'FILLING' | 'LABELING' | 'PACKING';
   primaryCount: number;
   wastageCount: number;
   secondaryPackagingCount?: number;
@@ -191,10 +180,6 @@ export interface TelemetryLogPayload {
   finishedGoodsProduced?: number;
   casesProduced?: number;
   packingTypeId?: string;
-  // QC inline
-  phValue?: number;
-  tdsValue?: number;
-  testResult?: 'PASSED' | 'FAILED' | 'PENDING';
   // Inventory linkage
   selectedStockId?: string;
 }

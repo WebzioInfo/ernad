@@ -56,6 +56,8 @@ export class ReportsController {
     return this.reportsService.getProductionBatches({ startDate, endDate });
   }
 
+  @Get('batch/:id')
+  @Permissions('reports:view')
   @ApiOperation({ summary: 'Get immutable batch dossier' })
   async getBatchDossier(@Req() req: any, @Param('id') id: string) {
     const roles = req.user?.roles || [];

@@ -52,7 +52,7 @@ export const telemetryLogSchema = z.object({
   shiftId:                z.string().uuid(),
   brandId:                z.string().uuid(),
   productId:              z.string().uuid(),
-  station:                z.enum(['BLOWING', 'FILLING', 'LABELING', 'PACKING', 'QC']),
+  station:                z.enum(['BLOWING', 'FILLING', 'LABELING', 'PACKING']),
   primaryCount:           z.number().int().min(0),
   wastageCount:           z.number().min(0),
   secondaryPackagingCount: z.number().int().min(0).default(0),
@@ -75,26 +75,12 @@ export const telemetryLogSchema = z.object({
   finishedGoodsProduced:  z.number().int().min(0).optional(),
   casesProduced:          z.number().int().min(0).optional(),
   packingTypeId:          z.string().uuid().optional(),
-  // QC inline
-  phValue:                z.number().min(0).max(14).optional(),
-  tdsValue:               z.number().min(0).optional(),
-  testResult:             z.enum(['PASSED', 'FAILED', 'PENDING']).optional(),
+
   selectedStockId:        z.string().uuid().optional(),
 });
 export type TelemetryLogForm = z.infer<typeof telemetryLogSchema>;
 
-// ─── QUALITY CHECK ────────────────────────────────────────────────────────────
 
-/** POST production/quality-checks – aligns with quality_checks schema */
-export const qualityCheckSchema = z.object({
-  batchId:     z.string().uuid(),
-  inspectorId: z.string().uuid(),
-  checkType:   z.string().max(100).min(1, 'Check type required'),
-  result:      z.enum(['PASS', 'FAIL']),
-  parameters:  z.record(z.any()).default({}),
-  remarks:     z.string().max(500).optional(),
-});
-export type QualityCheckForm = z.infer<typeof qualityCheckSchema>;
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
 
@@ -130,7 +116,7 @@ export type CreateStockForm = z.infer<typeof createStockSchema>;
 export const createNoteSchema = z.object({
   title:             z.string().min(1).max(255),
   content:           z.string().min(1),
-  type:              z.enum(['GENERAL', 'PRODUCTION', 'MAINTENANCE', 'QUALITY',
+  type:              z.enum(['GENERAL', 'PRODUCTION', 'MAINTENANCE',
                               'SHIFT_HANDOVER', 'INCIDENT', 'BREAKDOWN', 'ALERT', 'STOCK']),
   priority:          z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   lineId:            z.string().uuid().optional(),

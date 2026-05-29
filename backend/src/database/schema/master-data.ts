@@ -4,7 +4,7 @@ export const productionLines = pgTable('production_lines', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 100 }).notNull(),
   description: varchar('description', { length: 255 }),
-  status: varchar('status', { length: 50 }).default('IDLE').notNull(), // IDLE, RUNNING, CHANGEOVER, BREAKDOWN, MAINTENANCE, QUALITY_HOLD, SHIFT_CLOSED
+  status: varchar('status', { length: 50 }).default('IDLE').notNull(), // IDLE, RUNNING, CHANGEOVER, BREAKDOWN, MAINTENANCE, SHIFT_CLOSED
   currentEfficiency: decimal('current_efficiency', { precision: 5, scale: 2 }).default('0'),
   
 

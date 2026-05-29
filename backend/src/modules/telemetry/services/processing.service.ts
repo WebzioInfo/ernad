@@ -192,10 +192,6 @@ export class ProcessingService {
         rawMaterialId: dto.rawMaterialId || null,
         bagsUsed: dto.bagsUsed ? String(dto.bagsUsed) : null,
 
-        // QC Data
-        phValue: String(dto.phValue || '0'),
-        tdsValue: String(dto.tdsValue || '0'),
-        testResult: dto.testResult as any,
         loggedAt: dto.loggedAt ? new Date(dto.loggedAt) : new Date(),
       }).returning();
 

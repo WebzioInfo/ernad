@@ -61,9 +61,7 @@ export class ChangeoverDto {
   userId: string;
 }
 
-export class QualityCheckDto {
-
-
+export class LogDowntimeDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -72,15 +70,27 @@ export class QualityCheckDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  inspectorId: string;
-
-  @ApiProperty({ enum: ['PASS', 'FAIL'] })
-  @IsEnum(['PASS', 'FAIL'])
-  result: 'PASS' | 'FAIL';
+  lineId: string;
 
   @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  factoryId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  station: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+
+  @ApiProperty()
+  @IsString()
   @IsOptional()
-  parameters?: Record<string, any>;
+  startTime?: string;
 
   @ApiProperty()
   @IsString()
@@ -89,8 +99,6 @@ export class QualityCheckDto {
 }
 
 export class PackagingLogDto {
-
-
   @ApiProperty()
   @IsString()
   @IsNotEmpty()

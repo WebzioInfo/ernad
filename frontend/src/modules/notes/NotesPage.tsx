@@ -7,11 +7,13 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNotes, useCreateNote } from './hooks/useNotes';
 import { format } from 'date-fns';
+import ConfirmationModal from '../../components/common/ConfirmationModal';
 
 export default function NotesPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [pendingNoteData, setPendingNoteData] = useState<any>(null);
   
   const { data: notes, isLoading } = useNotes({
     search,
@@ -29,8 +31,7 @@ export default function NotesPage() {
       type: formData.get('type'),
       priority: formData.get('priority'),
     };
-    await createNoteMutation.mutateAsync(noteData);
-    setIsCreateModalOpen(false);
+    setPendingNoteData(noteData);
   };
 
   const getPriorityColor = (priority: string) => {
@@ -92,7 +93,7 @@ export default function NotesPage() {
             </h3>
             
             <div className="space-y-2">
-              {['all', 'GENERAL', 'PRODUCTION', 'MAINTENANCE', 'QUALITY', 'SHIFT_HANDOVER', 'INCIDENT', 'STOCK'].map((type) => (
+              {['all', 'GENERAL', 'PRODUCTION', 'MAINTENANCE', 'SHIFT_HANDOVER', 'INCIDENT', 'STOCK'].map((type) => (
                 <button
                   key={type}
                   onClick={() => setTypeFilter(type)}
@@ -233,7 +234,7 @@ export default function NotesPage() {
                       <option value="GENERAL">General</option>
                       <option value="PRODUCTION">Production</option>
                       <option value="MAINTENANCE">Maintenance</option>
-                      <option value="QUALITY">Quality</option>
+
                       <option value="INCIDENT">Incident</option>
                       <option value="SHIFT_HANDOVER">Shift Handover</option>
                     </select>
@@ -277,6 +278,22 @@ export default function NotesPage() {
           </motion.div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={!!pendingNoteData}
+        onClose={() => setPendingNoteData(null)}
+        onConfirm={async () => {
+          if (pendingNoteData) {
+            await createNoteMutation.mutateAsync(pendingNoteData);
+            setPendingNoteData(null);
+            setIsCreateModalOpen(false);
+          }
+        }}
+        title="Commit Note"
+        message="Are you sure you want to commit this note? It will be visible to the team."
+        confirmText="Yes, Commit"
+        variant="primary"
+      />
     </div>
   );
 }
