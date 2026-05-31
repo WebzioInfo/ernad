@@ -20,6 +20,7 @@ import {
 import { eq, sql, desc, ilike, and, isNull, gte } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
 import { ProductionEventsService } from '../../realtime/production.gateway';
+import { sumRawMaterialTransactions } from './raw-material-balance.util';
 
 @Injectable()
 export class InventoryService {
@@ -186,46 +187,13 @@ export class InventoryService {
       return 0;
     }
 
-    const [material] = await db.select().from(rawMaterials).where(eq(rawMaterials.id, materialId)).limit(1);
-    if (!material) return 0;
-
-    // 1. Sum Admin Transactions
     const txs = await db.select({
       quantityChange: rawMaterialTransactions.quantityChange
     })
     .from(rawMaterialTransactions)
     .where(eq(rawMaterialTransactions.materialId, materialId));
 
-    const totalTxs = txs.reduce((sum, t) => sum + Number(t.quantityChange), 0);
-
-    // 2. Sum Consumptions from logs
-    const logs = await db.select({
-      bagsUsed: productionLogs.bagsUsed,
-      capBoxUsage: productionLogs.capBoxUsage,
-      bopRollUsage: productionLogs.bopRollUsage,
-      shrinkWeightUsed: productionLogs.shrinkWeightUsed
-    })
-    .from(productionLogs)
-    .where(and(
-      eq(productionLogs.rawMaterialId, materialId),
-      isNull(productionLogs.deletedAt)
-    ));
-
-    const totalConsumed = logs.reduce((sum, l) => {
-      let qty = 0;
-      if (material.materialType === 'PREFORM') {
-        qty = Number(l.bagsUsed || 0);
-      } else if (material.materialType === 'CAP') {
-        qty = Number(l.capBoxUsage || 0);
-      } else if (material.materialType === 'LABEL') {
-        qty = Number(l.bopRollUsage || 0);
-      } else if (material.materialType === 'SHRINK') {
-        qty = Number(l.shrinkWeightUsed || 0);
-      }
-      return sum + qty;
-    }, 0);
-
-    return totalTxs - totalConsumed;
+    return sumRawMaterialTransactions(txs);
   }
 
   async getRawMaterials() {
@@ -275,24 +243,8 @@ export class InventoryService {
     .leftJoin(users, eq(rawMaterialTransactions.performedBy, users.id))
     .where(eq(rawMaterialTransactions.materialId, materialId));
     
-    // 2. Fetch Consumptions from logs
-    const logs = await db.select({
-      id: productionLogs.id,
-      bagsUsed: productionLogs.bagsUsed,
-      capBoxUsage: productionLogs.capBoxUsage,
-      bopRollUsage: productionLogs.bopRollUsage,
-      shrinkWeightUsed: productionLogs.shrinkWeightUsed,
-      createdAt: productionLogs.loggedAt,
-      userName: users.name
-    })
-    .from(productionLogs)
-    .leftJoin(users, eq(productionLogs.userId, users.id))
-    .where(and(
-      eq(productionLogs.rawMaterialId, materialId),
-      isNull(productionLogs.deletedAt)
-    ));
-    
-    // 3. Format and merge
+    // 2. Format transaction ledger. Production usage is already recorded as
+    // rawMaterialTransactions, so reading productionLogs here would double count.
     const ledgerEntries: any[] = [];
     
     // Add Admin transactions
@@ -306,32 +258,6 @@ export class InventoryService {
         userName: t.userName || 'Admin',
         unit: material.unit
       });
-    });
-    
-    // Add production consumption
-    logs.forEach(l => {
-      let qty = 0;
-      if (material.materialType === 'PREFORM') {
-        qty = Number(l.bagsUsed || 0);
-      } else if (material.materialType === 'CAP') {
-        qty = Number(l.capBoxUsage || 0);
-      } else if (material.materialType === 'LABEL') {
-        qty = Number(l.bopRollUsage || 0);
-      } else if (material.materialType === 'SHRINK') {
-        qty = Number(l.shrinkWeightUsed || 0);
-      }
-
-      if (qty > 0) {
-        ledgerEntries.push({
-          id: String(l.id),
-          type: 'CONSUMPTION',
-          quantityChange: -qty,
-          remarks: `Production Batch Log #${l.id}`,
-          createdAt: l.createdAt,
-          userName: l.userName || 'Operator',
-          unit: material.unit
-        });
-      }
     });
     
     // Sort by date ascending to calculate running balance
@@ -458,64 +384,20 @@ export class InventoryService {
   async recalculateInventory(tx?: any) {
     const runner = tx || db;
 
-    // 1. Recalculate Preforms
-    const [preformsMat] = await runner.select().from(rawMaterials).where(eq(rawMaterials.name, 'Preforms')).limit(1);
-    if (preformsMat) {
-      const [inwardedRes] = await runner.select({
+    const rawMaterialRows = await runner.select({ id: rawMaterials.id }).from(rawMaterials);
+    for (const material of rawMaterialRows) {
+      const [balanceRes] = await runner.select({
         sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
       })
       .from(rawMaterialTransactions)
-      .where(eq(rawMaterialTransactions.materialId, preformsMat.id));
-      
-      const [consumedRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(coalesce(nullif(${productionLogs.preformUsage}, 0), ${productionLogs.primaryCount} + cast(coalesce(${productionLogs.wastageCount}, '0') as integer))), '0')`
-      })
-      .from(productionLogs)
-      .where(and(
-        eq(productionLogs.station, 'BLOWING'),
-        isNull(productionLogs.deletedAt)
-      ));
-      
-      const inwarded = parseInt(inwardedRes.sum, 10);
-      const consumed = parseInt(consumedRes.sum, 10);
-      const currentStock = inwarded - consumed;
-      
-      await runner.update(rawMaterials)
-        .set({
-          currentStock,
-          updatedAt: new Date()
-        })
-        .where(eq(rawMaterials.id, preformsMat.id));
-    }
+      .where(eq(rawMaterialTransactions.materialId, material.id));
 
-    // 2. Recalculate Caps
-    const [capsMat] = await runner.select().from(rawMaterials).where(eq(rawMaterials.name, 'Caps')).limit(1);
-    if (capsMat) {
-      const [inwardedRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
-      })
-      .from(rawMaterialTransactions)
-      .where(eq(rawMaterialTransactions.materialId, capsMat.id));
-      
-      const [consumedRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(coalesce(nullif(${productionLogs.capUsage}, 0), ${productionLogs.primaryCount} + cast(coalesce(${productionLogs.wastageCount}, '0') as integer))), '0')`
-      })
-      .from(productionLogs)
-      .where(and(
-        eq(productionLogs.station, 'FILLING'),
-        isNull(productionLogs.deletedAt)
-      ));
-      
-      const inwarded = parseInt(inwardedRes.sum, 10);
-      const consumed = parseInt(consumedRes.sum, 10);
-      const currentStock = inwarded - consumed;
-      
       await runner.update(rawMaterials)
         .set({
-          currentStock,
+          currentStock: Number(balanceRes.sum || 0),
           updatedAt: new Date()
         })
-        .where(eq(rawMaterials.id, capsMat.id));
+        .where(eq(rawMaterials.id, material.id));
     }
 
     // 3. Recalculate Finished Goods Stock per Product

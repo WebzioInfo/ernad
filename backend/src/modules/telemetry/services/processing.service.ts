@@ -448,6 +448,99 @@ export class ProcessingService {
     }
   }
 
+  private getRawMaterialUsageFromLog(log: any): { materialId: string; qty: number } | null {
+    if (!log?.rawMaterialId) return null;
+
+    let qty = 0;
+    if (log.station === 'BLOWING') {
+      qty = Number(log.bagsUsed || 0);
+    } else if (log.station === 'FILLING') {
+      qty = Number(log.capBoxUsage || 0);
+    } else if (log.station === 'PACKING') {
+      qty = Number(log.shrinkWeightUsed || 0);
+    } else if (log.station === 'LABELING') {
+      qty = Number(log.bopRollUsage || 0);
+    }
+
+    if (qty <= 0) return null;
+    return { materialId: log.rawMaterialId, qty };
+  }
+
+  private async insertRawMaterialTransaction(
+    tx: any,
+    materialId: string,
+    quantityChange: number,
+    type: 'CONSUMPTION' | 'REVERSAL',
+    remarks: string,
+    performedBy?: string,
+  ) {
+    const [balanceRes] = await tx.select({
+      sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
+    })
+      .from(rawMaterialTransactions)
+      .where(eq(rawMaterialTransactions.materialId, materialId));
+
+    const balanceAfter = Number(balanceRes.sum || 0) + quantityChange;
+
+    await tx.insert(rawMaterialTransactions).values({
+      materialId,
+      type,
+      quantityChange,
+      balanceAfter,
+      remarks,
+      performedBy,
+      createdAt: new Date()
+    });
+  }
+
+  private async reverseRawMaterialUsage(tx: any, log: any, userId: string, remarks: string) {
+    const usage = this.getRawMaterialUsageFromLog(log);
+    if (!usage) return;
+
+    await this.insertRawMaterialTransaction(
+      tx,
+      usage.materialId,
+      usage.qty,
+      'REVERSAL',
+      remarks,
+      userId,
+    );
+  }
+
+  private async reconcileRawMaterialUsageChange(tx: any, beforeLog: any, afterLog: any, userId: string, remarks: string) {
+    const before = this.getRawMaterialUsageFromLog(beforeLog);
+    const after = this.getRawMaterialUsageFromLog(afterLog);
+
+    if (
+      before?.materialId === after?.materialId &&
+      before?.qty === after?.qty
+    ) {
+      return;
+    }
+
+    if (before) {
+      await this.insertRawMaterialTransaction(
+        tx,
+        before.materialId,
+        before.qty,
+        'REVERSAL',
+        `${remarks} - reverse previous usage`,
+        userId,
+      );
+    }
+
+    if (after) {
+      await this.insertRawMaterialTransaction(
+        tx,
+        after.materialId,
+        -after.qty,
+        'CONSUMPTION',
+        `${remarks} - apply corrected usage`,
+        userId,
+      );
+    }
+  }
+
   private getFieldName(station: string): any {
     const map: any = {
       BLOWING: 'blowingTotal',
@@ -751,52 +844,78 @@ export class ProcessingService {
     return feedEvents.slice(0, limit);
   }
 
-  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string }) {
-    const [existing] = await db.select().from(productionLogs).where(eq(productionLogs.id, logId)).limit(1);
-    if (!existing) throw new BadRequestException('Production log not found.');
+  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number }) {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(productionLogs).where(eq(productionLogs.id, logId)).for('update');
+      if (!existing) throw new BadRequestException('Production log not found.');
 
-    // Validate Batch Status (Don't allow editing completed/closed batches)
-    await this.validateBatchStatus(db, existing.batchId);
+      // Validate Batch Status (Don't allow editing completed/closed batches)
+      await this.validateBatchStatus(tx, existing.batchId);
 
-    const [updated] = await db.update(productionLogs)
-      .set({
-        ...(dto.primaryCount !== undefined && { primaryCount: dto.primaryCount }),
-        ...(dto.wastageCount !== undefined && { wastageCount: String(dto.wastageCount) }),
-        ...(dto.remarks !== undefined && { remarks: dto.remarks }),
-        updatedBy: userId,
-        updatedAt: new Date()
-      })
-      .where(eq(productionLogs.id, logId))
-      .returning();
+      const nextRawMaterialId = dto.rawMaterialId !== undefined ? dto.rawMaterialId : existing.rawMaterialId;
+      const nextBagsUsed = dto.bagsUsed !== undefined ? dto.bagsUsed : Number(existing.bagsUsed || 0);
+      const nextCapBoxUsage = dto.capBoxUsage !== undefined ? dto.capBoxUsage : Number(existing.capBoxUsage || 0);
+      const nextLabelsUsed = dto.labelsUsed !== undefined ? dto.labelsUsed : Number(existing.bopRollUsage || 0);
+      const nextShrinkRollsUsed = dto.shrinkRollsUsed !== undefined ? dto.shrinkRollsUsed : Number(existing.shrinkWeightUsed || 0);
 
-    // Calculate deltas to apply atomically
-    const primaryDelta = (dto.primaryCount !== undefined ? dto.primaryCount : existing.primaryCount) - existing.primaryCount;
-    const wastageDelta = (dto.wastageCount !== undefined ? dto.wastageCount : Number(existing.wastageCount)) - Number(existing.wastageCount);
+      const [updated] = await tx.update(productionLogs)
+        .set({
+          ...(dto.primaryCount !== undefined && { primaryCount: dto.primaryCount }),
+          ...(dto.wastageCount !== undefined && { wastageCount: String(dto.wastageCount) }),
+          ...(dto.remarks !== undefined && { remarks: dto.remarks }),
+          ...(dto.rawMaterialId !== undefined && { rawMaterialId: dto.rawMaterialId }),
+          ...(dto.bagsUsed !== undefined && { bagsUsed: String(dto.bagsUsed) }),
+          ...(dto.capBoxUsage !== undefined && { capBoxUsage: dto.capBoxUsage }),
+          ...(dto.labelsUsed !== undefined && { bopRollUsage: String(dto.labelsUsed), labelUsage: Math.round(Number(dto.labelsUsed || 0)) }),
+          ...(dto.shrinkRollsUsed !== undefined && { shrinkWeightUsed: String(dto.shrinkRollsUsed) }),
+          updatedBy: userId,
+          updatedAt: new Date()
+        })
+        .where(eq(productionLogs.id, logId))
+        .returning();
 
-    if (primaryDelta !== 0 || wastageDelta !== 0) {
-      const updateField = this.getFieldName(existing.station);
-      const setClause: any = {
-        scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
-        updatedAt: new Date()
-      };
-      if (updateField && updateField !== 'scrapTotal') {
-        setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta}`;
+      // Calculate deltas to apply atomically
+      const primaryDelta = (dto.primaryCount !== undefined ? dto.primaryCount : existing.primaryCount) - existing.primaryCount;
+      const wastageDelta = (dto.wastageCount !== undefined ? dto.wastageCount : Number(existing.wastageCount)) - Number(existing.wastageCount);
+
+      if (primaryDelta !== 0 || wastageDelta !== 0) {
+        const updateField = this.getFieldName(existing.station);
+        const setClause: any = {
+          scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
+          updatedAt: new Date()
+        };
+        if (updateField && updateField !== 'scrapTotal') {
+          setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta}`;
+        }
+        await tx.update(batchTotals)
+          .set(setClause)
+          .where(eq(batchTotals.batchId, existing.batchId));
       }
-      await db.update(batchTotals)
-        .set(setClause)
-        .where(eq(batchTotals.batchId, existing.batchId));
-    }
 
-    await this.auditService.logCorrection(
-      userId,
-      'production_logs',
-      String(logId),
-      existing,
-      updated,
-      dto.remarks || 'Manual Correction'
-    );
+      await this.reconcileRawMaterialUsageChange(tx, existing, {
+        ...existing,
+        rawMaterialId: nextRawMaterialId,
+        bagsUsed: String(nextBagsUsed),
+        capBoxUsage: nextCapBoxUsage,
+        bopRollUsage: String(nextLabelsUsed),
+        shrinkWeightUsed: String(nextShrinkRollsUsed)
+      }, userId, `Production Log #${logId} correction`);
 
-    return updated;
+      await this.inventoryService.recalculateInventory(tx);
+
+      await this.auditService.logCorrection(
+        userId,
+        'production_logs',
+        String(logId),
+        existing,
+        updated,
+        dto.remarks || 'Manual Correction'
+      );
+
+      await this.eventsService.emitDataChanged('inventory', { action: 'raw_material_usage_corrected', logId });
+
+      return updated;
+    });
   }
 
   async getAllLogs(filters: {
@@ -896,6 +1015,9 @@ export class ProcessingService {
       await tx.update(batchTotals)
         .set(setClause)
         .where(eq(batchTotals.batchId, existing.batchId));
+
+      await this.reverseRawMaterialUsage(tx, existing, userId, `VOID production log #${logId}: ${reason}`);
+      await this.inventoryService.recalculateInventory(tx);
 
       // 3. Audit Log
       await this.auditService.logCorrection(

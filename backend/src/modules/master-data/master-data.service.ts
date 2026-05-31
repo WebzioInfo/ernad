@@ -2,9 +2,9 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, products, productBrands, productionBatches, rawMaterials, rawMaterialTransactions, productionLogs } from '../../database/schema';
+import { productionLines, products, productBrands, productionBatches, rawMaterials, rawMaterialTransactions } from '../../database/schema';
 import { ProductionEventsService } from '../../realtime/production.gateway';
-import { isNull } from 'drizzle-orm';
+import { sumRawMaterialTransactions } from '../inventory/raw-material-balance.util';
 
 @Injectable()
 export class MasterDataService {
@@ -195,28 +195,7 @@ export class MasterDataService {
         .from(rawMaterialTransactions)
         .where(eq(rawMaterialTransactions.materialId, id));
       
-      const totalTxs = txs.reduce((sum, t) => sum + Number(t.quantityChange), 0);
-
-      const logs = await db.select({
-        primaryCount: productionLogs.primaryCount,
-        wastageCount: productionLogs.wastageCount,
-        preformUsage: productionLogs.preformUsage,
-        capUsage: productionLogs.capUsage
-      })
-      .from(productionLogs)
-      .where(and(eq(productionLogs.rawMaterialId, id), isNull(productionLogs.deletedAt)));
-
-      const totalConsumed = logs.reduce((sum, l) => {
-        const isBlowingUsage = l.preformUsage != null && l.preformUsage > 0;
-        const isFillingUsage = l.capUsage != null && l.capUsage > 0;
-        let qty = 0;
-        if (isBlowingUsage) qty = l.preformUsage as number;
-        else if (isFillingUsage) qty = l.capUsage as number;
-        else qty = l.primaryCount + Math.floor(Number(l.wastageCount || 0));
-        return sum + qty;
-      }, 0);
-
-      const currentBalance = totalTxs - totalConsumed;
+      const currentBalance = sumRawMaterialTransactions(txs);
       const difference = dto.currentStock - currentBalance;
 
       if (difference !== 0) {

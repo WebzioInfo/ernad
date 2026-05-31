@@ -4,9 +4,9 @@ The scalable, real-time Production Intelligence System (MES-lite) has been thoro
 
 ## What Was Accomplished 🏭
 
-1. **Robust PostgreSQL + Hybrid ORM Database** 🧱
-   - Core relational modeling (Batches, Users, Changeovers) mapped with **Prisma** for maintainability.
-   - High-throughput models (`operator_logs`, `material_flows`) optimized using **Drizzle ORM** guaranteeing minimal latency.
+1. **Robust PostgreSQL + Drizzle ORM Database**
+   - Drizzle ORM is the active schema and query layer.
+   - Legacy Prisma modeling has been retired from the active architecture.
 
 2. **Modular NestJS Backend** ⚙️
    - `ProductionBatchModule`: Regulates the core lifecycle preventing unlogged entries without an active batch.
