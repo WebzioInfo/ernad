@@ -104,7 +104,6 @@ export default function OperatorPanel() {
   // Station Specific States
   const [selectedCapRawMaterialId, setSelectedCapRawMaterialId] = useState('');
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
-  const [selectedLabelRawMaterialId, setSelectedLabelRawMaterialId] = useState('');
   const [bagsUsed, setBagsUsed] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
@@ -559,7 +558,7 @@ export default function OperatorPanel() {
       });
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
-      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setSelectedLabelRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);
+      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
       setMakeupChanged(false);
