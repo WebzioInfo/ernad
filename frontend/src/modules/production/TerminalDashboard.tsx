@@ -44,9 +44,7 @@ export default function TerminalDashboard() {
   const { data: batchData } = useQuery({
     queryKey: ['active-batch', currentLineId],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(currentLineId!))).data,
-    enabled: !!currentLineId,
-    refetchInterval: 10000,
-    retry: 1
+    enabled: !!currentLineId,    retry: 1
   });
 
   const lineData = useQuery({

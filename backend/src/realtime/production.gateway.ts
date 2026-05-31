@@ -72,4 +72,9 @@ export class ProductionEventsService {
     // Operators get sanitized info
     await this.realtimeService.emit('operators', 'NEW_NOTIFICATION', sanitize(notification));
   }
+
+  async emitDataChanged(domain: 'inventory' | 'products' | 'users' | 'incidents' | 'master-data', payload: any = {}) {
+    await this.realtimeService.emit('managers', 'DATA_CHANGED', { domain, ...payload });
+    await this.realtimeService.emit('managers', `${domain.toUpperCase()}_UPDATED`, payload);
+  }
 }

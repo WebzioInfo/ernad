@@ -12,6 +12,7 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:studio": "drizzle-kit studio",
+    "db:clean": "ts-node scripts/clean-transactional-data.ts",
     "seed": "ts-node scripts/seed.ts"
   },
   "engines": {

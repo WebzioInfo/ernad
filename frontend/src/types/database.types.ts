@@ -534,13 +534,6 @@ export interface Notification {
 
 // ── INVENTORY (inventory.ts) ─────────────────────────────────────────────────
 
-export interface MaterialCategory {
-  id: string;
-  name: string;
-  description?: string | null;
-  createdAt: string;
-}
-
 export interface RawMaterial {
   id: string;
   name: string;
@@ -820,6 +813,5 @@ export interface SalesOrderExpanded extends SalesOrder {
 }
 
 export interface InventoryStockExpanded extends InventoryStock {
-  category?: Pick<MaterialCategory, 'id' | 'name'>;
   warehouse?: Pick<WarehouseLocation, 'id' | 'name' | 'type'>;
 }

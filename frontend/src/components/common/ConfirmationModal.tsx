@@ -1,14 +1,16 @@
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Loader2, X } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info' | 'primary';
+  isPending?: boolean;
 }
 
 export default function ConfirmationModal({
@@ -19,10 +21,11 @@ export default function ConfirmationModal({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'danger'
+  variant = 'danger',
+  isPending = false
 }: ConfirmationModalProps) {
-  if (!isOpen) return null;
-
+  // We don't return null if !isOpen because Dialog handles its own mounting.
+  
   const colors = {
     danger: 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 text-white',
     warning: 'bg-amber-500 hover:bg-amber-600 shadow-amber-200 text-white',
@@ -38,8 +41,8 @@ export default function ConfirmationModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent showCloseButton={false} className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden p-0 border-none gap-0">
         <div className="p-8">
           <div className="flex justify-between items-start mb-6">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${iconColors[variant]}`}>
@@ -54,24 +57,26 @@ export default function ConfirmationModal({
           <p className="text-slate-500 font-medium leading-relaxed">{message}</p>
 
           <div className="mt-10 flex gap-3">
-            <button 
+            <button
+              type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+              disabled={isPending}
+              className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all active:scale-95 outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
             >
               {cancelText}
             </button>
-            <button 
-              onClick={() => {
-                onConfirm();
-                onClose();
-              }}
-              className={`flex-1 px-6 py-4 rounded-2xl font-black shadow-xl transition-all active:scale-95 ${colors[variant]}`}
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isPending}
+              className={`flex-1 px-6 py-4 rounded-2xl font-black shadow-xl transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:ring-slate-900 ${colors[variant]}`}
             >
+              {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
               {confirmText}
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

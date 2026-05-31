@@ -92,7 +92,7 @@ export default function OperatorPanel() {
   // Unified Entry State
   const [primaryCount, setPrimaryCount] = useState(0);
   const [rejectionCount, setRejectionCount] = useState(0);
-  const [secondaryPackagingCount, setSecondaryPackagingCount] = useState(0); // Bag/Box Count
+  const [secondaryPackagingCount] = useState(0); // Bag/Box Count
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
 
   // Filling station wastage toggle & inputs
@@ -104,12 +104,11 @@ export default function OperatorPanel() {
   // Station Specific States
   const [selectedCapRawMaterialId, setSelectedCapRawMaterialId] = useState('');
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
+  const [selectedLabelRawMaterialId, setSelectedLabelRawMaterialId] = useState('');
   const [bagsUsed, setBagsUsed] = useState(0);
-  const [preformUsage, setPreformUsage] = useState(0);
-  const [capUsage, setCapUsage] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
-  const [shrinkUsage, setShrinkUsage] = useState('');
+  const [shrinkUsage, setShrinkUsage] = useState<number>(0);
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
@@ -152,9 +151,7 @@ export default function OperatorPanel() {
   const { data: batchData, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['active-batch', lineId],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(lineId!))).data,
-    enabled: !!lineId,
-    refetchInterval: 15000,
-    retry: 1
+    enabled: !!lineId,    retry: 1
   });
 
   const activeBatch = batchData;
@@ -165,9 +162,7 @@ export default function OperatorPanel() {
       if (!activeBatch?.batch?.id) return [];
       return (await api.get(ENDPOINTS.TELEMETRY.ACTIVE_EVENTS(activeBatch.batch.id))).data;
     },
-    enabled: !!activeBatch?.batch?.id,
-    refetchInterval: 30000
-  });
+    enabled: !!activeBatch?.batch?.id,  });
 
   const endSessionMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
@@ -229,21 +224,13 @@ export default function OperatorPanel() {
   });
 
   const { data: rawMaterials } = useQuery({
-    queryKey: ['raw-materials'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.RAW_MATERIALS)).data,
-    enabled: currentStationId === 'BLOWING' || currentStationId === 'FILLING',
+    queryKey: ['raw-materials', currentStationId],
+    queryFn: async () => (await api.get(`${ENDPOINTS.MASTER_DATA.RAW_MATERIALS}?station=${currentStationId}`)).data,
+    enabled: ['BLOWING', 'FILLING', 'LABELING', 'PACKING'].includes(currentStationId),
   });
 
-  const preformRawMaterials = (rawMaterials || []).filter((material: any) => {
-    const categoryName = String(material.categoryName || '').toLowerCase();
-    const materialName = String(material.name || '').toLowerCase();
-    return categoryName.includes('preform') || materialName.includes('preform');
-  });
-  const capRawMaterials = (rawMaterials || []).filter((material: any) => {
-    const categoryName = String(material.categoryName || '').toLowerCase();
-    const materialName = String(material.name || '').toLowerCase();
-    return categoryName.includes('cap') || materialName.includes('cap');
-  });
+  // Backend handles station filtering via central filter
+  const stationRawMaterials = rawMaterials || [];
 
   // Fetch operators list for the handover selector
   const { data: operatorsList } = useQuery({
@@ -342,9 +329,7 @@ export default function OperatorPanel() {
         return null;
       }
     },
-    enabled: !!lineId && !!currentStation.id,
-    refetchInterval: 15000,
-  });
+    enabled: !!lineId && !!currentStation.id,  });
 
   const handleHandoverSubmit = async () => {
     if (!incomingOperatorId) {
@@ -432,17 +417,7 @@ export default function OperatorPanel() {
     }
   }, [isLoadingBatch]);
 
-  // Enforce Formula: Used = Production + Wastage
-  useEffect(() => {
-    if (currentStationId === 'FILLING' && productionWastages) {
-      const netProd = Math.max(0, rawProductionCount - bottleLeakage);
-      setCapUsage(netProd + capWastage);
-    } else {
-      const total = primaryCount + rejectionCount;
-      if (currentStationId === 'BLOWING') setPreformUsage(total);
-      if (currentStationId === 'FILLING') setCapUsage(total);
-    }
-  }, [primaryCount, rejectionCount, rawProductionCount, bottleLeakage, capWastage, productionWastages, currentStationId]);
+
 
   // Auto-calculate primaryCount (Production Unit Count) in Packing Station based on casesProduced and selected bottle config multiplier
   useEffect(() => {
@@ -469,9 +444,18 @@ export default function OperatorPanel() {
     }
     if (currentStation.id === 'FILLING' && !selectedCapRawMaterialId) return toast.error('Please select the Caps raw material.');
     if (currentStation.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
+    const derivedLabelMaterial = stationRawMaterials.find((m: any) => {
+      const pName = (activeBatch?.batch?.productName || '').toLowerCase();
+      const mName = m.name.toLowerCase();
+      return pName && (mName.includes(pName) || pName.includes(mName));
+    });
+
+    if (currentStation.id === 'LABELING' && !derivedLabelMaterial) {
+      return toast.error('No matching label material found for this product.');
+    }
 
     const currentBatch = activeBatch?.batch;
-    const selectedCapRawMaterial = capRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
+    const selectedCapRawMaterial = stationRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
 
     const calculatedPrimaryCount = (currentStation.id === 'FILLING' && productionWastages)
       ? Math.max(0, rawProductionCount - bottleLeakage)
@@ -511,32 +495,17 @@ export default function OperatorPanel() {
     }
 
     if (currentStation.id === 'BLOWING') {
-      // For Blowing, we purchase in KGs but produce in COUNT.
-      // We track 'preformsUsed' as the count of preforms consumed.
-      logEntry.preformUsage = preformUsage || (primaryCount + rejectionCount);
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
-      logEntry.capUsage = capUsage || (calculatedPrimaryCount + (productionWastages ? capWastage : calculatedWastageCount));
-      logEntry.capBoxUsage = capBoxUsage;
+      logEntry.boxesUsed = capBoxUsage;
       logEntry.rawMaterialId = selectedCapRawMaterialId;
-      logEntry.materials = selectedCapRawMaterial ? [{
-        materialName: selectedCapRawMaterial.name,
-        quantity: logEntry.capUsage,
-        unit: 'Pcs',
-        waste: (productionWastages ? capWastage : rejectionCount),
-      }] : [];
     } else if (currentStation.id === 'LABELING') {
-      logEntry.bopRollUsage = labelUsage;
-      logEntry.labelStickerWeight = labelUsage;
-      logEntry.damagedLabelWeight = rejectionCount;
-      logEntry.inkChanged = inkChanged;
-      logEntry.inkUsageMl = 0;
-      logEntry.makeupChanged = makeupChanged;
-      logEntry.makeupUsageMl = 0;
+      logEntry.labelsUsed = labelUsage;
+      logEntry.rawMaterialId = derivedLabelMaterial?.id;
     } else if (currentStation.id === 'PACKING') {
-      logEntry.shrinkWeightUsed = parseFloat(shrinkUsage) || 0;
-      logEntry.shrinkWasteWeight = parseFloat(shrinkWasteWeight) || 0;
+      logEntry.shrinkRollsUsed = Number(shrinkUsage) || 0;
+      logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
@@ -552,6 +521,8 @@ export default function OperatorPanel() {
       const committedLog = response.data?.log;
       const rawMaterialName = currentStation.id === 'BLOWING'
         ? rawMaterials?.find((material: any) => material.id === selectedRawMaterialId)?.name
+        : currentStation.id === 'LABELING'
+        ? derivedLabelMaterial?.name
         : selectedCapRawMaterial?.name;
 
       queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
@@ -588,9 +559,7 @@ export default function OperatorPanel() {
       });
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
-
-      setPrimaryCount(0); setRejectionCount(0); setSecondaryPackagingCount(0);
-      setPreformUsage(0); setCapUsage(0); setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage('');
+      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setSelectedLabelRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
       setMakeupChanged(false);
@@ -601,7 +570,7 @@ export default function OperatorPanel() {
       setCapWastage(0);
       setProductionWastages(false);
     } catch (err: any) {
-      toast.error('Failed to transmit log. Node error.');
+      toast.error(err.response?.data?.message || 'Failed to transmit log. Node error.');
     } finally { setIsSubmitting(false); }
   };
 
@@ -841,13 +810,13 @@ export default function OperatorPanel() {
                           className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
                         >
                           <option value="">Select Raw Material...</option>
-                          {preformRawMaterials.map((material: any) => (
+                          {stationRawMaterials.map((material: any) => (
                             <option key={material.id} value={material.id}>
-                              {material.name} ({material.categoryName})
+                              {material.name}
                             </option>
                           ))}
                         </select>
-                        {preformRawMaterials.length === 0 && (
+                        {stationRawMaterials.length === 0 && (
                           <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
                             No preform raw materials found.
                           </p>
@@ -867,19 +836,7 @@ export default function OperatorPanel() {
                         </p>
                       </div>
 
-                      <div className="space-y-1">
-                        <IndustrialNumericInput
-                          label="Preforms Used (This Log)"
-                          value={preformUsage}
-                          onChange={() => { }}
-                          suffix="Pcs"
-                          readOnly
-                          compact
-                        />
-                        <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
-                          Batch Total: <span className="text-slate-900">{(activeBatch as any)?.materialTotals?.preformTotal || 0} PCS</span>
-                        </p>
-                      </div>
+
                     </>
                   )}
 
@@ -895,13 +852,13 @@ export default function OperatorPanel() {
                           className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
                         >
                           <option value="">Select Caps raw material...</option>
-                          {capRawMaterials.map((material: any) => (
+                          {stationRawMaterials.map((material: any) => (
                             <option key={material.id} value={material.id}>
-                              {material.name} ({material.categoryName})
+                              {material.name}
                             </option>
                           ))}
                         </select>
-                        {capRawMaterials.length === 0 && (
+                        {stationRawMaterials.length === 0 && (
                           <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
                             No caps raw materials found.
                           </p>
@@ -916,21 +873,7 @@ export default function OperatorPanel() {
                         compact
                       />
 
-                      <div className="space-y-1">
-                        <IndustrialNumericInput
-                          label="Caps Used (This Log)"
-                          value={capUsage}
-                          onChange={() => { }}
-                          suffix="Pcs"
-                          readOnly
-                          compact
-                        />
-                        <p className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest px-2">
-                          Batch Total: <span className="text-slate-900">
-                            {((activeBatch as any)?.materialTotals?.capTotal || 0)} PCS
-                          </span>
-                        </p>
-                      </div>
+
                     </>
                   )}
 
@@ -938,11 +881,10 @@ export default function OperatorPanel() {
                     <>
                       <div className="space-y-1">
                         <IndustrialNumericInput
-                          label="Label Used"
+                          label="Labels Used (KG)"
                           value={labelUsage}
                           onChange={setLabelUsage}
                           suffix="KG"
-                          step={0.01}
                           compact
                         />
                       </div>
@@ -1009,40 +951,30 @@ export default function OperatorPanel() {
 
                       {/* Row 3 */}
                       <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
-                          Shrink Material Used (g)
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                          Shrink Roll Material
                         </label>
-                        <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={shrinkUsage}
-                            onChange={e => setShrinkUsage(e.target.value)}
-                            placeholder="e.g. 1.256"
-                            className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
-                          />
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
-                        </div>
+                        <select
+                          value={selectedRawMaterialId}
+                          onChange={e => setSelectedRawMaterialId(e.target.value)}
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
+                        >
+                          <option value="">Select Shrink Roll...</option>
+                          {stationRawMaterials.map((material: any) => (
+                            <option key={material.id} value={material.id}>
+                              {material.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 leading-tight select-none">
-                          Shrink Material Waste (g)
-                        </label>
-                        <div className="relative flex items-center rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm transition-all focus-within:ring-2 focus-within:ring-[#1A9A91]/20 focus-within:border-[#1A9A91]/35 h-14">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            value={shrinkWasteWeight}
-                            onChange={e => setShrinkWasteWeight(e.target.value)}
-                            placeholder="e.g. 0.124"
-                            className="flex-1 min-w-0 bg-transparent text-center font-mono font-black text-slate-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-2 text-xl"
-                          />
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pointer-events-none select-none pr-3">g</span>
-                        </div>
-                      </div>
+                      <IndustrialNumericInput
+                        label="Shrink Material Used (KG)"
+                        value={shrinkUsage}
+                        onChange={setShrinkUsage}
+                        suffix="KG"
+                        compact
+                      />
                     </div>
                   )}
                 </div>
@@ -1420,7 +1352,7 @@ export default function OperatorPanel() {
                   Cancel
                 </Button>
                 <Button
-                  disabled={startBatchMutation.isPending || !startShift || !startBrand || !startProduct}
+                  disabled={startBatchMutation.isPending || !startShift || !startBrand || !startProduct || !startStartTime}
                   onClick={() => setPendingStartBatch(true)}
                   className="h-12 bg-[#1A9A91] hover:bg-[#157C75] text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
                 >
@@ -1467,11 +1399,15 @@ export default function OperatorPanel() {
                   Cancel
                 </Button>
                 <Button
-                  disabled={stopBatchMutation.isPending || !endRemarks}
-                  onClick={() => setPendingStopBatch(true)}
+                  disabled={stopBatchMutation.isPending || !endEndTime || !endRemarks}
+                  onClick={() => {
+                    const d = new Date(endEndTime);
+                    if (isNaN(d.getTime())) { toast.error("Invalid End Time"); return; }
+                    setPendingStopBatch(true);
+                  }}
                   className="h-12 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-widest rounded-xl transition-all px-6 disabled:opacity-50"
                 >
-                  {stopBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Authorize Stop'}
+                  {stopBatchMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : 'End Production Batch'}
                 </Button>
               </div>
             </div>
@@ -1586,43 +1522,78 @@ export default function OperatorPanel() {
       <ConfirmationModal isOpen={pendingHandover} onClose={() => setPendingHandover(false)} onConfirm={() => { setPendingHandover(false); handleHandoverSubmit(); }} title="Confirm Handover" message="Are you sure you want to submit this shift handover?" variant="primary" confirmText="Yes, Handover" />
       <ConfirmationModal isOpen={pendingTelemetry} onClose={() => setPendingTelemetry(false)} onConfirm={() => { setPendingTelemetry(false); handleSaveTelemetry('ALL'); }} title="Commit Telemetry Log" message="Are you sure you want to commit this telemetry log to the ledger? Ensure all numbers are correct." variant="primary" confirmText="Yes, Commit" />
       <ConfirmationModal isOpen={pendingStartBatch} onClose={() => setPendingStartBatch(false)} onConfirm={() => {
-        setPendingStartBatch(false);
+        if (startBatchMutation.isPending) return;
+        
+        let isoTime: string;
+        try {
+          if (!startStartTime) throw new Error("Start Time is required.");
+          isoTime = new Date(startStartTime).toISOString();
+        } catch (error) {
+          toast.error("Invalid Start Time. Please select a valid date and time.");
+          setPendingStartBatch(false);
+          return;
+        }
+        
         startBatchMutation.mutate({
-          shiftId: startShift, brandId: startBrand, productId: startProduct,
-          batchCode: startBatchCode || undefined, remarks: startRemarks || undefined,
-          startTime: new Date(startStartTime).toISOString()
+          shiftId: startShift, 
+          brandId: startBrand, 
+          productId: startProduct,
+          batchCode: startBatchCode || undefined, 
+          remarks: startRemarks || undefined,
+          startTime: isoTime
         }, {
           onSuccess: () => {
+            setPendingStartBatch(false);
             setShowLineControl(false);
             setStartShift(''); setStartBrand(''); setStartProduct('');
             setStartBatchCode(''); setStartRemarks('');
+          },
+          onError: () => {
+            setPendingStartBatch(false);
           }
         });
-      }} title="Start Production Batch" message="Are you sure you want to launch a new batch?" variant="primary" confirmText="Yes, Start" />
+      }} title="Start Production Batch" message="Are you sure you want to launch a new batch?" variant="primary" confirmText="Yes, Start" isPending={startBatchMutation.isPending} />
 
       <ConfirmationModal isOpen={pendingStopBatch} onClose={() => setPendingStopBatch(false)} onConfirm={() => {
-        setPendingStopBatch(false);
+        if (stopBatchMutation.isPending) return;
+
+        let isoTime: string;
+        try {
+          if (!endEndTime) throw new Error("End Time is required.");
+          isoTime = new Date(endEndTime).toISOString();
+        } catch (error) {
+          toast.error("Invalid End Time. Please select a valid date and time.");
+          setPendingStopBatch(false);
+          return;
+        }
+
         stopBatchMutation.mutate({
           remarks: endRemarks,
-          endTime: new Date(endEndTime).toISOString()
+          endTime: isoTime
         }, {
-          onSuccess: () => { setShowLineControl(false); setEndRemarks(''); }
+          onSuccess: () => { setPendingStopBatch(false); setShowLineControl(false); setEndRemarks(''); },
+          onError: () => setPendingStopBatch(false)
         });
-      }} title="Stop Production Batch" message="Are you sure you want to finalize this production batch? This cannot be undone." variant="danger" confirmText="Yes, Stop" />
+      }} title="Stop Production Batch" message="Are you sure you want to finalize this production batch? This cannot be undone." variant="danger" confirmText="Yes, Stop" isPending={stopBatchMutation.isPending} />
 
       <ConfirmationModal isOpen={pendingChangeover} onClose={() => setPendingChangeover(false)} onConfirm={() => {
-        setPendingChangeover(false);
+        if (initiateChangeoverMutation.isPending) return;
         initiateChangeoverMutation.mutate({
-          productId: changeoverProduct, startTime: new Date(changeoverStartTime).toISOString()
+          productId: changeoverProduct,
+          startTime: new Date().toISOString()
         }, {
-          onSuccess: () => { setShowLineControl(false); setChangeoverBrand(''); setChangeoverProduct(''); }
+          onSuccess: () => { setPendingChangeover(false); setShowLineControl(false); setChangeoverBrand(''); setChangeoverProduct(''); },
+          onError: () => setPendingChangeover(false)
         });
-      }} title="Initiate Changeover" message="Are you sure you want to initiate SKU changeover?" variant="primary" confirmText="Yes, Initiate" />
+      }} title="Initiate Changeover" message="Are you sure you want to initiate SKU changeover?" variant="primary" confirmText="Yes, Initiate" isPending={initiateChangeoverMutation.isPending} />
 
       <ConfirmationModal isOpen={pendingCompleteChangeover} onClose={() => setPendingCompleteChangeover(false)} onConfirm={() => {
-        setPendingCompleteChangeover(false);
-        completeChangeoverMutation.mutate(undefined, { onSuccess: () => { setShowLineControl(false); } });
-      }} title="Complete Changeover" message="Are you sure changeover is complete and ready to run?" variant="primary" confirmText="Yes, Complete" />
+        if (completeChangeoverMutation.isPending) return;
+        completeChangeoverMutation.mutate(undefined, { 
+          onSuccess: () => { setPendingCompleteChangeover(false); setShowLineControl(false); },
+          onError: () => setPendingCompleteChangeover(false)
+        });
+      }} title="Complete Changeover" message="Are you sure changeover is complete and ready to run?" variant="primary" confirmText="Yes, Complete" isPending={completeChangeoverMutation.isPending} />
     </div>
   );
 }

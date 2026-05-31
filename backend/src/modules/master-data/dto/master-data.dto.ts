@@ -49,8 +49,12 @@ export class CreateRawMaterialDto {
   name: string;
 
   @ApiProperty()
-  @IsString()
-  categoryId: string;
+  @IsEnum(['PREFORM', 'CAP', 'LABEL', 'SHRINK', 'OTHER'])
+  materialType: string;
+
+  @ApiProperty()
+  @IsEnum(['BAG', 'BOX', 'PIECE', 'ROLL', 'KG'])
+  unit: string;
 }
 
 export class UpdateStockDto {
@@ -115,8 +119,18 @@ export class UpdateRawMaterialDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  categoryId?: string;
+  @IsEnum(['PREFORM', 'CAP', 'LABEL', 'SHRINK', 'OTHER'])
+  materialType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEnum(['BAG', 'BOX', 'PIECE', 'ROLL', 'KG'])
+  unit?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  currentStock?: number;
 }
 
 export class CreateShiftDto {

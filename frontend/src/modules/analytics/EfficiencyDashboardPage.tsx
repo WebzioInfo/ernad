@@ -27,9 +27,7 @@ export default function EfficiencyDashboardPage() {
       });
       return res.data;
     },
-    enabled: !!filters.lineId && isLive,
-    refetchInterval: 5000
-  });
+    enabled: !!filters.lineId && isLive,  });
 
   const getDates = () => {
     const end = new Date();

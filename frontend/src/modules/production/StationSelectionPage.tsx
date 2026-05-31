@@ -32,9 +32,7 @@ export default function StationSelectionPage() {
 
   const { data: activeSessions } = useQuery({
     queryKey: ['all-active-sessions'],
-    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.ACTIVE)).data,
-    refetchInterval: 10000
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.ACTIVE)).data,  });
 
   const startSessionMutation = useMutation({
     mutationFn: (data: { lineId: string, station: string }) => api.post(ENDPOINTS.OPERATOR_SESSIONS.START, data),

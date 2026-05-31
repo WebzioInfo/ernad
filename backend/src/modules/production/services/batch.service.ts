@@ -33,7 +33,24 @@ export class BatchService {
       const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).for('update');
       if (!line) throw new BadRequestException('Line not found.');
       if (line.status !== 'IDLE') {
-        throw new BadRequestException(`Line is ${line.status}. Must be IDLE to start.`);
+        const [activeBatch] = await tx.select({ id: productionBatches.id })
+          .from(productionBatches)
+          .where(and(
+            eq(productionBatches.lineId, lineId),
+            or(
+              eq(productionBatches.status, 'RUNNING'),
+              eq(productionBatches.status, 'CHANGEOVER')
+            )
+          ))
+          .limit(1);
+
+        if (activeBatch) {
+          throw new BadRequestException(`Line is ${line.status}. Must be IDLE to start.`);
+        }
+
+        await tx.update(productionLines)
+          .set({ status: 'IDLE', updatedAt: new Date() })
+          .where(eq(productionLines.id, lineId));
       }
 
       // Check if a BOM is configured for the product

@@ -34,20 +34,20 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
   // 1. Fetch Dossier (Metadata + Totals + Trend)
   const { data: dossier, isLoading: loadingDossier } = useQuery({
     queryKey: ['batch-dossier', batchId],
-    queryFn: async () => (await api.get(`/reports/batch/${batchId}`)).data
+    queryFn: async () => (await api.get(`reports/batch/${batchId}`)).data
   });
 
   // 2. Fetch Detailed Logs for Editing (Categorized by Station)
   const [station, setStation] = useState('BLOWING');
   const { data: logs, isLoading: loadingLogs } = useQuery({
     queryKey: ['batch-logs', batchId, station],
-    queryFn: async () => (await api.get(`/telemetry/history/${batchId}/${station}`)).data
+    queryFn: async () => (await api.get(`telemetry/history/${batchId}/${station}`)).data
   });
 
   // 3. Edit Mutation
   const editMutation = useMutation({
     mutationFn: async (logId: number) => {
-      await api.patch(`/telemetry/logs/${logId}`, editForm);
+      await api.patch(`telemetry/logs/${logId}`, editForm);
     },
     onSuccess: () => {
       toast.success('Log entry corrected successfully');

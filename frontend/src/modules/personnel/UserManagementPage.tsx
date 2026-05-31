@@ -82,7 +82,8 @@ export default function UserManagementPage() {
   const { user: currentUser } = useAuthStore();
   const callerRoles = currentUser?.roles || [];
   const isAdmin      = callerRoles.includes('ADMIN');
-  const canAddUser    = isAdmin;
+  const isManager    = callerRoles.includes('MANAGER');
+  const canAddUser    = isAdmin || isManager;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -411,6 +412,7 @@ export default function UserManagementPage() {
             setViewingUser(null);
           }}
           isAdmin={isAdmin}
+          canManage={canAddUser}
         />
       )}
 
@@ -427,7 +429,7 @@ export default function UserManagementPage() {
   );
 }
 
-function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAdmin }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void, isAdmin: boolean }) {
+function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAdmin, canManage }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void, isAdmin: boolean, canManage: boolean }) {
   const { data: logs } = useQuery({
     queryKey: ['user-audit-logs', user.id],
     queryFn: async () => (await api.get(ENDPOINTS.USERS.USER_AUDIT_LOGS(user.id))).data,
@@ -532,19 +534,21 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAd
           </div>
 
           {/* Modify Actions */}
-          {isAdmin && (
+          {canManage && (
             <div className="flex gap-3 pt-2">
-              <button
-                onClick={onToggleActive}
-                className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
-                  user.isActive
-                    ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
-                }`}
-              >
-                {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                {user.isActive ? 'Suspend User' : 'Restore User'}
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={onToggleActive}
+                  className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
+                    user.isActive
+                      ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                  }`}
+                >
+                  {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  {user.isActive ? 'Suspend User' : 'Restore User'}
+                </button>
+              )}
               <button
                 onClick={onEdit}
                 className="flex-1 h-9 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-colors flex items-center justify-center gap-1 shadow-sm"
@@ -581,8 +585,9 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAd
 function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) {
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.roles.includes('ADMIN');
+  const isManager = currentUser?.roles.includes('MANAGER');
 
-  const allowedRoles = isAdmin ? ADMIN_VISIBLE_ROLES : OPERATIONAL_ROLES;
+  const allowedRoles = isAdmin ? ADMIN_VISIBLE_ROLES : isManager ? OPERATIONAL_ROLES.filter(role => role.slug === 'OPERATOR') : OPERATIONAL_ROLES;
 
   const [formData, setFormData] = useState({
     name: user?.name || '',

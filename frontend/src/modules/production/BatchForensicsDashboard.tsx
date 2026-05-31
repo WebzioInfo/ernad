@@ -34,12 +34,12 @@ export default function BatchForensicsDashboard() {
 
   const { data: forensics, isLoading, error } = useQuery({
     queryKey: ['batch-forensics', batchId],
-    queryFn: async () => (await api.get(`/forensics/batch/${batchId}`)).data,
+    queryFn: async () => (await api.get(`forensics/batch/${batchId}`)).data,
     retry: false,
   });
 
   const correctMutation = useMutation({
-    mutationFn: async (payload: any) => (await api.patch(`/forensics/log/${selectedEntry.id}`, payload)).data,
+    mutationFn: async (payload: any) => (await api.patch(`forensics/log/${selectedEntry.id}`, payload)).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch-forensics', batchId] });
       setSelectedEntry(null);
@@ -48,7 +48,7 @@ export default function BatchForensicsDashboard() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (reason: string) => (await api.delete(`/forensics/log/${selectedEntry.id}`, { data: { reason } })).data,
+    mutationFn: async (reason: string) => (await api.delete(`forensics/log/${selectedEntry.id}`, { data: { reason } })).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch-forensics', batchId] });
       setSelectedEntry(null);

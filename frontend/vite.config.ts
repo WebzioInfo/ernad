@@ -15,6 +15,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['date-fns']
+    include: ['date-fns', 'jspdf', 'jspdf-autotable']
   }
 })

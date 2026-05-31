@@ -120,9 +120,7 @@ export default function IncidentsDashboard() {
 
   const factoryQuery = useQuery({
     queryKey: ['factory-live-incidents'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,
-    refetchInterval: 30000,
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,  });
 
   const selectedType = incidentTypes.find((type) => type.id === form.incidentTypeId);
 

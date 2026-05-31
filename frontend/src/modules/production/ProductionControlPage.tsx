@@ -118,7 +118,11 @@ const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shif
 
         {line.status === 'CHANGEOVER' && (
           <button 
-            onClick={() => line.batch?.id && completeChangeoverMutation.mutate()} 
+            onClick={() => {
+              if (window.confirm("Are you sure SKU changeover is complete?")) {
+                line.batch?.id && completeChangeoverMutation.mutate();
+              }
+            }} 
             disabled={completeChangeoverMutation.isPending || !line.batch?.id}
             className="flex-1 py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 hover:bg-emerald-500 disabled:opacity-50 disabled:grayscale active:scale-[0.98] group"
           >
@@ -140,16 +144,18 @@ const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shif
           products={products}
           onClose={() => setIsStartModalOpen(false)}
           onSubmit={(payload: any) => {
-            Object.assign({
-              lineId: line.id,
-              shiftId: selectedShift,
-              brandId: selectedBrand,
-              productId: selectedProduct,
-              batchCode: batchCode || undefined,
-              remarks,
-              startTime: new Date(startTime).toISOString(),
-            }, payload);
-            startMutation.mutate();
+            if (window.confirm("Are you sure you want to start this production batch?")) {
+              Object.assign({
+                lineId: line.id,
+                shiftId: selectedShift,
+                brandId: selectedBrand,
+                productId: selectedProduct,
+                batchCode: batchCode || undefined,
+                remarks,
+                startTime: new Date(startTime).toISOString(),
+              }, payload);
+              startMutation.mutate();
+            }
           }}
           isPending={startMutation.isPending}
           error={startMutation.error}
@@ -175,9 +181,7 @@ export default function ProductionControlPage() {
 
   const { data: lines, isLoading } = useQuery({
     queryKey: ['production-lines'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data,
-    refetchInterval: 15000,
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data,  });
 
   const { data: operatorsData } = useQuery({
     queryKey: ['operators'],
@@ -260,9 +264,7 @@ function ProductionCommander({ line, onBack, brands, products, shifts, operators
   const navigate = useNavigate();
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, { params: { lineId: line.id } })).data,
-    refetchInterval: 5000
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, { params: { lineId: line.id } })).data,  });
 
   const { data: batchHistory } = useQuery({
     queryKey: ['line-batch-history', line.id],
@@ -689,7 +691,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
             brands={brands}
             products={products}
             onClose={() => setShowStartModal(false)}
-            onSubmit={() => startMutation.mutate()}
+            onSubmit={() => {
+              if (window.confirm("Are you sure you want to start this production batch?")) {
+                startMutation.mutate();
+              }
+            }}
             isPending={startMutation.isPending}
             error={startMutation.error}
             selectedShift={selectedShift} setSelectedShift={setSelectedShift}
@@ -709,7 +715,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
       <div className="grid grid-cols-2 gap-4">
         {line.status === 'CHANGEOVER' ? (
           <button
-            onClick={() => completeChangeoverMutation.mutate()}
+            onClick={() => {
+              if (window.confirm("Are you sure SKU changeover is complete?")) {
+                completeChangeoverMutation.mutate();
+              }
+            }}
             disabled={completeChangeoverMutation.isPending}
             className="col-span-2 flex flex-col items-center gap-3 p-8 bg-emerald-600 text-white rounded-[2.5rem] hover:bg-emerald-700 transition-all group shadow-xl shadow-emerald-900/20"
           >
@@ -765,7 +775,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
           <div className="flex gap-4">
             <button onClick={() => setReopenModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Abort</button>
             <button
-              onClick={() => reopenMutation.mutate()}
+              onClick={() => {
+                if (window.confirm("Are you sure you want to reopen this closed session?")) {
+                  reopenMutation.mutate();
+                }
+              }}
               disabled={!reopenReason || reopenMutation.isPending}
               className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-indigo-100 disabled:opacity-50"
             >
@@ -815,7 +829,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
               </div>
               {activeBatchLogs && activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length > 0 && (
                 <button
-                  onClick={() => verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'))}
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to verify all logs in this batch?")) {
+                      verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'));
+                    }
+                  }}
                   disabled={verifyAllLogsMutation.isPending}
                   className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors disabled:opacity-50"
                 >
@@ -866,7 +884,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
                           </span>
                         ) : (
                           <button
-                            onClick={() => verifyLogMutation.mutate(log.id)}
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to verify this operator log?")) {
+                                verifyLogMutation.mutate(log.id);
+                              }
+                            }}
                             disabled={verifyLogMutation.isPending}
                             className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors disabled:opacity-50"
                           >
@@ -883,7 +905,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
 
           <div className="flex gap-4">
             <button onClick={() => setStopConfirmOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
-            <button onClick={() => stopMutation.mutate()} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-200">Confirm Close</button>
+            <button onClick={() => {
+              if (window.confirm("Are you sure you want to finalize and close this production batch?")) {
+                stopMutation.mutate();
+              }
+            }} className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-rose-200">Confirm Close</button>
           </div>
         </Modal>
       )}
@@ -939,7 +965,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
               </div>
               {activeBatchLogs && activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED').length > 0 && (
                 <button
-                  onClick={() => verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'))}
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to verify all logs in this batch?")) {
+                      verifyAllLogsMutation.mutate(activeBatchLogs.filter((l: any) => l.status !== 'VERIFIED'));
+                    }
+                  }}
                   disabled={verifyAllLogsMutation.isPending}
                   className="text-[9px] font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors disabled:opacity-50"
                 >
@@ -976,7 +1006,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
                           </span>
                         ) : (
                           <button
-                            onClick={() => verifyLogMutation.mutate(log.id)}
+                            onClick={() => {
+                              if (window.confirm("Are you sure you want to verify this operator log?")) {
+                                verifyLogMutation.mutate(log.id);
+                              }
+                            }}
                             disabled={verifyLogMutation.isPending}
                             className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-colors disabled:opacity-50"
                           >
@@ -1008,7 +1042,11 @@ function LineControlButtons({ line, brands, products, shifts }: any) {
           <div className="flex gap-4">
             <button onClick={() => setChangeoverModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-500 rounded-2xl font-black uppercase tracking-widest text-xs">Cancel</button>
             <button
-              onClick={() => changeoverMutation.mutate()}
+              onClick={() => {
+                if (window.confirm("Are you sure you want to initiate product changeover?")) {
+                  changeoverMutation.mutate();
+                }
+              }}
               disabled={!changeoverProduct || missingStations.length > 0 || hasUnverifiedLogs || changeoverMutation.isPending}
               className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-100 disabled:opacity-50"
             >

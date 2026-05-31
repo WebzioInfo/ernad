@@ -17,9 +17,7 @@ export default function NotificationBell() {
     queryFn: async () => {
       const res = await api.get(ENDPOINTS.NOTIFICATIONS.UNREAD);
       return res.data;
-    },
-    refetchInterval: 30000,
-  });
+    },  });
 
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {

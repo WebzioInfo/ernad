@@ -3,12 +3,16 @@ import { db } from '../../../database/db';
 import { productionLogs, users, batchTotals } from '../../../database/schema';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../../audit/audit.service';
+import { InventoryService } from '../../inventory/inventory.service';
 
 @Injectable()
 export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
 
-  constructor(private readonly audit: AuditService) {}
+  constructor(
+    private readonly audit: AuditService,
+    private readonly inventoryService: InventoryService
+  ) {}
 
   async verifyLog(logId: number, verifierId: string, remarks?: string) {
     return await db.transaction(async (tx) => {
@@ -83,6 +87,8 @@ export class VerificationService {
         payload: { status: 'REJECTED', reason }
       });
 
+      await this.inventoryService.recalculateInventory(tx);
+
       return updated;
     });
   }
@@ -131,6 +137,8 @@ export class VerificationService {
         updated,
         reason
       );
+
+      await this.inventoryService.recalculateInventory(tx);
 
       return updated;
     });

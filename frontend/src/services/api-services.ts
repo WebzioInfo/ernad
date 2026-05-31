@@ -20,7 +20,6 @@ import type {
   InventoryStock,
   InventoryLedger,
   PackagingConfiguration,
-  MaterialCategory,
   RawMaterial,
   WarehouseLocation,
   StockTransfer,
@@ -176,7 +175,9 @@ export interface TelemetryLogPayload {
   inkUsage?: number;
   solventUsage?: number;
   shrinkWeightUsed?: number;
-  shrinkWeightRejected?: number;
+  boxesUsed?: number;
+  labelsUsed?: number;
+  shrinkRollsUsed?: number;
   finishedGoodsProduced?: number;
   casesProduced?: number;
   packingTypeId?: string;
@@ -246,6 +247,12 @@ export const MasterDataService = {
 
   getRawMaterials: () =>
     api.get<RawMaterial[]>(ENDPOINTS.MASTER_DATA.RAW_MATERIALS).then(r => r.data),
+
+  deleteRawMaterial: (id: string) =>
+    api.delete(ENDPOINTS.MASTER_DATA.DELETE_RAW_MATERIAL(id)).then(r => r.data),
+
+  updateRawMaterial: (id: string, data: Partial<RawMaterial>) =>
+    api.patch(ENDPOINTS.MASTER_DATA.UPDATE_RAW_MATERIAL(id), data).then(r => r.data),
 };
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
@@ -296,8 +303,6 @@ export const InventoryService = {
   getStockByCategory: (category: string) =>
     api.get<InventoryStock[]>(ENDPOINTS.INVENTORY.STOCK_BY_CATEGORY(category)).then(r => r.data),
 
-  getCategories: () =>
-    api.get<MaterialCategory[]>(ENDPOINTS.INVENTORY.CATEGORIES).then(r => r.data),
 
   getWarehouses: () =>
     api.get<WarehouseLocation[]>(ENDPOINTS.INVENTORY.WAREHOUSES).then(r => r.data),
@@ -313,6 +318,21 @@ export const InventoryService = {
 
   getLedger: (stockId: string) =>
     api.get<InventoryLedger[]>(ENDPOINTS.INVENTORY.LEDGER(stockId)).then(r => r.data),
+
+  getRawMaterials: () =>
+    api.get<any[]>(ENDPOINTS.INVENTORY.RAW_MATERIALS).then(r => r.data),
+
+  getStationConsumption: () =>
+    api.get<any>(ENDPOINTS.INVENTORY.STATION_CONSUMPTION).then(r => r.data),
+
+  getProductionStock: () =>
+    api.get<any[]>(ENDPOINTS.INVENTORY.PRODUCTION_STOCK).then(r => r.data),
+
+  getRawMaterialLedger: (id: string) =>
+    api.get<any[]>(ENDPOINTS.INVENTORY.RAW_MATERIAL_LEDGER(id)).then(r => r.data),
+
+  getProductLedger: (id: string) =>
+    api.get<any[]>(ENDPOINTS.INVENTORY.PRODUCT_LEDGER(id)).then(r => r.data),
 };
 
 // ─── ANALYTICS ───────────────────────────────────────────────────────────────

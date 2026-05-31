@@ -38,9 +38,7 @@ export default function LineSelectionPage() {
 
   const { data: activeSessions } = useQuery({
     queryKey: ['all-active-sessions'],
-    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.ACTIVE)).data,
-    refetchInterval: 10000
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.OPERATOR_SESSIONS.ACTIVE)).data,  });
 
   const { data: lines, isLoading: isLoadingLines } = useQuery({
     queryKey: ['production-lines'],

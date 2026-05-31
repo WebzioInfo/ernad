@@ -27,9 +27,7 @@ export default function InventoryPage() {
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
-    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LIST)).data,
-    refetchInterval: 10000
-  });
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LIST)).data,  });
 
   const { data: categoriesData } = useQuery({
     queryKey: ['inventory-categories'],

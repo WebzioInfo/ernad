@@ -14,7 +14,6 @@ import {
   inventoryStock,
   packagingConfigurations,
   warehouseLocations,
-  materialCategories,
   rawMaterials,
 } from '../src/database/schema';
 
@@ -274,72 +273,27 @@ async function seed() {
       .returning();
   }
 
-  // ── Material Category (optional FK for inventoryStock) ────────────────────
-  let rawCategory = await db
-    .select()
-    .from(materialCategories)
-    .where(eq(materialCategories.name, 'Packaging Materials'));
-
-  if (!rawCategory.length) {
-    rawCategory = await db
-      .insert(materialCategories)
-      .values({ name: 'Packaging Materials' })
-      .returning();
-  }
-
-  // ── Material Categories ──────────────────────────────────────────────────
-  const categoriesToSeed = [
-    { name: 'Caps', description: 'Plastic closures for bottles' },
-    { name: 'Preforms', description: 'PET resin preforms for blowing bottles' },
-    { name: 'Labels', description: 'BOPP roll labels or stickers' },
-    { name: 'Shrink Rolls', description: 'Shrink wrapping plastic' }
-  ];
-
-  const categoryMap: Record<string, string> = {};
-
-  for (const cat of categoriesToSeed) {
-    let [existing] = await db
-      .select()
-      .from(materialCategories)
-      .where(eq(materialCategories.name, cat.name))
-      .limit(1);
-
-    if (!existing) {
-      const [inserted] = await db
-        .insert(materialCategories)
-        .values(cat)
-        .returning();
-      existing = inserted;
-    }
-    categoryMap[cat.name] = existing.id;
-  }
-
   // ── Raw Materials ────────────────────────────────────────────────────────
   const rawMaterialsToSeed = [
-    { name: 'Cap 1', categoryName: 'Caps' },
-    { name: 'Cap 2', categoryName: 'Caps' },
-    { name: 'Preform PET Resin A', categoryName: 'Preforms' },
-    { name: 'Preform PET Resin B', categoryName: 'Preforms' },
+    { name: 'Cap 1', materialType: 'CAP', unit: 'Boxes' },
+    { name: 'Cap 2', materialType: 'CAP', unit: 'Boxes' },
+    { name: 'Preform PET Resin A', materialType: 'PREFORM', unit: 'Bags' },
+    { name: 'Preform PET Resin B', materialType: 'PREFORM', unit: 'Bags' },
   ];
 
   for (const mat of rawMaterialsToSeed) {
-    const catId = categoryMap[mat.categoryName];
-    if (catId) {
-      const [existing] = await db
-        .select()
-        .from(rawMaterials)
-        .where(and(
-          eq(rawMaterials.name, mat.name),
-          eq(rawMaterials.categoryId, catId)
-        ))
-        .limit(1);
+    const [existing] = await db
+      .select()
+      .from(rawMaterials)
+      .where(eq(rawMaterials.name, mat.name))
+      .limit(1);
 
-      if (!existing) {
-        await db.insert(rawMaterials).values({
-          name: mat.name,
-          categoryId: catId,
-        });
-      }
+    if (!existing) {
+      await db.insert(rawMaterials).values({
+        name: mat.name,
+        materialType: mat.materialType,
+        unit: mat.unit,
+      });
     }
   }
 
@@ -363,7 +317,6 @@ async function seed() {
       await db.insert(inventoryStock).values({
         ...item,
         warehouseId: rawWarehouse[0].id,
-        categoryId: rawCategory[0].id,
       });
     }
   }

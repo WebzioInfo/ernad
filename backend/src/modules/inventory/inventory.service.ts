@@ -3,21 +3,34 @@ import { db } from '../../database/db';
 import { 
   inventoryStock, 
   inventoryTransactions, 
-  materialCategories, 
+
   warehouseLocations, 
   packagingConfigurations,
+  rawMaterials,
+  rawMaterialTransactions,
+  productStockTransactions,
+  productionStock,
+  products,
+  productionLogs,
+  dispatchLogs,
+  productionBatches,
+  users
 } from '../../database/schema';
-import { eq, sql, desc, ilike } from 'drizzle-orm';
+
+import { eq, sql, desc, ilike, and, isNull, gte } from 'drizzle-orm';
 import { AuditService } from '../audit/audit.service';
+import { ProductionEventsService } from '../../realtime/production.gateway';
 
 @Injectable()
 export class InventoryService {
   private readonly logger = new Logger(InventoryService.name);
 
-  constructor(private readonly auditService: AuditService) {}
+  constructor(
+    private readonly auditService: AuditService,
+    private readonly eventsService: ProductionEventsService,
+  ) {}
 
   async getInventory() {
-    // Join with categories for better UI
     return await db.select({
       id: inventoryStock.id,
       itemName: inventoryStock.itemName,
@@ -25,28 +38,25 @@ export class InventoryService {
       unit: inventoryStock.unit,
       quantity: inventoryStock.quantity,
       minimumStock: inventoryStock.minimumStock,
-      categoryName: materialCategories.name,
+      materialType: inventoryStock.materialType,
       warehouseName: warehouseLocations.name,
     })
     .from(inventoryStock)
-    .leftJoin(materialCategories, eq(inventoryStock.categoryId, materialCategories.id))
     .leftJoin(warehouseLocations, eq(inventoryStock.warehouseId, warehouseLocations.id))
     .orderBy(inventoryStock.itemName);
   }
 
-  async getStockByCategory(categoryName: string) {
+  async getStockByCategory(materialType: string) {
     return await db.select({
       id: inventoryStock.id,
       itemName: inventoryStock.itemName,
       sku: inventoryStock.sku,
       unit: inventoryStock.unit,
       quantity: inventoryStock.quantity,
-      categoryId: inventoryStock.categoryId,
-      categoryName: materialCategories.name,
+      materialType: inventoryStock.materialType,
     })
     .from(inventoryStock)
-    .innerJoin(materialCategories, eq(inventoryStock.categoryId, materialCategories.id))
-    .where(ilike(materialCategories.name, categoryName));
+    .where(ilike(inventoryStock.materialType, materialType));
   }
 
   async getMaterialLedger(stockId: string) {
@@ -75,9 +85,6 @@ export class InventoryService {
     return await db.select().from(warehouseLocations);
   }
 
-  async getCategories() {
-    return await db.select().from(materialCategories);
-  }
 
   async updateStock(dto: { 
     stockId: string; 
@@ -105,9 +112,6 @@ export class InventoryService {
       if (isInflow) {
         newQty += dto.quantity;
       } else if (isDeduction) {
-        if (currentQty < dto.quantity && dto.type !== 'ADJUSTMENT') {
-          throw new Error(`INSUFFICIENT_STOCK: Required ${dto.quantity}, Available ${currentQty} for ${stock.itemName}`);
-        }
         newQty -= dto.quantity;
       } else if (dto.type === 'ADJUSTMENT') {
         newQty = dto.quantity;
@@ -151,6 +155,7 @@ export class InventoryService {
         }
       });
 
+      await this.eventsService.emitDataChanged('inventory', { action: 'stock_updated', stockId: dto.stockId });
       return { stock: { ...stock, quantity: String(newQty) }, transaction };
     });
   }
@@ -160,16 +165,10 @@ export class InventoryService {
       ...dto,
       quantity: dto.quantity || '0',
     }).returning();
+    await this.eventsService.emitDataChanged('inventory', { action: 'stock_item_created', id: item.id });
     return item;
   }
 
-  async createCategory(dto: { name: string; description?: string }) {
-    const [category] = await db.insert(materialCategories).values({
-      ...dto,
-      createdAt: new Date(),
-    }).returning();
-    return category;
-  }
 
   async createWarehouse(dto: { name: string; type: string }) {
     const [warehouse] = await db.insert(warehouseLocations).values({
@@ -177,5 +176,682 @@ export class InventoryService {
       createdAt: new Date(),
     }).returning();
     return warehouse;
+  }
+
+  // ─── NEW SIMPLE INVENTORY IMPLEMENTATION ────────────────────────────
+
+  async getCurrentMaterialBalance(materialId: string): Promise<number> {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!materialId || !UUID_REGEX.test(materialId)) {
+      return 0;
+    }
+
+    const [material] = await db.select().from(rawMaterials).where(eq(rawMaterials.id, materialId)).limit(1);
+    if (!material) return 0;
+
+    // 1. Sum Admin Transactions
+    const txs = await db.select({
+      quantityChange: rawMaterialTransactions.quantityChange
+    })
+    .from(rawMaterialTransactions)
+    .where(eq(rawMaterialTransactions.materialId, materialId));
+
+    const totalTxs = txs.reduce((sum, t) => sum + Number(t.quantityChange), 0);
+
+    // 2. Sum Consumptions from logs
+    const logs = await db.select({
+      bagsUsed: productionLogs.bagsUsed,
+      capBoxUsage: productionLogs.capBoxUsage,
+      bopRollUsage: productionLogs.bopRollUsage,
+      shrinkWeightUsed: productionLogs.shrinkWeightUsed
+    })
+    .from(productionLogs)
+    .where(and(
+      eq(productionLogs.rawMaterialId, materialId),
+      isNull(productionLogs.deletedAt)
+    ));
+
+    const totalConsumed = logs.reduce((sum, l) => {
+      let qty = 0;
+      if (material.materialType === 'PREFORM') {
+        qty = Number(l.bagsUsed || 0);
+      } else if (material.materialType === 'CAP') {
+        qty = Number(l.capBoxUsage || 0);
+      } else if (material.materialType === 'LABEL') {
+        qty = Number(l.bopRollUsage || 0);
+      } else if (material.materialType === 'SHRINK') {
+        qty = Number(l.shrinkWeightUsed || 0);
+      }
+      return sum + qty;
+    }, 0);
+
+    return totalTxs - totalConsumed;
+  }
+
+  async getRawMaterials() {
+    try {
+      const materials = await db.select({
+        id: rawMaterials.id,
+        name: rawMaterials.name,
+        unit: rawMaterials.unit,
+        updatedAt: rawMaterials.updatedAt,
+      })
+      .from(rawMaterials)
+      .orderBy(rawMaterials.name);
+
+      const result = [];
+      for (const m of materials) {
+        const currentStock = await this.getCurrentMaterialBalance(m.id);
+        result.push({
+          ...m,
+          currentStock,
+        });
+      }
+      return result;
+    } catch (error) {
+      console.error('getRawMaterials CRASH:', error);
+      throw error;
+    }
+  }
+
+  async getRawMaterialLedger(materialId: string) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!materialId || !UUID_REGEX.test(materialId)) {
+      return [];
+    }
+    const [material] = await db.select().from(rawMaterials).where(eq(rawMaterials.id, materialId)).limit(1);
+    if (!material) return [];
+    
+    // 1. Fetch Admin Transactions
+    const txs = await db.select({
+      id: rawMaterialTransactions.id,
+      type: rawMaterialTransactions.type,
+      quantityChange: rawMaterialTransactions.quantityChange,
+      remarks: rawMaterialTransactions.remarks,
+      createdAt: rawMaterialTransactions.createdAt,
+      userName: users.name
+    })
+    .from(rawMaterialTransactions)
+    .leftJoin(users, eq(rawMaterialTransactions.performedBy, users.id))
+    .where(eq(rawMaterialTransactions.materialId, materialId));
+    
+    // 2. Fetch Consumptions from logs
+    const logs = await db.select({
+      id: productionLogs.id,
+      bagsUsed: productionLogs.bagsUsed,
+      capBoxUsage: productionLogs.capBoxUsage,
+      bopRollUsage: productionLogs.bopRollUsage,
+      shrinkWeightUsed: productionLogs.shrinkWeightUsed,
+      createdAt: productionLogs.loggedAt,
+      userName: users.name
+    })
+    .from(productionLogs)
+    .leftJoin(users, eq(productionLogs.userId, users.id))
+    .where(and(
+      eq(productionLogs.rawMaterialId, materialId),
+      isNull(productionLogs.deletedAt)
+    ));
+    
+    // 3. Format and merge
+    const ledgerEntries: any[] = [];
+    
+    // Add Admin transactions
+    txs.forEach(t => {
+      ledgerEntries.push({
+        id: t.id,
+        type: t.type,
+        quantityChange: Number(t.quantityChange),
+        remarks: t.remarks || 'Stock Adjustment',
+        createdAt: t.createdAt,
+        userName: t.userName || 'Admin',
+        unit: material.unit
+      });
+    });
+    
+    // Add production consumption
+    logs.forEach(l => {
+      let qty = 0;
+      if (material.materialType === 'PREFORM') {
+        qty = Number(l.bagsUsed || 0);
+      } else if (material.materialType === 'CAP') {
+        qty = Number(l.capBoxUsage || 0);
+      } else if (material.materialType === 'LABEL') {
+        qty = Number(l.bopRollUsage || 0);
+      } else if (material.materialType === 'SHRINK') {
+        qty = Number(l.shrinkWeightUsed || 0);
+      }
+
+      if (qty > 0) {
+        ledgerEntries.push({
+          id: String(l.id),
+          type: 'CONSUMPTION',
+          quantityChange: -qty,
+          remarks: `Production Batch Log #${l.id}`,
+          createdAt: l.createdAt,
+          userName: l.userName || 'Operator',
+          unit: material.unit
+        });
+      }
+    });
+    
+    // Sort by date ascending to calculate running balance
+    ledgerEntries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    
+    let balance = 0;
+    const sortedLedger = ledgerEntries.map(entry => {
+      balance += entry.quantityChange;
+      return {
+        ...entry,
+        balanceAfter: balance
+      };
+    });
+    
+    // Sort descending for display (newest first)
+    return sortedLedger.reverse();
+  }
+
+  async getProductionStock() {
+    // Ensure all products have a row in productionStock
+    const allProducts = await db.select().from(products);
+    for (const prod of allProducts) {
+      const existing = await db.select().from(productionStock).where(eq(productionStock.productId, prod.id)).limit(1);
+      if (existing.length === 0) {
+        await db.insert(productionStock).values({
+          productId: prod.id,
+          currentStock: 0,
+          totalProduced: 0,
+          totalDispatched: 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }).catch(() => {});
+      }
+    }
+
+    return await db.select({
+      id: productionStock.id,
+      productId: productionStock.productId,
+      productName: products.name,
+      currentStock: productionStock.currentStock,
+      totalProduced: productionStock.totalProduced,
+      totalDispatched: productionStock.totalDispatched,
+      availableStock: productionStock.currentStock
+    })
+    .from(productionStock)
+    .innerJoin(products, eq(productionStock.productId, products.id))
+    .orderBy(products.name);
+  }
+
+  async addStockTransaction(dto: { itemId: string; itemType: 'RAW' | 'PRODUCT'; quantity: number; remarks?: string; performedBy: string }) {
+    const result = await db.transaction(async (tx) => {
+      if (dto.itemType === 'PRODUCT') {
+        await tx.insert(productStockTransactions).values({
+          productId: dto.itemId,
+          type: 'ADD',
+          quantityChange: dto.quantity,
+          balanceAfter: 0,
+          remarks: dto.remarks,
+          performedBy: dto.performedBy,
+          createdAt: new Date()
+        });
+      } else {
+        await tx.insert(rawMaterialTransactions).values({
+          materialId: dto.itemId,
+          type: 'ADD',
+          quantityChange: dto.quantity,
+          balanceAfter: 0,
+          remarks: dto.remarks,
+          performedBy: dto.performedBy,
+          createdAt: new Date()
+        });
+      }
+      await this.recalculateInventory(tx);
+    });
+    await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_created', itemId: dto.itemId, itemType: dto.itemType });
+    return result;
+  }
+
+  async updateStockTransaction(dto: { transactionId: string; quantity: number; remarks?: string; performedBy: string }) {
+    const result = await db.transaction(async (tx) => {
+      const [rawTx] = await tx.select().from(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, dto.transactionId)).limit(1);
+      if (rawTx) {
+        await tx.update(rawMaterialTransactions)
+          .set({
+            quantityChange: dto.quantity,
+            remarks: dto.remarks,
+            performedBy: dto.performedBy
+          })
+          .where(eq(rawMaterialTransactions.id, dto.transactionId));
+      } else {
+        const [prodTx] = await tx.select().from(productStockTransactions).where(eq(productStockTransactions.id, dto.transactionId)).limit(1);
+        if (!prodTx) throw new Error('Transaction not found');
+
+        await tx.update(productStockTransactions)
+          .set({
+            quantityChange: dto.quantity,
+            remarks: dto.remarks,
+            performedBy: dto.performedBy
+          })
+          .where(eq(productStockTransactions.id, dto.transactionId));
+      }
+      await this.recalculateInventory(tx);
+    });
+    await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_updated', transactionId: dto.transactionId });
+    return result;
+  }
+
+  async deleteStockTransaction(transactionId: string) {
+    const result = await db.transaction(async (tx) => {
+      const [rawTx] = await tx.select().from(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, transactionId)).limit(1);
+      if (rawTx) {
+        await tx.delete(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, transactionId));
+      } else {
+        const [prodTx] = await tx.select().from(productStockTransactions).where(eq(productStockTransactions.id, transactionId)).limit(1);
+        if (!prodTx) throw new Error('Transaction not found');
+        await tx.delete(productStockTransactions).where(eq(productStockTransactions.id, transactionId));
+      }
+      await this.recalculateInventory(tx);
+    });
+    await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_deleted', transactionId });
+    return result;
+  }
+
+  async recalculateInventory(tx?: any) {
+    const runner = tx || db;
+
+    // 1. Recalculate Preforms
+    const [preformsMat] = await runner.select().from(rawMaterials).where(eq(rawMaterials.name, 'Preforms')).limit(1);
+    if (preformsMat) {
+      const [inwardedRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
+      })
+      .from(rawMaterialTransactions)
+      .where(eq(rawMaterialTransactions.materialId, preformsMat.id));
+      
+      const [consumedRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(coalesce(nullif(${productionLogs.preformUsage}, 0), ${productionLogs.primaryCount} + cast(coalesce(${productionLogs.wastageCount}, '0') as integer))), '0')`
+      })
+      .from(productionLogs)
+      .where(and(
+        eq(productionLogs.station, 'BLOWING'),
+        isNull(productionLogs.deletedAt)
+      ));
+      
+      const inwarded = parseInt(inwardedRes.sum, 10);
+      const consumed = parseInt(consumedRes.sum, 10);
+      const currentStock = inwarded - consumed;
+      
+      await runner.update(rawMaterials)
+        .set({
+          currentStock,
+          updatedAt: new Date()
+        })
+        .where(eq(rawMaterials.id, preformsMat.id));
+    }
+
+    // 2. Recalculate Caps
+    const [capsMat] = await runner.select().from(rawMaterials).where(eq(rawMaterials.name, 'Caps')).limit(1);
+    if (capsMat) {
+      const [inwardedRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
+      })
+      .from(rawMaterialTransactions)
+      .where(eq(rawMaterialTransactions.materialId, capsMat.id));
+      
+      const [consumedRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(coalesce(nullif(${productionLogs.capUsage}, 0), ${productionLogs.primaryCount} + cast(coalesce(${productionLogs.wastageCount}, '0') as integer))), '0')`
+      })
+      .from(productionLogs)
+      .where(and(
+        eq(productionLogs.station, 'FILLING'),
+        isNull(productionLogs.deletedAt)
+      ));
+      
+      const inwarded = parseInt(inwardedRes.sum, 10);
+      const consumed = parseInt(consumedRes.sum, 10);
+      const currentStock = inwarded - consumed;
+      
+      await runner.update(rawMaterials)
+        .set({
+          currentStock,
+          updatedAt: new Date()
+        })
+        .where(eq(rawMaterials.id, capsMat.id));
+    }
+
+    // 3. Recalculate Finished Goods Stock per Product
+    const allProducts = await runner.select().from(products);
+    for (const prod of allProducts) {
+      const productBatchesList = await runner.select({ id: productionBatches.id })
+        .from(productionBatches)
+        .where(and(eq(productionBatches.productId, prod.id), isNull(productionBatches.deletedAt)));
+      
+      let totalProduced = 0;
+      
+      for (const b of productBatchesList) {
+        // Sum Packed Bottles
+        const [packedRes] = await runner.select({
+          sum: sql<string>`coalesce(sum(${productionLogs.primaryCount}), '0')`
+        })
+        .from(productionLogs)
+        .where(and(
+          eq(productionLogs.batchId, b.id),
+          eq(productionLogs.station, 'PACKING'),
+          isNull(productionLogs.deletedAt)
+        ));
+        
+        // Sum Leak Bottles
+        const [leakRes] = await runner.select({
+          sum: sql<string>`coalesce(sum(${productionLogs.bottleLeakage}), '0')`
+        })
+        .from(productionLogs)
+        .where(and(
+          eq(productionLogs.batchId, b.id),
+          eq(productionLogs.station, 'FILLING'),
+          isNull(productionLogs.deletedAt)
+        ));
+        
+        // Sum Rejected Bottles
+        const [rejectRes] = await runner.select({
+          sum: sql<string>`coalesce(sum(cast(coalesce(${productionLogs.wastageCount}, '0') as integer)), '0')`
+        })
+        .from(productionLogs)
+        .where(and(
+          eq(productionLogs.batchId, b.id),
+          sql`station IN ('BLOWING', 'FILLING', 'LABELING')`,
+          isNull(productionLogs.deletedAt)
+        ));
+        
+        const packed = parseInt(packedRes.sum, 10);
+        const leakage = parseInt(leakRes.sum, 10);
+        const rejections = parseInt(rejectRes.sum, 10);
+        
+        const goodBottles = Math.max(0, packed - leakage - rejections);
+        totalProduced += goodBottles;
+      }
+      
+      // Calculate Dispatched
+      const [dispatchRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(${dispatchLogs.quantity}), '0')`
+      })
+      .from(dispatchLogs)
+      .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
+      .where(and(
+        eq(productionBatches.productId, prod.id),
+        isNull(productionBatches.deletedAt)
+      ));
+      
+      // Calculate Manual Inward / Adjustments
+      const [manualRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(${productStockTransactions.quantityChange}), '0')`
+      })
+      .from(productStockTransactions)
+      .where(eq(productStockTransactions.productId, prod.id));
+
+      const manualAdded = parseInt(manualRes.sum, 10);
+      const totalDispatched = parseInt(dispatchRes.sum, 10);
+      const availableStock = totalProduced + manualAdded - totalDispatched;
+      
+      // Upsert
+      const existing = await runner.select().from(productionStock).where(eq(productionStock.productId, prod.id)).limit(1);
+      if (existing.length > 0) {
+        await runner.update(productionStock)
+          .set({
+            currentStock: availableStock,
+            totalProduced,
+            totalDispatched,
+            updatedAt: new Date()
+          })
+          .where(eq(productionStock.productId, prod.id));
+      } else {
+        await runner.insert(productionStock).values({
+          productId: prod.id,
+          currentStock: availableStock,
+          totalProduced,
+          totalDispatched,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+    }
+  }
+
+  async getProductLedger(productId: string) {
+    const [prod] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+    if (!prod) return [];
+
+    // 1. Fetch manual product stock transactions
+    const manualTxs = await db.select({
+      id: productStockTransactions.id,
+      type: productStockTransactions.type,
+      quantityChange: productStockTransactions.quantityChange,
+      remarks: productStockTransactions.remarks,
+      createdAt: productStockTransactions.createdAt,
+      userName: users.name
+    })
+    .from(productStockTransactions)
+    .leftJoin(users, eq(productStockTransactions.performedBy, users.id))
+    .where(eq(productStockTransactions.productId, productId));
+
+    // 2. Fetch packing logs (Production Output)
+    const packingLogs = await db.select({
+      id: productionLogs.id,
+      primaryCount: productionLogs.primaryCount,
+      createdAt: productionLogs.loggedAt,
+      userName: users.name,
+      batchCode: productionBatches.batchCode
+    })
+    .from(productionLogs)
+    .leftJoin(users, eq(productionLogs.userId, users.id))
+    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+    .where(and(
+      eq(productionLogs.productId, productId),
+      eq(productionLogs.station, 'PACKING'),
+      isNull(productionLogs.deletedAt)
+    ));
+
+    // 3. Fetch leakages (FILLING logs)
+    const leakageLogs = await db.select({
+      id: productionLogs.id,
+      bottleLeakage: productionLogs.bottleLeakage,
+      createdAt: productionLogs.loggedAt,
+      userName: users.name,
+      batchCode: productionBatches.batchCode
+    })
+    .from(productionLogs)
+    .leftJoin(users, eq(productionLogs.userId, users.id))
+    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+    .where(and(
+      eq(productionLogs.productId, productId),
+      eq(productionLogs.station, 'FILLING'),
+      sql`${productionLogs.bottleLeakage} > 0`,
+      isNull(productionLogs.deletedAt)
+    ));
+
+    // 4. Fetch scrap/rejections (BLOWING, FILLING, LABELING logs with wastageCount > 0)
+    const rejectionLogs = await db.select({
+      id: productionLogs.id,
+      wastageCount: productionLogs.wastageCount,
+      createdAt: productionLogs.loggedAt,
+      userName: users.name,
+      station: productionLogs.station,
+      batchCode: productionBatches.batchCode
+    })
+    .from(productionLogs)
+    .leftJoin(users, eq(productionLogs.userId, users.id))
+    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+    .where(and(
+      eq(productionLogs.productId, productId),
+      sql`station IN ('BLOWING', 'FILLING', 'LABELING')`,
+      sql`cast(coalesce(${productionLogs.wastageCount}, '0') as integer) > 0`,
+      isNull(productionLogs.deletedAt)
+    ));
+
+    // 5. Fetch dispatches
+    const dispatches = await db.select({
+      id: dispatchLogs.id,
+      quantity: dispatchLogs.quantity,
+      createdAt: dispatchLogs.dispatchedAt,
+      userName: users.name,
+      batchCode: productionBatches.batchCode
+    })
+    .from(dispatchLogs)
+    .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
+    .leftJoin(users, eq(dispatchLogs.dispatchManagerId, users.id))
+    .where(and(
+      eq(productionBatches.productId, productId),
+      isNull(productionBatches.deletedAt)
+    ));
+
+    // Merge and format
+    const ledgerEntries: any[] = [];
+
+    // Manual transactions
+    manualTxs.forEach(t => {
+      ledgerEntries.push({
+        id: t.id,
+        type: t.type,
+        quantityChange: Number(t.quantityChange),
+        remarks: t.remarks || 'Stock Adjustment',
+        createdAt: t.createdAt,
+        userName: t.userName || 'Admin'
+      });
+    });
+
+    // Production (Packing)
+    packingLogs.forEach(l => {
+      ledgerEntries.push({
+        id: `packing_${l.id}`,
+        type: 'PRODUCTION',
+        quantityChange: l.primaryCount,
+        remarks: `Production Output (Batch #${l.batchCode})`,
+        createdAt: l.createdAt,
+        userName: l.userName || 'Operator'
+      });
+    });
+
+    // Leakages
+    leakageLogs.forEach(l => {
+      ledgerEntries.push({
+        id: `leak_${l.id}`,
+        type: 'LEAKAGE',
+        quantityChange: -l.bottleLeakage,
+        remarks: `Bottle Leakage in Filling (Batch #${l.batchCode})`,
+        createdAt: l.createdAt,
+        userName: l.userName || 'Operator'
+      });
+    });
+
+    // Rejections
+    rejectionLogs.forEach(l => {
+      const scrap = Math.floor(Number(l.wastageCount || 0));
+      ledgerEntries.push({
+        id: `reject_${l.id}`,
+        type: 'REJECTION',
+        quantityChange: -scrap,
+        remarks: `${l.station} Scrap Rejections (Batch #${l.batchCode})`,
+        createdAt: l.createdAt,
+        userName: l.userName || 'Operator'
+      });
+    });
+
+    // Dispatches
+    dispatches.forEach(d => {
+      ledgerEntries.push({
+        id: `dispatch_${d.id}`,
+        type: 'DISPATCH',
+        quantityChange: -d.quantity,
+        remarks: `Dispatched Stock (Batch #${d.batchCode})`,
+        createdAt: d.createdAt,
+        userName: d.userName || 'Logistics'
+      });
+    });
+
+    // Sort ascending by date to compute running balance
+    ledgerEntries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    let balance = 0;
+    const sortedLedger = ledgerEntries.map(entry => {
+      balance += entry.quantityChange;
+      return {
+        ...entry,
+        balanceAfter: balance
+      };
+    });
+
+    // Sort descending for display (newest first)
+    return sortedLedger.reverse();
+  }
+
+  async getStationConsumption() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const logs = await db.select({
+      station: productionLogs.station,
+      bagsUsed: productionLogs.bagsUsed,
+      capBoxUsage: productionLogs.capBoxUsage,
+      bopRollUsage: productionLogs.bopRollUsage,
+      shrinkWeightUsed: productionLogs.shrinkWeightUsed,
+      loggedAt: productionLogs.loggedAt,
+    })
+    .from(productionLogs)
+      .where(
+        and(
+        gte(productionLogs.loggedAt, thirtyDaysAgo),
+        isNull(productionLogs.deletedAt)
+      )
+    );
+
+    const stations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'] as const;
+    const initialValues = () => ({ preforms: 0, caps: 0, labels: 0, shrinkFilm: 0 });
+
+    const result = stations.reduce((acc, station) => {
+      acc[station] = {
+        today: initialValues(),
+        weekly: initialValues(),
+        monthly: initialValues(),
+      };
+      return acc;
+    }, {} as Record<string, { today: any; weekly: any; monthly: any }>);
+
+    for (const log of logs) {
+      const station = log.station;
+      if (!result[station]) continue;
+
+      const loggedAt = new Date(log.loggedAt);
+
+      const capsUsed = station === 'FILLING' ? Number(log.capBoxUsage || 0) : 0;
+      const preformsUsed = station === 'BLOWING' ? Number(log.bagsUsed || 0) : 0;
+      const labelsUsed = station === 'LABELING' ? Number(log.bopRollUsage || 0) : 0;
+      const shrinkFilmUsed = station === 'PACKING' ? Number(log.shrinkWeightUsed || 0) : 0;
+
+      const addToPeriod = (period: 'today' | 'weekly' | 'monthly') => {
+        result[station][period].preforms += preformsUsed;
+        result[station][period].caps += capsUsed;
+        result[station][period].labels += labelsUsed;
+        result[station][period].shrinkFilm += shrinkFilmUsed;
+      };
+
+      if (loggedAt >= todayStart) {
+        addToPeriod('today');
+        addToPeriod('weekly');
+        addToPeriod('monthly');
+      } else if (loggedAt >= sevenDaysAgo) {
+        addToPeriod('weekly');
+        addToPeriod('monthly');
+      } else if (loggedAt >= thirtyDaysAgo) {
+        addToPeriod('monthly');
+      }
+    }
+
+    return result;
   }
 }

@@ -24,6 +24,16 @@ async function migrate() {
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verified_by" uuid REFERENCES "users"("id")`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verified_at" timestamp`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verification_reason" varchar(500)`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_usage" integer DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_box_usage" integer DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_wastage" integer DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "preform_usage" integer DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "bop_roll_usage" decimal(8, 2) DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "shrink_weight_used" decimal(8, 2) DEFAULT '0'`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "label_usage" integer DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "shrink_waste_weight" decimal(8, 2)`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "ink_usage_ml" decimal(8, 2)`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "makeup_usage_ml" decimal(8, 2)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_production_logs_status" ON "production_logs" ("status")`);
 
     // 4. Drop unique batch code index and create non-unique index
@@ -89,6 +99,91 @@ async function migrate() {
       console.log('Successfully created shift_handovers table and indexes.');
     } catch (e: any) {
       console.error('Failed to create shift_handovers table:', e.message);
+    }
+
+    // 8. Inventory Module updates
+    try {
+      console.log('Applying Inventory updates...');
+      // Add current_stock column to raw_materials table if not exists
+      await db.execute(sql`ALTER TABLE "raw_materials" ADD COLUMN IF NOT EXISTS "current_stock" integer NOT NULL DEFAULT 0`);
+      
+      // Create raw_material_transactions table if not exists
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "raw_material_transactions" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "material_id" uuid NOT NULL REFERENCES "raw_materials"("id") ON DELETE CASCADE,
+          "type" varchar(50) NOT NULL,
+          "quantity_change" integer NOT NULL,
+          "balance_after" integer NOT NULL,
+          "remarks" text,
+          "performed_by" uuid REFERENCES "users"("id"),
+          "created_at" timestamp NOT NULL DEFAULT now()
+        );
+      `);
+
+      // Create product_stock_transactions table if not exists
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "product_stock_transactions" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "product_id" uuid NOT NULL REFERENCES "products"("id") ON DELETE CASCADE,
+          "type" varchar(50) NOT NULL,
+          "quantity_change" integer NOT NULL,
+          "balance_after" integer NOT NULL,
+          "remarks" text,
+          "performed_by" uuid REFERENCES "users"("id"),
+          "created_at" timestamp NOT NULL DEFAULT now()
+        );
+      `);
+      
+      // Create production_stock table if not exists
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "production_stock" (
+          "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+          "product_id" uuid NOT NULL UNIQUE REFERENCES "products"("id") ON DELETE CASCADE,
+          "current_stock" integer NOT NULL DEFAULT 0,
+          "total_produced" integer NOT NULL DEFAULT 0,
+          "total_dispatched" integer NOT NULL DEFAULT 0,
+          "created_at" timestamp NOT NULL DEFAULT now(),
+          "updated_at" timestamp NOT NULL DEFAULT now()
+        );
+      `);
+
+      // Ensure "Raw Materials" category exists
+      await db.execute(sql`
+        INSERT INTO "material_categories" ("id", "name", "description")
+        VALUES (gen_random_uuid(), 'Raw Materials', 'Raw material components')
+        ON CONFLICT ("name") DO UPDATE SET "description" = EXCLUDED.description;
+      `);
+
+      // Ensure Preforms raw material exists
+      await db.execute(sql`
+        INSERT INTO "raw_materials" ("id", "name", "category_id")
+        SELECT gen_random_uuid(), 'Preforms', id
+        FROM "material_categories"
+        WHERE "name" = 'Raw Materials'
+          AND NOT EXISTS (SELECT 1 FROM "raw_materials" WHERE "name" = 'Preforms');
+      `);
+
+      // Ensure Caps raw material exists
+      await db.execute(sql`
+        INSERT INTO "raw_materials" ("id", "name", "category_id")
+        SELECT gen_random_uuid(), 'Caps', id
+        FROM "material_categories"
+        WHERE "name" = 'Raw Materials'
+          AND NOT EXISTS (SELECT 1 FROM "raw_materials" WHERE "name" = 'Caps');
+      `);
+
+      // Initialize production stock rows for existing products
+      await db.execute(sql`
+        INSERT INTO "production_stock" ("id", "product_id", "current_stock", "total_produced", "total_dispatched")
+        SELECT gen_random_uuid(), id, 0, 0, 0
+        FROM "products"
+        ON CONFLICT ("product_id") DO NOTHING;
+      `);
+
+      console.log('Successfully applied Inventory Module tables and seeds.');
+    } catch (e: any) {
+      console.error('Failed to apply Inventory Module tables and seeds:', e.message);
     }
 
     console.log('Migrations applied successfully.');

@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -7,7 +7,7 @@ import {
   Activity, TrendingUp,
   Database, HardDrive, Cpu,
   Gauge, Clock, AlertTriangle,
-  CheckCircle2, RefreshCw
+  CheckCircle2, RefreshCw, Package
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { KPICard } from './components/DashboardCards';
@@ -51,9 +51,37 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
     queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_EFFICIENCY)).data
   });
 
-  const { data: salesSummary } = useQuery({
-    queryKey: ['tally-sales-summary'],
-    queryFn: async () => (await api.get(ENDPOINTS.TALLY.SUMMARY)).data
+  const { data: rawMaterials } = useQuery({
+    queryKey: ['raw-materials-kpis'],
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.RAW_MATERIALS)).data,  });
+
+  const { data: productionStock } = useQuery({
+    queryKey: ['production-stock-kpis'],
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.PRODUCTION_STOCK)).data,  });
+
+  const { startOfMonthStr, endOfMonthStr } = useMemo(() => {
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0);
+    end.setHours(23, 59, 59, 999);
+    return {
+      startOfMonthStr: start.toISOString(),
+      endOfMonthStr: end.toISOString()
+    };
+  }, []);
+
+  const { data: monthlyKPI } = useQuery({
+    queryKey: ['monthly-kpis-summary', startOfMonthStr, endOfMonthStr],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.KPIS, {
+      params: { 
+        startDate: startOfMonthStr, 
+        endDate: endOfMonthStr 
+      }
+    })).data,
+    staleTime: 60000
   });
 
   const isLive = filters.timeRange === 'live';
@@ -63,9 +91,13 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
     filling: factoryLive?.counters?.filling || 0,
     packing: factoryLive?.counters?.packing || 0,
     rejection: factoryLive?.counters?.rejection || 0,
-    yield: factoryLive?.counters?.blowing > 0 ? ((factoryLive?.counters?.packing / factoryLive?.counters?.blowing) * 100).toFixed(1) : '100',
-    totalSales: salesSummary?.totalSales || 0
+    yield: factoryLive?.counters?.blowing > 0 ? ((factoryLive?.counters?.packing / factoryLive?.counters?.blowing) * 100).toFixed(1) : '100'
   };
+
+  const preformsStock = rawMaterials?.find((r: any) => r.name === 'Preforms')?.currentStock ?? 0;
+  const capsStock = rawMaterials?.find((r: any) => r.name === 'Caps')?.currentStock ?? 0;
+  const jarStock = productionStock?.find((p: any) => p.productName?.toLowerCase().includes('20l'))?.currentStock ?? 0;
+  const monthlyProduced = monthlyKPI?.throughput ?? 0;
 
   return (
     <motion.div
@@ -90,21 +122,29 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
         <div className="flex items-center gap-4 bg-white p-3 rounded-[2.5rem] shadow-2xl border border-slate-50">
           <button 
              onClick={() => refetchLive()}
-             className="ml-2 w-12 h-12 bg-slate-50 hover:bg-indigo-600 hover:text-white text-slate-400 rounded-2xl flex items-center justify-center transition-all group active:scale-90"
+             className="ml-2 w-12 h-12 bg-slate-50 hover:bg-indigo-600 hover:text-white text-slate-400 rounded-2xl flex items-center justify-center transition-all group active:scale-95"
              title="Manual Sync"
            >
               <RefreshCw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
            </button>
-          <div className="flex flex-col items-end px-8 border-r border-slate-100">
+          <div className="flex flex-col items-end px-8">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Yield</span>
             <span className="text-3xl font-black text-emerald-600">{displayStats.yield}%</span>
           </div>
-          <div className="flex flex-col items-end px-8">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tally Sales (MTD)</span>
-            <span className="text-3xl font-black text-indigo-600">${(Number(displayStats.totalSales) / 1000).toFixed(1)}k</span>
-          </div>
         </div>
       </header>
+
+      {/* Material & Production Stock Status */}
+      <section className="space-y-4">
+        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Material & Production Stock</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+          <KPICard label="Preforms Available" value={preformsStock.toLocaleString()} trend="Raw Stock" icon={Database} color="indigo" chartColor="#6366f1" delay={0.1} />
+          <KPICard label="Caps Available" value={capsStock.toLocaleString()} trend="Raw Stock" icon={Cpu} color="blue" chartColor="#3b82f6" delay={0.2} />
+          <KPICard label="20L Jar Available Stock" value={jarStock.toLocaleString()} trend="Finished Goods" icon={Package} color="emerald" chartColor="#10b981" delay={0.3} />
+          <KPICard label="Total Bottles Produced Today" value={displayStats.packing.toLocaleString()} trend="Today" icon={CheckCircle2} color="indigo" chartColor="#6366f1" delay={0.4} />
+          <KPICard label="Total Produced This Month" value={monthlyProduced.toLocaleString()} trend="This Month" icon={TrendingUp} color="amber" chartColor="#f59e0b" delay={0.5} />
+        </div>
+      </section>
 
       {/* Main Industrial Counters */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">

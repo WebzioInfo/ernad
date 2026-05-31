@@ -29,9 +29,7 @@ export default function AuditLogsPage() {
 
   const { data: logs, isLoading } = useQuery<AuditLog[]>({
     queryKey: ['audit-logs'],
-    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,
-    refetchInterval: 10000,
-    retry: false
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,    retry: false
   });
 
   const getSeverity = (log: AuditLog) => {

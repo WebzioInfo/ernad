@@ -231,24 +231,21 @@ export class OperatorSessionsService {
       throw new BadRequestException(`Invalid station: ${newStation}`);
     }
 
-    // Get the current active session
-    let [activeSession] = await db.select().from(operatorSessions)
+    // Get ALL current active sessions for the operator
+    const activeSessions = await db.select().from(operatorSessions)
       .where(and(
         eq(operatorSessions.userId, userId),
         eq(operatorSessions.isActive, true)
-      ))
-      .limit(1);
+      ));
 
     // STRUCTURED LOGGING FOR TROUBLESHOOTING
     this.logger.log(
       `[CHANGE_STATION_REQ] operatorId: ${userId}, ` +
-      `currentSessionId: ${activeSession?.id || 'none'}, ` +
-      `currentStation: ${activeSession?.station || 'none'}, ` +
-      `requestedStation: ${newStation}, ` +
-      `lineId: ${activeSession?.lineId || 'none'}`
+      `activeSessionsCount: ${activeSessions.length}, ` +
+      `requestedStation: ${newStation}`
     );
 
-    if (!activeSession) {
+    if (activeSessions.length === 0) {
       this.logger.warn(`[CHANGE_STATION_FAIL] No active session found for operator ${userId}. Attempting auto-healing...`);
       
       const [lastSession] = await db.select().from(operatorSessions)
@@ -268,52 +265,83 @@ export class OperatorSessionsService {
 
       this.logger.log(`[CHANGE_STATION_HEAL] Healing session by starting new session on line ${lastSession.lineId}, station ${newStation}`);
       
-      activeSession = await this.startSession(
+      return await this.startSession(
         userId,
         lastSession.lineId,
         newStation,
         lastSession.shiftId || undefined,
         true
       );
-
-      return activeSession;
     }
 
-    this.logger.log(`[CHANGE_STATION_SUCCESS] Session ${activeSession.id} found active. Updating station to ${newStation}`);
+    // We have at least 1 active session. We want exactly ONE active session on the new station.
+    // If there is an existing session already on the new station, we will keep it and close the rest.
+    const targetSession = activeSessions.find(s => s.station === newStation);
+    const sessionToUpdate = activeSessions.find(s => s.station !== newStation);
 
-    // Check if the user is changing to the station they are already on
-    if (activeSession.station === newStation) {
-      return activeSession;
-    }
-
-    // Update the session
-    const [updatedSession] = await db.update(operatorSessions)
-      .set({ 
-        station: newStation,
-        lastActivity: new Date(),
-      })
-      .where(eq(operatorSessions.id, activeSession.id))
-      .returning();
-
-    // Log STATION_CHANGE event to audit log
-    await this.auditService.logAction({
-      userId,
-      action: 'STATION_CHANGE',
-      category: 'AUTH',
-      payload: {
-        fromStation: activeSession.station,
-        toStation: newStation,
-        lineId: activeSession.lineId
+    if (targetSession) {
+      this.logger.log(`[CHANGE_STATION_SUCCESS] Session already on ${newStation}. Closing others.`);
+      // Close any other active sessions
+      for (const s of activeSessions) {
+        if (s.id !== targetSession.id) {
+          await db.update(operatorSessions)
+            .set({ isActive: false, endTime: new Date(), endReason: 'switched_station' })
+            .where(eq(operatorSessions.id, s.id));
+        }
       }
-    });
 
-    // Invalidate Cache
-    if (this.redis.getAvailability()) {
-      this.redis.del(`operator_session:${userId}`).catch(() => {});
-      this.redis.set(`operator_session:${userId}`, JSON.stringify(updatedSession), 'EX', 3600 * 12).catch(() => {});
+      const [updatedSession] = await db.update(operatorSessions)
+        .set({ lastActivity: new Date() })
+        .where(eq(operatorSessions.id, targetSession.id))
+        .returning();
+
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${userId}`).catch(() => {});
+        this.redis.set(`operator_session:${userId}`, JSON.stringify(updatedSession), 'EX', 3600 * 12).catch(() => {});
+      }
+
+      return updatedSession;
     }
 
-    return updatedSession;
+    if (sessionToUpdate) {
+      this.logger.log(`[CHANGE_STATION_SUCCESS] Updating session ${sessionToUpdate.id} to ${newStation}`);
+      // Ensure we don't violate unique constraint by closing ALL other sessions first (if there are duplicates)
+      for (const s of activeSessions) {
+        if (s.id !== sessionToUpdate.id) {
+          await db.update(operatorSessions)
+            .set({ isActive: false, endTime: new Date(), endReason: 'duplicate_cleanup' })
+            .where(eq(operatorSessions.id, s.id));
+        }
+      }
+
+      const [updatedSession] = await db.update(operatorSessions)
+        .set({ 
+          station: newStation,
+          lastActivity: new Date(),
+        })
+        .where(eq(operatorSessions.id, sessionToUpdate.id))
+        .returning();
+
+      // Log STATION_CHANGE event to audit log
+      await this.auditService.logAction({
+        userId,
+        action: 'STATION_CHANGE',
+        category: 'AUTH',
+        payload: {
+          fromStation: sessionToUpdate.station,
+          toStation: newStation,
+          lineId: sessionToUpdate.lineId
+        }
+      });
+
+      // Invalidate Cache
+      if (this.redis.getAvailability()) {
+        this.redis.del(`operator_session:${userId}`).catch(() => {});
+        this.redis.set(`operator_session:${userId}`, JSON.stringify(updatedSession), 'EX', 3600 * 12).catch(() => {});
+      }
+
+      return updatedSession;
+    }
   }
 
   async getCurrentSession(userId: string) {

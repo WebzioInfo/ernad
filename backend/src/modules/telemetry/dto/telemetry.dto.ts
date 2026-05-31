@@ -117,17 +117,22 @@ export class TelemetryDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
-  @Max(10000)
-  bopRollUsage?: number;
-
-
+  @Max(100000)
+  boxesUsed?: number;
 
   @ApiProperty()
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(100000)
-  shrinkWeightUsed?: number;
+  labelsUsed?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100000)
+  shrinkRollsUsed?: number;
 
 
 

@@ -9,11 +9,13 @@ import {
   Layers, RefreshCw, LayoutDashboard,
   Play, BarChart3,
   History, ShieldCheck, Gauge,
-  ChevronRight, ArrowUpRight
+  ChevronRight, ArrowUpRight,
+  Cpu, Database, TrendingUp, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import useAuthStore from '../auth/auth.store';
+import { useRawMaterials, useProductionStock } from '../../hooks/useApi';
 
 const ManagerDashboard = memo(() => {
   const navigate = useNavigate();
@@ -23,9 +25,7 @@ const ManagerDashboard = memo(() => {
   // Parallel Fetching with Independent Error Handling
   const factoryQuery = useQuery({
     queryKey: ['factory-live-manager'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,
-    refetchInterval: 30000,
-    retry: 1
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,    retry: 1
   });
 
   const machineQuery = useQuery({
@@ -40,6 +40,39 @@ const ManagerDashboard = memo(() => {
     const sum = machineQuery.data.reduce((acc: number, m: any) => acc + (m.efficiency || 0), 0);
     return Math.round(sum / machineQuery.data.length);
   }, [machineQuery.data]);
+
+  const rawMaterialsQuery = useRawMaterials();
+  const productionStockQuery = useProductionStock();
+
+  const { startOfMonthStr, endOfMonthStr } = useMemo(() => {
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0);
+    end.setHours(23, 59, 59, 999);
+    return {
+      startOfMonthStr: start.toISOString(),
+      endOfMonthStr: end.toISOString()
+    };
+  }, []);
+
+  const monthlyKPIQuery = useQuery({
+    queryKey: ['monthly-kpis-summary-manager', startOfMonthStr, endOfMonthStr],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.KPIS, {
+      params: { 
+        startDate: startOfMonthStr, 
+        endDate: endOfMonthStr 
+      }
+    })).data,
+    staleTime: 60000
+  });
+
+  const preformsStock = rawMaterialsQuery.data?.filter((r: any) => r.materialType === 'PREFORM').reduce((sum, r) => sum + (Number(r.currentStock) || 0), 0) ?? 0;
+  const capsStock = rawMaterialsQuery.data?.filter((r: any) => r.materialType === 'CAP').reduce((sum, r) => sum + (Number(r.currentStock) || 0), 0) ?? 0;
+  const jarStock = productionStockQuery.data?.find((p: any) => p.productName?.toLowerCase().includes('20l'))?.currentStock ?? 0;
+  const monthlyProduced = monthlyKPIQuery.data?.throughput ?? 0;
 
   const alerts = useMemo(() => {
     const list = [];
@@ -85,6 +118,18 @@ const ManagerDashboard = memo(() => {
               */}
               <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
               <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/${user?.role?.toLowerCase() === 'manager' ? 'operators' : 'users'}`} color="cyan" />
+            </div>
+          </section>
+
+          {/* ─── LIVE MATERIAL & PRODUCTION STOCK ─── */}
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Material & Production Stock</h3>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <CompactKPICard label="Preforms Available" value={rawMaterialsQuery.isLoading ? '...' : `${preformsStock.toLocaleString()} Bags`} icon={Database} color="indigo" />
+              <CompactKPICard label="Caps Available" value={rawMaterialsQuery.isLoading ? '...' : `${capsStock.toLocaleString()} Boxes`} icon={Cpu} color="blue" />
+              <CompactKPICard label="20L Jar Stock" value={productionStockQuery.isLoading ? '...' : jarStock.toLocaleString()} icon={Package} color="emerald" />
+              <CompactKPICard label="Produced Today" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.counters?.packing?.toLocaleString() || 0)} icon={CheckCircle2} color="indigo" />
+              <CompactKPICard label="Produced This Month" value={monthlyKPIQuery.isLoading ? '...' : monthlyProduced.toLocaleString()} icon={TrendingUp} color="amber" />
             </div>
           </section>
 

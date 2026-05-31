@@ -92,6 +92,15 @@ export const ENDPOINTS = {
     TRANSFER_COMPLETE: (id: string) => `inventory/warehousing/transfers/${id}/complete`,
     PACKAGING: (productId: string) => `inventory/packaging/${productId}`,
     LEDGER: (id: string) => `inventory/${id}/ledger`,
+    
+    RAW_MATERIALS: 'inventory/raw-materials',
+    STATION_CONSUMPTION: 'inventory/station-consumption',
+    PRODUCTION_STOCK: 'inventory/production-stock',
+    ADD_STOCK: 'inventory/add-stock',
+    UPDATE_STOCK: 'inventory/update-stock',
+    DELETE_STOCK: 'inventory/delete-stock',
+    RAW_MATERIAL_LEDGER: (id: string) => `inventory/raw-materials/${id}/ledger`,
+    PRODUCT_LEDGER: (id: string) => `inventory/production-stock/${id}/ledger`,
   },
   ANALYTICS: {
     KPIS: 'analytics/kpis',
@@ -108,6 +117,8 @@ export const ENDPOINTS = {
     SHIFTS: 'master-data/shifts',
     SHIFT: (id: string) => `master-data/shifts/${id}`,
     RAW_MATERIALS: 'master-data/raw-materials',
+    UPDATE_RAW_MATERIAL: (id: string) => `master-data/raw-materials/${id}`,
+    DELETE_RAW_MATERIAL: (id: string) => `master-data/raw-materials/${id}`,
   },
   BIOMETRIC: {
     DEVICES: 'biometric/devices',
@@ -136,9 +147,6 @@ export const ENDPOINTS = {
     BATCHES: 'reports/batches',
     ATTENDANCE: 'reports/attendance',
     BATCH_DOSSIER: (id: string) => `reports/batch/${id}`,
-  },
-  TALLY: {
-    SUMMARY: 'tally/summary',
   },
   NOTIFICATIONS: {
     UNREAD: 'notifications/unread',

@@ -2,11 +2,15 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, products, productBrands, productionBatches, rawMaterials, materialCategories } from '../../database/schema';
+import { productionLines, products, productBrands, productionBatches, rawMaterials, rawMaterialTransactions, productionLogs } from '../../database/schema';
+import { ProductionEventsService } from '../../realtime/production.gateway';
+import { isNull } from 'drizzle-orm';
 
 @Injectable()
 export class MasterDataService {
   private linesCache: { data: any; expiresAt: number } | null = null;
+
+  constructor(private readonly eventsService: ProductionEventsService) {}
 
   async getLines() {
     const now = Date.now();
@@ -108,6 +112,7 @@ export class MasterDataService {
 
   async createProduct(dto: { name: string; sku?: string; brandId: string; category?: string; targetBPM?: number }) {
     const [product] = await db.insert(products).values({ ...dto }).returning();
+    await this.eventsService.emitDataChanged('products', { action: 'created', id: product.id });
     return product;
   }
 
@@ -134,40 +139,113 @@ export class MasterDataService {
       .set({ ...dto })
       .where(eq(products.id, id))
       .returning();
+    await this.eventsService.emitDataChanged('products', { action: 'updated', id });
     return product;
   }
 
   async deleteProduct(id: string) {
     await db.delete(products).where(eq(products.id, id));
+    await this.eventsService.emitDataChanged('products', { action: 'deleted', id });
     return { success: true };
   }
 
-  async getRawMaterials() {
+  async getRawMaterials(station?: string) {
+    if (station) {
+      const stationMap: Record<string, string> = {
+        'BLOWING': 'PREFORM',
+        'FILLING': 'CAP',
+        'CAPPING': 'CAP',
+        'LABELING': 'LABEL',
+        'PACKING': 'SHRINK'
+      };
+      
+      const targetType = stationMap[station.toUpperCase()];
+      if (targetType) {
+        return await db.select({
+          id: rawMaterials.id,
+          name: rawMaterials.name,
+          materialType: rawMaterials.materialType,
+          unit: rawMaterials.unit,
+          currentStock: rawMaterials.currentStock,
+        })
+        .from(rawMaterials)
+        .where(eq(rawMaterials.materialType, targetType));
+      }
+    }
+
     return await db.select({
       id: rawMaterials.id,
       name: rawMaterials.name,
-      categoryId: rawMaterials.categoryId,
-      categoryName: materialCategories.name,
+      materialType: rawMaterials.materialType,
+      unit: rawMaterials.unit,
+      currentStock: rawMaterials.currentStock,
     })
-    .from(rawMaterials)
-    .innerJoin(materialCategories, eq(rawMaterials.categoryId, materialCategories.id));
+    .from(rawMaterials);
   }
 
-  async createRawMaterial(dto: { name: string; categoryId: string }) {
+  async createRawMaterial(dto: { name: string; materialType: string; unit: string }) {
     const [rawMaterial] = await db.insert(rawMaterials).values({ ...dto }).returning();
+    await this.eventsService.emitDataChanged('inventory', { action: 'raw_material_created', id: rawMaterial.id });
     return rawMaterial;
   }
 
-  async updateRawMaterial(id: string, dto: { name?: string; categoryId?: string }) {
+  async updateRawMaterial(id: string, dto: { name?: string; materialType?: string; unit?: string; currentStock?: number }) {
+    if (dto.currentStock !== undefined) {
+      const txs = await db.select({ quantityChange: rawMaterialTransactions.quantityChange })
+        .from(rawMaterialTransactions)
+        .where(eq(rawMaterialTransactions.materialId, id));
+      
+      const totalTxs = txs.reduce((sum, t) => sum + Number(t.quantityChange), 0);
+
+      const logs = await db.select({
+        primaryCount: productionLogs.primaryCount,
+        wastageCount: productionLogs.wastageCount,
+        preformUsage: productionLogs.preformUsage,
+        capUsage: productionLogs.capUsage
+      })
+      .from(productionLogs)
+      .where(and(eq(productionLogs.rawMaterialId, id), isNull(productionLogs.deletedAt)));
+
+      const totalConsumed = logs.reduce((sum, l) => {
+        const isBlowingUsage = l.preformUsage != null && l.preformUsage > 0;
+        const isFillingUsage = l.capUsage != null && l.capUsage > 0;
+        let qty = 0;
+        if (isBlowingUsage) qty = l.preformUsage as number;
+        else if (isFillingUsage) qty = l.capUsage as number;
+        else qty = l.primaryCount + Math.floor(Number(l.wastageCount || 0));
+        return sum + qty;
+      }, 0);
+
+      const currentBalance = totalTxs - totalConsumed;
+      const difference = dto.currentStock - currentBalance;
+
+      if (difference !== 0) {
+        await db.insert(rawMaterialTransactions).values({
+          materialId: id,
+          type: 'EDIT',
+          quantityChange: difference,
+          balanceAfter: dto.currentStock,
+          remarks: 'Manual Stock Adjustment via Edit',
+        });
+      }
+    }
+
+    const { currentStock, ...updateData } = dto;
+    const dbPayload: any = { ...updateData, updatedAt: new Date() };
+    if (currentStock !== undefined) dbPayload.currentStock = currentStock;
+
     const [rawMaterial] = await db.update(rawMaterials)
-      .set({ ...dto, updatedAt: new Date() })
+      .set(dbPayload)
       .where(eq(rawMaterials.id, id))
       .returning();
+      
+    await this.eventsService.emitDataChanged('inventory', { action: 'raw_material_updated', id });
     return rawMaterial;
   }
 
   async deleteRawMaterial(id: string) {
     await db.delete(rawMaterials).where(eq(rawMaterials.id, id));
+    await this.eventsService.emitDataChanged('inventory', { action: 'raw_material_deleted', id });
     return { success: true };
   }
 }

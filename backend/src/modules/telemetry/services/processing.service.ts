@@ -15,7 +15,9 @@ import {
   downtimeLogs,
   users,
   operatorSessions,
-  rawMaterials
+  rawMaterials,
+  rawMaterialTransactions,
+  products
 } from '../../../database/schema';
 import { billOfMaterials } from '../../../database/schema';
 import { TelemetryDto } from '../dto/telemetry.dto';
@@ -25,6 +27,7 @@ import { ShiftService } from '../../master-data/shift.service';
 import { RedisService } from '../../../providers/redis/redis.service';
 import { OperatorSessionsService } from '../../operator-sessions/operator-sessions.service';
 import { MachineStateService } from '../../production/services/machine-state.service';
+import { InventoryService } from '../../inventory/inventory.service';
 
 @Injectable()
 export class ProcessingService {
@@ -38,6 +41,7 @@ export class ProcessingService {
     private readonly sessionService: OperatorSessionsService,
     private readonly auditService: AuditService,
     private readonly machineStateService: MachineStateService,
+    private readonly inventoryService: InventoryService,
   ) { }
 
   async preValidateTelemetry(userId: string, dto: TelemetryDto) {
@@ -164,11 +168,11 @@ export class ProcessingService {
         capUsage: dto.capUsage || 0,
         capBoxUsage: dto.capBoxUsage || 0,
         preformUsage: dto.preformUsage || 0,
-        bopRollUsage: String(dto.bopRollUsage || 0),
-        shrinkWeightUsed: String(dto.shrinkWeightUsed || 0),
+        bopRollUsage: String(dto.labelsUsed || 0),
+        shrinkWeightUsed: String(dto.shrinkRollsUsed || 0),
         inkUsage: String(dto.inkUsage || 0),
         solventUsage: String(dto.solventUsage || 0),
-        labelUsage: Math.round(Number(dto.bopRollUsage || 0)),
+        labelUsage: Math.round(Number(dto.labelsUsed || 0)),
         casesProduced: dto.casesProduced || 0,
         packingTypeId: dto.packingTypeId,
         finishedGoodsProduced: dto.finishedGoodsProduced || 0,
@@ -216,6 +220,9 @@ export class ProcessingService {
       // New Enterprise Material Logic
       await this.processEnterpriseInventory(tx, dto, log.id);
 
+      // Recalculate simple inventory
+      await this.inventoryService.recalculateInventory(tx);
+
       // Fast-fail Redis increment
       if (this.redisService.getAvailability()) {
         this.redisService.incrementCounter(dto.batchId, dto.station, finalPrimaryCount).catch(() => { });
@@ -229,8 +236,8 @@ export class ProcessingService {
           // Enterprise Material Totals
           capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
           preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
-          bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.bopRollUsage || 0}`,
-          shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkWeightUsed || 0}`,
+          bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.labelsUsed || 0}`,
+          shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkRollsUsed || 0}`,
           finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
           casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
 
@@ -289,189 +296,59 @@ export class ProcessingService {
   }
 
   private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number) {
-    const consumptionMap: Array<{ name: string; qty: number; category: string }> = [];
+    // ── Factory-Aligned Direct Ledger Deductions (Raw Materials) ──
+    let directDeductions: Array<{ materialId: string; qty: number; remarks: string }> = [];
 
-    const capRejection = dto.station === 'FILLING' && !dto.capUsage
-      ? Number(dto.capWastage ?? dto.wastageCount ?? 0)
-      : 0;
-    const preformRejection = dto.station === 'BLOWING' ? Number(dto.wastageCount || 0) : 0;
-    const bopRejection = dto.station === 'LABELING' ? Number(dto.wastageCount || 0) : 0;
-    const shrinkWeightRejected = dto.station === 'PACKING' ? Number(dto.wastageCount || 0) : 0;
+    // 1. Blowing (Bags)
+    if (dto.station === 'BLOWING' && dto.rawMaterialId && dto.bagsUsed && dto.bagsUsed > 0) {
+      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.bagsUsed, remarks: `Bags used in Blowing Station (Log #${logId})` });
+    }
 
-    if (dto.capUsage || capRejection) consumptionMap.push({ name: 'Caps', qty: Number(dto.capUsage || 0) + capRejection, category: 'Caps' });
-    if (dto.preformUsage || preformRejection) consumptionMap.push({ name: 'Preforms', qty: Number(dto.preformUsage || 0) + preformRejection, category: 'Preforms' });
-    if (dto.bopRollUsage || bopRejection) consumptionMap.push({ name: 'Labels', qty: Number(dto.bopRollUsage || 0) + bopRejection, category: 'Labels' });
-    if (dto.shrinkWeightUsed || shrinkWeightRejected) consumptionMap.push({ name: 'Shrink Film', qty: Number(dto.shrinkWeightUsed || 0) + shrinkWeightRejected, category: 'Shrink Rolls' });
-    if (dto.inkUsage) consumptionMap.push({ name: 'Ink', qty: Number(dto.inkUsage), category: 'Chemicals' });
-    if (dto.solventUsage) consumptionMap.push({ name: 'Solvent', qty: Number(dto.solventUsage), category: 'Chemicals' });
+    // 2. Capping (Boxes)
+    if (dto.station === 'FILLING' && dto.rawMaterialId && dto.boxesUsed && dto.boxesUsed > 0) {
+      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.boxesUsed, remarks: `Boxes used in Capping Station (Log #${logId})` });
+    }
 
-    // ── NEW: Automated BOM Consumption ──
-    // If this is a final station log, trigger BOM-based deduction
-    if (dto.station === 'PACKING' && dto.productId) {
-      const bomItems = await tx.select().from(billOfMaterials).where(eq(billOfMaterials.productId, dto.productId));
-      for (const bom of bomItems) {
-        const qty = Number(bom.quantityPerUnit) * dto.primaryCount;
+    // 3. Packing (Shrink Rolls)
+    if (dto.station === 'PACKING' && dto.rawMaterialId && dto.shrinkRollsUsed && dto.shrinkRollsUsed > 0) {
+      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.shrinkRollsUsed, remarks: `Shrink Rolls used in Packing Station (Log #${logId})` });
+    }
 
-        // Find existing or add new
-        const existingIdx = consumptionMap.findIndex(c => c.name === bom.stockId); // Using stockId as key for internal loop
-        if (existingIdx > -1) {
-          consumptionMap[existingIdx].qty += qty;
+    // 4. Labeling (Pieces auto-mapped from Product)
+    if (dto.station === 'LABELING' && dto.productId && dto.labelsUsed && dto.labelsUsed > 0) {
+      const productRec = await tx.select().from(products).where(eq(products.id, dto.productId));
+      if (productRec.length > 0) {
+        const labelName = `${productRec[0].name} Label`;
+        const labelMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, labelName));
+        if (labelMat.length > 0) {
+          directDeductions.push({ materialId: labelMat[0].id, qty: dto.labelsUsed, remarks: `Labels used in Labeling Station (Log #${logId})` });
         } else {
-          consumptionMap.push({
-            name: bom.stockId, // We'll handle stock lookup by ID now
-            qty: qty,
-            category: 'BOM_AUTO'
-          });
+          throw new NonRetryableBusinessError(`Label material not found for product. Expected: "${labelName}"`);
         }
       }
     }
 
-    for (const item of consumptionMap) {
-      if (item.qty <= 0) continue;
+    // Apply all direct deductions to rawMaterials table
+    for (const ded of directDeductions) {
+      const matRecord = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, ded.materialId)).for('update');
+      if (!matRecord || matRecord.length === 0) continue;
 
-      let stock;
+      const currentQty = Number(matRecord[0].currentStock || 0);
+      const newQty = currentQty - ded.qty;
 
-      // Priority 1: BOM Auto-consumption (already resolved to exact stock ID in item.name)
-      if (item.category === 'BOM_AUTO') {
-        const results = await tx.select().from(inventoryStock)
-          .where(eq(inventoryStock.id, item.name))
-          .for('update');
-        stock = results[0];
-      }
+      await tx.update(rawMaterials)
+        .set({ currentStock: newQty, updatedAt: new Date() })
+        .where(eq(rawMaterials.id, ded.materialId));
 
-      // Priority 2: Explicitly passed selectedStockId (if it matches item type)
-      if (!stock && dto.selectedStockId) {
-        const results = await tx.select().from(inventoryStock)
-          .where(eq(inventoryStock.id, dto.selectedStockId))
-          .for('update');
-        const candidate = results[0];
-        if (candidate && this.matchesMaterialType(candidate.itemName, item.name)) {
-          stock = candidate;
-        }
-      }
-
-      // Priority 3: Active Product BOM mapping lookup
-      if (!stock) {
-        const activeProductId = dto.productId;
-        if (activeProductId) {
-          const bomStocks = await tx.select({
-            stock: inventoryStock
-          })
-          .from(billOfMaterials)
-          .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
-          .where(
-            eq(billOfMaterials.productId, activeProductId)
-          )
-          .for('update');
-
-          for (const row of bomStocks) {
-            if (this.matchesMaterialType(row.stock.itemName, item.name)) {
-              stock = row.stock;
-              break;
-            }
-          }
-        }
-      }
-
-      // Priority 4: Exact Name Match
-      if (!stock) {
-        const stockItems = await tx.select()
-          .from(inventoryStock)
-          .where(
-            eq(inventoryStock.itemName, item.name)
-          )
-          .for('update');
-        if (stockItems.length > 0) {
-          stock = stockItems[0];
-        }
-      }
-
-      // Priority 5: Fuzzy ILIKE Match
-      if (!stock) {
-        let searchPattern = '';
-        const it = item.name.toLowerCase();
-        if (it.includes('preform')) searchPattern = '%preform%';
-        else if (it.includes('cap')) searchPattern = '%cap%';
-        else if (it.includes('label') || it.includes('sticker') || it.includes('bopp')) searchPattern = '%label%';
-        else if (it.includes('shrink') || it.includes('film') || it.includes('roll')) searchPattern = '%shrink%';
-        else if (it.includes('ink')) searchPattern = '%ink%';
-        else if (it.includes('solvent') || it.includes('makeup')) searchPattern = '%solvent%';
-
-        if (searchPattern) {
-          const fuzzyStocks = await tx.select()
-            .from(inventoryStock)
-            .where(
-              sql`lower(${inventoryStock.itemName}) LIKE ${searchPattern}`
-            )
-            .for('update');
-
-          if (fuzzyStocks.length > 0) {
-            stock = fuzzyStocks.find((s: any) => Number(s.quantity) > 0) || fuzzyStocks[0];
-          }
-        }
-      }
-
-      if (!stock) {
-        throw new NonRetryableBusinessError(`Material stock not found for ${item.name}. Please assign stock in the Operator Panel.`);
-      }
-
-      const currentQty = Number(stock.quantity);
-      if (currentQty < item.qty) {
-        throw new NonRetryableBusinessError(`INSUFFICIENT_STOCK: Required ${item.qty} ${stock.unit} of ${stock.itemName}, but only ${currentQty} available.`);
-      }
-
-      const newQty = currentQty - item.qty;
-
-      await tx.update(inventoryStock)
-        .set({
-          quantity: String(newQty),
-          updatedAt: new Date()
-        })
-        .where(eq(inventoryStock.id, stock.id));
-
-      await tx.insert(inventoryTransactions).values({
-        stockId: stock.id,
+      await tx.insert(rawMaterialTransactions).values({
+        materialId: ded.materialId,
         type: 'CONSUMPTION',
-        quantityChange: String(-item.qty),
-        balanceAfter: String(newQty),
-        referenceId: String(logId),
-        remarks: `Production Log #${logId} (${dto.station})`,
+        quantityChange: -ded.qty,
+        balanceAfter: newQty,
+        remarks: ded.remarks,
         createdAt: new Date()
       });
-
-      if (newQty <= Number(stock.minimumStock)) {
-        await this.notificationsService.createNotification(
-          'LOW_STOCK',
-          `Enterprise Stock Alert: ${stock.itemName}`,
-          `Current: ${newQty} ${stock.unit} | Min: ${stock.minimumStock}`,
-          'WARNING'
-        );
-      }
     }
-  }
-
-  private matchesMaterialType(stockItemName: string, itemType: string): boolean {
-    const sin = stockItemName.toLowerCase();
-    const it = itemType.toLowerCase();
-    if (it.includes('preform') || it.includes('blowing')) {
-      return sin.includes('preform');
-    }
-    if (it.includes('cap') || it.includes('filling')) {
-      return sin.includes('cap');
-    }
-    if (it.includes('label') || it.includes('sticker') || it.includes('bopp') || it.includes('labeling')) {
-      return sin.includes('label') || sin.includes('sticker') || sin.includes('bopp');
-    }
-    if (it.includes('shrink') || it.includes('film') || it.includes('roll') || it.includes('packing')) {
-      return sin.includes('shrink') || sin.includes('film') || sin.includes('roll') || sin.includes('wrap');
-    }
-    if (it.includes('ink')) {
-      return sin.includes('ink');
-    }
-    if (it.includes('solvent') || it.includes('makeup')) {
-      return sin.includes('solvent') || sin.includes('makeup') || sin.includes('make-up');
-    }
-    return false;
   }
 
   private async validateProductionFlow(station: string, count: number, totals: any) {

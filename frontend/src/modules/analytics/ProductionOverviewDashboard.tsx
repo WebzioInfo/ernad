@@ -36,9 +36,7 @@ export default function ProductionOverviewDashboard() {
       } catch (e) {
         return null;
       }
-    },
-    refetchInterval: 10000
-  });
+    },  });
 
   const summary = realSummary || MOCK_SUMMARY;
   const isMock = !realSummary;

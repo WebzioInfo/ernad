@@ -10,13 +10,19 @@ import { VerificationService } from './services/verification.service';
 import { MachineStateService } from './services/machine-state.service';
 
 import { EventsModule } from '../../realtime/events.module';
-
 import { OperatorSessionsModule } from '../operator-sessions/operator-sessions.module';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
-  imports: [EventsModule, OperatorSessionsModule, forwardRef(() => AuthModule), forwardRef(() => UsersModule)],
+  imports: [
+    EventsModule, 
+    OperatorSessionsModule, 
+    forwardRef(() => AuthModule), 
+    forwardRef(() => UsersModule),
+    InventoryModule
+  ],
   controllers: [ProductionController, ChangeoverController],
   providers: [
     BatchService, 

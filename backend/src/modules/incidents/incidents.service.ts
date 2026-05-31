@@ -269,6 +269,7 @@ export class IncidentsService {
       message: created.title,
       severity: created.priority === 'CRITICAL' ? 'CRITICAL' : 'WARNING',
     });
+    await this.eventsService.emitDataChanged('incidents', { action: 'created', id: created.id });
     return created;
   }
 
@@ -280,6 +281,7 @@ export class IncidentsService {
       .returning();
     if (!updated) throw new NotFoundException('Incident not found');
     await this.addHistory(id, userId, 'UPDATED', undefined, undefined, dto);
+    await this.eventsService.emitDataChanged('incidents', { action: 'updated', id });
     return updated;
   }
 
@@ -357,12 +359,14 @@ export class IncidentsService {
     });
 
     await this.logAudit(userId, `INCIDENT_${dto.status}`, 'incidents', id, dto);
+    await this.eventsService.emitDataChanged('incidents', { action: 'status_changed', id, status: dto.status });
     return updated;
   }
 
   async addComment(id: string, userId: string, comment: string) {
     const [row] = await db.insert(incidentComments).values({ incidentId: id, authorId: userId, comment }).returning();
     await this.addHistory(id, userId, 'COMMENT_ADDED', undefined, undefined, { comment });
+    await this.eventsService.emitDataChanged('incidents', { action: 'comment_added', id });
     return row;
   }
 
@@ -376,6 +380,7 @@ export class IncidentsService {
       mimeType: dto.mimeType,
     }).returning();
     await this.addHistory(id, userId, 'ATTACHMENT_ADDED', undefined, undefined, { kind: row.kind, fileName: row.fileName });
+    await this.eventsService.emitDataChanged('incidents', { action: 'attachment_added', id });
     return row;
   }
 
@@ -383,6 +388,7 @@ export class IncidentsService {
     await this.requireAdmin(roles);
     await db.update(incidents).set({ deletedAt: new Date(), deletedBy: userId }).where(eq(incidents.id, id));
     await this.logAudit(userId, 'INCIDENT_DELETED', 'incidents', id, {});
+    await this.eventsService.emitDataChanged('incidents', { action: 'deleted', id });
     return { success: true };
   }
 

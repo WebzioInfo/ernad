@@ -116,6 +116,7 @@ api.interceptors.response.use(
         
         if (!isBackgroundPoll) {
           toast.error('Network Latency Detected', {
+            id: 'network-latency',
             description: 'The operation is taking longer than expected. We are still trying in the background.',
           });
         }
@@ -138,20 +139,10 @@ api.interceptors.response.use(
         }
 
         toast.error('Network connection issue', {
+          id: 'network-error',
           description: 'The server is temporarily unreachable. Please check your connection or try again.',
           duration: 5000
         });
-      }
-      
-      // Strict Retry Logic for idempotent requests
-      if (config && (config.method === 'get' || config.method === 'head')) {
-        config._retryCount = config._retryCount || 0;
-        if (config._retryCount < 2) {
-          config._retryCount++;
-          const delay = config._retryCount * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return api(config);
-        }
       }
     }
 
@@ -161,6 +152,7 @@ api.interceptors.response.use(
       if (!isLoginRequest) {
         useAuthStore.getState().logout();
         toast.error('Session expired', {
+          id: 'session-expired',
           description: 'Please log in again to continue.'
         });
       }
@@ -170,6 +162,7 @@ api.interceptors.response.use(
     if (error.response?.status === 403) {
       const message = (error.response.data as any)?.message || 'Access Denied: Restricted resource.';
       toast.error('Forbidden', {
+        id: 'forbidden',
         description: message
       });
     }
@@ -177,6 +170,7 @@ api.interceptors.response.use(
     // 4. Handle 502/503/504 (Server Maintenance/Overload)
     if (error.response && [502, 503, 504].includes(error.response.status)) {
       toast.error('Server unavailable', {
+        id: 'server-unavailable',
         description: 'The system is currently undergoing maintenance or is overloaded. Please try again in a few minutes.'
       });
     } else if (error.response && error.response.status >= 400 && error.response.status !== 401 && error.response.status !== 403) {
@@ -191,6 +185,7 @@ api.interceptors.response.use(
 
       if (!skipGlobalToast && !(error.response.status === 404 && isBackgroundPoll)) {
         toast.error(message, {
+          id: `api-error-${errorCode}`,
           description: `Reference: ${errorCode}`
         });
       }

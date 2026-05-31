@@ -11,6 +11,7 @@ import { OperatorSessionsModule } from '../operator-sessions/operator-sessions.m
 import { MasterDataModule } from '../master-data/master-data.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EventsModule } from '../../realtime/events.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { EventsModule } from '../../realtime/events.module';
     MasterDataModule,
     NotificationsModule,
     EventsModule,
+    InventoryModule,
     BullModule.registerQueue({
       name: 'telemetry',
     }),

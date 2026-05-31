@@ -103,6 +103,9 @@ export class UsersController {
    * PATCH /api/users/:id/toggle-active
    * Admin only — Toggle active/inactive status
    */
+  @Patch(':id/toggle-active')
+  @Permissions('users:manage')
+  @ApiOperation({ summary: 'Toggle operator active status (Admin only)' })
   toggleActive(@Req() req: any, @Param('id') id: string) {
     const callerId = req.user.id;
     const roles = req.user?.roles || [];

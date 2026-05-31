@@ -51,11 +51,16 @@ export const QK = {
   // Inventory
   STOCK: ['inventory-stock'] as const,
   STOCK_BY_CATEGORY: (cat: string) => ['inventory-stock', cat] as const,
-  CATEGORIES: ['inventory-categories'] as const,
+
   WAREHOUSES: ['inventory-warehouses'] as const,
   TRANSFERS: ['inventory-transfers'] as const,
   PACKING_CONFIGS: (productId: string) => ['packing-configs', productId] as const,
   LEDGER: (stockId: string) => ['ledger', stockId] as const,
+  RAW_MATERIALS_STOCK: ['raw-materials-stock'] as const,
+  PRODUCTION_STOCK: ['production-stock'] as const,
+  STATION_CONSUMPTION: ['station-consumption'] as const,
+  RAW_MATERIAL_LEDGER: (id: string) => ['raw-material-ledger', id] as const,
+  PRODUCT_LEDGER: (id: string) => ['product-ledger', id] as const,
   // Analytics
   KPIS: ['kpis'] as const,
   LINE_PERF: (lineId?: string) => ['line-performance', lineId] as const,
@@ -87,7 +92,7 @@ export function useActiveBatch(lineId: string | undefined) {
     queryKey: QK.ACTIVE_BATCH(lineId!),
     queryFn: () => ProductionService.getActiveBatch(lineId!),
     enabled: !!lineId,
-    refetchInterval: 15_000,
+
     retry: 1,
   });
 }
@@ -96,7 +101,12 @@ export function useStartBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: StartBatchPayload) => ProductionService.startBatch(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.LINES }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.LINES });
+      qc.invalidateQueries({ queryKey: ['active-batch'] });
+      qc.invalidateQueries({ queryKey: QK.BATCHES });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -105,7 +115,12 @@ export function useCloseBatch() {
   return useMutation({
     mutationFn: ({ batchId, payload }: { batchId: string; payload: CloseBatchPayload }) =>
       ProductionService.closeBatch(batchId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.LINES }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.LINES });
+      qc.invalidateQueries({ queryKey: ['active-batch'] });
+      qc.invalidateQueries({ queryKey: QK.BATCHES });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -114,7 +129,11 @@ export function useReopenBatch() {
   return useMutation({
     mutationFn: ({ batchId, reason }: { batchId: string; reason: string }) =>
       ProductionService.reopenBatch(batchId, reason),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.LINES }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.LINES });
+      qc.invalidateQueries({ queryKey: ['active-batch'] });
+      qc.invalidateQueries({ queryKey: QK.BATCHES });
+    },
   });
 }
 
@@ -124,7 +143,10 @@ export function useInitiateChangeover() {
   return useMutation({
     mutationFn: ({ lineId, payload }: { lineId: string; payload: { batchId: string; productId: string } }) =>
       ProductionService.initiateChangeover(lineId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.LINES }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.LINES });
+      qc.invalidateQueries({ queryKey: ['active-batch'] });
+    },
   });
 }
 
@@ -132,7 +154,10 @@ export function useCompleteChangeover() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (batchId: string) => ProductionService.completeChangeover(batchId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.LINES }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.LINES });
+      qc.invalidateQueries({ queryKey: ['active-batch'] });
+    },
   });
 }
 
@@ -151,7 +176,7 @@ export function useActiveEvents(batchId: string | undefined) {
     queryKey: QK.ACTIVE_EVENTS(batchId!),
     queryFn: () => TelemetryService.getActiveEvents(batchId!),
     enabled: !!batchId,
-    refetchInterval: 30_000,
+
   });
 }
 
@@ -222,7 +247,7 @@ export function useLines() {
   return useQuery({
     queryKey: QK.LINES,
     queryFn: () => MasterDataService.getLines(),
-    refetchInterval: 15_000,
+
   });
 }
 
@@ -283,9 +308,7 @@ export function useStockByCategory(category: string | undefined) {
   });
 }
 
-export function useCategories() {
-  return useQuery({ queryKey: QK.CATEGORIES, queryFn: () => InventoryService.getCategories() });
-}
+
 
 export function useWarehouses() {
   return useQuery({ queryKey: QK.WAREHOUSES, queryFn: () => InventoryService.getWarehouses() });
@@ -307,6 +330,34 @@ export function useLedger(stockId: string | undefined) {
   });
 }
 
+export function useRawMaterials() {
+  return useQuery({ queryKey: QK.RAW_MATERIALS_STOCK, queryFn: () => InventoryService.getRawMaterials() });
+}
+
+export function useProductionStock() {
+  return useQuery({ queryKey: QK.PRODUCTION_STOCK, queryFn: () => InventoryService.getProductionStock() });
+}
+
+export function useStationConsumption() {
+  return useQuery({ queryKey: QK.STATION_CONSUMPTION, queryFn: () => InventoryService.getStationConsumption() });
+}
+
+export function useRawMaterialLedger(id: string | undefined) {
+  return useQuery({
+    queryKey: QK.RAW_MATERIAL_LEDGER(id!),
+    queryFn: () => InventoryService.getRawMaterialLedger(id!),
+    enabled: !!id,
+  });
+}
+
+export function useProductLedger(id: string | undefined) {
+  return useQuery({
+    queryKey: QK.PRODUCT_LEDGER(id!),
+    queryFn: () => InventoryService.getProductLedger(id!),
+    enabled: !!id,
+  });
+}
+
 // ─── ANALYTICS HOOKS ──────────────────────────────────────────────────────────
 
 export function useKpis() {
@@ -317,7 +368,7 @@ export function useLinePerformance(lineId?: string) {
   return useQuery({
     queryKey: QK.LINE_PERF(lineId),
     queryFn: () => AnalyticsService.getLinePerformance(lineId ? { lineId } : undefined),
-    refetchInterval: 5_000,
+
   });
 }
 
@@ -325,7 +376,7 @@ export function useFactoryLive() {
   return useQuery({
     queryKey: QK.FACTORY_LIVE,
     queryFn: () => AnalyticsService.getFactoryLive(),
-    refetchInterval: 10_000,
+
   });
 }
 
@@ -339,7 +390,7 @@ export function useAttendanceToday() {
   return useQuery({
     queryKey: QK.ATTENDANCE_TODAY,
     queryFn: () => BiometricService.getAttendanceToday(),
-    refetchInterval: 60_000,
+
   });
 }
 
@@ -382,7 +433,7 @@ export function useUnreadNotifications() {
   return useQuery({
     queryKey: QK.NOTIFICATIONS,
     queryFn: () => NotificationService.getUnread(),
-    refetchInterval: 30_000,
+
   });
 }
 

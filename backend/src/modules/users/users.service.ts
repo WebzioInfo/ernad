@@ -13,6 +13,7 @@ import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../providers/mail/mail.service';
 import { MediaService } from '../../providers/media/media.service';
 import { RedisService } from '../../providers/redis/redis.service';
+import { ProductionEventsService } from '../../realtime/production.gateway';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -25,6 +26,7 @@ export class UsersService {
     private readonly mailService: MailService,
     private readonly mediaService: MediaService,
     private readonly redisService: RedisService,
+    private readonly eventsService: ProductionEventsService,
   ) {}
 
   /**
@@ -288,8 +290,8 @@ export class UsersService {
   }
 
   /**
-   * Create a new operator with a bcrypt-hashed PIN.
-   * STRICT: Only ADMIN can create users.
+   * Create a new staff member with a bcrypt-hashed PIN.
+   * Admins can assign all supported roles; managers can create operators.
    */
   async createOperator(actorRoles: string[], dto: any) {
     if (!dto.name || !dto.username || !dto.pin) {
@@ -300,9 +302,11 @@ export class UsersService {
       throw new BadRequestException('Operator PIN must be exactly 4 digits');
     }
 
-    const isAdmin = actorRoles.includes('ADMIN');
+    const normalizedActorRoles = actorRoles.map((role) => String(role).toUpperCase());
+    const isAdmin = normalizedActorRoles.includes('ADMIN');
+    const isManager = normalizedActorRoles.includes('MANAGER');
 
-    if (!isAdmin) {
+    if (!isAdmin && !isManager) {
       throw new ForbiddenException('You do not have permission to create users');
     }
 
@@ -312,8 +316,11 @@ export class UsersService {
     if (invalidRole) {
       throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, OPERATOR`);
     }
+    if (!isAdmin && requestedRoles.some(r => r !== 'OPERATOR')) {
+      throw new ForbiddenException('Managers can only create operator staff accounts');
+    }
 
-    return await db.transaction(async (tx) => {
+    const createdUser = await db.transaction(async (tx) => {
       const existing = await tx
         .select({ id: users.id })
         .from(users)
@@ -376,6 +383,9 @@ export class UsersService {
 
       return this.getOperatorWithContext(created.id, tx);
     });
+
+    await this.eventsService.emitDataChanged('users', { action: 'created', id: createdUser?.id });
+    return createdUser;
   }
 
   /**
@@ -391,7 +401,7 @@ export class UsersService {
       throw new ForbiddenException('You do not have permission to update users');
     }
     try {
-      return await db.transaction(async (tx) => {
+      const updatedUser = await db.transaction(async (tx) => {
         // RED TEAM FIX: Implement hierarchical validation before update
         const existing = await this.getOperatorById(id, callerId, callerRoles);
         if (!existing) throw new NotFoundException(`User not found`);
@@ -471,6 +481,8 @@ export class UsersService {
 
         return this.getOperatorWithContext(id, tx);
       });
+      await this.eventsService.emitDataChanged('users', { action: 'updated', id });
+      return updatedUser;
     } catch (error: any) {
       this.logger.error(`Failed to update operator ${id}: ${error.message}`, error.stack);
       throw error;
@@ -494,6 +506,7 @@ export class UsersService {
 
     // RED TEAM FIX: Invalidate auth cache immediately on status change
     await this.redisService.del(`user:status:${id}`);
+    await this.eventsService.emitDataChanged('users', { action: 'status_changed', id });
 
     return {
       message: `Operator "${existing.name}" has been ${newStatus ? 'activated' : 'deactivated'}.`,
@@ -524,6 +537,7 @@ export class UsersService {
       .update(users)
       .set({ pinCode: hashed })
       .where(eq(users.id, id));
+    await this.eventsService.emitDataChanged('users', { action: 'pin_reset', id });
 
     return { message: `PIN for "${rows[0].name}" has been reset successfully.` };
   }
@@ -547,6 +561,7 @@ export class UsersService {
       username: sql`${users.username} || '_deleted_' || ${id.slice(0, 8)}`,
       email: sql`${users.email} || '_deleted_' || ${id.slice(0, 8)}`
     }).where(eq(users.id, id));
+    await this.eventsService.emitDataChanged('users', { action: 'deleted', id });
 
     return { message: `Operator "${rows[0].name}" has been soft-deleted.` };
   }

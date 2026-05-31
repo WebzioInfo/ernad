@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Req, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, ParseUUIDPipe } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { AuthGuard } from '../auth/auth.guard';
@@ -27,12 +27,7 @@ export class InventoryController {
     return await this.inventoryService.getWarehouses();
   }
 
-  @Get('categories')
-  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
-  @ApiOperation({ summary: 'Get all material categories' })
-  async getCategories() {
-    return await this.inventoryService.getCategories();
-  }
+
 
   @Get('stock/category/:category')
   @Roles('OPERATOR', 'MANAGER', 'ADMIN')
@@ -41,12 +36,7 @@ export class InventoryController {
     return await this.inventoryService.getStockByCategory(category);
   }
 
-  @Post('categories')
-  @Permissions('settings:manage')
-  @ApiOperation({ summary: 'Create a new material category' })
-  async createCategory(@Body() dto: { name: string; description?: string }) {
-    return await this.inventoryService.createCategory(dto);
-  }
+
 
   @Post('warehouses')
   @Permissions('settings:manage')
@@ -84,5 +74,77 @@ export class InventoryController {
   @ApiOperation({ summary: 'Define a new inventory stock item' })
   async createStockItem(@Body() dto: any) {
     return await this.inventoryService.createStockItem(dto);
+  }
+
+  // ─── NEW SIMPLE INVENTORY ENDPOINTS ─────────────────────────────────
+
+  @Get('raw-materials')
+  @ApiOperation({ summary: 'Get raw material stocks' })
+  async getRawMaterials() {
+    return await this.inventoryService.getRawMaterials();
+  }
+
+  @Get('raw-materials/:id/ledger')
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get ledger for raw material' })
+  async getRawMaterialLedger(@Param('id') id: string) {
+    return await this.inventoryService.getRawMaterialLedger(id);
+  }
+
+  @Get('station-consumption')
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get raw material consumption by station' })
+  async getStationConsumption() {
+    return await this.inventoryService.getStationConsumption();
+  }
+
+  @Get('production-stock')
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get finished goods production stock' })
+  async getProductionStock() {
+    return await this.inventoryService.getProductionStock();
+  }
+
+  @Post('add-stock')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Add raw material or product stock (Admin only)' })
+  async addStock(@Body() body: { materialId?: string; itemId?: string; itemType?: 'RAW' | 'PRODUCT'; quantity: number; remarks?: string }, @Req() req: any) {
+    const itemId = body.itemId || body.materialId;
+    const itemType = body.itemType || 'RAW';
+    if (!itemId) throw new Error('itemId or materialId is required');
+
+    return await this.inventoryService.addStockTransaction({
+      itemId,
+      itemType,
+      quantity: Number(body.quantity),
+      remarks: body.remarks,
+      performedBy: req.user.id || req.user.sub
+    });
+  }
+
+  @Get('production-stock/:id/ledger')
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Get ledger for a product production stock' })
+  async getProductLedger(@Param('id') id: string) {
+    return await this.inventoryService.getProductLedger(id);
+  }
+
+  @Put('update-stock')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin only)' })
+  async updateStockTransaction(@Body() body: { transactionId: string; quantity: number; remarks?: string }, @Req() req: any) {
+    return await this.inventoryService.updateStockTransaction({
+      transactionId: body.transactionId,
+      quantity: Number(body.quantity),
+      remarks: body.remarks,
+      performedBy: req.user.id || req.user.sub
+    });
+  }
+
+  @Delete('delete-stock')
+  @Roles('ADMIN')
+  @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin only)' })
+  async deleteStockTransaction(@Body() body: { transactionId: string }) {
+    return await this.inventoryService.deleteStockTransaction(body.transactionId);
   }
 }

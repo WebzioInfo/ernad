@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, Logger, Version } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Req, Logger, Version, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MasterDataService } from './master-data.service';
 import { ShiftService } from './shift.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { Roles } from '../auth/roles.decorator';
 import { 
   CreateLineDto, 
   CreateBrandDto, 
@@ -83,19 +84,19 @@ export class MasterDataController {
   }
 
   @Post('products')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async createProduct(@Body() dto: CreateProductDto) {
     return await this.masterDataService.createProduct(dto);
   }
 
   @Patch('products/:id')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
     return await this.masterDataService.updateProduct(id, dto);
   }
 
   @Delete('products/:id')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async deleteProduct(@Param('id') id: string) {
     return await this.masterDataService.deleteProduct(id);
   }
@@ -114,24 +115,24 @@ export class MasterDataController {
 
   @Get('raw-materials')
   @Permissions('settings:view')
-  async getRawMaterials() {
-    return await this.masterDataService.getRawMaterials();
+  async getRawMaterials(@Query('station') station?: string) {
+    return await this.masterDataService.getRawMaterials(station);
   }
 
   @Post('raw-materials')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async createRawMaterial(@Body() dto: CreateRawMaterialDto) {
     return await this.masterDataService.createRawMaterial(dto);
   }
 
   @Patch('raw-materials/:id')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async updateRawMaterial(@Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
     return await this.masterDataService.updateRawMaterial(id, dto);
   }
 
   @Delete('raw-materials/:id')
-  @Permissions('settings:manage')
+  @Roles('ADMIN', 'MANAGER')
   async deleteRawMaterial(@Param('id') id: string) {
     return await this.masterDataService.deleteRawMaterial(id);
   }

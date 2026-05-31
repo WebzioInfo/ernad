@@ -2,17 +2,13 @@ import { pgTable, uuid, varchar, timestamp, integer, boolean, decimal, uniqueInd
 import { products } from './master-data';
 import { users } from './users';
 
-export const materialCategories = pgTable('material_categories', {
-  id: uuid('id').defaultRandom().primaryKey(),
-  name: varchar('name', { length: 100 }).notNull().unique(),
-  description: varchar('description', { length: 255 }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
 
 export const rawMaterials = pgTable('raw_materials', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: varchar('name', { length: 150 }).notNull(),
-  categoryId: uuid('category_id').references(() => materialCategories.id, { onDelete: 'cascade' }).notNull(),
+  materialType: varchar('material_type', { length: 50 }).notNull(), // PREFORM, CAP, LABEL, SHRINK, OTHER
+  unit: varchar('unit', { length: 50 }).notNull(), // BAG, BOX, PIECE, ROLL
+  currentStock: integer('current_stock').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -35,7 +31,7 @@ export const supplierBatches = pgTable('supplier_batches', {
 export const inventoryStock = pgTable('inventory_stock', {
   id: uuid('id').defaultRandom().primaryKey(),
   warehouseId: uuid('warehouse_id').references(() => warehouseLocations.id, { onDelete: 'restrict' }).notNull(),
-  categoryId: uuid('category_id').references(() => materialCategories.id, { onDelete: 'restrict' }),
+  materialType: varchar('material_type', { length: 50 }),
   itemName: varchar('item_name', { length: 150 }).notNull(),
   sku: varchar('sku', { length: 100 }),
   unit: varchar('unit', { length: 20 }).notNull(), // Kg, Rolls, Bags, Boxes, Pcs
@@ -128,6 +124,38 @@ export const stockTransfers = pgTable('stock_transfers', {
   transferredAt: timestamp('transferred_at').defaultNow().notNull(),
   receivedAt: timestamp('received_at'),
   remarks: text('remarks'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const rawMaterialTransactions = pgTable('raw_material_transactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  materialId: uuid('material_id').references(() => rawMaterials.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // ADD, EDIT, DELETE
+  quantityChange: integer('quantity_change').notNull(),
+  balanceAfter: integer('balance_after').notNull(),
+  remarks: text('remarks'),
+  performedBy: uuid('performed_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const productStockTransactions = pgTable('product_stock_transactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // ADD, EDIT, DELETE
+  quantityChange: integer('quantity_change').notNull(),
+  balanceAfter: integer('balance_after').notNull(),
+  remarks: text('remarks'),
+  performedBy: uuid('performed_by').references(() => users.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const productionStock = pgTable('production_stock', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull().unique(),
+  currentStock: integer('current_stock').default(0).notNull(), // Available Stock
+  totalProduced: integer('total_produced').default(0).notNull(),
+  totalDispatched: integer('total_dispatched').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
