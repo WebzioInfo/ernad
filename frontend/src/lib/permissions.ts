@@ -86,6 +86,6 @@ export const ROUTE_ACCESS: Record<string, { roles?: string[]; permissions?: Perm
   '/reports': { permissions: [PERMISSIONS.REPORTS_VIEW] },
   '/attendance': { permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
   '/personnel': { permissions: [PERMISSIONS.USER_VIEW] },
-  '/settings': { roles: [ROLES.ADMIN] },
+  '/settings': { roles: [ROLES.ADMIN, ROLES.MANAGER] },
   '/operator/select': { roles: [ROLES.OPERATOR, ROLES.MANAGER, ROLES.ADMIN] },
 };

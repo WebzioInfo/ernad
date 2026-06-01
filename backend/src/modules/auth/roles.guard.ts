@@ -87,6 +87,7 @@ export class RolesGuard implements CanActivate {
             'forensics:edit',
             'attendance:view',
             'settings:view',
+            'settings:manage',
             'users:view',
             'notifications:view',
             'incidents:view',
