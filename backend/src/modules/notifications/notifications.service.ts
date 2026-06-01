@@ -123,7 +123,7 @@ export class NotificationsService {
 
   // ── Typed convenience triggers ──
   async triggerFlowViolation(details: string, batchId: string) {
-    return this.createNotification('FLOW_VIOLATION', 'Flow Violation', details, 'CRITICAL', `flow:${batchId}`);
+    return this.createNotification('FLOW_VIOLATION', 'Flow Violation', details, 'WARNING', `flow:${batchId}`);
   }
 
   async triggerAnomalyAlert(details: string, batchId: string) {

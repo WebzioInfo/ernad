@@ -277,6 +277,8 @@ export class InventoryService {
   }
 
   async getProductionStock() {
+    await this.recalculateInventory();
+
     // Ensure all products have a row in productionStock
     const allProducts = await db.select().from(products);
     for (const prod of allProducts) {
@@ -410,9 +412,9 @@ export class InventoryService {
       let totalProduced = 0;
       
       for (const b of productBatchesList) {
-        // Sum Packed Bottles
+        // Finished goods stock is tracked in cases from the packing station.
         const [packedRes] = await runner.select({
-          sum: sql<string>`coalesce(sum(${productionLogs.primaryCount}), '0')`
+          sum: sql<string>`coalesce(sum(${productionLogs.casesProduced}), '0')`
         })
         .from(productionLogs)
         .where(and(
@@ -420,35 +422,8 @@ export class InventoryService {
           eq(productionLogs.station, 'PACKING'),
           isNull(productionLogs.deletedAt)
         ));
-        
-        // Sum Leak Bottles
-        const [leakRes] = await runner.select({
-          sum: sql<string>`coalesce(sum(${productionLogs.bottleLeakage}), '0')`
-        })
-        .from(productionLogs)
-        .where(and(
-          eq(productionLogs.batchId, b.id),
-          eq(productionLogs.station, 'FILLING'),
-          isNull(productionLogs.deletedAt)
-        ));
-        
-        // Sum Rejected Bottles
-        const [rejectRes] = await runner.select({
-          sum: sql<string>`coalesce(sum(cast(coalesce(${productionLogs.wastageCount}, '0') as integer)), '0')`
-        })
-        .from(productionLogs)
-        .where(and(
-          eq(productionLogs.batchId, b.id),
-          sql`station IN ('BLOWING', 'FILLING', 'LABELING')`,
-          isNull(productionLogs.deletedAt)
-        ));
-        
-        const packed = parseInt(packedRes.sum, 10);
-        const leakage = parseInt(leakRes.sum, 10);
-        const rejections = parseInt(rejectRes.sum, 10);
-        
-        const goodBottles = Math.max(0, packed - leakage - rejections);
-        totalProduced += goodBottles;
+
+        totalProduced += parseInt(packedRes.sum, 10);
       }
       
       // Calculate Dispatched
@@ -514,10 +489,10 @@ export class InventoryService {
     .leftJoin(users, eq(productStockTransactions.performedBy, users.id))
     .where(eq(productStockTransactions.productId, productId));
 
-    // 2. Fetch packing logs (Production Output)
+    // 2. Fetch packing logs (Production Output in cases)
     const packingLogs = await db.select({
       id: productionLogs.id,
-      primaryCount: productionLogs.primaryCount,
+      casesProduced: productionLogs.casesProduced,
       createdAt: productionLogs.loggedAt,
       userName: users.name,
       batchCode: productionBatches.batchCode
@@ -531,44 +506,8 @@ export class InventoryService {
       isNull(productionLogs.deletedAt)
     ));
 
-    // 3. Fetch leakages (FILLING logs)
-    const leakageLogs = await db.select({
-      id: productionLogs.id,
-      bottleLeakage: productionLogs.bottleLeakage,
-      createdAt: productionLogs.loggedAt,
-      userName: users.name,
-      batchCode: productionBatches.batchCode
-    })
-    .from(productionLogs)
-    .leftJoin(users, eq(productionLogs.userId, users.id))
-    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
-    .where(and(
-      eq(productionLogs.productId, productId),
-      eq(productionLogs.station, 'FILLING'),
-      sql`${productionLogs.bottleLeakage} > 0`,
-      isNull(productionLogs.deletedAt)
-    ));
-
-    // 4. Fetch scrap/rejections (BLOWING, FILLING, LABELING logs with wastageCount > 0)
-    const rejectionLogs = await db.select({
-      id: productionLogs.id,
-      wastageCount: productionLogs.wastageCount,
-      createdAt: productionLogs.loggedAt,
-      userName: users.name,
-      station: productionLogs.station,
-      batchCode: productionBatches.batchCode
-    })
-    .from(productionLogs)
-    .leftJoin(users, eq(productionLogs.userId, users.id))
-    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
-    .where(and(
-      eq(productionLogs.productId, productId),
-      sql`station IN ('BLOWING', 'FILLING', 'LABELING')`,
-      sql`cast(coalesce(${productionLogs.wastageCount}, '0') as integer) > 0`,
-      isNull(productionLogs.deletedAt)
-    ));
-
-    // 5. Fetch dispatches
+    // 3. Fetch dispatches. Finished goods are counted as packed cases;
+    // bottle-level leakage/rejection is already upstream of the packing count.
     const dispatches = await db.select({
       id: dispatchLogs.id,
       quantity: dispatchLogs.quantity,
@@ -601,36 +540,13 @@ export class InventoryService {
 
     // Production (Packing)
     packingLogs.forEach(l => {
+      const casesProduced = Number(l.casesProduced || 0);
+      if (casesProduced <= 0) return;
       ledgerEntries.push({
         id: `packing_${l.id}`,
         type: 'PRODUCTION',
-        quantityChange: l.primaryCount,
+        quantityChange: casesProduced,
         remarks: `Production Output (Batch #${l.batchCode})`,
-        createdAt: l.createdAt,
-        userName: l.userName || 'Operator'
-      });
-    });
-
-    // Leakages
-    leakageLogs.forEach(l => {
-      ledgerEntries.push({
-        id: `leak_${l.id}`,
-        type: 'LEAKAGE',
-        quantityChange: -l.bottleLeakage,
-        remarks: `Bottle Leakage in Filling (Batch #${l.batchCode})`,
-        createdAt: l.createdAt,
-        userName: l.userName || 'Operator'
-      });
-    });
-
-    // Rejections
-    rejectionLogs.forEach(l => {
-      const scrap = Math.floor(Number(l.wastageCount || 0));
-      ledgerEntries.push({
-        id: `reject_${l.id}`,
-        type: 'REJECTION',
-        quantityChange: -scrap,
-        remarks: `${l.station} Scrap Rejections (Batch #${l.batchCode})`,
         createdAt: l.createdAt,
         userName: l.userName || 'Operator'
       });

@@ -449,10 +449,6 @@ export default function OperatorPanel() {
       return pName && (mName.includes(pName) || pName.includes(mName));
     });
 
-    if (currentStation.id === 'LABELING' && !derivedLabelMaterial) {
-      return toast.error('No matching label material found for this product.');
-    }
-
     const currentBatch = activeBatch?.batch;
     const selectedCapRawMaterial = stationRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
 
@@ -556,6 +552,15 @@ export default function OperatorPanel() {
       toast.success(`${currentStation.title} Data Committed!`, {
         description: `Logged production telemetry to the ledger.`,
       });
+      const warnings = response.data?.warnings;
+      if (warnings && warnings.length > 0) {
+        warnings.forEach((warning: any) => {
+          toast.warning('Warning: Flow Mismatch', {
+            description: warning.message,
+            duration: 8000,
+          });
+        });
+      }
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
       setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);

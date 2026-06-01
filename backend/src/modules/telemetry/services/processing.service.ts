@@ -29,6 +29,12 @@ import { OperatorSessionsService } from '../../operator-sessions/operator-sessio
 import { MachineStateService } from '../../production/services/machine-state.service';
 import { InventoryService } from '../../inventory/inventory.service';
 
+export enum ValidationSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL'
+}
+
 @Injectable()
 export class ProcessingService {
   private readonly logger = new Logger(ProcessingService.name);
@@ -80,6 +86,7 @@ export class ProcessingService {
   }
 
   async handleTelemetryLog(userId: string, dto: TelemetryDto) {
+    const warnings: any[] = [];
     const log = await db.transaction(async (tx) => {
       this.logger.debug(`[PROCESSOR] Verifying idempotency for requestId: ${dto.requestId}`);
 
@@ -127,7 +134,10 @@ export class ProcessingService {
       }
 
       if (!dto.isRework) {
-        await this.validateProductionFlow(dto.station, finalPrimaryCount, current);
+        const warning = await this.validateProductionFlow(userId, dto.batchId, dto.station, finalPrimaryCount, current);
+        if (warning) {
+          warnings.push(warning);
+        }
       }
 
       let sessionId = dto.sessionId;
@@ -280,7 +290,7 @@ export class ProcessingService {
       this.logger.error(`Failed to update machine state for line ${dto.lineId} station ${dto.station}: ${err.message}`);
     }
 
-    return log;
+    return { log, warnings };
   }
 
   private async processLegacyMaterialUsage(tx: any, logId: number, batchId: string, mat: any, loggedAt: Date) {
@@ -314,17 +324,33 @@ export class ProcessingService {
       directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.shrinkRollsUsed, remarks: `Shrink Rolls used in Packing Station (Log #${logId})` });
     }
 
-    // 4. Labeling (Pieces auto-mapped from Product)
-    if (dto.station === 'LABELING' && dto.productId && dto.labelsUsed && dto.labelsUsed > 0) {
-      const productRec = await tx.select().from(products).where(eq(products.id, dto.productId));
-      if (productRec.length > 0) {
-        const labelName = `${productRec[0].name} Label`;
-        const labelMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, labelName));
-        if (labelMat.length > 0) {
-          directDeductions.push({ materialId: labelMat[0].id, qty: dto.labelsUsed, remarks: `Labels used in Labeling Station (Log #${logId})` });
-        } else {
-          throw new NonRetryableBusinessError(`Label material not found for product. Expected: "${labelName}"`);
+    // 4. Labeling (Pieces Priority-based mapping)
+    if (dto.station === 'LABELING' && dto.labelsUsed && dto.labelsUsed > 0) {
+      this.logger.debug(`[LABELING PAYLOAD] rawMaterialId: ${dto.rawMaterialId}, productId: ${dto.productId}, labelsUsed: ${dto.labelsUsed}`);
+
+      let resolvedMaterialId: string | null = null;
+
+      if (dto.rawMaterialId) {
+        resolvedMaterialId = dto.rawMaterialId;
+        this.logger.debug(`[LABELING RESOLUTION] Priority 1: Using provided rawMaterialId: ${resolvedMaterialId}`);
+      } else if (dto.productId) {
+        const productRec = await tx.select().from(products).where(eq(products.id, dto.productId));
+        if (productRec.length > 0) {
+          const labelName = `Label - ${productRec[0].name}`;
+          const labelMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, labelName));
+          if (labelMat.length > 0) {
+            resolvedMaterialId = labelMat[0].id;
+            this.logger.debug(`[LABELING RESOLUTION] Priority 2: Mapped product to label material: ${labelName} (${resolvedMaterialId})`);
+          } else {
+            this.logger.warn(`[LABELING RESOLUTION] Priority 3: Label material not found for product. Expected: "${labelName}"`);
+          }
         }
+      }
+
+      if (resolvedMaterialId) {
+        directDeductions.push({ materialId: resolvedMaterialId, qty: dto.labelsUsed, remarks: `Labels used in Labeling Station (Log #${logId})` });
+      } else {
+        this.logger.warn(`[LABELING RESOLUTION] Could not resolve label material for payload. Ignoring deduction.`);
       }
     }
 
@@ -351,29 +377,64 @@ export class ProcessingService {
     }
   }
 
-  private async validateProductionFlow(station: string, count: number, totals: any) {
+  private async validateProductionFlow(userId: string, batchId: string, station: string, count: number, totals: any) {
     const nextTotal = (totals[this.getFieldName(station)] || 0) + count;
+    let message: string | null = null;
+    let expectedOutput = 0;
+    let actualOutput = nextTotal;
 
     if (station === 'FILLING' && nextTotal > totals.blowingTotal) {
-      throw new BadRequestException(
-        `FLOW_VIOLATION: Filling count (${nextTotal}) cannot exceed Blowing output (${totals.blowingTotal}). ` +
-        `Shortfall: ${nextTotal - totals.blowingTotal} units.`
-      );
-    }
-    if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
-      throw new BadRequestException(
-        `FLOW_VIOLATION: Labeling count (${nextTotal}) cannot exceed Filling output (${totals.fillingTotal}). ` +
-        `Shortfall: ${nextTotal - totals.fillingTotal} units.`
-      );
-    }
-    if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
-      throw new BadRequestException(
-        `FLOW_VIOLATION: Packing count (${nextTotal}) cannot exceed Labeling output (${totals.labelingTotal}). ` +
-        `Shortfall: ${nextTotal - totals.labelingTotal} units.`
-      );
+      expectedOutput = Number(totals.blowingTotal || 0);
+      const shortfall = nextTotal - expectedOutput;
+      message = `FLOW_VIOLATION: Filling count (${nextTotal}) cannot exceed Blowing output (${expectedOutput}). Shortfall: ${shortfall} units.`;
+    } else if (station === 'LABELING' && nextTotal > totals.fillingTotal) {
+      expectedOutput = Number(totals.fillingTotal || 0);
+      const shortfall = nextTotal - expectedOutput;
+      message = `FLOW_VIOLATION: Labeling count (${nextTotal}) cannot exceed Filling output (${expectedOutput}). Shortfall: ${shortfall} units.`;
+    } else if (station === 'PACKING' && nextTotal > totals.labelingTotal) {
+      expectedOutput = Number(totals.labelingTotal || 0);
+      const shortfall = nextTotal - expectedOutput;
+      message = `FLOW_VIOLATION: Packing count (${nextTotal}) cannot exceed Labeling output (${expectedOutput}). Shortfall: ${shortfall} units.`;
     }
 
-    // No flow validation for QC as it is not a sequential production unit in the same ledger
+    if (message) {
+      const variance = actualOutput - expectedOutput;
+
+      // 1. Audit Log: logAction with category PRODUCTION and action FLOW_WARNING
+      await this.auditService.logAction({
+        userId,
+        action: 'FLOW_WARNING',
+        entityType: 'production_batches',
+        entityId: batchId,
+        category: 'PRODUCTION',
+        payload: {
+          eventType: 'FLOW_WARNING',
+          workstation: station,
+          batchId,
+          expectedOutput,
+          actualOutput,
+          variance,
+          createdAt: new Date()
+        }
+      });
+
+      // 2. Notification: createNotification with type FLOW_VIOLATION and severity WARNING
+      await this.notificationsService.createNotification(
+        'FLOW_VIOLATION',
+        'Flow Violation Warning',
+        message,
+        'WARNING',
+        `flow:${batchId}`
+      );
+
+      return {
+        severity: ValidationSeverity.WARNING,
+        type: 'FLOW_VIOLATION',
+        message
+      };
+    }
+
+    return null;
   }
 
   private async validateBatchStatus(tx: any, batchId: string) {
@@ -1036,7 +1097,8 @@ export class ProcessingService {
   async createManualLog(userId: string, dto: TelemetryDto) {
     const [batch] = await db.select().from(productionBatches).where(eq(productionBatches.id, dto.batchId)).limit(1);
     if (!batch) throw new NonRetryableBusinessError('Target batch not found.');
-    return await this.handleTelemetryLog(userId, dto);
+    const { log, warnings } = await this.handleTelemetryLog(userId, dto);
+    return { success: true, saved: true, warnings, log };
   }
 
   async getActiveEvents(batchId: string) {

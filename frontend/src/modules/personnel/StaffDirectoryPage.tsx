@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import {
   Users, Search, Filter, Mail,
-  ShieldCheck, Loader2, MoreHorizontal
+  ShieldCheck, Loader2, MoreHorizontal, UserPlus
 } from 'lucide-react';
 import { ENDPOINTS } from '../../constants/endpoints';
+import useAuthStore from '../auth/auth.store';
+import { UserFormModal } from './UserManagementPage';
 
 interface Staff {
   id: string;
@@ -20,7 +22,11 @@ interface Staff {
 }
 
 export default function StaffDirectoryPage() {
+  const { user } = useAuthStore();
+  const userRoles = (user?.roles || [user?.role]).map((role: any) => String(role).toUpperCase());
+  const canRegisterStaff = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const { data: staffData, isLoading } = useQuery({
     queryKey: ['staff-directory', searchTerm],
@@ -77,9 +83,15 @@ export default function StaffDirectoryPage() {
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
             eSSL Biometric: Active
           </div>
-          <button className="px-4 py-2 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-xs shadow-sm transition-all active:scale-95">
-            Register New Staff
-          </button>
+          {canRegisterStaff && (
+            <button
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="px-4 py-2 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-xs shadow-sm transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Register New Staff
+            </button>
+          )}
         </div>
       </div>
 
@@ -256,6 +268,10 @@ export default function StaffDirectoryPage() {
           </div>
         ))}
       </div>
+
+      {isRegisterModalOpen && (
+        <UserFormModal onClose={() => setIsRegisterModalOpen(false)} />
+      )}
     </div>
   );
 }

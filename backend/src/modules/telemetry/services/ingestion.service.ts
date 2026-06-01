@@ -57,11 +57,14 @@ export class IngestionService {
     await this.processingService.preValidateTelemetry(finalUserId, dto);
 
     // Commit directly so the operator history has read-after-write consistency.
-    const log = await this.processingService.handleTelemetryLog(finalUserId, dto);
+    const { log, warnings } = await this.processingService.handleTelemetryLog(finalUserId, dto);
 
     return {
       status: 'COMMITTED',
       requestId: dto.requestId,
+      success: true,
+      saved: true,
+      warnings,
       log,
       message: 'Log committed to ledger.'
     };

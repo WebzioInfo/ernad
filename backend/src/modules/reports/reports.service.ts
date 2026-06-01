@@ -12,6 +12,7 @@ import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'driz
 @Injectable()
 export class ReportsService {
   private readonly logger = new Logger(ReportsService.name);
+  private tableExistsCache = new Map<string, boolean>();
 
   private static readonly PRIVILEGED_ROLES = [
     'ADMIN',
@@ -31,6 +32,17 @@ export class ReportsService {
       .where(inArray(userRoles.roleId, privilegedRoles.map(r => r.id)));
     
     return privilegedUserRoles.map(pur => pur.userId);
+  }
+
+  private async hasTable(tableName: string) {
+    if (this.tableExistsCache.has(tableName)) {
+      return this.tableExistsCache.get(tableName)!;
+    }
+
+    const [result] = await db.execute(sql`select to_regclass(${`public.${tableName}`}) as table_name`);
+    const exists = Boolean(result?.table_name);
+    this.tableExistsCache.set(tableName, exists);
+    return exists;
   }
 
   // ─── PRODUCTION REPORTS ───
@@ -195,6 +207,14 @@ export class ReportsService {
   async getSalesReport(filters: { startDate: Date; endDate: Date }, callerRoles: string[] = []) {
     try {
       this.logger.log(`[SALES_REPORT] Aggregating range: ${filters.startDate.toISOString()} - ${filters.endDate.toISOString()}`);
+
+      const hasSalesTables = await this.hasTable('sales_orders') && await this.hasTable('sales_order_items');
+      if (!hasSalesTables) {
+        return {
+          summary: { totalRevenue: 0, orderCount: 0, avgOrderValue: 0 },
+          topProducts: []
+        };
+      }
       
       const conditions = [between(salesOrders.orderDate, filters.startDate, filters.endDate)];
 
@@ -226,12 +246,14 @@ export class ReportsService {
       .orderBy(desc(sql`SUM(${salesOrderItems.totalPrice})`))
       .limit(10);
 
-      const stockResults = await db.select({
-        productId: finishedGoodsInventory.productId,
-        totalStock: sql<string>`SUM(${finishedGoodsInventory.quantity})`
-      })
-      .from(finishedGoodsInventory)
-      .groupBy(finishedGoodsInventory.productId);
+      const stockResults = await this.hasTable('finished_goods_inventory')
+        ? await db.select({
+          productId: finishedGoodsInventory.productId,
+          totalStock: sql<string>`SUM(${finishedGoodsInventory.quantity})`
+        })
+        .from(finishedGoodsInventory)
+        .groupBy(finishedGoodsInventory.productId)
+        : [];
 
       return {
         summary,

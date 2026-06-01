@@ -14,7 +14,7 @@ import { ENDPOINTS } from '../../constants/endpoints';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import useAuthStore from '../auth/auth.store';
 
-interface User {
+export interface User {
   id: string;
   name: string;
   username: string;
@@ -582,7 +582,7 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAd
   );
 }
 
-function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) {
+export function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) {
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.roles.includes('ADMIN');
   const isManager = currentUser?.roles.includes('MANAGER');
@@ -637,6 +637,7 @@ function UserFormModal({ user, onClose }: { user?: User, onClose: () => void }) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-directory'] });
       toast.success(user ? 'User updated' : 'User added');
       onClose();
     },

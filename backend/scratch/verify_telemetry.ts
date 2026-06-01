@@ -16,10 +16,15 @@ async function main() {
       if (dto.triggerStockError) {
         throw new NonRetryableBusinessError("Material stock not found for Caps. Please assign stock in the Operator Panel.");
       }
+      const warnings: any[] = [];
       if (dto.triggerFlowError) {
-        throw new BadRequestException("FLOW_VIOLATION: Filling count (8) cannot exceed Blowing output (0)");
+        warnings.push({
+          severity: 'WARNING',
+          type: 'FLOW_VIOLATION',
+          message: "FLOW_VIOLATION: Filling count (8) cannot exceed Blowing output (0)"
+        });
       }
-      return { success: true };
+      return { log: { success: true }, warnings };
     }
   } as unknown as ProcessingService;
 
@@ -71,8 +76,8 @@ async function main() {
     console.log(`Discard called: ${discard1Called} (expected: true)`);
   }
 
-  // Test Case 2: Transient Flow Error (Should NOT discard on 1st attempt)
-  console.log("\n--- TEST 2: Transient Flow Error (Attempt 1) ---");
+  // Test Case 2: Flow Warning (Should succeed on 1st attempt and NOT discard)
+  console.log("\n--- TEST 2: Flow Warning (Attempt 1) ---");
   let discard2Called = false;
   const job2 = {
     id: 'job-2',
@@ -85,14 +90,15 @@ async function main() {
   } as unknown as Job;
 
   try {
-    await processor.process(job2);
+    const res = await processor.process(job2);
+    console.log(`Job 2 processed successfully, returned:`, JSON.stringify(res));
+    console.log(`Discard called: ${discard2Called} (expected: false)`);
   } catch (err: any) {
     console.log(`Caught error: ${err.message}`);
-    console.log(`Discard called: ${discard2Called} (expected: false)`);
   }
 
-  // Test Case 3: Transient Flow Error (Attempt 5 - exhausted)
-  console.log("\n--- TEST 3: Transient Flow Error (Attempt 5 - Final) ---");
+  // Test Case 3: Flow Warning (Attempt 5 - Final)
+  console.log("\n--- TEST 3: Flow Warning (Attempt 5 - Final) ---");
   let discard3Called = false;
   const job3 = {
     id: 'job-3',
@@ -105,18 +111,18 @@ async function main() {
   } as unknown as Job;
 
   try {
-    await processor.process(job3);
+    const res = await processor.process(job3);
+    console.log(`Job 3 processed successfully, returned:`, JSON.stringify(res));
+    console.log(`Discard called: ${discard3Called} (expected: false)`);
   } catch (err: any) {
     console.log(`Caught error: ${err.message}`);
-    console.log(`Discard called: ${discard3Called} (expected: true)`);
   }
 
-  console.log(`\nDLQ Content count: ${redisDLQ.length} (expected: 2)`);
+  console.log(`\nDLQ Content count: ${redisDLQ.length} (expected: 1)`);
   console.log("DLQ item 1 error:", redisDLQ[0]?.error);
-  console.log("DLQ item 2 error:", redisDLQ[1]?.error);
-  console.log(`Audit logs written: ${auditLogsWritten.length} (expected: 2)`);
+  console.log(`Audit logs written: ${auditLogsWritten.length} (expected: 1)`);
   
-  if (discard1Called && !discard2Called && discard3Called && redisDLQ.length === 2 && auditLogsWritten.length === 2) {
+  if (discard1Called && !discard2Called && !discard3Called && redisDLQ.length === 1 && auditLogsWritten.length === 1) {
     console.log("\nTelemetry processor unit tests PASSED successfully!");
     process.exit(0);
   } else {

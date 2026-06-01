@@ -202,7 +202,7 @@ export default function RawMaterialsPage() {
                 <th className="px-8 py-5 text-right text-[#1A9A91]">Available Stock</th>
                 <th className="px-8 py-5 text-center">Last Updated</th>
                 <th className="px-8 py-5 text-center">Status</th>
-                {isAdmin && <th className="px-8 py-5 text-right">Actions</th>}
+                {(isAdmin || isManager) && <th className="px-8 py-5 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -245,7 +245,7 @@ export default function RawMaterialsPage() {
                         </span>
                       )}
                     </td>
-                    {isAdmin && (
+                    {(isAdmin || isManager) && (
                       <td className="px-8 py-6 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -258,15 +258,17 @@ export default function RawMaterialsPage() {
                           >
                             <PenLine className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMaterialToDelete(material);
-                            }}
-                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {(isAdmin || isManager) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMaterialToDelete(material);
+                              }}
+                              className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     )}
@@ -750,7 +752,7 @@ export function CreateMaterialModal({ onClose, onSubmit, isPending }: any) {
                 <option value="">Select...</option>
                 <option value="BAG">Bag</option>
                 <option value="BOX">Box</option>
-                <option value="PIECE">Piece</option>
+                <option value="PCS">Piece (PCS)</option>
                 <option value="ROLL">Roll</option>
                 <option value="KG">Kilogram (KG)</option>
               </select>
@@ -791,6 +793,8 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
     if (!name || !materialType || !unit || currentStock === '') return;
     onSubmit({ name, materialType, unit, currentStock: Number(currentStock) });
   };
+
+  const hasChanges = name !== (material.name || '') || materialType !== (material.materialType || '') || unit !== (material.unit || '') || currentStock !== (material.currentStock ?? 0);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -847,7 +851,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
               >
                 <option value="BAG">Bag</option>
                 <option value="BOX">Box</option>
-                <option value="PIECE">Piece</option>
+                <option value="PCS">Piece (PCS)</option>
                 <option value="ROLL">Roll</option>
                 <option value="KG">Kilogram (KG)</option>
               </select>
@@ -878,7 +882,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
             </button>
             <button
               type="submit"
-              disabled={isPending || !name || !materialType || !unit || currentStock === ''}
+              disabled={isPending || !name || !materialType || !unit || currentStock === '' || !hasChanges}
               className="flex-1 px-5 py-3 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-[#1A9A91]/20"
             >
               {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}

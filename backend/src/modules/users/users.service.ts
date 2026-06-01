@@ -21,6 +21,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
+  private userLinesTableExistsCache: boolean | null = null;
   
   constructor(
     private readonly mailService: MailService,
@@ -38,6 +39,16 @@ export class UsersService {
   ] as const;
 
   private static readonly VALID_ROLE_SLUGS = ['ADMIN', 'MANAGER', 'OPERATOR'] as const;
+
+  private async hasUserLinesTable(client: any = db) {
+    if (this.userLinesTableExistsCache !== null) {
+      return this.userLinesTableExistsCache;
+    }
+
+    const [result] = await client.execute(sql`select to_regclass('public.user_lines') as table_name`);
+    this.userLinesTableExistsCache = Boolean(result?.table_name);
+    return this.userLinesTableExistsCache;
+  }
 
   /**
    * Get all users — role-scoped with filtering and pagination.
@@ -172,14 +183,16 @@ export class UsersService {
         .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
         .where(inArray(userRoles.userId, userIds));
 
-      // Fetch all assigned lines for all fetched users in a single query
-      const allUserLines = await db
-        .select({
-          userId: userLines.userId,
-          lineId: userLines.lineId
-        })
-        .from(userLines)
-        .where(inArray(userLines.userId, userIds));
+      let allUserLines: Array<{ userId: string; lineId: string }> = [];
+      if (await this.hasUserLinesTable()) {
+        allUserLines = await db
+          .select({
+            userId: userLines.userId,
+            lineId: userLines.lineId
+          })
+          .from(userLines)
+          .where(inArray(userLines.userId, userIds));
+      }
 
       // Group roles by userId
       const rolesByUserId = allUserRoles.reduce((acc, curr) => {
@@ -240,11 +253,14 @@ export class UsersService {
     .innerJoin(userRoles, eq(userRoles.roleId, roles.id))
     .where(eq(userRoles.userId, rows[0].id));
 
-    const userLinesResult = await client.select({
-      lineId: sql<string>`${userLines.lineId}`
-    })
-    .from(userLines)
-    .where(eq(userLines.userId, rows[0].id));
+    let userLinesResult: Array<{ lineId: string }> = [];
+    if (await this.hasUserLinesTable(client)) {
+      userLinesResult = await client.select({
+        lineId: sql<string>`${userLines.lineId}`
+      })
+      .from(userLines)
+      .where(eq(userLines.userId, rows[0].id));
+    }
 
     return { 
       ...rows[0], 
@@ -372,13 +388,15 @@ export class UsersService {
       }
 
       // Assign Production Lines
-      const linesToAssign = Array.isArray(dto.assignedLines) ? dto.assignedLines : [];
-      for (const lineId of linesToAssign) {
-        if (!lineId) continue;
-        await tx.insert(userLines).values({
-          userId: created.id,
-          lineId: lineId
-        }).onConflictDoNothing();
+      if (await this.hasUserLinesTable(tx)) {
+        const linesToAssign = Array.isArray(dto.assignedLines) ? dto.assignedLines : [];
+        for (const lineId of linesToAssign) {
+          if (!lineId) continue;
+          await tx.insert(userLines).values({
+            userId: created.id,
+            lineId: lineId
+          }).onConflictDoNothing();
+        }
       }
 
       return this.getOperatorWithContext(created.id, tx);
@@ -467,16 +485,18 @@ export class UsersService {
         }
 
         // Sync Production Lines
-        const linesToAssign = Array.isArray(dto.assignedLines) ? dto.assignedLines : [];
-        this.logger.log(`[TX] Syncing ${linesToAssign.length} lines for user ${id}`);
-        
-        await tx.delete(userLines).where(eq(userLines.userId, id));
-        for (const lineId of linesToAssign) {
-          if (!lineId) continue;
-          await tx.insert(userLines).values({
-            userId: id,
-            lineId: lineId
-          }).onConflictDoNothing();
+        if (await this.hasUserLinesTable(tx)) {
+          const linesToAssign = Array.isArray(dto.assignedLines) ? dto.assignedLines : [];
+          this.logger.log(`[TX] Syncing ${linesToAssign.length} lines for user ${id}`);
+          
+          await tx.delete(userLines).where(eq(userLines.userId, id));
+          for (const lineId of linesToAssign) {
+            if (!lineId) continue;
+            await tx.insert(userLines).values({
+              userId: id,
+              lineId: lineId
+            }).onConflictDoNothing();
+          }
         }
 
         return this.getOperatorWithContext(id, tx);
