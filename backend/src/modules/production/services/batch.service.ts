@@ -29,7 +29,14 @@ export class BatchService {
     operatorIds: string[] = [],
     targetQuantity?: number
   ) {
-    const result = await db.transaction(async (tx) => {
+    console.log("START BATCH REQUEST", { lineId, brandId, productId, shiftId, createdBy, batchCode, remarks, startTime, operatorIds, targetQuantity });
+    console.log("LINE", lineId);
+    console.log("PRODUCT", productId);
+    console.log("SHIFT", shiftId);
+    console.log("BATCH CODE", batchCode);
+
+    try {
+      const result = await db.transaction(async (tx) => {
       const [line] = await tx.select().from(productionLines).where(eq(productionLines.id, lineId)).for('update');
       if (!line) throw new BadRequestException('Line not found.');
       if (line.status !== 'IDLE') {
@@ -37,10 +44,7 @@ export class BatchService {
           .from(productionBatches)
           .where(and(
             eq(productionBatches.lineId, lineId),
-            or(
-              eq(productionBatches.status, 'RUNNING'),
-              eq(productionBatches.status, 'CHANGEOVER')
-            )
+            sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
           ))
           .limit(1);
 
@@ -149,6 +153,12 @@ export class BatchService {
     await this.eventsService.emitProductionUpdated(result.id, lineId);
 
     return result;
+    } catch(error: any) {
+       console.error("FAILED QUERY", error);
+       if (error.query) console.error("QUERY", error.query);
+       if (error.parameters) console.error("PARAMS", error.parameters);
+       throw error;
+    }
   }
 
   async getBatches(limit = 50) {
@@ -202,10 +212,7 @@ export class BatchService {
         .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
         .where(and(
           eq(productionBatches.lineId, lineId),
-          or(
-            eq(productionBatches.status, 'RUNNING'),
-            eq(productionBatches.status, 'CHANGEOVER')
-          )
+          sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
         ))
         .orderBy(desc(productionBatches.startTime))
         .limit(1);

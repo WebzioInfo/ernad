@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useRawMaterials, useStationConsumption, useRawMaterialLedger, QK } from '../../hooks/useApi';
+import { MaterialUnit, MaterialType } from '../../types/enums';
 
 export default function RawMaterialsPage() {
   const { user } = useAuthStore();
@@ -733,11 +734,11 @@ export function CreateMaterialModal({ onClose, onSubmit, isPending }: any) {
                 required
               >
                 <option value="">Select...</option>
-                <option value="PREFORM">Preform</option>
-                <option value="CAP">Cap</option>
-                <option value="LABEL">Label</option>
-                <option value="SHRINK">Shrink Roll</option>
-                <option value="OTHER">Other</option>
+                <option value={MaterialType.PREFORM}>Preform</option>
+                <option value={MaterialType.CAP}>Cap</option>
+                <option value={MaterialType.LABEL}>Label</option>
+                <option value={MaterialType.SHRINK}>Shrink Roll</option>
+                <option value={MaterialType.OTHER}>Other</option>
               </select>
             </div>
 
@@ -750,11 +751,12 @@ export function CreateMaterialModal({ onClose, onSubmit, isPending }: any) {
                 required
               >
                 <option value="">Select...</option>
-                <option value="BAG">Bag</option>
-                <option value="BOX">Box</option>
-                <option value="PCS">Piece (PCS)</option>
-                <option value="ROLL">Roll</option>
-                <option value="KG">Kilogram (KG)</option>
+                <option value={MaterialUnit.BAG}>Bag (BAG)</option>
+                <option value={MaterialUnit.BOX}>Box (BOX)</option>
+                <option value={MaterialUnit.PCS}>Piece (PCS)</option>
+                <option value={MaterialUnit.ROLL}>Roll (ROLL)</option>
+                <option value={MaterialUnit.KG}>Kilogram (KG)</option>
+                <option value={MaterialUnit.LTR}>Liter (LTR)</option>
               </select>
             </div>
           </div>
@@ -833,11 +835,11 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
                 className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] transition-all appearance-none"
                 required
               >
-                <option value="PREFORM">Preform</option>
-                <option value="CAP">Cap</option>
-                <option value="LABEL">Label</option>
-                <option value="SHRINK">Shrink Roll</option>
-                <option value="OTHER">Other</option>
+                <option value={MaterialType.PREFORM}>Preform</option>
+                <option value={MaterialType.CAP}>Cap</option>
+                <option value={MaterialType.LABEL}>Label</option>
+                <option value={MaterialType.SHRINK}>Shrink Roll</option>
+                <option value={MaterialType.OTHER}>Other</option>
               </select>
             </div>
 
@@ -849,11 +851,12 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
                 className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] transition-all appearance-none"
                 required
               >
-                <option value="BAG">Bag</option>
-                <option value="BOX">Box</option>
-                <option value="PCS">Piece (PCS)</option>
-                <option value="ROLL">Roll</option>
-                <option value="KG">Kilogram (KG)</option>
+                <option value={MaterialUnit.BAG}>Bag (BAG)</option>
+                <option value={MaterialUnit.BOX}>Box (BOX)</option>
+                <option value={MaterialUnit.PCS}>Piece (PCS)</option>
+                <option value={MaterialUnit.ROLL}>Roll (ROLL)</option>
+                <option value={MaterialUnit.KG}>Kilogram (KG)</option>
+                <option value={MaterialUnit.LTR}>Liter (LTR)</option>
               </select>
             </div>
           </div>

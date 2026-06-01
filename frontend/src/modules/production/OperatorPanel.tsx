@@ -113,6 +113,7 @@ export default function OperatorPanel() {
   const [tdsValue, setTdsValue] = useState(0);
 
   // Label station states
+  const [selectedLabelRawMaterialId, setSelectedLabelRawMaterialId] = useState('');
   const [inkChanged, setInkChanged] = useState(false);
   const [makeupChanged, setMakeupChanged] = useState(false);
 
@@ -425,7 +426,18 @@ export default function OperatorPanel() {
       const multiplier = activeConfig ? activeConfig.multiplier : 0;
       setPrimaryCount(casesProduced * multiplier);
     }
-  }, [casesProduced, selectedBottleConfig, currentStation.id]);
+  }, [casesProduced, selectedBottleConfig, currentStation?.id]);
+
+  useEffect(() => {
+    if (currentStation?.id === 'LABELING' && stationRawMaterials.length > 0 && activeBatch?.batch?.productName && !selectedLabelRawMaterialId) {
+      const derivedLabelMaterial = stationRawMaterials.find((m: any) => {
+        const pName = activeBatch.batch.productName.toLowerCase();
+        const mName = m.name.toLowerCase();
+        return m.materialType === 'LABEL' && (mName.includes(pName) || pName.includes(mName));
+      });
+      if (derivedLabelMaterial) setSelectedLabelRawMaterialId(derivedLabelMaterial.id);
+    }
+  }, [currentStation?.id, stationRawMaterials, activeBatch?.batch?.productName, selectedLabelRawMaterialId]);
 
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (!activeBatch?.batch) return toast.error('No active batch found.');
@@ -441,13 +453,9 @@ export default function OperatorPanel() {
     if (currentStation.id === 'FILLING' && productionWastages && bottleLeakage > rawProductionCount) {
       return toast.error('Filled bottle leakage cannot exceed raw production count');
     }
-    if (currentStation.id === 'FILLING' && !selectedCapRawMaterialId) return toast.error('Please select the Caps raw material.');
-    if (currentStation.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
-    const derivedLabelMaterial = stationRawMaterials.find((m: any) => {
-      const pName = (activeBatch?.batch?.productName || '').toLowerCase();
-      const mName = m.name.toLowerCase();
-      return pName && (mName.includes(pName) || pName.includes(mName));
-    });
+    if (currentStation?.id === 'FILLING' && !selectedCapRawMaterialId) return toast.error('Please select the Caps raw material.');
+    if (currentStation?.id === 'BLOWING' && !selectedRawMaterialId) return toast.error('Please select the Raw Material.');
+    if (currentStation?.id === 'LABELING' && !selectedLabelRawMaterialId) return toast.error('Please select the Label Raw Material.');
 
     const currentBatch = activeBatch?.batch;
     const selectedCapRawMaterial = stationRawMaterials.find((material: any) => material.id === selectedCapRawMaterialId);
@@ -493,12 +501,14 @@ export default function OperatorPanel() {
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.bagsUsed = bagsUsed;
     } else if (currentStation.id === 'FILLING') {
-      logEntry.boxesUsed = capBoxUsage;
+      logEntry.capBoxUsage = capBoxUsage;
       logEntry.rawMaterialId = selectedCapRawMaterialId;
-    } else if (currentStation.id === 'LABELING') {
+    } else if (currentStation?.id === 'LABELING') {
       logEntry.labelsUsed = labelUsage;
-      logEntry.rawMaterialId = derivedLabelMaterial?.id;
-    } else if (currentStation.id === 'PACKING') {
+      logEntry.rawMaterialId = selectedLabelRawMaterialId;
+      logEntry.inkChanged = inkChanged;
+      logEntry.makeupChanged = makeupChanged;
+    } else if (currentStation?.id === 'PACKING') {
       logEntry.shrinkRollsUsed = Number(shrinkUsage) || 0;
       logEntry.rawMaterialId = selectedRawMaterialId;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
@@ -514,10 +524,10 @@ export default function OperatorPanel() {
       setIsSubmitting(true);
       const response = await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
       const committedLog = response.data?.log;
-      const rawMaterialName = currentStation.id === 'BLOWING'
+      const rawMaterialName = currentStation?.id === 'BLOWING'
         ? rawMaterials?.find((material: any) => material.id === selectedRawMaterialId)?.name
-        : currentStation.id === 'LABELING'
-        ? derivedLabelMaterial?.name
+        : currentStation?.id === 'LABELING'
+        ? rawMaterials?.find((material: any) => material.id === selectedLabelRawMaterialId)?.name
         : selectedCapRawMaterial?.name;
 
       queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
@@ -881,9 +891,27 @@ export default function OperatorPanel() {
                     </>
                   )}
 
-                  {currentStation.id === 'LABELING' && (
+                  {currentStation?.id === 'LABELING' && (
                     <>
-                      <div className="space-y-1">
+                      <div className="flex flex-col justify-center mb-4">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block mb-2">
+                          Label Raw Material
+                        </label>
+                        <select
+                          value={selectedLabelRawMaterialId}
+                          onChange={e => setSelectedLabelRawMaterialId(e.target.value)}
+                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
+                        >
+                          <option value="">Select Label Material...</option>
+                          {stationRawMaterials.filter((m: any) => m.materialType === 'LABEL').map((material: any) => (
+                            <option key={material.id} value={material.id}>
+                              {material.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1 mb-6">
                         <IndustrialNumericInput
                           label="Labels Used (KG)"
                           value={labelUsage}

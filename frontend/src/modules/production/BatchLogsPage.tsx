@@ -40,11 +40,20 @@ interface BatchHistoryEvent {
   source?: 'OPERATOR' | 'MACHINE' | 'SYSTEM' | string;
   station?: string;
   rawMaterialName?: string | null;
+  rawMaterialUnit?: string | null;
   bagsUsed?: number | null;
   preformUsage?: number | null;
   capUsage?: number | null;
   capBoxUsage?: number | null;
   secondaryPackagingCount?: number | null;
+  bopRollUsage?: string | null;
+  shrinkWeightUsed?: string | null;
+  labelStickerWeight?: string | null;
+  damagedLabelWeight?: string | null;
+  shrinkWasteWeight?: string | null;
+  labelUsage?: number | null;
+  inkChanged?: boolean;
+  makeupChanged?: boolean;
 }
 
 const stations: { id: StationId; label: string }[] = [
@@ -228,24 +237,117 @@ export default function BatchLogsPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:min-w-[440px]">
-                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output</p>
-                      <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Wastage</p>
-                      <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Bags</p>
-                      <p className="text-sm font-black text-slate-900">{formatNumber(event.bagsUsed)}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Material</p>
-                      <p className="text-sm font-black text-slate-900">
-                        {formatNumber(event.preformUsage || event.capUsage || event.capBoxUsage || event.secondaryPackagingCount)}
-                      </p>
-                    </div>
+                    {station === 'BLOWING' && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
+                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Preforms Used</p>
+                          <p className="text-sm font-black text-slate-900">
+                            {formatNumber(event.preformUsage)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'PCS'}</span>
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Bottle Wastage</p>
+                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
+                        </div>
+                      </>
+                    )}
+
+                    {station === 'FILLING' && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
+                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cap Box Usage</p>
+                          <p className="text-sm font-black text-slate-900">
+                            {formatNumber(event.capBoxUsage)} <span className="text-[10px] text-slate-500">BOX</span>
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Wastage Bottles</p>
+                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
+                        </div>
+                        {event.rawMaterialName && (
+                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cap Material</p>
+                            <p className="text-sm font-black text-slate-900 truncate" title={event.rawMaterialName}>{event.rawMaterialName}</p>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {station === 'LABELING' && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
+                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Labels Used</p>
+                          <p className="text-sm font-black text-slate-900 truncate" title={event.rawMaterialName || undefined}>
+                            {formatNumber(event.bopRollUsage || event.labelUsage)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'KG'}</span>
+                          </p>
+                          {event.rawMaterialName && <p className="text-[10px] font-bold text-slate-500 truncate mt-1">{event.rawMaterialName}</p>}
+                        </div>
+                        {event.inkChanged && (
+                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ink Changed</p>
+                            <p className="text-sm font-black text-[#1A9A91]">YES</p>
+                          </div>
+                        )}
+                        {event.makeupChanged && (
+                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Makeup Changed</p>
+                            <p className="text-sm font-black text-[#1A9A91]">YES</p>
+                          </div>
+                        )}
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Label Wastage</p>
+                          <p className="text-sm font-black text-rose-600">
+                            {formatNumber(event.damagedLabelWeight || event.wastageCount)} <span className="text-[10px] text-slate-500">{event.damagedLabelWeight ? 'KG' : ''}</span>
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    {station === 'PACKING' && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Packed Bottles</p>
+                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Shrink Used</p>
+                          <p className="text-sm font-black text-slate-900">
+                            {formatNumber(event.shrinkWeightUsed)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'KG'}</span>
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cartons Used</p>
+                          <p className="text-sm font-black text-slate-900">
+                            {formatNumber(event.secondaryPackagingCount)} <span className="text-[10px] text-slate-500">BOX</span>
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    {!['BLOWING', 'FILLING', 'LABELING', 'PACKING'].includes(station) && (
+                      <>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output</p>
+                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
+                        </div>
+                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Wastage</p>
+                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

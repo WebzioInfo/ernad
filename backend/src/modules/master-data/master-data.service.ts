@@ -32,7 +32,7 @@ export class MasterDataService {
     .from(productionLines)
     .leftJoin(productionBatches, and(
       eq(productionLines.id, productionBatches.lineId),
-      inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
+      sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
     ))
     .leftJoin(products, eq(productionBatches.productId, products.id))
     .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id));
@@ -62,7 +62,7 @@ export class MasterDataService {
     .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
     .where(and(
       eq(productionBatches.lineId, id),
-      inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
+      sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
     ))
     .limit(1);
 

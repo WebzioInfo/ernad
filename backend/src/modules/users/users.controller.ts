@@ -80,9 +80,9 @@ export class UsersController {
   @Post()
   @Permissions('users:manage')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new operator (Admin only)' })
+  @ApiOperation({ summary: 'Create a new operator (Admin/Manager)' })
   createOperator(@Req() req: any, @Body() dto: CreateUserDto) {
-    return this.usersService.createOperator(req.user.roles || [], dto);
+    return this.usersService.createOperator(req.user.id, req.user.roles || [], dto);
   }
 
   /**

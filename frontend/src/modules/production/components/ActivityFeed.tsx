@@ -18,9 +18,7 @@ interface LogEntry {
   damagedLabelWeight?: string | number;
   bopRollUsage?: string | number;
   inkChanged?: boolean;
-  inkUsageMl?: string | number;
   makeupChanged?: boolean;
-  makeupUsageMl?: string | number;
   shrinkWasteWeight?: string | number;
   sourceBatchNumber?: string;
   rawMaterialId?: string;
@@ -238,10 +236,10 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
                             <span className="text-[#1A9A91] font-black">{log.preformUsage}</span>
                           </div>
                         )}
-                        {log.capBoxUsage !== undefined && Number(log.capBoxUsage) > 0 && (
+                        {log.capBoxUsage !== undefined && log.station === 'FILLING' && (
                           <div className="flex justify-between">
                             <span>Cap Boxes:</span>
-                            <span className="text-[#1A9A91] font-black">{log.capBoxUsage}</span>
+                            <span className="text-[#1A9A91] font-black">{log.capBoxUsage} BOX</span>
                           </div>
                         )}
                         {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (

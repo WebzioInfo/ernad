@@ -256,19 +256,9 @@ export class TelemetryDto {
   inkChanged?: boolean;
 
   @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  inkUsageMl?: number;
-
-  @ApiProperty()
   @IsBoolean()
   @IsOptional()
   makeupChanged?: boolean;
-
-  @ApiProperty()
-  @IsNumber()
-  @IsOptional()
-  makeupUsageMl?: number;
 
   @ApiProperty()
   @IsNumber()

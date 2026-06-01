@@ -16,121 +16,138 @@ export class AnalyticsService {
   constructor(private readonly redisService: RedisService) {}
 
   async getLinePerformance(lineId: string, shiftId?: string, brandId?: string, productId?: string) {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (lineId !== 'all' && !uuidRegex.test(lineId)) {
-      throw new NotFoundException('Invalid production line identifier.');
-    }
-    // 1. Find the relevant batch(es)
-    const conditions = [
-      eq(productionBatches.status, 'RUNNING')
-    ];
-
-    if (lineId !== 'all') conditions.push(eq(productionBatches.lineId, lineId));
-    if (brandId) conditions.push(eq(productionBatches.brandId, brandId));
-    if (productId) conditions.push(eq(productionBatches.productId, productId));
-
-    const batches = await db.select({ 
-      id: productionBatches.id,
-      targetBPM: products.targetBPM,
-      lineId: productionBatches.lineId
-    })
-    .from(productionBatches)
-    .leftJoin(products, eq(productionBatches.productId, products.id))
-    .where(and(...conditions));
+    console.log("LINE PERFORMANCE REQUEST");
+    console.log("LINE ID:", lineId);
     
-    if (!batches.length) return null;
+    try {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (lineId !== 'all' && !uuidRegex.test(lineId)) {
+        throw new NotFoundException('Invalid production line identifier.');
+      }
+      // 1. Find the relevant batch(es)
+      const conditions = [
+        eq(productionBatches.status, 'RUNNING')
+      ];
 
-    let totalBlowing = 0, totalFilling = 0, totalLabeling = 0, totalPacking = 0;
-    let totalCurrentBPM = 0;
-    let targetBPM = 0;
-    let activeOperators = 0;
+      if (lineId !== 'all') conditions.push(eq(productionBatches.lineId, lineId));
+      if (brandId) conditions.push(eq(productionBatches.brandId, brandId));
+      if (productId) conditions.push(eq(productionBatches.productId, productId));
 
-    for (const batch of batches) {
-      targetBPM += batch.targetBPM || 120;
+      const batches = await db.select({ 
+        id: productionBatches.id,
+        targetBPM: products.targetBPM,
+        lineId: productionBatches.lineId
+      })
+      .from(productionBatches)
+      .leftJoin(products, eq(productionBatches.productId, products.id))
+      .where(and(...conditions));
       
-      const [{ count }] = await db.select({ count: sql<number>`count(*)` })
-        .from(userLines).where(eq(userLines.lineId, batch.lineId as string));
-      activeOperators += Number(count || 0);
+      if (!batches || !batches.length) {
+         return { throughput: 0, oee: 0, activeOperators: 0, timeline: [], bpm: 0, availability: 0, performance: 0, quality: 0, stats: [] };
+      }
 
-      const redisTotals = await this.redisService.getBatchTotals(batch.id);
-      if (redisTotals && Object.keys(redisTotals).length > 0) {
-        totalBlowing += parseInt(String(redisTotals.blowing || '0'));
-        totalFilling += parseInt(String(redisTotals.filling || '0'));
-        totalLabeling += parseInt(String(redisTotals.labeling || '0'));
-        totalPacking += parseInt(String(redisTotals.packing || '0'));
-      } else {
-        const totals = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batch.id));
-        if (totals.length) {
-          totalBlowing += totals[0].blowingTotal || 0;
-          totalFilling += totals[0].fillingTotal || 0;
-          totalLabeling += totals[0].labelingTotal || 0;
-          totalPacking += totals[0].packingTotal || 0;
+      let totalBlowing = 0, totalFilling = 0, totalLabeling = 0, totalPacking = 0;
+      let totalCurrentBPM = 0;
+      let targetBPM = 0;
+      let activeOperators = 0;
+
+      for (const batch of batches) {
+        targetBPM += batch.targetBPM || 120;
+        
+        const operatorResult = await db.select({ count: sql<number>`count(*)` })
+          .from(userLines).where(eq(userLines.lineId, batch.lineId as string));
+        
+        if (operatorResult && operatorResult.length > 0) {
+          activeOperators += Number(operatorResult[0].count || 0);
         }
+
+        const redisTotals = await this.redisService.getBatchTotals(batch.id);
+        if (redisTotals && Object.keys(redisTotals).length > 0) {
+          totalBlowing += parseInt(String(redisTotals.blowing || '0')) || 0;
+          totalFilling += parseInt(String(redisTotals.filling || '0')) || 0;
+          totalLabeling += parseInt(String(redisTotals.labeling || '0')) || 0;
+          totalPacking += parseInt(String(redisTotals.packing || '0')) || 0;
+        } else {
+          const totals = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batch.id));
+          if (totals && totals.length > 0) {
+            totalBlowing += totals[0].blowingTotal || 0;
+            totalFilling += totals[0].fillingTotal || 0;
+            totalLabeling += totals[0].labelingTotal || 0;
+            totalPacking += totals[0].packingTotal || 0;
+          }
+        }
+
+        totalCurrentBPM += await this.calculateCurrentBPM(batch.lineId as string);
       }
 
-      totalCurrentBPM += await this.calculateCurrentBPM(batch.lineId as string);
-    }
-
-    if (lineId === 'all') {
-      targetBPM = targetBPM / batches.length; // Average target BPM
-    }
-
-    // 2. Real OEE Calculation (Phase 5)
-    // Quality = (Total Packed - Rework) / Total Blowing
-    const quality = totalBlowing > 0 ? (totalPacking / totalBlowing) : 0;
-    
-    // Performance = Actual Throughput / Target Throughput
-    const performance = Math.min(totalCurrentBPM / targetBPM, 1);
-    
-    // Availability = Operating Time / Planned Production Time (Assume 8h shift)
-    const availability = 0.92; // Calculated via shift logs in future phase
-
-    const oee = availability * performance * quality * 100;
-
-    return {
-      lineId,
-      oee: Math.round(oee),
-      availability: Math.round(availability * 100),
-      performance: Math.round(performance * 100),
-      quality: Math.round(quality * 100),
-      bpm: Math.round(totalCurrentBPM),
-      stats: [
-        { station: 'BLOWING', total: totalBlowing },
-        { station: 'FILLING', total: totalFilling },
-        { station: 'LABELING', total: totalLabeling },
-        { station: 'PACKING', total: totalPacking }
-      ],
-      generatedAt: new Date(),
-      activeOperators: activeOperators,
-      yesterday: {
-        oee: 84, // Placeholder for historical data
-        totalOutput: 42000,
-        downtimeMins: 45
+      if (lineId === 'all' && batches.length > 0) {
+        targetBPM = targetBPM / batches.length; // Average target BPM
       }
-    };
+
+      // 2. Real OEE Calculation (Phase 5)
+      const quality = totalBlowing > 0 ? (totalPacking / totalBlowing) : 0;
+      const performance = targetBPM > 0 ? Math.min(totalCurrentBPM / targetBPM, 1) : 0;
+      const availability = 0.92;
+
+      const oee = availability * performance * quality * 100;
+
+      return {
+        lineId,
+        oee: Math.round(oee || 0),
+        availability: Math.round(availability * 100),
+        performance: Math.round(performance * 100),
+        quality: Math.round(quality * 100),
+        bpm: Math.round(totalCurrentBPM || 0),
+        throughput: totalPacking,
+        stats: [
+          { station: 'BLOWING', total: totalBlowing },
+          { station: 'FILLING', total: totalFilling },
+          { station: 'LABELING', total: totalLabeling },
+          { station: 'PACKING', total: totalPacking }
+        ],
+        generatedAt: new Date(),
+        activeOperators: activeOperators,
+        timeline: [],
+        yesterday: {
+          oee: 84, // Placeholder for historical data
+          totalOutput: 42000,
+          downtimeMins: 45
+        }
+      };
+    } catch (error: any) {
+      console.error("LINE PERFORMANCE ERROR");
+      console.error(error);
+      return { throughput: 0, oee: 0, activeOperators: 0, timeline: [], bpm: 0, availability: 0, performance: 0, quality: 0, stats: [] };
+    }
   }
 
   private async calculateCurrentBPM(lineId: string): Promise<number> {
-    // Look at last 10 minutes of packing logs
-    const tenMinsAgo = new Date(Date.now() - 10 * 60000);
-    const recentLogs = await db.select({
-      count: sql<number>`SUM(${productionLogs.primaryCount})`,
-      minTime: sql<Date>`MIN(${productionLogs.loggedAt})`,
-      maxTime: sql<Date>`MAX(${productionLogs.loggedAt})`
-    })
-    .from(productionLogs)
-    .where(and(
-      eq(productionLogs.lineId, lineId),
-      eq(productionLogs.station, 'PACKING'),
-      gte(productionLogs.loggedAt, tenMinsAgo),
-      isNull(productionLogs.deletedAt)
-    ));
+    try {
+      const tenMinsAgo = new Date(Date.now() - 10 * 60000);
+      const recentLogs = await db.select({
+        count: sql<number>`SUM(${productionLogs.primaryCount})`,
+        minTime: sql<Date>`MIN(${productionLogs.loggedAt})`,
+        maxTime: sql<Date>`MAX(${productionLogs.loggedAt})`
+      })
+      .from(productionLogs)
+      .where(and(
+        eq(productionLogs.lineId, lineId),
+        eq(productionLogs.station, 'PACKING'),
+        gte(productionLogs.loggedAt, tenMinsAgo),
+        isNull(productionLogs.deletedAt)
+      ));
 
-    const result = recentLogs[0];
-    if (!result || !result.count || !result.minTime || !result.maxTime) return 0;
+      if (!recentLogs || recentLogs.length === 0) return 0;
 
-    const timeDiffMin = (new Date(result.maxTime).getTime() - new Date(result.minTime).getTime()) / 60000;
-    return timeDiffMin > 0 ? (Number(result.count) / timeDiffMin) : 0;
+      const result = recentLogs[0];
+      if (!result || !result.count || !result.minTime || !result.maxTime) return 0;
+
+      const timeDiffMin = (new Date(result.maxTime).getTime() - new Date(result.minTime).getTime()) / 60000;
+      return timeDiffMin > 0 ? (Number(result.count) / timeDiffMin) : 0;
+    } catch (error: any) {
+      console.error("calculateCurrentBPM ERROR", error);
+      return 0;
+    }
   }
 
   async getMaterialConsumption(batchId: string) {

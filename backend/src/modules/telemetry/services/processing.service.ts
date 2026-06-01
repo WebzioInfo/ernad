@@ -194,9 +194,7 @@ export class ProcessingService {
         labelStickerWeight: dto.labelStickerWeight ? String(dto.labelStickerWeight) : null,
         damagedLabelWeight: dto.damagedLabelWeight ? String(dto.damagedLabelWeight) : null,
         inkChanged: dto.inkChanged || false,
-        inkUsageMl: dto.inkUsageMl ? String(dto.inkUsageMl) : null,
         makeupChanged: dto.makeupChanged || false,
-        makeupUsageMl: dto.makeupUsageMl ? String(dto.makeupUsageMl) : null,
 
         // New Packing Station Fields
         shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
@@ -222,7 +220,7 @@ export class ProcessingService {
           action: 'CONSUMABLES_CHANGED',
           entityType: 'production_logs',
           entityId: String(log.id),
-          payload: { inkChanged: dto.inkChanged, inkUsageMl: dto.inkUsageMl, makeupChanged: dto.makeupChanged, makeupUsageMl: dto.makeupUsageMl },
+          payload: { inkChanged: dto.inkChanged, makeupChanged: dto.makeupChanged },
           category: 'TELEMETRY'
         });
       }
@@ -351,6 +349,22 @@ export class ProcessingService {
         directDeductions.push({ materialId: resolvedMaterialId, qty: dto.labelsUsed, remarks: `Labels used in Labeling Station (Log #${logId})` });
       } else {
         this.logger.warn(`[LABELING RESOLUTION] Could not resolve label material for payload. Ignoring deduction.`);
+      }
+    }
+
+    // 5. Labeling (Ink)
+    if (dto.station === 'LABELING' && dto.inkChanged) {
+      const inkMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Ink')).limit(1);
+      if (inkMat.length > 0) {
+        directDeductions.push({ materialId: inkMat[0].id, qty: 1, remarks: `Ink changed in Labeling Station (Log #${logId})` });
+      }
+    }
+
+    // 6. Labeling (Makeup)
+    if (dto.station === 'LABELING' && dto.makeupChanged) {
+      const makeupMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Makeup')).limit(1);
+      if (makeupMat.length > 0) {
+        directDeductions.push({ materialId: makeupMat[0].id, qty: 1, remarks: `Makeup changed in Labeling Station (Log #${logId})` });
       }
     }
 
@@ -633,9 +647,7 @@ export class ProcessingService {
       labelStickerWeight: productionLogs.labelStickerWeight,
       damagedLabelWeight: productionLogs.damagedLabelWeight,
       inkChanged: productionLogs.inkChanged,
-      inkUsageMl: productionLogs.inkUsageMl,
       makeupChanged: productionLogs.makeupChanged,
-      makeupUsageMl: productionLogs.makeupUsageMl,
       
       // Packing specific
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
@@ -644,6 +656,7 @@ export class ProcessingService {
       // Blowing / Material Consumption
       rawMaterialId: productionLogs.rawMaterialId,
       rawMaterialName: rawMaterials.name,
+      rawMaterialUnit: rawMaterials.unit,
       bagsUsed: productionLogs.bagsUsed,
       preformUsage: productionLogs.preformUsage,
       capUsage: productionLogs.capUsage,
@@ -771,15 +784,14 @@ export class ProcessingService {
         labelStickerWeight: l.labelStickerWeight,
         damagedLabelWeight: l.damagedLabelWeight,
         inkChanged: l.inkChanged,
-        inkUsageMl: l.inkUsageMl,
         makeupChanged: l.makeupChanged,
-        makeupUsageMl: l.makeupUsageMl,
         // Packing specific
         shrinkWasteWeight: l.shrinkWasteWeight,
         sourceBatchNumber: l.sourceBatchNumber,
         // Blowing / Material Consumption
         rawMaterialId: l.rawMaterialId,
         rawMaterialName: l.rawMaterialName,
+        rawMaterialUnit: l.rawMaterialUnit,
         bagsUsed: l.bagsUsed,
         preformUsage: l.preformUsage,
         capUsage: l.capUsage,

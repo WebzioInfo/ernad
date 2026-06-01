@@ -91,7 +91,8 @@ export class RolesGuard implements CanActivate {
             'notifications:view',
             'incidents:view',
             'incidents:create',
-            'incidents:update'
+            'incidents:update',
+            'users:manage'
           ];
           if (managerPermissions.includes(p)) {
             return true;

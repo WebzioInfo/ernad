@@ -309,7 +309,7 @@ export class UsersService {
    * Create a new staff member with a bcrypt-hashed PIN.
    * Admins can assign all supported roles; managers can create operators.
    */
-  async createOperator(actorRoles: string[], dto: any) {
+  async createOperator(callerId: string, actorRoles: string[], dto: any) {
     if (!dto.name || !dto.username || !dto.pin) {
       throw new BadRequestException('name, username, and pin are required');
     }
@@ -400,6 +400,15 @@ export class UsersService {
       }
 
       return this.getOperatorWithContext(created.id, tx);
+    });
+
+    await db.insert(auditLogs).values({
+      actorId: callerId,
+      action: 'CREATE_OPERATOR',
+      entityType: 'USER',
+      entityId: createdUser?.id,
+      category: 'GENERAL',
+      occurredAt: new Date(),
     });
 
     await this.eventsService.emitDataChanged('users', { action: 'created', id: createdUser?.id });

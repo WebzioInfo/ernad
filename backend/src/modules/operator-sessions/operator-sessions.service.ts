@@ -156,7 +156,7 @@ export class OperatorSessionsService {
       const [activeBatch] = await tx.select().from(productionBatches)
         .where(and(
           eq(productionBatches.lineId, lineId),
-          or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER'))
+          sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
         ))
         .orderBy(desc(productionBatches.startTime))
         .limit(1);
@@ -484,7 +484,7 @@ export class OperatorSessionsService {
         const [activeBatch] = await tx.select({ id: productionBatches.id }).from(productionBatches)
           .where(and(
             eq(productionBatches.lineId, outgoingSession.lineId),
-            or(eq(productionBatches.status, 'RUNNING'), eq(productionBatches.status, 'CHANGEOVER'))
+            sql`${productionBatches.status} IN ('RUNNING', 'CHANGEOVER')`
           ))
           .orderBy(desc(productionBatches.startTime))
           .limit(1);

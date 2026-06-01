@@ -1,5 +1,7 @@
 import { IsString, IsOptional, IsNumber, IsEnum, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { MaterialUnit, MaterialType } from '../../../common/enums/material.enum';
 
 export class CreateLineDto {
   @ApiProperty({ example: 'Line 1' })
@@ -49,11 +51,22 @@ export class CreateRawMaterialDto {
   name: string;
 
   @ApiProperty()
-  @IsEnum(['PREFORM', 'CAP', 'LABEL', 'SHRINK', 'OTHER'])
+  @IsEnum(MaterialType, { message: `materialType must be a valid MaterialType (${Object.values(MaterialType).join(', ')})` })
   materialType: string;
 
   @ApiProperty()
-  @IsEnum(['BAG', 'BOX', 'PIECE', 'ROLL', 'KG'])
+  @Transform(({ value }) => {
+    if (!value) return value;
+    const v = String(value).toUpperCase();
+    if (v.includes('PCS') || v.includes('PIECE')) return MaterialUnit.PCS;
+    if (v.includes('KG') || v.includes('KILOGRAM')) return MaterialUnit.KG;
+    if (v.includes('BAG')) return MaterialUnit.BAG;
+    if (v.includes('LTR') || v.includes('LITER')) return MaterialUnit.LTR;
+    if (v.includes('BOX')) return MaterialUnit.BOX;
+    if (v.includes('ROLL')) return MaterialUnit.ROLL;
+    return value;
+  })
+  @IsEnum(MaterialUnit, { message: `unit must be a valid MaterialUnit (${Object.values(MaterialUnit).join(', ')})` })
   unit: string;
 }
 
@@ -119,12 +132,23 @@ export class UpdateRawMaterialDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(['PREFORM', 'CAP', 'LABEL', 'SHRINK', 'OTHER'])
+  @IsEnum(MaterialType, { message: `materialType must be a valid MaterialType (${Object.values(MaterialType).join(', ')})` })
   materialType?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsEnum(['BAG', 'BOX', 'PIECE', 'ROLL', 'KG'])
+  @Transform(({ value }) => {
+    if (!value) return value;
+    const v = String(value).toUpperCase();
+    if (v.includes('PCS') || v.includes('PIECE')) return MaterialUnit.PCS;
+    if (v.includes('KG') || v.includes('KILOGRAM')) return MaterialUnit.KG;
+    if (v.includes('BAG')) return MaterialUnit.BAG;
+    if (v.includes('LTR') || v.includes('LITER')) return MaterialUnit.LTR;
+    if (v.includes('BOX')) return MaterialUnit.BOX;
+    if (v.includes('ROLL')) return MaterialUnit.ROLL;
+    return value;
+  })
+  @IsEnum(MaterialUnit, { message: `unit must be a valid MaterialUnit (${Object.values(MaterialUnit).join(', ')})` })
   unit?: string;
 
   @ApiPropertyOptional()

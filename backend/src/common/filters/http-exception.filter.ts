@@ -70,7 +70,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       success: false,
       message,
       errorCode,
-      ...(process.env.NODE_ENV !== 'production' && { technical: exception.message }),
+      ...(process.env.NODE_ENV !== 'production' && { 
+        technical: exception.message,
+        actualError: exception.message,
+        stack: exception.stack
+      }),
       timestamp: logData.timestamp,
       path: request.url,
     });
