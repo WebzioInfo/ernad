@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { useRawMaterials, useStationConsumption, useRawMaterialLedger, QK } from '../../hooks/useApi';
 import { MaterialUnit, MaterialType } from '../../types/enums';
+import { useTransactionOverlay } from '../../components/TransactionOverlay';
 
 export default function RawMaterialsPage() {
   const { user } = useAuthStore();
@@ -29,6 +30,7 @@ export default function RawMaterialsPage() {
   const [materialToDelete, setMaterialToDelete] = useState<any>(null);
 
   const queryClient = useQueryClient();
+  const overlay = useTransactionOverlay();
 
 
   // Fetch Preforms and Caps raw materials
@@ -44,81 +46,104 @@ export default function RawMaterialsPage() {
   const { data: ledger, isLoading: isLedgerLoading, refetch: refetchLedger } = useRawMaterialLedger(currentMaterial?.id);
 
   const createMaterialMutation = useMutation({
-    mutationFn: (data: { name: string; materialType: string; unit: string }) => api.post('/master-data/raw-materials', data),
-    onSuccess: () => {
+    mutationFn: (data: { name: string; materialType: string; unit: string }) => {
+      overlay.startProcessing('Creating Material...');
+      return api.post('/master-data/raw-materials', data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
-      toast.success('Raw material created successfully');
+      await overlay.showSuccess('Material Created');
       setIsCreateMaterialModalOpen(false);
     },
     onError: (err: any) => {
+      overlay.showError('Create Failed');
       toast.error(err.response?.data?.message || 'Failed to create raw material');
     }
   });
 
   const updateMaterialMutation = useMutation({
-    mutationFn: (data: { id: string; payload: any }) => api.patch(ENDPOINTS.MASTER_DATA.UPDATE_RAW_MATERIAL(data.id), data.payload),
-    onSuccess: () => {
+    mutationFn: (data: { id: string; payload: any }) => {
+      overlay.startProcessing('Updating Material...');
+      return api.patch(ENDPOINTS.MASTER_DATA.UPDATE_RAW_MATERIAL(data.id), data.payload);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
-      toast.success('Raw material updated successfully');
+      await overlay.showSuccess('Material Updated');
       setIsEditMaterialModalOpen(false);
       setMaterialToEdit(null);
     },
     onError: (err: any) => {
+      overlay.showError('Update Failed');
       toast.error(err.response?.data?.message || 'Failed to update raw material');
     }
   });
 
   const addStockMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.ADD_STOCK, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Recording Stock...');
+      return api.post(ENDPOINTS.INVENTORY.ADD_STOCK, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
       if (currentMaterial?.id) queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIAL_LEDGER(currentMaterial.id) });
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
-      toast.success('Stock added successfully');
+      await overlay.showSuccess('Stock Added');
       setIsAddModalOpen(false);
     },
     onError: (err: any) => {
+      overlay.showError('Save Failed');
       toast.error(err.response?.data?.message || 'Failed to add stock');
     }
   });
 
   const updateStockMutation = useMutation({
-    mutationFn: (data: any) => api.put(ENDPOINTS.INVENTORY.UPDATE_STOCK, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Updating Record...');
+      return api.put(ENDPOINTS.INVENTORY.UPDATE_STOCK, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
       if (currentMaterial?.id) queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIAL_LEDGER(currentMaterial.id) });
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
-      toast.success('Stock transaction updated successfully');
+      await overlay.showSuccess('Record Updated');
       setEditingTransaction(null);
     },
     onError: (err: any) => {
+      overlay.showError('Update Failed');
       toast.error(err.response?.data?.message || 'Failed to update transaction');
     }
   });
 
   const deleteStockMutation = useMutation({
-    mutationFn: (transactionId: string) => 
-      api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } }),
-    onSuccess: () => {
+    mutationFn: (transactionId: string) => {
+      overlay.startProcessing('Deleting Record...');
+      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } });
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
       if (currentMaterial?.id) queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIAL_LEDGER(currentMaterial.id) });
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
-      toast.success('Stock transaction deleted successfully');
+      await overlay.showSuccess('Record Deleted');
       setTransactionToDelete(null);
     },
     onError: (err: any) => {
+      overlay.showError('Delete Failed');
       toast.error(err.response?.data?.message || 'Failed to delete transaction');
     }
   });
 
   const deleteMaterialMutation = useMutation({
-    mutationFn: (id: string) => api.delete(ENDPOINTS.MASTER_DATA.DELETE_RAW_MATERIAL(id)),
-    onSuccess: () => {
+    mutationFn: (id: string) => {
+      overlay.startProcessing('Deleting Material...');
+      return api.delete(ENDPOINTS.MASTER_DATA.DELETE_RAW_MATERIAL(id));
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
-      toast.success('Raw material deleted successfully');
+      await overlay.showSuccess('Material Deleted');
       setMaterialToDelete(null);
     },
     onError: (err: any) => {
+      overlay.showError('Delete Failed');
       toast.error(err.response?.data?.message || 'Failed to delete material');
     }
   });

@@ -60,6 +60,7 @@ export const getCorsConfig = (env: string = process.env.NODE_ENV || 'development
       'x-onesignal-app-id',
       'x-onesignal-user-id',
       'x-onesignal-agent',
+      'x-idempotency-key',
     ],
     exposedHeaders: ['Content-Range', 'X-Content-Range', 'x-mes-request-id', 'Content-Disposition'],
     preflightContinue: false,

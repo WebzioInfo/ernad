@@ -73,6 +73,11 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const requestId = uuidv4();
   config.headers['x-mes-request-id'] = requestId;
 
+  // Global Idempotency Key for Mutation Requests
+  if (config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
+    config.headers['X-Idempotency-Key'] = uuidv4();
+  }
+
   // Add Vercel Protection Skip if available in storage (Optional hardening)
   const protectionSkip = localStorage.getItem('vercel-protection-skip');
   if (protectionSkip) {

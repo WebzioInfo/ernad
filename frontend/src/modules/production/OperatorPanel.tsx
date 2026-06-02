@@ -22,6 +22,7 @@ import { ENDPOINTS } from '../../constants/endpoints';
 import { OperatorHeader } from './components/OperatorHeader';
 import { StationWorkspace } from './components/StationWorkspace';
 import { ActivityFeed } from './components/ActivityFeed';
+import { useTransactionOverlay } from '../../components/TransactionOverlay';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Button } from "../../components/ui/button";
 import { Wind, PackageOpen, Zap, Box } from 'lucide-react';
@@ -42,6 +43,7 @@ export default function OperatorPanel() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user, logout: authLogout } = useAuthStore();
+  const overlay = useTransactionOverlay();
 
   // Initialize line-specific WebSocket connections
   useWebSocket(lineId);
@@ -247,72 +249,80 @@ export default function OperatorPanel() {
       batchCode?: string;
       remarks?: string;
       startTime: string;
-    }) => api.post(ENDPOINTS.PRODUCTION.START_BATCH, {
-      lineId: lineId!,
-      ...payload
-    }),
-    onSuccess: () => {
+    }) => {
+      overlay.startProcessing('Starting Production Batch...');
+      return api.post(ENDPOINTS.PRODUCTION.START_BATCH, {
+        lineId: lineId!,
+        ...payload
+      });
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
-      toast.success('Production batch started successfully');
+      await overlay.showSuccess('Batch Started');
+      setShowLineControl(false);
     },
     onError: (err: any) => {
+      overlay.showError('Start Failed');
       toast.error(err.response?.data?.message || 'Failed to start production batch');
     }
   });
 
   const stopBatchMutation = useMutation({
     mutationFn: (payload: { remarks?: string; endTime?: string }) => {
-      if (!activeBatch?.batch?.id) {
-        throw new Error('No active batch found to close');
-      }
+      if (!activeBatch?.batch?.id) throw new Error('No active batch found to close');
+      overlay.startProcessing('Closing Production Batch...');
       return api.patch(ENDPOINTS.PRODUCTION.CLOSE_BATCH(activeBatch.batch.id), {
         remarks: payload.remarks,
         endTime: payload.endTime ? new Date(payload.endTime).toISOString() : undefined,
         materialReturn: undefined
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
       queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
-      toast.success('Production batch closed successfully');
+      await overlay.showSuccess('Batch Closed');
+      setShowLineControl(false);
     },
     onError: (err: any) => {
+      overlay.showError('Close Failed');
       toast.error(err.response?.data?.message || 'Failed to close production batch');
     }
   });
 
   const initiateChangeoverMutation = useMutation({
     mutationFn: (payload: { productId: string; startTime: string; reason?: string; notes?: string }) => {
-      if (!activeBatch?.batch?.id) {
-        throw new Error('No active batch found for changeover');
-      }
+      if (!activeBatch?.batch?.id) throw new Error('No active batch found for changeover');
+      overlay.startProcessing('Initiating Changeover...');
       return api.post(ENDPOINTS.PRODUCTION.LINE_CHANGEOVER(lineId!), {
         productId: payload.productId,
         batchId: activeBatch.batch.id,
         startTime: new Date(payload.startTime).toISOString()
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
-      toast.success('Changeover initiated successfully');
+      await overlay.showSuccess('Changeover Initiated');
+      setShowLineControl(false);
     },
     onError: (err: any) => {
+      overlay.showError('Changeover Failed');
       toast.error(err.response?.data?.message || 'Failed to initiate changeover');
     }
   });
 
   const completeChangeoverMutation = useMutation({
     mutationFn: () => {
-      if (!activeBatch?.batch?.id) {
-        throw new Error('No active batch found to complete changeover');
-      }
+      if (!activeBatch?.batch?.id) throw new Error('No active batch found to complete changeover');
+      overlay.startProcessing('Completing Changeover...');
       return api.post(ENDPOINTS.PRODUCTION.COMPLETE_CHANGEOVER(activeBatch.batch.id));
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['active-batch', lineId] });
-      toast.success('Changeover completed. Line is now RUNNING.');
+      await overlay.showSuccess('Line is now RUNNING');
+      setShowLineControl(false);
     },
     onError: (err: any) => {
+      overlay.showError('Completion Failed');
       toast.error(err.response?.data?.message || 'Failed to complete changeover');
     }
   });
@@ -332,6 +342,7 @@ export default function OperatorPanel() {
     enabled: !!lineId && !!currentStation.id,  });
 
   const handleHandoverSubmit = async () => {
+    if (overlay.isLocked) return;
     if (!incomingOperatorId) {
       toast.error('Please select the incoming operator.');
       return;
@@ -355,6 +366,7 @@ export default function OperatorPanel() {
 
     try {
       setIsSubmittingHandover(true);
+      overlay.startProcessing('Processing Handover...');
       const response = await api.post('/operator-sessions/handover', {
         incomingOperatorId,
         incomingOperatorPin,
@@ -374,6 +386,8 @@ export default function OperatorPanel() {
       queryClient.invalidateQueries({ queryKey: ['recent-handover'] });
       refetchRecentHandover();
 
+      await overlay.showSuccess('Handover Complete');
+
       // Reset form states
       setIncomingOperatorId('');
       setIncomingOperatorPin('');
@@ -385,8 +399,9 @@ export default function OperatorPanel() {
       // Update operator state in active UI and close modal
       setActiveOperator(newUser);
       setShowHandoverModal(false);
-      toast.success(`Shift handover successful! Now logged in as ${newUser.name}`);
+      toast.success(`Now logged in as ${newUser.name}`);
     } catch (err: any) {
+      overlay.showError('Handover Failed');
       toast.error(err.response?.data?.message || 'Verification failure or handover rejected.');
     } finally {
       setIsSubmittingHandover(false);
@@ -440,6 +455,7 @@ export default function OperatorPanel() {
   }, [currentStation?.id, stationRawMaterials, activeBatch?.batch?.productName, selectedLabelRawMaterialId]);
 
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
+    if (overlay.isLocked) return;
     if (!activeBatch?.batch) return toast.error('No active batch found.');
     if (isSubmitting) return;
 
@@ -522,6 +538,7 @@ export default function OperatorPanel() {
 
     try {
       setIsSubmitting(true);
+      overlay.startProcessing('Processing Production Data...');
       const response = await api.post(ENDPOINTS.TELEMETRY.LOGS, logEntry);
       const committedLog = response.data?.log;
       const rawMaterialName = currentStation?.id === 'BLOWING'
@@ -559,9 +576,8 @@ export default function OperatorPanel() {
         return [newHistoryEntry, ...withoutDuplicate].slice(0, 50);
       });
 
-      toast.success(`${currentStation.title} Data Committed!`, {
-        description: `Logged production telemetry to the ledger.`,
-      });
+      await overlay.showSuccess('Production Recorded');
+      
       const warnings = response.data?.warnings;
       if (warnings && warnings.length > 0) {
         warnings.forEach((warning: any) => {
@@ -573,6 +589,10 @@ export default function OperatorPanel() {
       }
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
+      
+      // Auto Reset Form
+      setPrimaryCount(0);
+      setRejectionCount(0);
       setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
@@ -584,6 +604,7 @@ export default function OperatorPanel() {
       setCapWastage(0);
       setProductionWastages(false);
     } catch (err: any) {
+      overlay.showError('Save Failed');
       toast.error(err.response?.data?.message || 'Failed to transmit log. Node error.');
     } finally { setIsSubmitting(false); }
   };

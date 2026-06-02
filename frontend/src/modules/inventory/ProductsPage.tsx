@@ -12,6 +12,7 @@ import useAuthStore from '../auth/auth.store';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { StockTransactionModal } from './RawMaterialsPage';
 import { useProductionStock, useProducts, useBrands, useProductLedger, QK } from '../../hooks/useApi';
+import { useTransactionOverlay } from '../../components/TransactionOverlay';
 
 export default function ProductsPage() {
   const { user } = useAuthStore();
@@ -29,6 +30,7 @@ export default function ProductsPage() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+  const overlay = useTransactionOverlay();
 
   const { data: productionStock, isLoading, refetch } = useProductionStock();
   const { data: products = [] } = useProducts();
@@ -39,42 +41,53 @@ export default function ProductsPage() {
   const { data: ledger, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
 
   const addStockMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.ADD_STOCK, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Adding Stock...');
+      return api.post(ENDPOINTS.INVENTORY.ADD_STOCK, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
       if (currentProduct?.productId) queryClient.invalidateQueries({ queryKey: QK.PRODUCT_LEDGER(currentProduct.productId) });
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });
-      toast.success('Stock added successfully');
+      await overlay.showSuccess('Stock Added');
       setIsAddModalOpen(false);
     },
     onError: (err: any) => {
+      overlay.showError('Save Failed');
       toast.error(err.response?.data?.message || 'Failed to add stock');
     }
   });
 
   const updateStockMutation = useMutation({
-    mutationFn: (data: any) => api.put(ENDPOINTS.INVENTORY.UPDATE_STOCK, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Updating Record...');
+      return api.put(ENDPOINTS.INVENTORY.UPDATE_STOCK, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
       if (currentProduct?.productId) queryClient.invalidateQueries({ queryKey: QK.PRODUCT_LEDGER(currentProduct.productId) });
-      toast.success('Stock transaction updated successfully');
+      await overlay.showSuccess('Record Updated');
       setEditingTransaction(null);
     },
     onError: (err: any) => {
+      overlay.showError('Update Failed');
       toast.error(err.response?.data?.message || 'Failed to update transaction');
     }
   });
 
   const deleteStockMutation = useMutation({
-    mutationFn: (transactionId: string) => 
-      api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } }),
-    onSuccess: () => {
+    mutationFn: (transactionId: string) => {
+      overlay.startProcessing('Deleting Record...');
+      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } });
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
       if (currentProduct?.productId) queryClient.invalidateQueries({ queryKey: QK.PRODUCT_LEDGER(currentProduct.productId) });
-      toast.success('Stock transaction deleted successfully');
+      await overlay.showSuccess('Record Deleted');
       setTransactionToDelete(null);
     },
     onError: (err: any) => {
+      overlay.showError('Delete Failed');
       toast.error(err.response?.data?.message || 'Failed to delete transaction');
     }
   });
@@ -82,31 +95,37 @@ export default function ProductsPage() {
   const saveProductMutation = useMutation({
     mutationFn: (data: any) => {
       const { id, ...payload } = data;
+      overlay.startProcessing(id ? 'Updating Product...' : 'Adding Product...');
       return id
         ? api.patch(`${ENDPOINTS.MASTER_DATA.PRODUCTS}/${id}`, payload)
         : api.post(ENDPOINTS.MASTER_DATA.PRODUCTS, payload);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTS });
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
-      toast.success(editingProduct ? 'Product updated successfully' : 'Product added successfully');
+      await overlay.showSuccess(editingProduct ? 'Product Updated' : 'Product Added');
       setEditingProduct(null);
       setIsProductModalOpen(false);
     },
     onError: (err: any) => {
+      overlay.showError('Save Failed');
       toast.error(err.response?.data?.message || 'Failed to save product');
     }
   });
 
   const deleteProductMutation = useMutation({
-    mutationFn: (productId: string) => api.delete(`${ENDPOINTS.MASTER_DATA.PRODUCTS}/${productId}`),
-    onSuccess: () => {
+    mutationFn: (productId: string) => {
+      overlay.startProcessing('Deleting Product...');
+      return api.delete(`${ENDPOINTS.MASTER_DATA.PRODUCTS}/${productId}`);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTS });
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
-      toast.success('Product deleted successfully');
+      await overlay.showSuccess('Product Deleted');
       setProductToDelete(null);
     },
     onError: (err: any) => {
+      overlay.showError('Delete Failed');
       toast.error(err.response?.data?.message || 'Failed to delete product');
     }
   });

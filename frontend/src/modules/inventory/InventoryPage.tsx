@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTransactionOverlay } from '../../components/TransactionOverlay';
 
 export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,6 +25,7 @@ export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<'ledger' | 'config'>('ledger');
 
   const queryClient = useQueryClient();
+  const overlay = useTransactionOverlay();
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
@@ -40,21 +42,35 @@ export default function InventoryPage() {
   });
 
   const updateStockMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.STOCK, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Updating Ledger...');
+      return api.post(ENDPOINTS.INVENTORY.STOCK, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       if (viewingLedger) queryClient.invalidateQueries({ queryKey: ['ledger', viewingLedger.id] });
-      toast.success('Stock ledger updated successfully');
+      await overlay.showSuccess('Ledger Updated');
       setUpdatingMaterial(null);
+    },
+    onError: (err: any) => {
+      overlay.showError('Update Failed');
+      toast.error(err.response?.data?.message || 'Failed to update ledger');
     }
   });
 
   const createMaterialMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.ITEMS, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Creating Item...');
+      return api.post(ENDPOINTS.INVENTORY.ITEMS, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      toast.success('Enterprise Stock Item Created');
+      await overlay.showSuccess('Item Created');
       setIsCreateModalOpen(false);
+    },
+    onError: (err: any) => {
+      overlay.showError('Create Failed');
+      toast.error(err.response?.data?.message || 'Failed to create item');
     }
   });
 
@@ -508,19 +524,35 @@ function CreateMaterialModal({ categories, warehouses, onClose, onSubmit, isPend
 }
 
 function InventoryConfigView({ categories, warehouses, queryClient }: any) {
+  const overlay = useTransactionOverlay();
+
   const createCategoryMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.CATEGORIES, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Creating Category...');
+      return api.post(ENDPOINTS.INVENTORY.CATEGORIES, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-categories'] });
-      toast.success('Material Category Created');
+      await overlay.showSuccess('Category Created');
+    },
+    onError: (err: any) => {
+      overlay.showError('Create Failed');
+      toast.error(err.response?.data?.message || 'Failed to create category');
     }
   });
 
   const createWarehouseMutation = useMutation({
-    mutationFn: (data: any) => api.post(ENDPOINTS.INVENTORY.WAREHOUSES, data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      overlay.startProcessing('Registering Location...');
+      return api.post(ENDPOINTS.INVENTORY.WAREHOUSES, data);
+    },
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-warehouses'] });
-      toast.success('Warehouse Location Registered');
+      await overlay.showSuccess('Location Registered');
+    },
+    onError: (err: any) => {
+      overlay.showError('Registration Failed');
+      toast.error(err.response?.data?.message || 'Failed to register location');
     }
   });
 

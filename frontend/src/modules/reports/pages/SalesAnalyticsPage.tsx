@@ -14,6 +14,7 @@ import {
   useUpdateSalesTransaction,
   useDeleteSalesTransaction
 } from '../../../hooks/useApi';
+import { useTransactionOverlay } from '../../../components/TransactionOverlay';
 
 export default function SalesAnalyticsPage() {
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
@@ -40,6 +41,7 @@ export default function SalesAnalyticsPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
 
+  const overlay = useTransactionOverlay();
   const createTxMutation = useCreateSalesTransaction();
 
   if (isLedgerLoading || isBrandsLoading || isProductsLoading) {
@@ -91,11 +93,15 @@ export default function SalesAnalyticsPage() {
   const projectedStock = isDeduction ? currentStock - quantityInt : currentStock + quantityInt;
 
   const handleSave = () => {
+    if (overlay.isLocked) return;
+
     if (!selectedBrandId || !selectedProductId || !transactionType || quantityInt <= 0) {
       setErrorMsg('All fields are required and quantity must be greater than zero.');
       setTimeout(() => setErrorMsg(''), 5000);
       return;
     }
+
+    overlay.startProcessing('Saving Transaction...');
 
     createTxMutation.mutate(
       {
@@ -105,13 +111,18 @@ export default function SalesAnalyticsPage() {
         quantity: quantityInt,
       },
       {
-        onSuccess: () => {
-          setQuantity(''); // Clear quantity field for rapid successive entries
+        onSuccess: async () => {
+          await overlay.showSuccess('Saved Successfully');
+          // Clear ALL previous inputs
+          setQuantity('');
+          setSelectedBrandId('');
+          setSelectedProductId('');
+          setTransactionType('SALES_DISPATCH');
           setErrorMsg('');
         },
         onError: (err: any) => {
+          overlay.showError('Save Failed');
           setErrorMsg(err?.response?.data?.message || 'Failed to create sales transaction.');
-          setTimeout(() => setErrorMsg(''), 5000);
         }
       }
     );
