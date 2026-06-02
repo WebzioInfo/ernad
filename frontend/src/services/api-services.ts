@@ -474,3 +474,40 @@ export const ReportService = {
   getSales: (params?: Record<string, string>) =>
     api.get(ENDPOINTS.REPORTS.SALES, { params }).then(r => r.data),
 };
+
+// ─── SALES TRANSACTIONS ───────────────────────────────────────────────────────
+
+export interface CreateSalesTransactionPayload {
+  brandId: string;
+  productId: string;
+  type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
+  quantity: number;
+}
+
+export interface SalesTransaction {
+  id: string;
+  brandId: string;
+  brandName: string;
+  productId: string;
+  productName: string;
+  type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
+  quantity: number;
+  performedBy: string;
+  userName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const SalesService = {
+  getSalesTransactions: () =>
+    api.get<SalesTransaction[]>(ENDPOINTS.SALES.TRANSACTIONS).then(r => r.data),
+
+  createSalesTransaction: (payload: CreateSalesTransactionPayload) =>
+    api.post<SalesTransaction>(ENDPOINTS.SALES.TRANSACTIONS, payload).then(r => r.data),
+
+  updateSalesTransaction: (id: string, payload: CreateSalesTransactionPayload) =>
+    api.patch<SalesTransaction>(ENDPOINTS.SALES.TRANSACTION(id), payload).then(r => r.data),
+
+  deleteSalesTransaction: (id: string) =>
+    api.delete<{ success: boolean }>(ENDPOINTS.SALES.TRANSACTION(id)).then(r => r.data),
+};

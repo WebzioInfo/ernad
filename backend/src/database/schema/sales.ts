@@ -1,10 +1,11 @@
 import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum } from 'drizzle-orm/pg-core';
-import { products } from './master-data';
+import { products, productBrands } from './master-data';
 import { users } from './users';
 import { productionBatches } from './production';
 
 export const orderStatusEnum = pgEnum('order_status', ['DRAFT', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']);
 export const paymentStatusEnum = pgEnum('payment_status', ['PENDING', 'PARTIAL', 'PAID', 'REFUNDED']);
+export const salesTransactionTypeEnum = pgEnum('sales_transaction_type', ['SALES_DISPATCH', 'RETURN', 'DAMAGE']);
 
 export const customers = pgTable('customers', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -60,4 +61,21 @@ export const salesPayments = pgTable('sales_payments', {
   referenceNumber: varchar('reference_number', { length: 100 }),
   remarks: text('remarks'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const salesTransactions = pgTable('sales_transactions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  brandId: uuid('brand_id').references(() => productBrands.id, { onDelete: 'restrict' }).notNull(),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }).notNull(),
+  type: salesTransactionTypeEnum('type').notNull(),
+  quantity: integer('quantity').notNull(),
+  performedBy: uuid('performed_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_sales_transactions_brand').on(table.brandId),
+    index('idx_sales_transactions_product').on(table.productId),
+    index('idx_sales_transactions_date').on(table.createdAt),
+  ];
 });

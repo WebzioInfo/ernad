@@ -14,7 +14,8 @@ import {
   productionLogs,
   dispatchLogs,
   productionBatches,
-  users
+  users,
+  salesTransactions
 } from '../../database/schema';
 
 import { eq, sql, desc, ilike, and, isNull, gte } from 'drizzle-orm';
@@ -444,9 +445,17 @@ export class InventoryService {
       .from(productStockTransactions)
       .where(eq(productStockTransactions.productId, prod.id));
 
+      // Calculate Sales Transactions impact: RETURN is +qty, SALES_DISPATCH & DAMAGE are -qty
+      const [salesRes] = await runner.select({
+        sum: sql<string>`coalesce(sum(case when ${salesTransactions.type} = 'RETURN' then ${salesTransactions.quantity} else -${salesTransactions.quantity} end), '0')`
+      })
+      .from(salesTransactions)
+      .where(eq(salesTransactions.productId, prod.id));
+
+      const salesImpact = parseInt(salesRes.sum, 10);
       const manualAdded = parseInt(manualRes.sum, 10);
       const totalDispatched = parseInt(dispatchRes.sum, 10);
-      const availableStock = totalProduced + manualAdded - totalDispatched;
+      const availableStock = totalProduced + manualAdded - totalDispatched + salesImpact;
       
       // Upsert
       const existing = await runner.select().from(productionStock).where(eq(productionStock.productId, prod.id)).limit(1);
@@ -523,8 +532,50 @@ export class InventoryService {
       isNull(productionBatches.deletedAt)
     ));
 
+    // 4. Fetch sales transactions
+    const salesTxs = await db.select({
+      id: salesTransactions.id,
+      type: salesTransactions.type,
+      quantity: salesTransactions.quantity,
+      createdAt: salesTransactions.createdAt,
+      userName: users.name
+    })
+    .from(salesTransactions)
+    .leftJoin(users, eq(salesTransactions.performedBy, users.id))
+    .where(eq(salesTransactions.productId, productId));
+
     // Merge and format
     const ledgerEntries: any[] = [];
+
+    // Sales transactions
+    salesTxs.forEach(t => {
+      let typeLabel = '';
+      let quantityChange = 0;
+      let remarks = '';
+      
+      if (t.type === 'RETURN') {
+        typeLabel = 'RETURN';
+        quantityChange = t.quantity;
+        remarks = 'Returned Product';
+      } else if (t.type === 'SALES_DISPATCH') {
+        typeLabel = 'SALES_DISPATCH';
+        quantityChange = -t.quantity;
+        remarks = 'Sales Dispatch';
+      } else if (t.type === 'DAMAGE') {
+        typeLabel = 'DAMAGE';
+        quantityChange = -t.quantity;
+        remarks = 'Damaged Product';
+      }
+
+      ledgerEntries.push({
+        id: `sales_${t.id}`,
+        type: typeLabel,
+        quantityChange,
+        remarks,
+        createdAt: t.createdAt,
+        userName: t.userName || 'Manager'
+      });
+    });
 
     // Manual transactions
     manualTxs.forEach(t => {

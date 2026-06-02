@@ -148,6 +148,10 @@ export const ENDPOINTS = {
     ATTENDANCE: 'reports/attendance',
     BATCH_DOSSIER: (id: string) => `reports/batch/${id}`,
   },
+  SALES: {
+    TRANSACTIONS: 'sales/transactions',
+    TRANSACTION: (id: string) => `sales/transactions/${id}`,
+  },
   NOTIFICATIONS: {
     UNREAD: 'notifications/unread',
     MARK_READ: (id: string) => `notifications/${id}/read`,

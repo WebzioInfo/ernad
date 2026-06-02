@@ -18,10 +18,12 @@ import {
   BiometricService,
   NotesService,
   NotificationService,
+  SalesService,
   type StartBatchPayload,
   type CloseBatchPayload,
   type TelemetryLogPayload,
   type CreateNotePayload,
+  type CreateSalesTransactionPayload,
 } from '../services/api-services';
 
 // ─── QUERY KEY REGISTRY ───────────────────────────────────────────────────────
@@ -76,6 +78,8 @@ export const QK = {
   NOTE: (id: string) => ['note', id] as const,
   // Notifications
   NOTIFICATIONS: ['notifications-unread'] as const,
+  // Sales
+  SALES_TRANSACTIONS: ['sales-transactions'] as const,
 };
 
 // ─── PRODUCTION HOOKS ─────────────────────────────────────────────────────────
@@ -442,5 +446,48 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: (notificationId: string) => NotificationService.markRead(notificationId),
     onSuccess: () => qc.invalidateQueries({ queryKey: QK.NOTIFICATIONS }),
+  });
+}
+
+// ─── SALES HOOKS ──────────────────────────────────────────────────────────────
+
+export function useSalesTransactions() {
+  return useQuery({
+    queryKey: QK.SALES_TRANSACTIONS,
+    queryFn: () => SalesService.getSalesTransactions(),
+  });
+}
+
+export function useCreateSalesTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateSalesTransactionPayload) => SalesService.createSalesTransaction(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.SALES_TRANSACTIONS });
+      qc.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
+    },
+  });
+}
+
+export function useUpdateSalesTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: CreateSalesTransactionPayload }) =>
+      SalesService.updateSalesTransaction(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.SALES_TRANSACTIONS });
+      qc.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
+    },
+  });
+}
+
+export function useDeleteSalesTransaction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => SalesService.deleteSalesTransaction(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.SALES_TRANSACTIONS });
+      qc.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
+    },
   });
 }
