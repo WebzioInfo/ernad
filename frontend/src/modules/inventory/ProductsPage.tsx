@@ -13,6 +13,7 @@ import ConfirmationModal from '../../components/common/ConfirmationModal';
 import { StockTransactionModal } from './RawMaterialsPage';
 import { useProductionStock, useProducts, useBrands, useProductLedger, QK } from '../../hooks/useApi';
 import { useTransactionOverlay } from '../../components/TransactionOverlay';
+import { useMemo } from 'react';
 
 export default function ProductsPage() {
   const { user } = useAuthStore();
@@ -136,21 +137,48 @@ export default function ProductsPage() {
     toast.success('Finished Goods stock updated.');
   };
 
-  const filteredStock = productionStock?.filter((p: any) => 
-    (p.productName || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  const productById = new Map<string, any>(products.map((product: any) => [product.id, product]));
+  const filteredStock = useMemo(() => {
+    return productionStock?.filter((p: any) => 
+      (p.productName || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [productionStock, searchQuery]);
+
+  const productById = useMemo(() => {
+    return new Map<string, any>(products.map((product: any) => [product.id, product]));
+  }, [products]);
 
   // Calculate totals for dashboard summary cards
-  const totalAvailableStock = productionStock?.reduce((acc: number, cur: any) => acc + cur.currentStock, 0) || 0;
-  const totalProducedAllTime = productionStock?.reduce((acc: number, cur: any) => acc + cur.totalProduced, 0) || 0;
-  const totalDispatchedAllTime = productionStock?.reduce((acc: number, cur: any) => acc + cur.totalDispatched, 0) || 0;
+  const { totalAvailableStock, totalProducedAllTime, totalDispatchedAllTime } = useMemo(() => {
+    return {
+      totalAvailableStock: productionStock?.reduce((acc: number, cur: any) => acc + cur.currentStock, 0) || 0,
+      totalProducedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + cur.totalProduced, 0) || 0,
+      totalDispatchedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + cur.totalDispatched, 0) || 0
+    };
+  }, [productionStock]);
 
   if (isLoading) {
     return (
-      <div className="h-96 flex flex-col items-center justify-center text-slate-400 gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-[#1A9A91]" />
-        <p className="font-semibold uppercase tracking-wider text-[10px]">Syncing Production Stocks...</p>
+      <div className="space-y-8 pb-12">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-200">
+          <div className="w-1/3 h-10 bg-slate-200 animate-pulse rounded-xl" />
+          <div className="w-1/4 h-10 bg-slate-200 animate-pulse rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-3xl p-6 h-32 flex flex-col justify-center gap-2">
+              <div className="w-24 h-4 bg-slate-100 animate-pulse rounded-full" />
+              <div className="w-32 h-8 bg-slate-200 animate-pulse rounded-xl" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6">
+           <div className="w-full h-12 bg-slate-100 animate-pulse rounded-xl mb-6" />
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+             {[...Array(8)].map((_, i) => (
+               <div key={i} className="h-64 bg-slate-50 border border-slate-100 rounded-3xl animate-pulse" />
+             ))}
+           </div>
+        </div>
       </div>
     );
   }

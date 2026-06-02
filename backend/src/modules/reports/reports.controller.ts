@@ -2,6 +2,7 @@ import { ReportsService } from './reports.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
+import { Roles } from '../auth/roles.decorator';
 import { Controller, Get, Query, UseGuards, Param, BadRequestException, Logger, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
@@ -27,6 +28,7 @@ export class ReportsController {
   }
 
   @Get('production')
+  @Roles('ADMIN')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get comprehensive production analytics' })
   async getProductionReport(
@@ -46,6 +48,7 @@ export class ReportsController {
   }
 
   @Get('batches')
+  @Roles('ADMIN')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get list of production batches' })
   async getProductionBatches(
@@ -57,6 +60,7 @@ export class ReportsController {
   }
 
   @Get('batch/:id')
+  @Roles('ADMIN')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get immutable batch dossier' })
   async getBatchDossier(@Req() req: any, @Param('id') id: string) {
@@ -79,6 +83,7 @@ export class ReportsController {
   }
 
   @Get('attendance')
+  @Roles('ADMIN')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get detailed attendance report' })
   async getAttendanceReport(

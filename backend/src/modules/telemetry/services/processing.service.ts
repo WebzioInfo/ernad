@@ -648,9 +648,12 @@ export class ProcessingService {
       damagedLabelWeight: productionLogs.damagedLabelWeight,
       inkChanged: productionLogs.inkChanged,
       makeupChanged: productionLogs.makeupChanged,
+      inkUsage: productionLogs.inkUsage,
+      solventUsage: productionLogs.solventUsage,
       
       // Packing specific
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
+      shrinkWeightUsed: productionLogs.shrinkWeightUsed,
       sourceBatchNumber: productionLogs.sourceBatchNumber,
 
       // Blowing / Material Consumption
@@ -785,8 +788,11 @@ export class ProcessingService {
         damagedLabelWeight: l.damagedLabelWeight,
         inkChanged: l.inkChanged,
         makeupChanged: l.makeupChanged,
+        inkUsage: l.inkUsage,
+        solventUsage: l.solventUsage,
         // Packing specific
         shrinkWasteWeight: l.shrinkWasteWeight,
+        shrinkWeightUsed: l.shrinkWeightUsed,
         sourceBatchNumber: l.sourceBatchNumber,
         // Blowing / Material Consumption
         rawMaterialId: l.rawMaterialId,

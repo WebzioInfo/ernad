@@ -143,7 +143,7 @@ api.interceptors.response.use(
           return Promise.resolve({ data: { status: 'QUEUED_OFFLINE', requestId: config.headers['x-mes-request-id'] }, status: 202 });
         }
 
-        toast.error('Network connection issue', {
+        toast.error('Backend unavailable', {
           id: 'network-error',
           description: 'The server is temporarily unreachable. Please check your connection or try again.',
           duration: 5000
@@ -165,8 +165,8 @@ api.interceptors.response.use(
 
     // 3. Handle 403 Forbidden (CORS or Permissions)
     if (error.response?.status === 403) {
-      const message = (error.response.data as any)?.message || 'Access Denied: Restricted resource.';
-      toast.error('Forbidden', {
+      const message = (error.response.data as any)?.message || 'Restricted resource.';
+      toast.error('Access denied', {
         id: 'forbidden',
         description: message
       });
@@ -189,10 +189,16 @@ api.interceptors.response.use(
       const isBackgroundPoll = isBackgroundPollUrl(config?.url);
 
       if (!skipGlobalToast && !(error.response.status === 404 && isBackgroundPoll)) {
-        toast.error(message, {
-          id: `api-error-${errorCode}`,
-          description: `Reference: ${errorCode}`
-        });
+        if (error.response.status === 500) {
+          toast.error('Server error', { id: `api-error-500`, description: 'An unexpected backend error occurred.' });
+        } else if (error.response.status === 404) {
+          toast.error('Data not found', { id: `api-error-404`, description: message });
+        } else {
+          toast.error(message, {
+            id: `api-error-${errorCode}`,
+            description: `Reference: ${errorCode}`
+          });
+        }
       }
     }
 

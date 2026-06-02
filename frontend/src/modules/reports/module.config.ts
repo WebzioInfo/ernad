@@ -13,10 +13,10 @@ export const reportsConfig: ModuleConfig = {
     {
       path: 'reports/production',
       element: lazy(() => import('./pages/ProductionReportsPage')),
-      allowedRoles: ['ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN']
     },
     {
-      path: 'reports/sales',
+      path: 'sales',
       element: lazy(() => import('./pages/SalesAnalyticsPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
     },
@@ -38,19 +38,27 @@ export const reportsConfig: ModuleConfig = {
     {
       id: 'reports',
       label: 'Reports',
+      allowedRoles: ['ADMIN'],
       items: [
         {
           id: 'prod_reports',
           label: 'Reports',
           icon: FileText,
           path: '/reports/production',
-          allowedRoles: ['ADMIN', 'MANAGER']
-        },
+          allowedRoles: ['ADMIN']
+        }
+      ]
+    },
+    {
+      id: 'sales',
+      label: 'Sales',
+      allowedRoles: ['ADMIN', 'MANAGER'],
+      items: [
         {
-          id: 'sales_reports',
+          id: 'sales_module',
           label: 'Sales',
           icon: BarChart4,
-          path: '/reports/sales',
+          path: '/sales',
           allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]

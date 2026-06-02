@@ -547,34 +547,20 @@ export default function OperatorPanel() {
         ? rawMaterials?.find((material: any) => material.id === selectedLabelRawMaterialId)?.name
         : selectedCapRawMaterial?.name;
 
-      queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
-        const newHistoryEntry = {
-          id: `prod_log_${committedLog?.id || logEntry.requestId}`,
-          primaryCount: committedLog?.primaryCount ?? logEntry.primaryCount,
-          wastageCount: committedLog?.wastageCount ?? logEntry.wastageCount,
-          bottleLeakage: committedLog?.bottleLeakage ?? logEntry.bottleLeakage,
-          capWastage: committedLog?.capWastage ?? logEntry.capWastage,
-          eventType: committedLog?.eventType ?? logEntry.eventType,
-          secondaryPackagingCount: committedLog?.secondaryPackagingCount ?? logEntry.secondaryPackagingCount,
-          remarks: committedLog?.remarks ?? logEntry.remarks,
-          loggedAt: committedLog?.loggedAt ?? logEntry.loggedAt,
-          userName: activeOperator?.name || user?.name || 'Operator',
-          source: ['MACHINE_BREAKDOWN', 'POWER_FAILURE', 'LOW_SPEED'].includes(logEntry.eventType) ? 'MACHINE' : 'OPERATOR',
-          station: committedLog?.station ?? logEntry.station,
-          rawMaterialId: committedLog?.rawMaterialId ?? logEntry.rawMaterialId,
-          rawMaterialName,
-          bagsUsed: committedLog?.bagsUsed ?? logEntry.bagsUsed,
-          preformUsage: committedLog?.preformUsage ?? logEntry.preformUsage,
-          capUsage: committedLog?.capUsage ?? logEntry.capUsage,
-          capBoxUsage: committedLog?.capBoxUsage ?? logEntry.capBoxUsage,
-          bopRollUsage: committedLog?.bopRollUsage ?? logEntry.bopRollUsage,
-          shrinkWasteWeight: committedLog?.shrinkWasteWeight ?? logEntry.shrinkWasteWeight,
-          sourceBatchNumber: committedLog?.sourceBatchNumber ?? logEntry.sourceBatchNumber,
-        };
-
-        const withoutDuplicate = previous.filter((entry: any) => entry.id !== newHistoryEntry.id);
-        return [newHistoryEntry, ...withoutDuplicate].slice(0, 50);
-      });
+      if (committedLog) {
+        queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
+          // Instead of building a fake frontend log, inject the exact backend schema
+          // Ensure rawMaterialName and userName are attached if the API doesn't populate relations fully
+          const exactRecord = {
+            ...committedLog,
+            rawMaterialName: committedLog.rawMaterial?.name || rawMaterialName,
+            userName: committedLog.user?.name || activeOperator?.name || user?.name || 'Operator',
+          };
+          
+          const withoutDuplicate = previous.filter((entry: any) => entry.id !== exactRecord.id);
+          return [exactRecord, ...withoutDuplicate].slice(0, 50);
+        });
+      }
 
       await overlay.showSuccess('Production Recorded');
       

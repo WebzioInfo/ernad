@@ -572,7 +572,7 @@ export class UsersService {
   }
 
   /**
-   * Delete an operator (Soft-delete).
+   * Delete an operator (Permanent Delete).
    */
   async deleteOperator(id: string) {
     const rows = await db
@@ -584,15 +584,16 @@ export class UsersService {
       throw new NotFoundException(`Operator with id "${id}" not found`);
     }
 
-    await db.update(users).set({ 
-      isActive: false, 
-      deletedAt: new Date(),
-      username: sql`${users.username} || '_deleted_' || ${id.slice(0, 8)}`,
-      email: sql`${users.email} || '_deleted_' || ${id.slice(0, 8)}`
-    }).where(eq(users.id, id));
-    await this.eventsService.emitDataChanged('users', { action: 'deleted', id });
-
-    return { message: `Operator "${rows[0].name}" has been soft-deleted.` };
+    try {
+      await db.delete(users).where(eq(users.id, id));
+      await this.eventsService.emitDataChanged('users', { action: 'deleted', id });
+      return { message: `Operator "${rows[0].name}" has been permanently deleted.` };
+    } catch (error: any) {
+      if (error.code === '23503') {
+        throw new BadRequestException('Cannot permanently delete user with historical records. Please deactivate them instead.');
+      }
+      throw error;
+    }
   }
 
   async getUserAuditLogs(userId: string, callerRoles: string[] = []) {

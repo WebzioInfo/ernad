@@ -7,10 +7,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   BarChart3,
-  Clock,
   Database,
   Loader2,
-  User,
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -205,150 +203,82 @@ export default function BatchLogsPage() {
             </div>
           ) : (
             events.map((event) => (
-              <div key={event.id} className="p-4 hover:bg-slate-50/70 transition-colors">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[#1A9A91] shrink-0">
-                      {event.source === 'MACHINE' ? <AlertTriangle className="h-5 w-5 text-rose-500" /> : <Activity className="h-5 w-5" />}
+              <div 
+                key={event.id} 
+                className="px-4 py-2 hover:bg-slate-50/80 transition-colors border-b border-slate-100 last:border-b-0 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+              >
+                {/* LEFT: Event Type, Operator, Date */}
+                <div className="flex items-start md:items-center gap-3 w-full md:w-1/3 shrink-0">
+                  <div className="h-6 w-6 rounded flex items-center justify-center shrink-0 border border-slate-200 bg-white mt-0.5 md:mt-0">
+                    {event.source === 'MACHINE' ? <AlertTriangle className="h-3 w-3 text-rose-500" /> : <Activity className="h-3 w-3 text-[#1A9A91]" />}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-800 uppercase tracking-tight">{event.eventType?.replace(/_/g, ' ') || 'PRODUCTION EVENT'}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${eventClass(event.source)}`}>{event.station || station}</span>
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-black text-slate-900">{event.eventType?.replace(/_/g, ' ') || 'Production Event'}</p>
-                        <span className={`inline-flex rounded-md border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${eventClass(event.source)}`}>
-                          {event.source || 'OPERATOR'}
-                        </span>
-                        <span className="inline-flex rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-500">
-                          {event.station || station}
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-500 mt-1">{event.remarks || 'No remarks recorded.'}</p>
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {event.userName || 'System'}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDate(event.loggedAt)}
-                        </span>
-                        {event.rawMaterialName && <span>Material: {event.rawMaterialName}</span>}
-                      </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium mt-0.5 flex-wrap">
+                      <span className="truncate max-w-[140px]">{event.userName || 'System'}</span>
+                      <span className="text-slate-300">•</span>
+                      <span>{formatDate(event.loggedAt)}</span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:min-w-[440px]">
-                    {station === 'BLOWING' && (
-                      <>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
-                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Preforms Used</p>
-                          <p className="text-sm font-black text-slate-900">
-                            {formatNumber(event.preformUsage)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'PCS'}</span>
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Bottle Wastage</p>
-                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
-                        </div>
-                      </>
-                    )}
+                {/* CENTER: Material & Remarks */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center text-[10px] text-slate-500">
+                  {event.rawMaterialName && (
+                    <span className="font-bold text-slate-700 truncate">Mat: {event.rawMaterialName}</span>
+                  )}
+                  {event.remarks && (
+                    <span className="italic truncate">{event.remarks}</span>
+                  )}
+                </div>
 
-                    {station === 'FILLING' && (
-                      <>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
-                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cap Box Usage</p>
-                          <p className="text-sm font-black text-slate-900">
-                            {formatNumber(event.capBoxUsage)} <span className="text-[10px] text-slate-500">BOX</span>
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Wastage Bottles</p>
-                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
-                        </div>
-                        {event.rawMaterialName && (
-                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cap Material</p>
-                            <p className="text-sm font-black text-slate-900 truncate" title={event.rawMaterialName}>{event.rawMaterialName}</p>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {station === 'LABELING' && (
-                      <>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output Bottles</p>
-                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Labels Used</p>
-                          <p className="text-sm font-black text-slate-900 truncate" title={event.rawMaterialName || undefined}>
-                            {formatNumber(event.bopRollUsage || event.labelUsage)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'KG'}</span>
-                          </p>
-                          {event.rawMaterialName && <p className="text-[10px] font-bold text-slate-500 truncate mt-1">{event.rawMaterialName}</p>}
-                        </div>
-                        {event.inkChanged && (
-                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ink Changed</p>
-                            <p className="text-sm font-black text-[#1A9A91]">YES</p>
-                          </div>
-                        )}
-                        {event.makeupChanged && (
-                          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Makeup Changed</p>
-                            <p className="text-sm font-black text-[#1A9A91]">YES</p>
-                          </div>
-                        )}
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Label Wastage</p>
-                          <p className="text-sm font-black text-rose-600">
-                            {formatNumber(event.damagedLabelWeight || event.wastageCount)} <span className="text-[10px] text-slate-500">{event.damagedLabelWeight ? 'KG' : ''}</span>
-                          </p>
-                        </div>
-                      </>
-                    )}
-
-                    {station === 'PACKING' && (
-                      <>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Packed Bottles</p>
-                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Shrink Used</p>
-                          <p className="text-sm font-black text-slate-900">
-                            {formatNumber(event.shrinkWeightUsed)} <span className="text-[10px] text-slate-500">{event.rawMaterialUnit || 'KG'}</span>
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cartons Used</p>
-                          <p className="text-sm font-black text-slate-900">
-                            {formatNumber(event.secondaryPackagingCount)} <span className="text-[10px] text-slate-500">BOX</span>
-                          </p>
-                        </div>
-                      </>
-                    )}
-
-                    {!['BLOWING', 'FILLING', 'LABELING', 'PACKING'].includes(station) && (
-                      <>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Output</p>
-                          <p className="text-sm font-black text-slate-900">{formatNumber(event.primaryCount)}</p>
-                        </div>
-                        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3 text-right">
-                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Wastage</p>
-                          <p className="text-sm font-black text-rose-600">{formatNumber(event.wastageCount)}</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                {/* RIGHT: Chips for Output, Rejects, Material Usage */}
+                <div className="flex items-center gap-1.5 w-full md:w-auto flex-wrap justify-start md:justify-end shrink-0">
+                  {Number(event.primaryCount) > 0 && (
+                    <div className="px-2 py-1 rounded bg-[#1A9A91]/10 text-[#1A9A91] border border-[#1A9A91]/20 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                      Out: +{formatNumber(event.primaryCount)}
+                    </div>
+                  )}
+                  {(Number(event.wastageCount) > 0 || Number(event.damagedLabelWeight) > 0) && (
+                    <div className="px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-100 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
+                      Rej: {formatNumber(event.damagedLabelWeight || event.wastageCount)}
+                    </div>
+                  )}
+                  
+                  {/* Station specific usages */}
+                  {station === 'BLOWING' && Number(event.bagsUsed) > 0 && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      Bags: {event.bagsUsed}
+                    </div>
+                  )}
+                  {station === 'FILLING' && Number(event.capUsage) > 0 && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      Caps: {formatNumber(event.capUsage)}
+                    </div>
+                  )}
+                  {station === 'LABELING' && (Number(event.bopRollUsage) > 0 || Number(event.labelUsage) > 0) && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      Lbl: {formatNumber(event.bopRollUsage || event.labelUsage)} KG
+                    </div>
+                  )}
+                  {station === 'LABELING' && (event.inkChanged || event.makeupChanged) && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      HTT: YES
+                    </div>
+                  )}
+                  {station === 'PACKING' && Number(event.secondaryPackagingCount) > 0 && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      Box: {formatNumber(event.secondaryPackagingCount)}
+                    </div>
+                  )}
+                  {station === 'PACKING' && Number(event.shrinkWeightUsed) > 0 && (
+                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                      Shrink: {formatNumber(event.shrinkWeightUsed)} KG
+                    </div>
+                  )}
                 </div>
               </div>
             ))

@@ -278,8 +278,9 @@ export class InventoryService {
   }
 
   async getProductionStock() {
-    await this.recalculateInventory();
-
+    // RED TEAM FIX: Removed 'await this.recalculateInventory();' here
+    // Inventory recalculation is triggered on transaction changes. Calling it on GET causes massive latency.
+    
     // Ensure all products have a row in productionStock
     const allProducts = await db.select().from(products);
     for (const prod of allProducts) {

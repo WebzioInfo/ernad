@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database, Search, RefreshCw,
-  Edit3, AlertCircle,
+  Edit3, AlertCircle, Loader2,
   X, ShieldCheck
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
@@ -276,8 +276,8 @@ export default function ProductionLogsManager() {
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Line / Batch</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Station</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Yield / Scrap</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Used</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Yield & Scrap</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Station Metrics</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
@@ -296,18 +296,18 @@ export default function ProductionLogsManager() {
                       )}
                     >
                       <td className="px-8 py-6">
-                        <p className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors font-mono tracking-tight">#{log.id}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">{format(new Date(log.loggedAt), 'HH:mm:ss')}</p>
+                        <p className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight truncate max-w-[150px]">{log.userName || log.user?.name || 'Operator'}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">#{log.id} • {format(new Date(log.loggedAt), 'HH:mm')}</p>
                       </td>
                       <td className="px-8 py-6">
-                        <p className="text-xs font-black text-slate-600 uppercase tracking-tight">{log.lineName}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase">{log.batchCode}</p>
+                        <p className="text-xs font-black text-slate-600 uppercase tracking-tight truncate max-w-[120px]">{log.lineName || log.line?.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 font-mono uppercase">{log.batchCode || log.batch?.batchCode}</p>
                       </td>
                       <td className="px-8 py-6">
                         <Badge variant="indigo">{log.station}</Badge>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-4">
                           <div>
                             <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
                             <p className="text-[8px] font-black text-slate-400 uppercase">Production</p>
@@ -319,8 +319,31 @@ export default function ProductionLogsManager() {
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <p className="text-sm font-black text-indigo-600 tabular-nums font-mono">{formatDecimal(log.primaryCount + Number(log.wastageCount))}</p>
-                        <p className="text-[8px] font-black text-slate-400 uppercase">Total Used</p>
+                        <div className="flex flex-col gap-1.5">
+                          {log.station === 'BLOWING' && (
+                            <>
+                              {log.rawMaterial?.name && <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase">{log.rawMaterial.name}</p>}
+                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bagsUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Bags Used</span></div>
+                            </>
+                          )}
+                          {log.station === 'FILLING' && (
+                            <>
+                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.capUsage || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Caps Used</span></div>
+                            </>
+                          )}
+                          {log.station === 'LABELING' && (
+                            <>
+                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bopRollUsage || log.labelStickerWeight || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Labels Used</span></div>
+                              {(log.inkUsage > 0 || log.solventUsage > 0) && <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.inkUsage || 0}ML / {log.solventUsage || 0}ML</p><span className="text-[8px] font-bold text-slate-400 uppercase">HTT Used</span></div>}
+                            </>
+                          )}
+                          {log.station === 'PACKING' && (
+                            <>
+                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.secondaryPackagingCount || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Boxes Used</span></div>
+                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.shrinkWeightUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Shrink (KG)</span></div>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="px-8 py-6">
                         <Badge variant={
@@ -470,7 +493,7 @@ export default function ProductionLogsManager() {
 
         {rejectingLog && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => setRejectingLog(null)} />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={() => !rejectMutation.isPending && setRejectingLog(null)} />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-white border border-slate-200 rounded-[3rem] p-10 shadow-2xl">
               <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-6" />
               <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic text-center">Reject <span className="text-rose-600">Transaction</span></h3>
@@ -480,17 +503,31 @@ export default function ProductionLogsManager() {
                 placeholder="Reason for rejection (required)..."
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
-                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-900 outline-none focus:border-rose-500/50 transition-all mb-8 resize-none"
+                disabled={rejectMutation.isPending}
+                className="w-full h-32 bg-slate-50 border border-slate-200 rounded-2xl p-6 text-sm font-bold text-slate-900 outline-none focus:border-rose-500/50 transition-all mb-8 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
               />
 
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setRejectingLog(null)} className="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[10px]">Cancel</button>
+                <button 
+                  onClick={() => setRejectingLog(null)} 
+                  disabled={rejectMutation.isPending}
+                  className="py-4 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={() => rejectMutation.mutate({ id: rejectingLog.id, reason: rejectionReason })}
                   disabled={!rejectionReason || rejectMutation.isPending}
-                  className="py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50"
+                  className="py-4 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Confirm Reject
+                  {rejectMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Rejecting...
+                    </>
+                  ) : (
+                    'Confirm Reject'
+                  )}
                 </button>
               </div>
             </motion.div>

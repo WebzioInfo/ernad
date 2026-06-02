@@ -430,6 +430,12 @@ export default function UserManagementPage() {
 }
 
 function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAdmin, canManage }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void, isAdmin: boolean, canManage: boolean }) {
+  const isTargetAdmin = user.roles?.includes('ADMIN');
+  const isTargetManager = user.roles?.includes('MANAGER');
+  const isSelf = user.id === currentUser?.id;
+  
+  // Managers can manage users, but NOT Admins. Managers can edit themselves.
+  const canEditThisUser = isAdmin || (canManage && !isTargetAdmin && (!isTargetManager || isSelf));
   const { data: logs } = useQuery({
     queryKey: ['user-audit-logs', user.id],
     queryFn: async () => (await api.get(ENDPOINTS.USERS.USER_AUDIT_LOGS(user.id))).data,
@@ -534,21 +540,19 @@ function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAd
           </div>
 
           {/* Modify Actions */}
-          {canManage && (
+          {canEditThisUser && (
             <div className="flex gap-3 pt-2">
-              {isAdmin && (
-                <button
-                  onClick={onToggleActive}
-                  className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
-                    user.isActive
-                      ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
-                  }`}
-                >
-                  {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                  {user.isActive ? 'Suspend User' : 'Restore User'}
-                </button>
-              )}
+              <button
+                onClick={onToggleActive}
+                className={`flex-1 h-9 rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-all flex items-center justify-center gap-1 border ${
+                  user.isActive
+                    ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-600 hover:text-white hover:border-rose-600'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                }`}
+              >
+                {user.isActive ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                {user.isActive ? 'Suspend User' : 'Restore User'}
+              </button>
               <button
                 onClick={onEdit}
                 className="flex-1 h-9 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg font-semibold uppercase tracking-wider text-[10px] transition-colors flex items-center justify-center gap-1 shadow-sm"
@@ -588,6 +592,8 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
   const isManager = currentUser?.roles.includes('MANAGER');
 
   const allowedRoles = isAdmin ? ADMIN_VISIBLE_ROLES : isManager ? OPERATIONAL_ROLES.filter(role => role.slug === 'OPERATOR') : OPERATIONAL_ROLES;
+  const isSelf = user?.id === currentUser?.id;
+  const canEditRoles = isAdmin || (isManager && !isSelf);
 
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -652,9 +658,13 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
     const data = { ...formData };
     if (!data.pin) delete (data as any).pin;
 
-    // Sanitize roles
-    if (data.roles && Array.isArray(data.roles)) {
-      data.roles = Array.from(new Set(data.roles.map(r => String(r).trim().toUpperCase())));
+    // Sanitize roles if we are allowed to edit them
+    if (canEditRoles) {
+      if (data.roles && Array.isArray(data.roles)) {
+        data.roles = Array.from(new Set(data.roles.map(r => String(r).trim().toUpperCase())));
+      }
+    } else {
+      delete (data as any).roles;
     }
 
     mutation.mutate(data);
@@ -733,26 +743,36 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
           {/* Access Roles */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-600">Access Roles</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {allowedRoles.map((role: { slug: string; label: string }) => {
-                const isSelected = formData.roles.includes(role.slug);
-                return (
-                  <button
-                    key={role.slug}
-                    type="button"
-                    onClick={() => toggleRole(role.slug)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-between ${
-                      isSelected
-                        ? 'bg-emerald-50 border-[#1A9A91] text-[#1A9A91] shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-655 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>{role.label}</span>
-                    {isSelected && <BadgeCheck className="w-3.5 h-3.5 text-[#1A9A91]" />}
-                  </button>
-                );
-              })}
-            </div>
+            {canEditRoles ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {allowedRoles.map((role: { slug: string; label: string }) => {
+                  const isSelected = formData.roles.includes(role.slug);
+                  return (
+                    <button
+                      key={role.slug}
+                      type="button"
+                      onClick={() => toggleRole(role.slug)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-between ${
+                        isSelected
+                          ? 'bg-emerald-50 border-[#1A9A91] text-[#1A9A91] shadow-sm'
+                          : 'bg-white border-slate-200 text-slate-655 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{role.label}</span>
+                      {isSelected && <BadgeCheck className="w-3.5 h-3.5 text-[#1A9A91]" />}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {formData.roles.map(r => (
+                  <span key={r} className="px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-xs font-semibold uppercase">
+                    {r.replace('_', ' ')}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Dept & Job Title */}

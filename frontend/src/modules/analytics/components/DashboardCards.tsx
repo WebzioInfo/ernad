@@ -1,21 +1,13 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  AreaChart, Area, ResponsiveContainer
+  AreaChart, Area, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 
-const MOCK_CHART_DATA = [
-  { name: '06:00', value: 400 },
-  { name: '08:00', value: 300 },
-  { name: '10:00', value: 600 },
-  { name: '12:00', value: 800 },
-  { name: '14:00', value: 500 },
-  { name: '16:00', value: 900 },
-  { name: '18:00', value: 1100 },
-];
+export const KPICard = memo(({ label, value, trend, icon: Icon, color, chartColor, negativeTrend, data = [], delay = 0 }: any) => {
+  const gradientId = useMemo(() => `gradient-${label.replace(/\s+/g, '-').toLowerCase()}`, [label]);
 
-export const KPICard = memo(({ label, value, trend, icon: Icon, color, chartColor, negativeTrend, delay = 0 }: any) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -43,12 +35,30 @@ export const KPICard = memo(({ label, value, trend, icon: Icon, color, chartColo
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
         <h4 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{value}</h4>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 w-full h-16 opacity-10 group-hover:opacity-25 transition-opacity" style={{ minWidth: 0 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={MOCK_CHART_DATA}>
-            <Area type="monotone" dataKey="value" stroke="none" fill={chartColor} />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="h-16 w-full mt-4">
+        {(!data || data.length === 0) ? (
+          <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">No Data Available</div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <Tooltip cursor={{ stroke: 'rgba(203, 213, 225, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}/>
+              <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke={chartColor} 
+                strokeWidth={2}
+                fillOpacity={1} 
+                fill={`url(#${gradientId})`} 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </motion.div>
   );
@@ -94,5 +104,3 @@ export const HealthMetric = ({ label, status, score }: any) => (
     </div>
   </div>
 );
-
-export { MOCK_CHART_DATA };

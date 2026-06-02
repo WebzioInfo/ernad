@@ -21,6 +21,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Permissions } from '../auth/permissions.decorator';
 import { Public } from '../auth/public.decorator';
+import { Roles } from '../auth/roles.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
@@ -148,12 +149,13 @@ export class UsersController {
 
   /**
    * DELETE /api/users/:id
-   * Admin only — Soft delete an operator
+   * Admin only — Permanent delete an operator
    */
   @Delete(':id')
+  @Roles('ADMIN')
   @Permissions('users:manage')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft delete operator (Admin only)' })
+  @ApiOperation({ summary: 'Permanent delete operator (Admin only)' })
   deleteOperator(@Param('id') id: string) {
     return this.usersService.deleteOperator(id);
   }

@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import DashboardLayout from '../layouts/DashboardLayout';
 import Login from '../modules/auth/Login';
 import RequireAuth from '../modules/auth/RequireAuth';
@@ -20,6 +21,17 @@ const IncidentsDashboard = lazy(() => import('../modules/incidents/pages/Inciden
 
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
+
+const ReportsDenied = () => {
+  const navigate = useNavigate();
+  import('react').then((React) => {
+    React.useEffect(() => {
+      toast.error('Access Denied', { description: 'Managers do not have access to Reports.' });
+      navigate('/manager/overview', { replace: true });
+    }, [navigate]);
+  });
+  return null;
+};
 
 export function AppRoutes() {
   const renderRoutes = (routes: RouteDefinition[]) => {
@@ -88,6 +100,7 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/manager/overview" replace />} />
+          <Route path="reports/*" element={<ReportsDenied />} />
           {renderRoutes(dynamicRoutes)}
           {/* Static / Compatibility Routes (Coming Soon) */}
           {/* 

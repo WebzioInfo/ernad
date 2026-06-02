@@ -24,9 +24,8 @@ export class AnalyticsService {
       if (lineId !== 'all' && !uuidRegex.test(lineId)) {
         throw new NotFoundException('Invalid production line identifier.');
       }
-      // 1. Find the relevant batch(es)
       const conditions = [
-        eq(productionBatches.status, 'RUNNING')
+        inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER'])
       ];
 
       if (lineId !== 'all') conditions.push(eq(productionBatches.lineId, lineId));
@@ -50,32 +49,56 @@ export class AnalyticsService {
       let totalCurrentBPM = 0;
       let targetBPM = 0;
       let activeOperators = 0;
+      const allRecentLogs: any[] = [];
 
       for (const batch of batches) {
         targetBPM += batch.targetBPM || 120;
         
-        const operatorResult = await db.select({ count: sql<number>`count(*)` })
-          .from(userLines).where(eq(userLines.lineId, batch.lineId as string));
+        // Distinct operators who logged data for this batch
+        const operatorResult = await db.select({ count: sql<number>`COUNT(DISTINCT ${productionLogs.userId})` })
+          .from(productionLogs)
+          .where(and(
+            eq(productionLogs.batchId, batch.id),
+            isNull(productionLogs.deletedAt)
+          ));
         
         if (operatorResult && operatorResult.length > 0) {
           activeOperators += Number(operatorResult[0].count || 0);
         }
 
-        const redisTotals = await this.redisService.getBatchTotals(batch.id);
-        if (redisTotals && Object.keys(redisTotals).length > 0) {
-          totalBlowing += parseInt(String(redisTotals.blowing || '0')) || 0;
-          totalFilling += parseInt(String(redisTotals.filling || '0')) || 0;
-          totalLabeling += parseInt(String(redisTotals.labeling || '0')) || 0;
-          totalPacking += parseInt(String(redisTotals.packing || '0')) || 0;
-        } else {
-          const totals = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batch.id));
-          if (totals && totals.length > 0) {
-            totalBlowing += totals[0].blowingTotal || 0;
-            totalFilling += totals[0].fillingTotal || 0;
-            totalLabeling += totals[0].labelingTotal || 0;
-            totalPacking += totals[0].packingTotal || 0;
-          }
-        }
+        // Direct aggregation from productionLogs instead of batchTotals cache
+        const [logStats] = await db.select({
+          blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+          filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+          labeling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+          packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        })
+        .from(productionLogs)
+        .where(and(
+          eq(productionLogs.batchId, batch.id),
+          isNull(productionLogs.deletedAt)
+        ));
+
+        totalBlowing += Number(logStats?.blowing || 0);
+        totalFilling += Number(logStats?.filling || 0);
+        totalLabeling += Number(logStats?.labeling || 0);
+        totalPacking += Number(logStats?.packing || 0);
+
+        // Fetch recent logs for timeline
+        const latestLogs = await db.select({
+          station: productionLogs.station,
+          count: productionLogs.primaryCount,
+          timestamp: productionLogs.loggedAt
+        })
+        .from(productionLogs)
+        .where(and(
+          eq(productionLogs.batchId, batch.id),
+          isNull(productionLogs.deletedAt)
+        ))
+        .orderBy(desc(productionLogs.loggedAt))
+        .limit(15);
+        
+        allRecentLogs.push(...latestLogs);
 
         totalCurrentBPM += await this.calculateCurrentBPM(batch.lineId as string);
       }
@@ -107,6 +130,7 @@ export class AnalyticsService {
         ],
         generatedAt: new Date(),
         activeOperators: activeOperators,
+        recentLogs: allRecentLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 15),
         timeline: [],
         yesterday: {
           oee: 84, // Placeholder for historical data

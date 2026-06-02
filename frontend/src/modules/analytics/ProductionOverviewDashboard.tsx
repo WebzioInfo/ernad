@@ -6,19 +6,6 @@ import {
   Zap, Package, CheckCircle2, AlertTriangle
 } from 'lucide-react';
 
-const MOCK_SUMMARY = {
-  stats: [
-    { station: 'BLOWING', total: 12450 },
-    { station: 'FILLING', total: 12420 },
-    { station: 'LABELING', total: 12380 },
-    { station: 'PACKING', total: 1032 }, // Cases
-  ],
-  oee: 84.5,
-  quality: 99.2,
-  availability: 92.1,
-  performance: 91.8
-};
-
 export default function ProductionOverviewDashboard() {
   const { filters } = useOutletContext<{ filters: any }>();
   const { data: realSummary, isLoading } = useQuery({
@@ -36,9 +23,15 @@ export default function ProductionOverviewDashboard() {
       } catch (e) {
         return null;
       }
-    },  });
+    },  });
 
-  const summary = realSummary || MOCK_SUMMARY;
+  const summary = realSummary || {
+    stats: [],
+    oee: 0,
+    quality: 0,
+    availability: 0,
+    performance: 0
+  };
   const isMock = !realSummary;
 
   if (isLoading) return <div className="animate-pulse space-y-4">
