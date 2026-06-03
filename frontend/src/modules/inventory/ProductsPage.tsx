@@ -79,7 +79,7 @@ export default function ProductsPage() {
   const deleteStockMutation = useMutation({
     mutationFn: (transactionId: string) => {
       overlay.startProcessing('Deleting Record...');
-      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } });
+      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId, itemType: 'PRODUCT' } });
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });

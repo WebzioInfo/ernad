@@ -430,6 +430,7 @@ export default function UserManagementPage() {
 }
 
 function UserDetailModal({ user, onClose, onEdit, onToggleActive, onDelete, isAdmin, canManage }: { user: User, onClose: () => void, onEdit: () => void, onToggleActive: () => void, onDelete: () => void, isAdmin: boolean, canManage: boolean }) {
+  const { user: currentUser } = useAuthStore();
   const isTargetAdmin = user.roles?.includes('ADMIN');
   const isTargetManager = user.roles?.includes('MANAGER');
   const isSelf = user.id === currentUser?.id;

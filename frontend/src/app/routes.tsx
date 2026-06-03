@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+
 import DashboardLayout from '../layouts/DashboardLayout';
 import Login from '../modules/auth/Login';
 import RequireAuth from '../modules/auth/RequireAuth';

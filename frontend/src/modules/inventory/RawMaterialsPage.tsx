@@ -117,7 +117,7 @@ export default function RawMaterialsPage() {
   const deleteStockMutation = useMutation({
     mutationFn: (transactionId: string) => {
       overlay.startProcessing('Deleting Record...');
-      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId } });
+      return api.delete(ENDPOINTS.INVENTORY.DELETE_STOCK, { data: { transactionId, itemType: 'RAW' } });
     },
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: QK.RAW_MATERIALS_STOCK });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, User, Cpu, Activity, RefreshCw } from 'lucide-react';
+import { Layers, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -12,56 +12,12 @@ interface ActivityFeedProps {
   isRefreshing?: boolean;
 }
 
-const getFriendlyEventName = (eventType: string) => {
-  const map: Record<string, string> = {
-    NORMAL_PRODUCTION: 'Production Committed',
-    BATCH_START: 'Batch Initialized',
-    BATCH_END: 'Batch Closed',
-    OPERATOR_LOGIN: 'Operator Joined Station',
-    OPERATOR_LOGOUT: 'Operator Logged Out',
-    MATERIAL_ASSIGNMENT: 'Material Issued',
-    POWER_FAILURE: 'Power Outage',
-    MACHINE_BREAKDOWN: 'Machine Breakdown',
-    LOW_SPEED: 'Low Speed Anomaly',
-    MATERIAL_SHORTAGE: 'Material Shortage',
-    DOWNTIME_PAUSE: 'Operator Paused Line',
-    DOWNTIME_RESOLVED: 'Downtime Cleared',
-  };
-  return map[eventType] || eventType.replace(/_/g, ' ');
-};
-
 const getDotColor = (eventType: string) => {
   if (['NORMAL_PRODUCTION', 'OPERATOR_LOGIN'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
   if (['BATCH_START', 'BATCH_END'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
   if (['MATERIAL_ASSIGNMENT'].includes(eventType)) return 'bg-[#1A9A91] ring-[#1A9A91]/15';
   if (['OPERATOR_LOGOUT', 'DOWNTIME_RESOLVED'].includes(eventType)) return 'bg-slate-400 ring-slate-100';
   return 'bg-rose-500 ring-rose-100'; // Anomalies
-};
-
-const stationStyles: Record<string, string> = {
-  BLOWING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
-  FILLING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
-  LABELING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
-  PACKING: 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20',
-  QC: 'bg-rose-50 text-rose-700 border-rose-100/60',
-};
-
-const getSourceIcon = (source?: string) => {
-  if (source === 'MACHINE') return <Activity size={10} className="text-[#1A9A91]" />;
-  if (source === 'SYSTEM') return <Cpu size={10} className="text-[#1A9A91]" />;
-  return <User size={10} className="text-[#1A9A91]" />;
-};
-
-const getSourceBadgeClass = (source?: string) => {
-  if (source === 'MACHINE') return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
-  if (source === 'SYSTEM') return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
-  return 'bg-[#1A9A91]/5 text-[#1A9A91] border-[#1A9A91]/20';
-};
-
-const formatWastageValue = (value: string | number) => {
-  const num = Number(value);
-  if (isNaN(num)) return value;
-  return num % 1 === 0 ? num.toString() : num.toFixed(2);
 };
 
 export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, isRefreshing }) => {
@@ -100,8 +56,6 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ history, onRefresh, 
             </div>
           ) : (
             history.map((log, idx) => {
-              const friendlyEvent = getFriendlyEventName(log.eventType);
-              const isNormalProd = log.eventType === 'NORMAL_PRODUCTION';
               const dotColor = getDotColor(log.eventType);
               
               return (
