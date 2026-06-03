@@ -304,7 +304,8 @@ export class InventoryService {
       currentStock: productionStock.currentStock,
       totalProduced: productionStock.totalProduced,
       totalDispatched: productionStock.totalDispatched,
-      availableStock: productionStock.currentStock
+      availableStock: productionStock.currentStock,
+      brandId: products.brandId
     })
     .from(productionStock)
     .innerJoin(products, eq(productionStock.productId, products.id))

@@ -213,7 +213,7 @@ export default function ProductsPage() {
             <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </button>
 
-          {isAdmin && (
+          {canManageProducts && (
             <button
               onClick={() => {
                 setIsAddModalOpen(true);
@@ -467,7 +467,7 @@ export default function ProductsPage() {
                       <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Balance: {tx.balanceAfter.toLocaleString()}</p>
                     </div>
 
-                    {isAdmin && isManual && (
+                    {canManageProducts && isManual && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setEditingTransaction(tx)}
@@ -501,6 +501,7 @@ export default function ProductsPage() {
           onClose={() => setIsAddModalOpen(false)}
           onSubmit={(data: any) => addStockMutation.mutate(data)}
           isPending={addStockMutation.isPending}
+          defaultType="PRODUCT"
         />
       )}
 
@@ -513,6 +514,7 @@ export default function ProductsPage() {
           onClose={() => setEditingTransaction(null)}
           onSubmit={(data: any) => updateStockMutation.mutate({ transactionId: editingTransaction.id, quantity: data.quantity, remarks: data.remarks })}
           isPending={updateStockMutation.isPending}
+          defaultType="PRODUCT"
         />
       )}
 

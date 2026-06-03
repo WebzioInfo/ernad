@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
-import { useRawMaterials, useStationConsumption, useRawMaterialLedger, QK } from '../../hooks/useApi';
+import { useRawMaterials, useStationConsumption, useRawMaterialLedger, QK, useBrands } from '../../hooks/useApi';
 import { MaterialUnit, MaterialType } from '../../types/enums';
 import { useTransactionOverlay } from '../../components/TransactionOverlay';
 
@@ -564,9 +564,9 @@ export default function RawMaterialsPage() {
   );
 }
 
-export function StockTransactionModal({ materials, material, transaction, onClose, onSubmit, isPending }: any) {
+export function StockTransactionModal({ materials, material, transaction, onClose, onSubmit, isPending, defaultType = 'RAW' }: any) {
   const [itemType, setItemType] = useState<'RAW' | 'PRODUCT'>(
-    transaction?.productId ? 'PRODUCT' : 'RAW'
+    transaction?.productId ? 'PRODUCT' : defaultType
   );
   const [quantity, setQuantity] = useState(transaction ? Math.abs(transaction.quantityChange).toString() : '');
   const [remarks, setRemarks] = useState(transaction?.remarks || '');
@@ -575,15 +575,19 @@ export function StockTransactionModal({ materials, material, transaction, onClos
   );
 
   const { data: products } = useQuery({
-    queryKey: ['production-stock-modal-list'],
+    queryKey: ['production-stock-modal-list', 'with-brands'], // updated query key to bypass old cache
     queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.PRODUCTION_STOCK)).data,
     enabled: !transaction
   });
+  
+  const { data: brands } = useBrands();
+  const [selectedBrandId, setSelectedBrandId] = useState('');
 
   const handleTypeChange = (newType: 'RAW' | 'PRODUCT') => {
     setItemType(newType);
     if (newType === 'PRODUCT') {
-      setSelectedId(products?.[0]?.productId || '');
+      setSelectedBrandId('');
+      setSelectedId('');
     } else {
       setSelectedId(materials?.[0]?.id || '');
     }
@@ -628,6 +632,27 @@ export function StockTransactionModal({ materials, material, transaction, onClos
           )}
 
           <div className="space-y-1">
+            {itemType === 'PRODUCT' && !transaction && (
+              <div className="space-y-1 mb-3">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                  Brand
+                </label>
+                <select
+                  value={selectedBrandId}
+                  onChange={(e) => {
+                    setSelectedBrandId(e.target.value);
+                    setSelectedId(''); // Reset product selection when brand changes
+                  }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-black focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]/50 outline-none transition-all"
+                >
+                  <option value="">Select Brand...</option>
+                  {brands?.map((b: any) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
               {itemType === 'PRODUCT' ? 'Product Name' : 'Material Name'}
             </label>
@@ -639,15 +664,18 @@ export function StockTransactionModal({ materials, material, transaction, onClos
               />
             ) : itemType === 'PRODUCT' ? (
               <select
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-black focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]/50 outline-none transition-all"
-              >
-                <option value="">Select Product...</option>
-                {products?.map((p: any) => (
-                  <option key={p.productId} value={p.productId}>{p.productName}</option>
-                ))}
-              </select>
+                  value={selectedId}
+                  onChange={(e) => setSelectedId(e.target.value)}
+                  disabled={!selectedBrandId}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-black focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]/50 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Select Product...</option>
+                  {products
+                    ?.filter((p: any) => p.brandId === selectedBrandId)
+                    .map((p: any) => (
+                      <option key={p.productId} value={p.productId}>{p.productName}</option>
+                  ))}
+                </select>
             ) : (
               <select
                 value={selectedId}
