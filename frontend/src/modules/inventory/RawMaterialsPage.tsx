@@ -611,7 +611,7 @@ export function StockTransactionModal({ materials, material, transaction, onClos
             onSubmit({ 
               itemId: selectedId, 
               itemType, 
-              quantity: parseInt(quantity, 10), 
+              quantity: Number(quantity), 
               remarks 
             });
           }}
@@ -725,7 +725,7 @@ export function StockTransactionModal({ materials, material, transaction, onClos
             </button>
             <button
               type="submit"
-              disabled={isPending || !quantity || parseInt(quantity, 10) <= 0 || !selectedId}
+              disabled={isPending || !quantity || Number(quantity) <= 0 || !selectedId}
               className="px-5 py-2 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
