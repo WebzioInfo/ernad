@@ -842,14 +842,14 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
   const [name, setName] = useState('');
   const [materialType, setMaterialType] = useState('');
   const [unit, setUnit] = useState('');
-  const [currentStock, setCurrentStock] = useState<number | ''>('');
+  const [currentStock, setCurrentStock] = useState<string | number>('');
 
   useEffect(() => {
     if (material) {
       setName(material.name || '');
       setMaterialType(material.materialType || '');
       setUnit(material.unit || '');
-      setCurrentStock(material.currentStock !== undefined && material.currentStock !== null ? Number(material.currentStock) : 0);
+      setCurrentStock(material.currentStock !== undefined && material.currentStock !== null ? material.currentStock : '');
     }
   }, [material]);
 
@@ -859,12 +859,12 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
     onSubmit({ name, materialType, unit, currentStock: Number(currentStock) });
   };
 
-  const currentFormData = { name, materialType, unit, currentStock: Number(currentStock) };
+  const currentFormData = { name, materialType, unit, currentStock: String(currentStock) };
   const originalFormData = {
     name: material.name || '',
     materialType: material.materialType || '',
     unit: material.unit || '',
-    currentStock: material.currentStock !== undefined && material.currentStock !== null ? Number(material.currentStock) : 0
+    currentStock: material.currentStock !== undefined && material.currentStock !== null ? String(material.currentStock) : ''
   };
 
   const isDirty = JSON.stringify(currentFormData) !== JSON.stringify(originalFormData);
@@ -938,7 +938,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
               type="number"
               step="any"
               value={currentStock}
-              onChange={(e) => setCurrentStock(e.target.value ? Number(e.target.value) : '')}
+              onChange={(e) => setCurrentStock(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] transition-all"
               required
             />
