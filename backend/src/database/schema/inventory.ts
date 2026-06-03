@@ -137,6 +137,11 @@ export const rawMaterialTransactions = pgTable('raw_material_transactions', {
   remarks: text('remarks'),
   performedBy: uuid('performed_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_raw_mat_tx_material').on(table.materialId),
+    index('idx_raw_mat_tx_time').on(table.createdAt),
+  ];
 });
 
 export const productStockTransactions = pgTable('product_stock_transactions', {
@@ -148,6 +153,11 @@ export const productStockTransactions = pgTable('product_stock_transactions', {
   remarks: text('remarks'),
   performedBy: uuid('performed_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_prod_stock_tx_product').on(table.productId),
+    index('idx_prod_stock_tx_time').on(table.createdAt),
+  ];
 });
 
 export const productionStock = pgTable('production_stock', {

@@ -806,7 +806,7 @@ export function CreateMaterialModal({ onClose, onSubmit, isPending }: any) {
                 <option value="">Select...</option>
                 <option value={MaterialUnit.BAG}>Bag (BAG)</option>
                 <option value={MaterialUnit.BOX}>Box (BOX)</option>
-                <option value={MaterialUnit.PCS}>Piece (PCS)</option>
+                <option value={MaterialUnit.PCS}>Pieces / Count (PCS)</option>
                 <option value={MaterialUnit.ROLL}>Roll (ROLL)</option>
                 <option value={MaterialUnit.KG}>Kilogram (KG)</option>
                 <option value={MaterialUnit.LTR}>Liter (LTR)</option>
@@ -906,7 +906,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
               >
                 <option value={MaterialUnit.BAG}>Bag (BAG)</option>
                 <option value={MaterialUnit.BOX}>Box (BOX)</option>
-                <option value={MaterialUnit.PCS}>Piece (PCS)</option>
+                <option value={MaterialUnit.PCS}>Pieces / Count (PCS)</option>
                 <option value={MaterialUnit.ROLL}>Roll (ROLL)</option>
                 <option value={MaterialUnit.KG}>Kilogram (KG)</option>
                 <option value={MaterialUnit.LTR}>Liter (LTR)</option>

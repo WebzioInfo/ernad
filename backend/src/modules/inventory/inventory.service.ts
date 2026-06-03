@@ -315,27 +315,46 @@ export class InventoryService {
   async addStockTransaction(dto: { itemId: string; itemType: 'RAW' | 'PRODUCT'; quantity: number; remarks?: string; performedBy: string }) {
     const result = await db.transaction(async (tx) => {
       if (dto.itemType === 'PRODUCT') {
+        const qty = Number(dto.quantity);
+        // Insert log
         await tx.insert(productStockTransactions).values({
           productId: dto.itemId,
-          type: 'ADD',
-          quantityChange: dto.quantity,
+          type: qty > 0 ? 'ADD' : 'DEDUCT',
+          quantityChange: qty,
           balanceAfter: 0,
           remarks: dto.remarks,
           performedBy: dto.performedBy,
           createdAt: new Date()
         });
+
+        // Atomic update stock
+        const existing = await tx.select().from(productionStock).where(eq(productionStock.productId, dto.itemId)).limit(1);
+        if (existing.length > 0) {
+          await tx.update(productionStock)
+            .set({ currentStock: sql`${productionStock.currentStock} + ${qty}`, updatedAt: new Date() })
+            .where(eq(productionStock.productId, dto.itemId));
+        } else {
+          await tx.insert(productionStock).values({
+            productId: dto.itemId, currentStock: qty, totalProduced: 0, totalDispatched: 0,
+            createdAt: new Date(), updatedAt: new Date()
+          });
+        }
       } else {
+        const qty = Number(dto.quantity);
         await tx.insert(rawMaterialTransactions).values({
           materialId: dto.itemId,
-          type: 'ADD',
-          quantityChange: dto.quantity,
+          type: qty > 0 ? 'ADD' : 'DEDUCT',
+          quantityChange: qty,
           balanceAfter: 0,
           remarks: dto.remarks,
           performedBy: dto.performedBy,
           createdAt: new Date()
         });
+
+        await tx.update(rawMaterials)
+          .set({ currentStock: sql`${rawMaterials.currentStock} + ${qty}`, updatedAt: new Date() })
+          .where(eq(rawMaterials.id, dto.itemId));
       }
-      await this.recalculateInventory(tx);
     });
     await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_created', itemId: dto.itemId, itemType: dto.itemType });
     return result;
@@ -343,28 +362,31 @@ export class InventoryService {
 
   async updateStockTransaction(dto: { transactionId: string; quantity: number; remarks?: string; performedBy: string }) {
     const result = await db.transaction(async (tx) => {
+      const newQty = Number(dto.quantity);
+      
       const [rawTx] = await tx.select().from(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, dto.transactionId)).limit(1);
       if (rawTx) {
+        const diff = newQty - Number(rawTx.quantityChange);
         await tx.update(rawMaterialTransactions)
-          .set({
-            quantityChange: dto.quantity,
-            remarks: dto.remarks,
-            performedBy: dto.performedBy
-          })
+          .set({ quantityChange: newQty, remarks: dto.remarks, performedBy: dto.performedBy })
           .where(eq(rawMaterialTransactions.id, dto.transactionId));
+          
+        await tx.update(rawMaterials)
+          .set({ currentStock: sql`${rawMaterials.currentStock} + ${diff}`, updatedAt: new Date() })
+          .where(eq(rawMaterials.id, rawTx.materialId));
       } else {
         const [prodTx] = await tx.select().from(productStockTransactions).where(eq(productStockTransactions.id, dto.transactionId)).limit(1);
         if (!prodTx) throw new Error('Transaction not found');
+        const diff = newQty - Number(prodTx.quantityChange);
 
         await tx.update(productStockTransactions)
-          .set({
-            quantityChange: dto.quantity,
-            remarks: dto.remarks,
-            performedBy: dto.performedBy
-          })
+          .set({ quantityChange: newQty, remarks: dto.remarks, performedBy: dto.performedBy })
           .where(eq(productStockTransactions.id, dto.transactionId));
+          
+        await tx.update(productionStock)
+          .set({ currentStock: sql`${productionStock.currentStock} + ${diff}`, updatedAt: new Date() })
+          .where(eq(productionStock.productId, prodTx.productId));
       }
-      await this.recalculateInventory(tx);
     });
     await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_updated', transactionId: dto.transactionId });
     return result;
@@ -375,18 +397,25 @@ export class InventoryService {
       const [rawTx] = await tx.select().from(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, transactionId)).limit(1);
       if (rawTx) {
         await tx.delete(rawMaterialTransactions).where(eq(rawMaterialTransactions.id, transactionId));
+        await tx.update(rawMaterials)
+          .set({ currentStock: sql`${rawMaterials.currentStock} - ${Number(rawTx.quantityChange)}`, updatedAt: new Date() })
+          .where(eq(rawMaterials.id, rawTx.materialId));
       } else {
         const [prodTx] = await tx.select().from(productStockTransactions).where(eq(productStockTransactions.id, transactionId)).limit(1);
         if (!prodTx) throw new Error('Transaction not found');
+        
         await tx.delete(productStockTransactions).where(eq(productStockTransactions.id, transactionId));
+        await tx.update(productionStock)
+          .set({ currentStock: sql`${productionStock.currentStock} - ${Number(prodTx.quantityChange)}`, updatedAt: new Date() })
+          .where(eq(productionStock.productId, prodTx.productId));
       }
-      await this.recalculateInventory(tx);
     });
     await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_deleted', transactionId });
     return result;
   }
 
   async recalculateInventory(tx?: any) {
+    // Only runs manually or via night jobs now. Stock transactions are atomic.
     const runner = tx || db;
 
     const rawMaterialRows = await runner.select({ id: rawMaterials.id }).from(rawMaterials);
@@ -398,14 +427,10 @@ export class InventoryService {
       .where(eq(rawMaterialTransactions.materialId, material.id));
 
       await runner.update(rawMaterials)
-        .set({
-          currentStock: Number(balanceRes.sum || 0),
-          updatedAt: new Date()
-        })
+        .set({ currentStock: Number(balanceRes.sum || 0), updatedAt: new Date() })
         .where(eq(rawMaterials.id, material.id));
     }
 
-    // 3. Recalculate Finished Goods Stock per Product
     const allProducts = await runner.select().from(products);
     for (const prod of allProducts) {
       const productBatchesList = await runner.select({ id: productionBatches.id })
@@ -413,71 +438,37 @@ export class InventoryService {
         .where(and(eq(productionBatches.productId, prod.id), isNull(productionBatches.deletedAt)));
       
       let totalProduced = 0;
-      
       for (const b of productBatchesList) {
-        // Finished goods stock is tracked in cases from the packing station.
-        const [packedRes] = await runner.select({
-          sum: sql<string>`coalesce(sum(${productionLogs.casesProduced}), '0')`
-        })
-        .from(productionLogs)
-        .where(and(
-          eq(productionLogs.batchId, b.id),
-          eq(productionLogs.station, 'PACKING'),
-          isNull(productionLogs.deletedAt)
-        ));
-
+        const [packedRes] = await runner.select({ sum: sql<string>`coalesce(sum(${productionLogs.casesProduced}), '0')` })
+          .from(productionLogs)
+          .where(and(eq(productionLogs.batchId, b.id), eq(productionLogs.station, 'PACKING'), isNull(productionLogs.deletedAt)));
         totalProduced += parseInt(packedRes.sum, 10);
       }
       
-      // Calculate Dispatched
-      const [dispatchRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(${dispatchLogs.quantity}), '0')`
-      })
-      .from(dispatchLogs)
-      .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
-      .where(and(
-        eq(productionBatches.productId, prod.id),
-        isNull(productionBatches.deletedAt)
-      ));
+      const [dispatchRes] = await runner.select({ sum: sql<string>`coalesce(sum(${dispatchLogs.quantity}), '0')` })
+        .from(dispatchLogs).innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
+        .where(and(eq(productionBatches.productId, prod.id), isNull(productionBatches.deletedAt)));
       
-      // Calculate Manual Inward / Adjustments
-      const [manualRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(${productStockTransactions.quantityChange}), '0')`
-      })
-      .from(productStockTransactions)
-      .where(eq(productStockTransactions.productId, prod.id));
+      const [manualRes] = await runner.select({ sum: sql<string>`coalesce(sum(${productStockTransactions.quantityChange}), '0')` })
+        .from(productStockTransactions).where(eq(productStockTransactions.productId, prod.id));
 
-      // Calculate Sales Transactions impact: RETURN is +qty, SALES_DISPATCH & DAMAGE are -qty
       const [salesRes] = await runner.select({
         sum: sql<string>`coalesce(sum(case when ${salesTransactions.type} = 'RETURN' then ${salesTransactions.quantity} else -${salesTransactions.quantity} end), '0')`
-      })
-      .from(salesTransactions)
-      .where(eq(salesTransactions.productId, prod.id));
+      }).from(salesTransactions).where(eq(salesTransactions.productId, prod.id));
 
       const salesImpact = parseInt(salesRes.sum, 10);
       const manualAdded = parseInt(manualRes.sum, 10);
       const totalDispatched = parseInt(dispatchRes.sum, 10);
       const availableStock = totalProduced + manualAdded - totalDispatched + salesImpact;
       
-      // Upsert
       const existing = await runner.select().from(productionStock).where(eq(productionStock.productId, prod.id)).limit(1);
       if (existing.length > 0) {
         await runner.update(productionStock)
-          .set({
-            currentStock: availableStock,
-            totalProduced,
-            totalDispatched,
-            updatedAt: new Date()
-          })
+          .set({ currentStock: availableStock, totalProduced, totalDispatched, updatedAt: new Date() })
           .where(eq(productionStock.productId, prod.id));
       } else {
         await runner.insert(productionStock).values({
-          productId: prod.id,
-          currentStock: availableStock,
-          totalProduced,
-          totalDispatched,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          productId: prod.id, currentStock: availableStock, totalProduced, totalDispatched, createdAt: new Date(), updatedAt: new Date()
         });
       }
     }

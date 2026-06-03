@@ -46,9 +46,7 @@ async function bootstrap() {
   const { getCorsConfig } = await import('./common/config/cors.config');
   app.enableCors(getCorsConfig());
 
-  // 3. PIPES & FILTERS & INTERCEPTORS
-  const { IdempotencyInterceptor } = await import('./common/interceptors/idempotency.interceptor');
-  app.useGlobalInterceptors(new IdempotencyInterceptor());
+  // 3. PIPES & FILTERS
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(new ValidationPipe({ 
     whitelist: true, 
