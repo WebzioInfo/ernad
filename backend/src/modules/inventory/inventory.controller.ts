@@ -113,11 +113,6 @@ export class InventoryController {
     const itemType = body.itemType || 'RAW';
     if (!itemId) throw new Error('itemId or materialId is required');
 
-    const userRoles = (req.user?.roles || [req.user?.role]).map((r: any) => String(r).toUpperCase());
-    if (itemType === 'RAW' && !userRoles.includes('ADMIN')) {
-      throw new ForbiddenException('Only Administrators can manage raw material stock');
-    }
-
     return await this.inventoryService.addStockTransaction({
       itemId,
       itemType,
@@ -138,10 +133,6 @@ export class InventoryController {
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin & Manager)' })
   async updateStockTransaction(@Body() body: { transactionId: string; quantity: number; remarks?: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
-    const userRoles = (req.user?.roles || [req.user?.role]).map((r: any) => String(r).toUpperCase());
-    if (body.itemType === 'RAW' && !userRoles.includes('ADMIN')) {
-      throw new ForbiddenException('Only Administrators can modify raw material stock');
-    }
     return await this.inventoryService.updateStockTransaction({
       transactionId: body.transactionId,
       quantity: Number(body.quantity),
@@ -154,10 +145,6 @@ export class InventoryController {
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin & Manager)' })
   async deleteStockTransaction(@Body() body: { transactionId: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
-    const userRoles = (req.user?.roles || [req.user?.role]).map((r: any) => String(r).toUpperCase());
-    if (body.itemType === 'RAW' && !userRoles.includes('ADMIN')) {
-      throw new ForbiddenException('Only Administrators can delete raw material stock');
-    }
     return await this.inventoryService.deleteStockTransaction(body.transactionId);
   }
 }
