@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ENDPOINTS } from '../../constants/endpoints';
 import { api } from '../../services/api-client';
@@ -839,10 +839,19 @@ export function CreateMaterialModal({ onClose, onSubmit, isPending }: any) {
 }
 
 export function EditMaterialModal({ material, onClose, onSubmit, isPending }: any) {
-  const [name, setName] = useState(material.name || '');
-  const [materialType, setMaterialType] = useState(material.materialType || '');
-  const [unit, setUnit] = useState(material.unit || '');
-  const [currentStock, setCurrentStock] = useState<number | ''>(material.currentStock ?? 0);
+  const [name, setName] = useState('');
+  const [materialType, setMaterialType] = useState('');
+  const [unit, setUnit] = useState('');
+  const [currentStock, setCurrentStock] = useState<number | ''>('');
+
+  useEffect(() => {
+    if (material) {
+      setName(material.name || '');
+      setMaterialType(material.materialType || '');
+      setUnit(material.unit || '');
+      setCurrentStock(material.currentStock !== undefined && material.currentStock !== null ? Number(material.currentStock) : 0);
+    }
+  }, [material]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -850,7 +859,15 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
     onSubmit({ name, materialType, unit, currentStock: Number(currentStock) });
   };
 
-  const hasChanges = name !== (material.name || '') || materialType !== (material.materialType || '') || unit !== (material.unit || '') || currentStock !== (material.currentStock ?? 0);
+  const currentFormData = { name, materialType, unit, currentStock: Number(currentStock) };
+  const originalFormData = {
+    name: material.name || '',
+    materialType: material.materialType || '',
+    unit: material.unit || '',
+    currentStock: material.currentStock !== undefined && material.currentStock !== null ? Number(material.currentStock) : 0
+  };
+
+  const isDirty = JSON.stringify(currentFormData) !== JSON.stringify(originalFormData);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -940,7 +957,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
             </button>
             <button
               type="submit"
-              disabled={isPending || !name || !materialType || !unit || currentStock === '' || !hasChanges}
+              disabled={isPending || !name || !materialType || !unit || currentStock === '' || !isDirty}
               className="flex-1 px-5 py-3 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-[#1A9A91]/20"
             >
               {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
