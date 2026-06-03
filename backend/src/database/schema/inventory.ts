@@ -8,7 +8,7 @@ export const rawMaterials = pgTable('raw_materials', {
   name: varchar('name', { length: 150 }).notNull(),
   materialType: varchar('material_type', { length: 50 }).notNull(), // PREFORM, CAP, LABEL, SHRINK, OTHER
   unit: varchar('unit', { length: 50 }).notNull(), // BAG, BOX, PIECE, ROLL
-  currentStock: integer('current_stock').default(0).notNull(),
+  currentStock: decimal('current_stock', { precision: 12, scale: 2 }).default('0').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -132,8 +132,8 @@ export const rawMaterialTransactions = pgTable('raw_material_transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
   materialId: uuid('material_id').references(() => rawMaterials.id, { onDelete: 'cascade' }).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // ADD, EDIT, DELETE
-  quantityChange: integer('quantity_change').notNull(),
-  balanceAfter: integer('balance_after').notNull(),
+  quantityChange: decimal('quantity_change', { precision: 12, scale: 2 }).notNull(),
+  balanceAfter: decimal('balance_after', { precision: 12, scale: 2 }).notNull(),
   remarks: text('remarks'),
   performedBy: uuid('performed_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -148,8 +148,8 @@ export const productStockTransactions = pgTable('product_stock_transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
   type: varchar('type', { length: 50 }).notNull(), // ADD, EDIT, DELETE
-  quantityChange: integer('quantity_change').notNull(),
-  balanceAfter: integer('balance_after').notNull(),
+  quantityChange: decimal('quantity_change', { precision: 12, scale: 2 }).notNull(),
+  balanceAfter: decimal('balance_after', { precision: 12, scale: 2 }).notNull(),
   remarks: text('remarks'),
   performedBy: uuid('performed_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -163,9 +163,9 @@ export const productStockTransactions = pgTable('product_stock_transactions', {
 export const productionStock = pgTable('production_stock', {
   id: uuid('id').defaultRandom().primaryKey(),
   productId: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull().unique(),
-  currentStock: integer('current_stock').default(0).notNull(), // Available Stock
-  totalProduced: integer('total_produced').default(0).notNull(),
-  totalDispatched: integer('total_dispatched').default(0).notNull(),
+  currentStock: decimal('current_stock', { precision: 12, scale: 2 }).default('0').notNull(), // Available Stock
+  totalProduced: decimal('total_produced', { precision: 12, scale: 2 }).default('0').notNull(),
+  totalDispatched: decimal('total_dispatched', { precision: 12, scale: 2 }).default('0').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

@@ -695,6 +695,7 @@ export function StockTransactionModal({ materials, material, transaction, onClos
             <input 
               required
               type="number"
+              step="any"
               min="1"
               value={quantity} 
               onChange={(e) => setQuantity(e.target.value)} 
@@ -918,6 +919,7 @@ export function EditMaterialModal({ material, onClose, onSubmit, isPending }: an
             <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">Current Stock Balance</label>
             <input
               type="number"
+              step="any"
               value={currentStock}
               onChange={(e) => setCurrentStock(e.target.value ? Number(e.target.value) : '')}
               className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] transition-all"

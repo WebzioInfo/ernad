@@ -416,6 +416,7 @@ function StockUpdateModal({ material, onClose, onSubmit, isPending }: any) {
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity ({material.unit})</label>
               <input
                 type="number"
+                step="any"
                 className="w-full bg-slate-50 border-2 border-transparent rounded-[1.5rem] px-8 py-6 text-3xl font-black focus:ring-0 focus:border-indigo-600/20 focus:bg-white transition-all text-slate-900"
                 placeholder="0.00"
                 value={quantity}
@@ -502,7 +503,7 @@ function CreateMaterialModal({ categories, warehouses, onClose, onSubmit, isPend
                 </select>
               </FormField>
               <FormField label="Depletion Alert Level">
-                <input type="number" value={minimumStock} onChange={(e) => setMinimumStock(e.target.value)} className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-none outline-none" />
+                <input type="number" step="any" value={minimumStock} onChange={(e) => setMinimumStock(e.target.value)} className="w-full bg-slate-50 rounded-2xl px-6 py-5 font-bold border-none outline-none" />
               </FormField>
             </div>
 
