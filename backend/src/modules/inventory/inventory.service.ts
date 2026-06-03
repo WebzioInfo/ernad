@@ -288,9 +288,9 @@ export class InventoryService {
       if (existing.length === 0) {
         await db.insert(productionStock).values({
           productId: prod.id,
-          currentStock: 0,
-          totalProduced: 0,
-          totalDispatched: 0,
+          currentStock: '0',
+          totalProduced: '0',
+          totalDispatched: '0',
           createdAt: new Date(),
           updatedAt: new Date()
         }).catch(() => {});
@@ -320,8 +320,8 @@ export class InventoryService {
         await tx.insert(productStockTransactions).values({
           productId: dto.itemId,
           type: qty > 0 ? 'ADD' : 'DEDUCT',
-          quantityChange: qty,
-          balanceAfter: 0,
+          quantityChange: String(qty),
+          balanceAfter: '0',
           remarks: dto.remarks,
           performedBy: dto.performedBy,
           createdAt: new Date()
@@ -335,7 +335,7 @@ export class InventoryService {
             .where(eq(productionStock.productId, dto.itemId));
         } else {
           await tx.insert(productionStock).values({
-            productId: dto.itemId, currentStock: qty, totalProduced: 0, totalDispatched: 0,
+            productId: dto.itemId, currentStock: String(qty), totalProduced: '0', totalDispatched: '0',
             createdAt: new Date(), updatedAt: new Date()
           });
         }
@@ -344,8 +344,8 @@ export class InventoryService {
         await tx.insert(rawMaterialTransactions).values({
           materialId: dto.itemId,
           type: qty > 0 ? 'ADD' : 'DEDUCT',
-          quantityChange: qty,
-          balanceAfter: 0,
+          quantityChange: String(qty),
+          balanceAfter: '0',
           remarks: dto.remarks,
           performedBy: dto.performedBy,
           createdAt: new Date()
@@ -368,7 +368,7 @@ export class InventoryService {
       if (rawTx) {
         const diff = newQty - Number(rawTx.quantityChange);
         await tx.update(rawMaterialTransactions)
-          .set({ quantityChange: newQty, remarks: dto.remarks, performedBy: dto.performedBy })
+          .set({ quantityChange: String(newQty), remarks: dto.remarks, performedBy: dto.performedBy })
           .where(eq(rawMaterialTransactions.id, dto.transactionId));
           
         await tx.update(rawMaterials)
@@ -380,7 +380,7 @@ export class InventoryService {
         const diff = newQty - Number(prodTx.quantityChange);
 
         await tx.update(productStockTransactions)
-          .set({ quantityChange: newQty, remarks: dto.remarks, performedBy: dto.performedBy })
+          .set({ quantityChange: String(newQty), remarks: dto.remarks, performedBy: dto.performedBy })
           .where(eq(productStockTransactions.id, dto.transactionId));
           
         await tx.update(productionStock)

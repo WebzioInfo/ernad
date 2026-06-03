@@ -202,8 +202,8 @@ export class MasterDataService {
         await db.insert(rawMaterialTransactions).values({
           materialId: id,
           type: 'EDIT',
-          quantityChange: difference,
-          balanceAfter: dto.currentStock,
+          quantityChange: String(difference),
+          balanceAfter: String(dto.currentStock),
           remarks: 'Manual Stock Adjustment via Edit',
         });
       }
@@ -211,7 +211,7 @@ export class MasterDataService {
 
     const { currentStock, ...updateData } = dto;
     const dbPayload: any = { ...updateData, updatedAt: new Date() };
-    if (currentStock !== undefined) dbPayload.currentStock = currentStock;
+    if (currentStock !== undefined) dbPayload.currentStock = String(currentStock);
 
     const [rawMaterial] = await db.update(rawMaterials)
       .set(dbPayload)
