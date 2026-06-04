@@ -109,7 +109,6 @@ export default function OperatorPanel() {
   const [bagsUsed, setBagsUsed] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
-  const [shrinkUsage, setShrinkUsage] = useState<number>(0);
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
   const [tdsValue, setTdsValue] = useState(0);
@@ -120,9 +119,32 @@ export default function OperatorPanel() {
   const [makeupChanged, setMakeupChanged] = useState(false);
 
   // New Packing Station States
-  const [shrinkWasteWeight, setShrinkWasteWeight] = useState('');
+  const [selectedShrinks, setSelectedShrinks] = useState<Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>>([]);
   const [selectedBottleConfig, setSelectedBottleConfig] = useState<string>('');
   const [testResult] = useState<'PASSED' | 'FAILED' | 'PENDING'>('PASSED');
+
+  const toggleShrink = (material: any) => {
+    setSelectedShrinks(prev => {
+      const exists = prev.find(s => s.shrinkId === material.id);
+      if (exists) {
+        return prev.filter(s => s.shrinkId !== material.id);
+      } else {
+        return [...prev, { shrinkId: material.id, shrinkName: material.name, mmUsed: 0, wastageKg: 0 }];
+      }
+    });
+  };
+
+  const handleMmUsedChange = (shrinkId: string, value: number) => {
+    setSelectedShrinks(prev =>
+      prev.map(s => s.shrinkId === shrinkId ? { ...s, mmUsed: value } : s)
+    );
+  };
+
+  const handleWastageKgChange = (shrinkId: string, value: number) => {
+    setSelectedShrinks(prev =>
+      prev.map(s => s.shrinkId === shrinkId ? { ...s, wastageKg: value } : s)
+    );
+  };
 
   const [eventType] = useState('NORMAL_PRODUCTION');
   const [remarks, setRemarks] = useState('');
@@ -480,11 +502,29 @@ export default function OperatorPanel() {
       ? Math.max(0, rawProductionCount - bottleLeakage)
       : Math.floor(primaryCount);
 
+    const totalSelectedShrinksWastage = currentStation.id === 'PACKING'
+      ? selectedShrinks.reduce((sum, s) => sum + (s.wastageKg || 0), 0)
+      : 0;
+
     const calculatedWastageCount = (currentStation.id === 'FILLING' && productionWastages)
       ? (bottleLeakage + capWastage)
       : (currentStation.id === 'PACKING'
-        ? (parseFloat(shrinkWasteWeight) || 0)
+        ? totalSelectedShrinksWastage
         : rejectionCount);
+
+    if (currentStation.id === 'PACKING') {
+      if (selectedShrinks.length === 0) {
+        return toast.error('Please select at least one shrink roll material.');
+      }
+      for (const shrink of selectedShrinks) {
+        if (shrink.mmUsed === undefined || shrink.mmUsed <= 0) {
+          return toast.error(`Please enter a valid MM Used value for ${shrink.shrinkName}.`);
+        }
+        if (shrink.wastageKg === undefined || shrink.wastageKg < 0) {
+          return toast.error(`Please enter a valid Wastage value for ${shrink.shrinkName}.`);
+        }
+      }
+    }
 
     const logEntry: any = {
       requestId: uuidv4(),
@@ -525,8 +565,8 @@ export default function OperatorPanel() {
       logEntry.inkChanged = inkChanged;
       logEntry.makeupChanged = makeupChanged;
     } else if (currentStation?.id === 'PACKING') {
-      logEntry.shrinkRollsUsed = Number(shrinkUsage) || 0;
-      logEntry.rawMaterialId = selectedRawMaterialId;
+      logEntry.shrinkWastageKg = totalSelectedShrinksWastage;
+      logEntry.selectedShrinks = selectedShrinks;
       logEntry.sourceBatchNumber = activeBatch?.batch?.batchCode;
       logEntry.finishedGoodsProduced = primaryCount;
       logEntry.casesProduced = casesProduced;
@@ -579,11 +619,11 @@ export default function OperatorPanel() {
       // Auto Reset Form
       setPrimaryCount(0);
       setRejectionCount(0);
-      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setShrinkUsage(0);
+      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
       setMakeupChanged(false);
-      setShrinkWasteWeight('');
+      setSelectedShrinks([]);
       setSelectedBottleConfig('');
       setRawProductionCount(0);
       setBottleLeakage(0);
@@ -988,32 +1028,80 @@ export default function OperatorPanel() {
                         />
                       </div>
 
-                      {/* Row 3 */}
-                      <div className="space-y-2">
-                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
-                          Shrink Roll Material
-                        </label>
-                        <select
-                          value={selectedRawMaterialId}
-                          onChange={e => setSelectedRawMaterialId(e.target.value)}
-                          className="w-full h-12 bg-white border border-slate-200 rounded-xl px-6 text-sm font-bold text-slate-900 outline-none focus:border-[#1A9A91]/45 transition-all"
-                        >
-                          <option value="">Select Shrink Roll...</option>
-                          {stationRawMaterials.map((material: any) => (
-                            <option key={material.id} value={material.id}>
-                              {material.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* Row 3 - Multiple Shrink Card Selection Grid */}
+                      <div className="md:col-span-2 space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">
+                            Select Shrink Materials
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {stationRawMaterials.filter((m: any) => m.materialType === 'SHRINK').map((material: any) => {
+                              const isSelected = selectedShrinks.some(s => s.shrinkId === material.id);
+                              return (
+                                <button
+                                  key={material.id}
+                                  type="button"
+                                  onClick={() => toggleShrink(material)}
+                                  className={`w-28 px-3 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all duration-300 relative overflow-hidden h-12 cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-[#1A9A91]/10 border-[#1A9A91] shadow-md shadow-[#1A9A91]/5'
+                                      : 'bg-white border-slate-200 hover:border-[#1A9A91]/45'
+                                  }`}
+                                >
+                                  <span className={`text-xs font-black uppercase tracking-wider ${isSelected ? 'text-[#1A9A91]' : 'text-slate-700'}`}>
+                                    {material.name.match(/(\d+)\s*(?:mm|m)/i)
+                                      ? `${material.name.match(/(\d+)\s*(?:mm|m)/i)![1]}mm`
+                                      : material.name}
+                                  </span>
+                                  {isSelected && (
+                                    <div className="w-5 h-5 rounded-full bg-[#1A9A91] flex items-center justify-center text-white text-[10px] font-black shrink-0">
+                                      ✓
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {stationRawMaterials.filter((m: any) => m.materialType === 'SHRINK').length === 0 && (
+                            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest px-2">
+                              No shrink roll materials found for this station.
+                            </p>
+                          )}
+                        </div>
 
-                      <IndustrialNumericInput
-                        label="Shrink Material Used (KG)"
-                        value={shrinkUsage}
-                        onChange={setShrinkUsage}
-                        suffix="KG"
-                        compact
-                      />
+                        {selectedShrinks.length > 0 && (
+                          <div className="space-y-4 p-4 border border-[#1A9A91]/15 rounded-2xl bg-[#1A9A91]/5">
+                            <h5 className="text-[10px] font-black text-[#1A9A91] uppercase tracking-widest">
+                              Usage and Wastage per Selected Shrink
+                            </h5>
+                            <div className="grid grid-cols-1 gap-4">
+                              {selectedShrinks.map(shrink => (
+                                <div key={shrink.shrinkId} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2">
+                                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">{shrink.shrinkName}</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <IndustrialNumericInput
+                                      label="Usage"
+                                      value={shrink.mmUsed}
+                                      onChange={(val) => handleMmUsedChange(shrink.shrinkId, val)}
+                                      suffix="KG"
+                                      step={0.1}
+                                      compact
+                                    />
+                                    <IndustrialNumericInput
+                                      label="Wastage"
+                                      value={shrink.wastageKg || 0}
+                                      onChange={(val) => handleWastageKgChange(shrink.shrinkId, val)}
+                                      suffix="KG"
+                                      step={0.1}
+                                      compact
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

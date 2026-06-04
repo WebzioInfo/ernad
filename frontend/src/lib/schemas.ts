@@ -77,6 +77,14 @@ export const telemetryLogSchema = z.object({
   packingTypeId:          z.string().uuid().optional(),
 
   selectedStockId:        z.string().uuid().optional(),
+
+  shrinkWastageKg:        z.number().min(0).optional().nullable(),
+  selectedShrinks:        z.array(z.object({
+    shrinkId: z.string().uuid(),
+    shrinkName: z.string(),
+    mmUsed: z.number().min(0),
+    wastageKg: z.number().min(0).optional().nullable(),
+  })).optional().nullable(),
 });
 export type TelemetryLogForm = z.infer<typeof telemetryLogSchema>;
 

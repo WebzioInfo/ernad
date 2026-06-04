@@ -52,6 +52,8 @@ interface BatchHistoryEvent {
   labelUsage?: number | null;
   inkChanged?: boolean;
   makeupChanged?: boolean;
+  selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
+  shrinkWastageKg?: string | number;
 }
 
 const stations: { id: StationId; label: string }[] = [
@@ -242,9 +244,9 @@ export default function BatchLogsPage() {
                       Out: +{formatNumber(event.primaryCount)}
                     </div>
                   )}
-                  {(Number(event.wastageCount) > 0 || Number(event.damagedLabelWeight) > 0) && (
+                  {(Number(event.wastageCount) > 0 || Number(event.damagedLabelWeight) > 0 || (event.shrinkWastageKg && Number(event.shrinkWastageKg) > 0)) && (
                     <div className="px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-100 font-black text-[10px] uppercase tracking-wider flex items-center gap-1">
-                      Rej: {formatNumber(event.damagedLabelWeight || event.wastageCount)}
+                      Rej: {formatNumber(event.damagedLabelWeight || event.shrinkWastageKg || event.wastageCount)} {station === 'PACKING' || event.station === 'PACKING' || event.station === 'LABELING' ? 'KG' : ''}
                     </div>
                   )}
                   
@@ -274,10 +276,22 @@ export default function BatchLogsPage() {
                       Box: {formatNumber(event.secondaryPackagingCount)}
                     </div>
                   )}
-                  {station === 'PACKING' && Number(event.shrinkWeightUsed) > 0 && (
-                    <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
-                      Shrink: {formatNumber(event.shrinkWeightUsed)} KG
-                    </div>
+                  {station === 'PACKING' && (
+                    <>
+                      {event.selectedShrinks && event.selectedShrinks.length > 0 ? (
+                        event.selectedShrinks.map((s, idx) => (
+                          <div key={idx} className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                            {s.shrinkName}: {s.mmUsed} KG{s.wastageKg ? ` (W: ${s.wastageKg} KG)` : ''}
+                          </div>
+                        ))
+                      ) : (
+                        Number(event.shrinkWeightUsed) > 0 && (
+                          <div className="px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold text-[10px] uppercase tracking-wider">
+                            Shrink: {formatNumber(event.shrinkWeightUsed)} KG
+                          </div>
+                        )
+                      )}
+                    </>
                   )}
                 </div>
               </div>

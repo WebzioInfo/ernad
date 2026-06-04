@@ -12,7 +12,8 @@ import {
   StartBatchDto, 
   LogDowntimeDto,
   PackagingLogDto, 
-  DispatchLogDto 
+  DispatchLogDto,
+  CorrectLogDto
 } from './dto/production.dto';
 
 import { ChangeoverService } from './changeover.service';
@@ -221,7 +222,7 @@ export class ProductionController {
   async correctLog(
     @Param('id') logId: string,
     @Req() req: any,
-    @Body() body: { newData: any, reason: string }
+    @Body() body: CorrectLogDto
   ) {
     return await this.verificationService.correctLog(Number(logId), req.user.sub, body.newData, body.reason);
   }

@@ -155,7 +155,16 @@ export class ProcessingService {
         sessionId = activeSession.id;
       }
 
-      const wastageCount = Number(dto.wastageCount || 0);
+      let wastageCount = Number(dto.wastageCount || 0);
+      if (dto.station === 'PACKING') {
+        if (dto.selectedShrinks && dto.selectedShrinks.length > 0) {
+          const totalWastage = dto.selectedShrinks.reduce((sum, s) => sum + (s.wastageKg || 0), 0);
+          wastageCount = totalWastage;
+          dto.shrinkWastageKg = totalWastage;
+        } else if (dto.shrinkWastageKg !== undefined) {
+          wastageCount = dto.shrinkWastageKg;
+        }
+      }
 
       const [log] = await tx.insert(productionLogs).values({
         requestId: dto.requestId,
@@ -198,6 +207,8 @@ export class ProcessingService {
 
         // New Packing Station Fields
         shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
+        shrinkWastageKg: String(dto.shrinkWastageKg || 0),
+        selectedShrinks: dto.selectedShrinks || [],
         sourceBatchNumber: dto.sourceBatchNumber || null,
 
         // Blowing / Material Consumption Fields
@@ -226,7 +237,7 @@ export class ProcessingService {
       }
 
       // New Enterprise Material Logic
-      await this.processEnterpriseInventory(tx, dto, log.id);
+      await this.processEnterpriseInventory(tx, dto, log.id, userId);
 
       // Recalculate simple inventory
       await this.inventoryService.recalculateInventory(tx);
@@ -245,7 +256,11 @@ export class ProcessingService {
           capTotal: sql`${batchTotals.capTotal} + ${dto.capUsage || 0}`,
           preformTotal: sql`${batchTotals.preformTotal} + ${dto.preformUsage || 0}`,
           bopRollTotal: sql`${batchTotals.bopRollTotal} + ${dto.labelsUsed || 0}`,
-          shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${dto.shrinkRollsUsed || 0}`,
+          shrinkWeightTotal: sql`${batchTotals.shrinkWeightTotal} + ${
+            dto.selectedShrinks && dto.selectedShrinks.length > 0
+              ? dto.selectedShrinks.reduce((sum, s) => sum + (s.mmUsed || 0), 0)
+              : (dto.shrinkRollsUsed || 0)
+          }`,
           finishedGoodsTotal: sql`${batchTotals.finishedGoodsTotal} + ${dto.finishedGoodsProduced || 0}`,
           casesTotal: sql`${batchTotals.casesTotal} + ${dto.casesProduced || 0}`,
 
@@ -303,7 +318,7 @@ export class ProcessingService {
     });
   }
 
-  private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number) {
+  private async processEnterpriseInventory(tx: any, dto: TelemetryDto, logId: number, userId: string) {
     // ── Factory-Aligned Direct Ledger Deductions (Raw Materials) ──
     let directDeductions: Array<{ materialId: string; qty: number; remarks: string }> = [];
 
@@ -318,8 +333,27 @@ export class ProcessingService {
     }
 
     // 3. Packing (Shrink Rolls)
-    if (dto.station === 'PACKING' && dto.rawMaterialId && dto.shrinkRollsUsed && dto.shrinkRollsUsed > 0) {
-      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.shrinkRollsUsed, remarks: `Shrink Rolls used in Packing Station (Log #${logId})` });
+    if (dto.station === 'PACKING') {
+      if (dto.selectedShrinks && dto.selectedShrinks.length > 0) {
+        for (const shrink of dto.selectedShrinks) {
+          const usage = shrink.mmUsed || 0;
+          const wastage = shrink.wastageKg || 0;
+          const totalDeduction = usage + wastage;
+          if (totalDeduction > 0) {
+            directDeductions.push({
+              materialId: shrink.shrinkId,
+              qty: totalDeduction,
+              remarks: `Shrink roll used in Packing Station: ${shrink.shrinkName} (Usage: ${usage} KG, Wastage: ${wastage} KG) (Log #${logId})`
+            });
+          }
+        }
+      } else if (dto.rawMaterialId && dto.shrinkRollsUsed && dto.shrinkRollsUsed > 0) {
+        directDeductions.push({
+          materialId: dto.rawMaterialId,
+          qty: dto.shrinkRollsUsed,
+          remarks: `Shrink Rolls used in Packing Station (Log #${logId})`
+        });
+      }
     }
 
     // 4. Labeling (Pieces Priority-based mapping)
@@ -377,15 +411,16 @@ export class ProcessingService {
       const newQty = currentQty - ded.qty;
 
       await tx.update(rawMaterials)
-        .set({ currentStock: newQty, updatedAt: new Date() })
+        .set({ currentStock: String(newQty), updatedAt: new Date() })
         .where(eq(rawMaterials.id, ded.materialId));
 
       await tx.insert(rawMaterialTransactions).values({
         materialId: ded.materialId,
         type: 'CONSUMPTION',
-        quantityChange: -ded.qty,
-        balanceAfter: newQty,
+        quantityChange: String(-ded.qty),
+        balanceAfter: String(newQty),
         remarks: ded.remarks,
+        performedBy: userId,
         createdAt: new Date()
       });
     }
@@ -569,8 +604,47 @@ export class ProcessingService {
   }
 
   private async reverseRawMaterialUsage(tx: any, log: any, userId: string, remarks: string) {
+    if (log.station === 'PACKING' && log.selectedShrinks && log.selectedShrinks.length > 0) {
+      for (const shrink of log.selectedShrinks) {
+        const usage = shrink.mmUsed || 0;
+        const wastage = shrink.wastageKg || 0;
+        const totalRestored = usage + wastage;
+        if (totalRestored > 0) {
+          const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, shrink.shrinkId)).for('update');
+          const currentQty = mat ? Number(mat.currentStock || 0) : 0;
+          const restoredQty = currentQty + totalRestored;
+
+          if (mat) {
+            await tx.update(rawMaterials)
+              .set({ currentStock: String(restoredQty), updatedAt: new Date() })
+              .where(eq(rawMaterials.id, shrink.shrinkId));
+          }
+
+          await this.insertRawMaterialTransaction(
+            tx,
+            shrink.shrinkId,
+            totalRestored,
+            'REVERSAL',
+            `${remarks} - restore shrink ${shrink.shrinkName} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
+            userId,
+          );
+        }
+      }
+      return;
+    }
+
     const usage = this.getRawMaterialUsageFromLog(log);
     if (!usage) return;
+
+    const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, usage.materialId)).for('update');
+    const currentQty = mat ? Number(mat.currentStock || 0) : 0;
+    const restoredQty = currentQty + usage.qty;
+
+    if (mat) {
+      await tx.update(rawMaterials)
+        .set({ currentStock: restoredQty, updatedAt: new Date() })
+        .where(eq(rawMaterials.id, usage.materialId));
+    }
 
     await this.insertRawMaterialTransaction(
       tx,
@@ -655,6 +729,8 @@ export class ProcessingService {
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
       shrinkWeightUsed: productionLogs.shrinkWeightUsed,
       sourceBatchNumber: productionLogs.sourceBatchNumber,
+      shrinkWastageKg: productionLogs.shrinkWastageKg,
+      selectedShrinks: productionLogs.selectedShrinks,
 
       // Blowing / Material Consumption
       rawMaterialId: productionLogs.rawMaterialId,
@@ -794,6 +870,8 @@ export class ProcessingService {
         shrinkWasteWeight: l.shrinkWasteWeight,
         shrinkWeightUsed: l.shrinkWeightUsed,
         sourceBatchNumber: l.sourceBatchNumber,
+        shrinkWastageKg: l.shrinkWastageKg,
+        selectedShrinks: l.selectedShrinks,
         // Blowing / Material Consumption
         rawMaterialId: l.rawMaterialId,
         rawMaterialName: l.rawMaterialName,

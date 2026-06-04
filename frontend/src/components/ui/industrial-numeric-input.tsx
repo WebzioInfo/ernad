@@ -56,7 +56,10 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             type="button"
             onClick={handleDecrement}
             disabled={props.disabled || props.readOnly}
-            className="h-full px-4 bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
+            className={cn(
+              "h-full bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0",
+              compact ? "px-2.5 min-w-[36px]" : "px-4 min-w-[44px]"
+            )}
           >
             <Minus className="w-4 h-4" />
           </button>
@@ -84,7 +87,10 @@ const IndustrialNumericInput = React.forwardRef<HTMLInputElement, IndustrialNume
             type="button"
             onClick={handleIncrement}
             disabled={props.disabled || props.readOnly}
-            className="h-full px-4 bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0 min-w-[44px]"
+            className={cn(
+              "h-full bg-slate-50 hover:bg-[#1A9A91]/5 text-slate-400 hover:text-[#1A9A91] disabled:opacity-50 disabled:hover:bg-slate-50 disabled:hover:text-slate-400 rounded-xl transition-all active:scale-95 border border-slate-100 flex items-center justify-center shrink-0",
+              compact ? "px-2.5 min-w-[36px]" : "px-4 min-w-[44px]"
+            )}
           >
             <Plus className="w-4 h-4" />
           </button>

@@ -32,6 +32,8 @@ async function migrate() {
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "shrink_weight_used" decimal(8, 2) DEFAULT '0'`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "label_usage" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "shrink_waste_weight" decimal(8, 2)`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "shrink_wastage_kg" decimal(8, 2) DEFAULT '0' NOT NULL`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "selected_shrinks" jsonb DEFAULT '[]'::jsonb NOT NULL`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "ink_usage_ml" decimal(8, 2)`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "makeup_usage_ml" decimal(8, 2)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS "idx_production_logs_status" ON "production_logs" ("status")`);

@@ -266,6 +266,16 @@ export class TelemetryDto {
   shrinkWasteWeight?: number;
 
   @ApiProperty()
+  @IsNumber()
+  @IsOptional()
+  shrinkWastageKg?: number;
+
+  @ApiProperty()
+  @IsArray()
+  @IsOptional()
+  selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
+
+  @ApiProperty()
   @IsString()
   @IsOptional()
   sourceBatchNumber?: string;

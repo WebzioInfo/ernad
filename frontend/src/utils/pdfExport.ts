@@ -223,14 +223,48 @@ export const generateBatchAuditPDF = async (metadata: any, totals: any, logs: an
   doc.text(`Forensic Event Ledger - ${station}`, 14, currentY);
   
   if (logs && logs.length > 0) {
-    const logCols = ["Time", "Event / Remarks", "Operator", "Output", "Wastage"];
-    const logRows = logs.map((log: any) => [
-      format(new Date(log.loggedAt), 'MMM dd, HH:mm:ss'),
-      log.remarks || 'No remarks recorded',
-      `${log.userName} ${log.updatedByName ? '(Revised)' : ''}`,
-      log.primaryCount?.toLocaleString() || '0',
-      log.wastageCount?.toLocaleString() || '0'
-    ]);
+    const logCols = ["Time", "Remarks", "Operator", "Material Usage", "Output", "Wastage"];
+    const logRows = logs.map((log: any) => {
+      let materialUsageStr = '';
+      const currentStationId = (log.station || station).toUpperCase();
+      if (currentStationId === 'PACKING') {
+        if (log.selectedShrinks && log.selectedShrinks.length > 0) {
+          materialUsageStr = log.selectedShrinks.map((s: any) => `${s.shrinkName}: ${s.mmUsed} KG${s.wastageKg ? ` (W: ${s.wastageKg} KG)` : ''}`).join('\n');
+        } else if (log.shrinkWeightUsed && Number(log.shrinkWeightUsed) > 0) {
+          materialUsageStr = `Shrink: ${log.shrinkWeightUsed} KG`;
+        }
+      } else if (currentStationId === 'BLOWING') {
+        if (log.bagsUsed && Number(log.bagsUsed) > 0) {
+          materialUsageStr = `${log.bagsUsed} Bags`;
+        }
+      } else if (currentStationId === 'FILLING') {
+        if (log.capUsage && Number(log.capUsage) > 0) {
+          materialUsageStr = `${log.capUsage} Caps`;
+        }
+      } else if (currentStationId === 'LABELING') {
+        if (log.bopRollUsage && Number(log.bopRollUsage) > 0) {
+          materialUsageStr = `${log.bopRollUsage} KG`;
+        }
+      }
+
+      let wastageStr = '';
+      if (currentStationId === 'PACKING') {
+        wastageStr = `${log.shrinkWastageKg !== undefined ? log.shrinkWastageKg : log.wastageCount} KG`;
+      } else if (currentStationId === 'LABELING') {
+        wastageStr = `${log.wastageCount} KG`;
+      } else {
+        wastageStr = log.wastageCount?.toLocaleString() || '0';
+      }
+
+      return [
+        format(new Date(log.loggedAt), 'MMM dd, HH:mm:ss'),
+        log.remarks || 'No remarks recorded',
+        `${log.userName || log.user?.name || 'Operator'} ${log.updatedByName ? '(Revised)' : ''}`,
+        materialUsageStr || '-',
+        log.primaryCount?.toLocaleString() || '0',
+        wastageStr
+      ];
+    });
     
     autoTable(doc, {
       head: [logCols],
@@ -241,10 +275,12 @@ export const generateBatchAuditPDF = async (metadata: any, totals: any, logs: an
       alternateRowStyles: { fillColor: [248, 250, 252] },
       styles: { fontSize: 8, cellPadding: 3 },
       columnStyles: {
-        0: { cellWidth: 35 },
-        2: { cellWidth: 40 },
-        3: { cellWidth: 25, halign: 'right' },
-        4: { cellWidth: 25, halign: 'right' }
+        0: { cellWidth: 30 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 42 },
+        4: { cellWidth: 20, halign: 'right' },
+        5: { cellWidth: 20, halign: 'right' }
       },
       margin: { left: 14, right: 14 }
     });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
 import {
@@ -29,7 +29,13 @@ interface BatchDossierModalProps {
 export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) {
   const queryClient = useQueryClient();
   const [editingLogId, setEditingLogId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState({ primaryCount: 0, wastageCount: 0, remarks: '' });
+  const [editForm, setEditForm] = useState<{
+    primaryCount: number;
+    wastageCount: number;
+    remarks: string;
+    shrinkWastageKg?: number;
+    selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number }>;
+  }>({ primaryCount: 0, wastageCount: 0, remarks: '' });
 
   // 1. Fetch Dossier (Metadata + Totals + Trend)
   const { data: dossier, isLoading: loadingDossier } = useQuery({
@@ -44,10 +50,66 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
     queryFn: async () => (await api.get(`telemetry/history/${batchId}/${station}`)).data
   });
 
+  const { data: rawMaterials } = useQuery({
+    queryKey: ['raw-materials-packing'],
+    queryFn: async () => (await api.get('master-data/raw-materials?station=PACKING')).data,
+  });
+  const packingRawMaterials = rawMaterials || [];
+
+  const toggleDossierShrink = (material: any) => {
+    setEditForm(prev => {
+      const currentShrinks = prev.selectedShrinks || [];
+      const exists = currentShrinks.find((s: any) => s.shrinkId === material.id);
+      let newShrinks;
+      if (exists) {
+        newShrinks = currentShrinks.filter((s: any) => s.shrinkId !== material.id);
+      } else {
+        newShrinks = [...currentShrinks, { shrinkId: material.id, shrinkName: material.name, mmUsed: 0, wastageKg: 0 }];
+      }
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
+  const handleDossierMmUsedChange = (shrinkId: string, value: number) => {
+    setEditForm(prev => {
+      const currentShrinks = prev.selectedShrinks || [];
+      const newShrinks = currentShrinks.map((s: any) =>
+        s.shrinkId === shrinkId ? { ...s, mmUsed: value } : s
+      );
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
+  const handleDossierWastageKgChange = (shrinkId: string, value: number) => {
+    setEditForm(prev => {
+      const currentShrinks = prev.selectedShrinks || [];
+      const newShrinks = currentShrinks.map((s: any) =>
+        s.shrinkId === shrinkId ? { ...s, wastageKg: value } : s
+      );
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
   // 3. Edit Mutation
   const editMutation = useMutation({
     mutationFn: async (logId: number) => {
-      await api.patch(`telemetry/logs/${logId}`, editForm);
+      if (!editForm.remarks) {
+        throw new Error('Reason is required for correction.');
+      }
+      let totalWastage = Number(editForm.wastageCount || 0);
+      if (station === 'PACKING') {
+        totalWastage = (editForm.selectedShrinks || []).reduce((sum: number, s: any) => sum + (s.wastageKg || 0), 0);
+      }
+      const payload: any = {
+        primaryCount: editForm.primaryCount,
+        wastageCount: totalWastage,
+        remarks: editForm.remarks
+      };
+      if (station === 'PACKING') {
+        payload.shrinkWastageKg = totalWastage;
+        payload.selectedShrinks = editForm.selectedShrinks || [];
+      }
+      await api.post(`production/logs/${logId}/correct`, { newData: payload, reason: editForm.remarks });
     },
     onSuccess: () => {
       toast.success('Log entry corrected successfully');
@@ -55,15 +117,19 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
       queryClient.invalidateQueries({ queryKey: ['batch-logs', batchId] });
       queryClient.invalidateQueries({ queryKey: ['batch-dossier', batchId] });
     },
-    onError: () => toast.error('Failed to update log entry')
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.message || 'Failed to update log entry');
+    }
   });
 
   const startEdit = (log: any) => {
     setEditingLogId(log.id);
     setEditForm({
       primaryCount: log.primaryCount,
-      wastageCount: log.wastageCount,
-      remarks: log.remarks || ''
+      wastageCount: log.station === 'PACKING' ? Number(log.shrinkWastageKg || 0) : log.wastageCount,
+      remarks: log.remarks || '',
+      shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
+      selectedShrinks: log.selectedShrinks ? JSON.parse(JSON.stringify(log.selectedShrinks)) : []
     });
   };
 
@@ -250,84 +316,213 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                     <tr><td colSpan={6} className="p-20 text-center"><div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto" /></td></tr>
                   ) : logs?.length === 0 ? (
                     <tr><td colSpan={6} className="p-20 text-center text-slate-400 font-bold italic">No logs found for this station.</td></tr>
-                  ) : logs?.map((log: any) => (
-                    <tr key={log.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-5">
-                        <span className="text-xs font-bold text-slate-500">{format(new Date(log.loggedAt), 'HH:mm:ss')}</span>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                            <User className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{log.userName}</p>
-                            {log.updatedByName && (
-                              <p className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">
-                                Edited by {log.updatedByName}
-                              </p>
+                  ) : logs?.map((log: any) => {
+                    const isEditing = editingLogId === log.id;
+                    const isPacking = log.station === 'PACKING';
+                    return (
+                      <Fragment key={log.id}>
+                        <tr className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="px-8 py-5">
+                            <span className="text-xs font-bold text-slate-500">{format(new Date(log.loggedAt), 'HH:mm:ss')}</span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
+                                <User className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">{log.userName}</p>
+                                {log.updatedByName && (
+                                  <p className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">
+                                    Edited by {log.updatedByName}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className={`
+                                 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest
+                                 ${log.eventType === 'NORMAL_PRODUCTION' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}
+                               `}>
+                              {log.eventType}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5 text-right font-black tabular-nums text-slate-900">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                className="w-24 px-3 py-1.5 bg-slate-100 border-none rounded-lg text-right font-black"
+                                value={editForm.primaryCount}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, primaryCount: Number(e.target.value) }))}
+                              />
+                            ) : log.primaryCount.toLocaleString()}
+                          </td>
+                          <td className="px-8 py-5 text-right font-black tabular-nums text-rose-600">
+                            {isEditing ? (
+                              isPacking ? (
+                                <span className="text-xs text-slate-400">See panel below</span>
+                              ) : (
+                                <input
+                                  type="number"
+                                  className="w-24 px-3 py-1.5 bg-slate-100 border-none rounded-lg text-right font-black text-rose-600"
+                                  value={editForm.wastageCount}
+                                  onChange={(e) => setEditForm(prev => ({ ...prev, wastageCount: Number(e.target.value) }))}
+                                />
+                              )
+                            ) : (
+                              isPacking ? (
+                                `${formatDecimal(log.shrinkWastageKg !== undefined ? log.shrinkWastageKg : log.wastageCount)} KG`
+                              ) : (
+                                `${formatDecimal(log.wastageCount)} ${log.station === 'LABELING' ? 'KG' : ''}`
+                              )
                             )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <span className={`
-                             px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest
-                             ${log.eventType === 'NORMAL_PRODUCTION' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}
-                           `}>
-                          {log.eventType}
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right font-black tabular-nums text-slate-900">
-                        {editingLogId === log.id ? (
-                          <input
-                            type="number"
-                            className="w-24 px-3 py-1.5 bg-slate-100 border-none rounded-lg text-right font-black"
-                            value={editForm.primaryCount}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, primaryCount: Number(e.target.value) }))}
-                          />
-                        ) : log.primaryCount.toLocaleString()}
-                      </td>
-                      <td className="px-8 py-5 text-right font-black tabular-nums text-rose-600">
-                        {editingLogId === log.id ? (
-                          <input
-                            type="number"
-                            className="w-24 px-3 py-1.5 bg-slate-100 border-none rounded-lg text-right font-black text-rose-600"
-                            value={editForm.wastageCount}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, wastageCount: Number(e.target.value) }))}
-                          />
-                        ) : formatDecimal(log.wastageCount)}
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex justify-center gap-2">
-                          {editingLogId === log.id ? (
-                            <>
-                              <button
-                                onClick={() => editMutation.mutate(log.id)}
-                                disabled={editMutation.isPending}
-                                className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setEditingLogId(null)}
-                                className="w-8 h-8 bg-slate-100 text-slate-400 rounded-lg flex items-center justify-center hover:bg-slate-200 transition-all"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => startEdit(log)}
-                              className="w-10 h-10 bg-white border border-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:border-indigo-500 hover:text-indigo-600 hover:shadow-xl transition-all opacity-0 group-hover:opacity-100"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex justify-center gap-2">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={() => editMutation.mutate(log.id)}
+                                    disabled={editMutation.isPending || !editForm.remarks}
+                                    className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingLogId(null)}
+                                    className="w-8 h-8 bg-slate-100 text-slate-400 rounded-lg flex items-center justify-center hover:bg-slate-200 transition-all"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => startEdit(log)}
+                                  className="w-10 h-10 bg-white border border-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:border-indigo-500 hover:text-indigo-600 hover:shadow-xl transition-all opacity-0 group-hover:opacity-100"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isEditing && isPacking && (
+                          <tr className="bg-slate-50/50">
+                            <td colSpan={6} className="px-8 py-4 border-b border-slate-100">
+                              <div className="space-y-4 max-w-2xl text-left">
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                                    Select Shrink Materials
+                                  </label>
+                                  <div className="flex flex-wrap gap-2">
+                                    {packingRawMaterials.filter((m: any) => m.materialType === 'SHRINK').map((material: any) => {
+                                      const isSelected = (editForm.selectedShrinks || []).some((s: any) => s.shrinkId === material.id);
+                                      return (
+                                        <button
+                                          key={material.id}
+                                          type="button"
+                                          onClick={() => toggleDossierShrink(material)}
+                                          className={`w-28 px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all duration-200 relative overflow-hidden h-11 cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-indigo-50 border-indigo-500'
+                                              : 'bg-white border-slate-200 hover:border-indigo-500/45'
+                                          }`}
+                                        >
+                                          <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                            {material.name.match(/(\d+)\s*(?:mm|m)/i)
+                                              ? `${material.name.match(/(\d+)\s*(?:mm|m)/i)![1]}mm`
+                                              : material.name}
+                                          </span>
+                                          {isSelected && (
+                                            <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[9px] font-black shrink-0">
+                                              ✓
+                                            </div>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                 {(editForm.selectedShrinks || []).length > 0 && (
+                                   <div className="space-y-2 p-3 border border-indigo-150 rounded-xl bg-indigo-50/20">
+                                     <h5 className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
+                                       Usage and Wastage per Selected Shrink
+                                     </h5>
+                                     <div className="grid grid-cols-1 gap-2">
+                                       {(editForm.selectedShrinks || []).map((shrink: any) => (
+                                         <div key={shrink.shrinkId} className="bg-white p-2.5 rounded-lg border border-slate-200 flex flex-col gap-2">
+                                           <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">{shrink.shrinkName}</span>
+                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                             <div className="space-y-1">
+                                               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-left">Usage</label>
+                                               <div className="flex items-center gap-1">
+                                                 <input
+                                                   type="number"
+                                                   step="0.1"
+                                                   value={shrink.mmUsed}
+                                                   onChange={(e) => handleDossierMmUsedChange(shrink.shrinkId, Number(e.target.value))}
+                                                   className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 text-right"
+                                                 />
+                                                 <span className="text-[9px] font-bold text-slate-400">KG</span>
+                                               </div>
+                                             </div>
+                                             <div className="space-y-1">
+                                               <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block text-left">Wastage</label>
+                                               <div className="flex items-center gap-1">
+                                                 <input
+                                                   type="number"
+                                                   step="0.1"
+                                                   value={shrink.wastageKg || 0}
+                                                   onChange={(e) => handleDossierWastageKgChange(shrink.shrinkId, Number(e.target.value))}
+                                                   className="w-full h-9 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 text-right"
+                                                 />
+                                                 <span className="text-[9px] font-bold text-slate-400">KG</span>
+                                               </div>
+                                             </div>
+                                           </div>
+                                         </div>
+                                       ))}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 <div className="space-y-1">
+                                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block text-left">Correction Reason (Required)</label>
+                                   <input
+                                     type="text"
+                                     value={editForm.remarks}
+                                     onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
+                                     placeholder="Explain correction reason..."
+                                     className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
+                                   />
+                                 </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {isEditing && !isPacking && (
+                          <tr className="bg-slate-50/50">
+                            <td colSpan={6} className="px-8 py-4 border-b border-slate-100">
+                              <div className="max-w-md space-y-1 text-left">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Correction Reason (Required)</label>
+                                <input
+                                  type="text"
+                                  required
+                                  value={editForm.remarks}
+                                  onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
+                                  placeholder="Explain the correction reason..."
+                                  className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

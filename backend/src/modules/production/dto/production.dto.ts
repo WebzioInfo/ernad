@@ -159,3 +159,14 @@ export class DispatchLogDto {
   @IsOptional()
   remarks?: string;
 }
+
+export class CorrectLogDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  newData: any;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  reason: string;
+}

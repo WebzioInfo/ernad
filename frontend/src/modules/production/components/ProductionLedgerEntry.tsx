@@ -30,7 +30,8 @@ export interface LedgerLog {
   capUsage?: number | string;
   preformUsage?: number | string;
   bottleLeakage?: number | string;
-  capWastage?: number | string;
+  selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
+  shrinkWastageKg?: string | number;
 }
 
 interface ProductionLedgerEntryProps {
@@ -140,7 +141,9 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
             {hasRejects && (
               <div className="flex justify-between col-span-2">
                 <span>Rejects:</span>
-                <span className="text-rose-500 font-black">{formatWastageValue(log.wastageCount)}g</span>
+                <span className="text-rose-500 font-black">
+                  {formatWastageValue(log.shrinkWastageKg !== undefined ? log.shrinkWastageKg : log.wastageCount)} KG
+                </span>
               </div>
             )}
             {log.secondaryPackagingCount !== undefined && log.secondaryPackagingCount > 0 && (
@@ -149,11 +152,25 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
                 <span className="text-[#1A9A91] font-black">{log.secondaryPackagingCount}</span>
               </div>
             )}
-            {(log.shrinkWeightUsed !== undefined && Number(log.shrinkWeightUsed) > 0) && (
-              <div className="flex justify-between col-span-2">
-                <span>Shrink Used:</span>
-                <span className="text-[#1A9A91] font-black">{log.shrinkWeightUsed} KG</span>
+            {log.selectedShrinks && log.selectedShrinks.length > 0 ? (
+              <div className="flex flex-col col-span-2 border-t border-slate-200/40 pt-1 mt-1">
+                <span className="text-slate-400 font-bold mb-0.5">Shrink Materials Used:</span>
+                <ul className="list-disc list-inside space-y-0.5 pl-1">
+                  {log.selectedShrinks.map((s, idx) => (
+                    <li key={idx} className="flex justify-between text-slate-700">
+                      <span>• {s.shrinkName}:</span>
+                      <span className="text-[#1A9A91] font-black">{s.mmUsed} KG {s.wastageKg ? `(Wastage: ${s.wastageKg} KG)` : ''}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
+            ) : (
+              log.shrinkWeightUsed !== undefined && Number(log.shrinkWeightUsed) > 0 && (
+                <div className="flex justify-between col-span-2">
+                  <span>Shrink Used:</span>
+                  <span className="text-[#1A9A91] font-black">{log.shrinkWeightUsed} KG</span>
+                </div>
+              )
             )}
           </>
         )}

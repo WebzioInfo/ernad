@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { db } from '../../../database/db';
-import { productionLogs, users, batchTotals } from '../../../database/schema';
+import { productionLogs, users, batchTotals, rawMaterials, rawMaterialTransactions } from '../../../database/schema';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../../audit/audit.service';
 import { InventoryService } from '../../inventory/inventory.service';
@@ -100,6 +100,99 @@ export class VerificationService {
       const [oldLog] = await tx.select().from(productionLogs).where(eq(productionLogs.id, logId)).limit(1);
       if (!oldLog) throw new BadRequestException('Log not found');
 
+      if (oldLog.station === 'PACKING') {
+        if (newData.selectedShrinks !== undefined) {
+          const totalWastage = (newData.selectedShrinks || []).reduce((sum, s: any) => sum + (s.wastageKg || 0), 0);
+          newData.shrinkWastageKg = totalWastage;
+          newData.wastageCount = String(totalWastage);
+        } else if (newData.shrinkWastageKg !== undefined) {
+          newData.wastageCount = String(newData.shrinkWastageKg);
+        }
+      }
+
+      // Reconcile selected shrinks if updated for PACKING station
+      let shrinkWeightDelta = 0;
+      if (oldLog.station === 'PACKING' && newData.selectedShrinks !== undefined) {
+        const oldShrinks = (oldLog.selectedShrinks || []) as Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
+        const newShrinks = (newData.selectedShrinks || []) as Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
+
+        // 1. Reverse old shrinks
+        for (const shrink of oldShrinks) {
+          const usage = shrink.mmUsed || 0;
+          const wastage = shrink.wastageKg || 0;
+          const totalRestored = usage + wastage;
+          if (totalRestored > 0) {
+            const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, shrink.shrinkId)).for('update');
+            if (mat) {
+              const currentStock = Number(mat.currentStock || 0);
+              const restoredStock = currentStock + totalRestored;
+              
+              await tx.update(rawMaterials)
+                .set({ currentStock: String(restoredStock), updatedAt: new Date() })
+                .where(eq(rawMaterials.id, shrink.shrinkId));
+
+              const [balanceRes] = await tx.select({
+                sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
+              })
+                .from(rawMaterialTransactions)
+                .where(eq(rawMaterialTransactions.materialId, shrink.shrinkId));
+              const balanceAfter = Number(balanceRes.sum || 0) + totalRestored;
+
+              await tx.insert(rawMaterialTransactions).values({
+                materialId: shrink.shrinkId,
+                type: 'REVERSAL',
+                quantityChange: String(totalRestored),
+                balanceAfter: String(balanceAfter),
+                remarks: `Correction reversal for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
+                performedBy: verifierId,
+                createdAt: new Date()
+              });
+            }
+          }
+        }
+
+        // 2. Apply new shrinks
+        for (const shrink of newShrinks) {
+          const usage = shrink.mmUsed || 0;
+          const wastage = shrink.wastageKg || 0;
+          const totalDeduction = usage + wastage;
+          if (totalDeduction > 0) {
+            const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, shrink.shrinkId)).for('update');
+            if (!mat) {
+              throw new BadRequestException(`Material not found for shrink: ${shrink.shrinkName}`);
+            }
+
+            const currentStock = Number(mat.currentStock || 0);
+            const newStock = currentStock - totalDeduction;
+
+            await tx.update(rawMaterials)
+              .set({ currentStock: String(newStock), updatedAt: new Date() })
+              .where(eq(rawMaterials.id, shrink.shrinkId));
+
+            const [balanceRes] = await tx.select({
+              sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
+            })
+              .from(rawMaterialTransactions)
+              .where(eq(rawMaterialTransactions.materialId, shrink.shrinkId));
+            const balanceAfter = Number(balanceRes.sum || 0) - totalDeduction;
+
+            await tx.insert(rawMaterialTransactions).values({
+              materialId: shrink.shrinkId,
+              type: 'CONSUMPTION',
+              quantityChange: String(-totalDeduction),
+              balanceAfter: String(balanceAfter),
+              remarks: `Correction usage for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
+              performedBy: verifierId,
+              createdAt: new Date()
+            });
+          }
+        }
+
+        const oldSum = oldShrinks.reduce((sum, s) => sum + (s.mmUsed || 0) + (s.wastageKg || 0), 0);
+        const newSum = newShrinks.reduce((sum, s) => sum + (s.mmUsed || 0) + (s.wastageKg || 0), 0);
+        shrinkWeightDelta = newSum - oldSum;
+      }
+
       const [updated] = await tx.update(productionLogs)
         .set({
           ...newData,
@@ -115,7 +208,7 @@ export class VerificationService {
       const primaryDelta = (newData.primaryCount !== undefined ? newData.primaryCount : oldLog.primaryCount) - oldLog.primaryCount;
       const wastageDelta = Number(newData.wastageCount !== undefined ? newData.wastageCount : oldLog.wastageCount) - Number(oldLog.wastageCount);
 
-      if (primaryDelta !== 0 || wastageDelta !== 0) {
+      if (primaryDelta !== 0 || wastageDelta !== 0 || shrinkWeightDelta !== 0) {
         const updateField = this.getFieldName(oldLog.station);
         const setClause: any = {
           scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
@@ -123,6 +216,9 @@ export class VerificationService {
         };
         if (updateField && updateField !== 'scrapTotal') {
           setClause[updateField] = sql`${batchTotals[updateField]} + ${primaryDelta}`;
+        }
+        if (shrinkWeightDelta !== 0) {
+          setClause.shrinkWeightTotal = sql`${batchTotals.shrinkWeightTotal} + ${shrinkWeightDelta}`;
         }
         await tx.update(batchTotals)
           .set(setClause)

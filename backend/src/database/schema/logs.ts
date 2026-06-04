@@ -60,6 +60,8 @@ export const productionLogs = pgTable('production_logs', {
 
   // Packing Station Specifics
   shrinkWasteWeight: decimal('shrink_waste_weight', { precision: 8, scale: 2 }),
+  shrinkWastageKg: decimal('shrink_wastage_kg', { precision: 8, scale: 2 }).default('0').notNull(),
+  selectedShrinks: jsonb('selected_shrinks').$type<Array<{ shrinkId: string, shrinkName: string, mmUsed: number, wastageKg?: number }>>().default([]).notNull(),
   sourceBatchNumber: varchar('source_batch_number', { length: 100 }),
 
   // Label Station Specifics

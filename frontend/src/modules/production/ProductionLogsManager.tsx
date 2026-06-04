@@ -65,10 +65,76 @@ export default function ProductionLogsManager() {
   });
   const [search, setSearch] = useState('');
   const [editingLog, setEditingLog] = useState<any>(null);
+  const [originalLog, setOriginalLog] = useState<any>(null);
   const [verifyingLog, setVerifyingLog] = useState<any>(null);
   const [rejectingLog, setRejectingLog] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [verificationRemarks, setVerificationRemarks] = useState('');
+
+  const { data: rawMaterials } = useQuery({
+    queryKey: ['raw-materials-packing'],
+    queryFn: async () => (await api.get(`${ENDPOINTS.MASTER_DATA.RAW_MATERIALS}?station=PACKING`)).data,
+  });
+  const packingRawMaterials = rawMaterials || [];
+
+  const toggleEditingShrink = (material: any) => {
+    setEditingLog((prev: any) => {
+      if (!prev) return null;
+      const currentShrinks = prev.selectedShrinks || [];
+      const exists = currentShrinks.find((s: any) => s.shrinkId === material.id);
+      let newShrinks;
+      if (exists) {
+        newShrinks = currentShrinks.filter((s: any) => s.shrinkId !== material.id);
+      } else {
+        newShrinks = [...currentShrinks, { shrinkId: material.id, shrinkName: material.name, mmUsed: 0, wastageKg: 0 }];
+      }
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
+  const handleEditingMmUsedChange = (shrinkId: string, value: number) => {
+    setEditingLog((prev: any) => {
+      if (!prev) return null;
+      const currentShrinks = prev.selectedShrinks || [];
+      const newShrinks = currentShrinks.map((s: any) =>
+        s.shrinkId === shrinkId ? { ...s, mmUsed: value } : s
+      );
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
+  const handleEditingWastageKgChange = (shrinkId: string, value: number) => {
+    setEditingLog((prev: any) => {
+      if (!prev) return null;
+      const currentShrinks = prev.selectedShrinks || [];
+      const newShrinks = currentShrinks.map((s: any) =>
+        s.shrinkId === shrinkId ? { ...s, wastageKg: value } : s
+      );
+      return { ...prev, selectedShrinks: newShrinks };
+    });
+  };
+
+  const isDirty = useMemo(() => {
+    if (!editingLog || !originalLog) return false;
+    
+    if (editingLog.primaryCount !== originalLog.primaryCount) return true;
+    if (editingLog.wastageCount !== originalLog.wastageCount) return true;
+    if (editingLog.remarks !== originalLog.remarks) return true;
+    if (editingLog.shrinkWastageKg !== originalLog.shrinkWastageKg) return true;
+
+    const origShrinks = originalLog.selectedShrinks || [];
+    const editShrinks = editingLog.selectedShrinks || [];
+    if (origShrinks.length !== editShrinks.length) return true;
+    for (let i = 0; i < origShrinks.length; i++) {
+      const origS = origShrinks[i];
+      const editS = editShrinks.find((s: any) => s.shrinkId === origS.shrinkId);
+      if (!editS) return true;
+      if (Number(editS.mmUsed) !== Number(origS.mmUsed)) return true;
+      if (Number(editS.wastageKg || 0) !== Number(origS.wastageKg || 0)) return true;
+    }
+
+    return false;
+  }, [editingLog, originalLog]);
 
   // --- DATA FETCHING ---
   const { data: logs, isLoading: loadingLogs, refetch } = useQuery({
@@ -340,7 +406,22 @@ export default function ProductionLogsManager() {
                           {log.station === 'PACKING' && (
                             <>
                               <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.secondaryPackagingCount || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Boxes Used</span></div>
-                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.shrinkWeightUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Shrink (KG)</span></div>
+                              {log.selectedShrinks && log.selectedShrinks.length > 0 ? (
+                                <div className="space-y-0.5">
+                                  {log.selectedShrinks.map((s: any, idx: number) => (
+                                    <div key={idx} className="flex gap-1 items-baseline text-[9px] text-slate-500 font-bold uppercase flex-wrap">
+                                      <span>{s.mmUsed} KG</span>
+                                      {s.wastageKg ? <span className="text-rose-500 font-bold">+{s.wastageKg} KG W</span> : null}
+                                      <span className="text-[8px] font-normal text-slate-450 truncate max-w-[80px]">{s.shrinkName}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.shrinkWeightUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Shrink (KG)</span></div>
+                              )}
+                              {log.shrinkWastageKg !== undefined && Number(log.shrinkWastageKg) > 0 && (
+                                <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-rose-500 font-mono">{log.shrinkWastageKg}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Wastage (KG)</span></div>
+                              )}
                             </>
                           )}
                         </div>
@@ -377,7 +458,18 @@ export default function ProductionLogsManager() {
                               </button>
                             )}
                             <button
-                              onClick={() => setEditingLog(log)}
+                              onClick={() => {
+                                const selectedShrinksCopy = log.selectedShrinks 
+                                  ? JSON.parse(JSON.stringify(log.selectedShrinks))
+                                  : [];
+                                const logCopy = {
+                                  ...log,
+                                  selectedShrinks: selectedShrinksCopy,
+                                  shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0
+                                };
+                                setEditingLog(logCopy);
+                                setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
+                              }}
                               className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded-lg transition-all"
                             >
                               <Edit3 size={14} />
@@ -419,36 +511,147 @@ export default function ProductionLogsManager() {
 
               <form className="space-y-8" onSubmit={(e) => {
                 e.preventDefault();
+                let totalWastage = Number(editingLog.wastageCount || 0);
+                if (editingLog.station === 'PACKING') {
+                  totalWastage = (editingLog.selectedShrinks || []).reduce((sum: number, s: any) => sum + (s.wastageKg || 0), 0);
+                }
+                const payload: any = {
+                  primaryCount: editingLog.primaryCount,
+                  wastageCount: totalWastage,
+                  remarks: editingLog.remarks
+                };
+                if (editingLog.station === 'PACKING') {
+                  payload.shrinkWastageKg = totalWastage;
+                  payload.selectedShrinks = editingLog.selectedShrinks || [];
+                }
                 correctMutation.mutate({
                   id: editingLog.id,
-                  data: {
-                    primaryCount: editingLog.primaryCount,
-                    wastageCount: editingLog.wastageCount,
-                    remarks: editingLog.remarks
-                  },
+                  data: payload,
                   reason: editingLog.remarks
                 });
               }}>
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Count</label>
-                    <input
-                      type="number"
-                      value={editingLog.primaryCount}
-                      onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
-                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
-                    />
+                {editingLog.station === 'PACKING' ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Count</label>
+                        <input
+                          type="number"
+                          value={editingLog.primaryCount}
+                          onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
+                          className="w-full h-14 bg-slate-50 border border-slate-200 rounded-xl px-4 text-lg font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Source Batch Number</label>
+                        <input
+                          type="text"
+                          value={editingLog.sourceBatchNumber || 'N/A'}
+                          readOnly
+                          className="w-full h-14 bg-slate-200 border-none rounded-xl px-4 text-sm font-mono font-bold text-slate-500 outline-none cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">
+                        Select Shrink Materials
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {packingRawMaterials.filter((m: any) => m.materialType === 'SHRINK').map((material: any) => {
+                          const isSelected = (editingLog.selectedShrinks || []).some((s: any) => s.shrinkId === material.id);
+                          return (
+                            <button
+                              key={material.id}
+                              type="button"
+                              onClick={() => toggleEditingShrink(material)}
+                              className={`w-28 px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all duration-200 relative overflow-hidden h-11 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-indigo-50 border-indigo-500'
+                                  : 'bg-white border-slate-200 hover:border-indigo-500/45'
+                              }`}
+                            >
+                              <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                {material.name.match(/(\d+)\s*(?:mm|m)/i)
+                                  ? `${material.name.match(/(\d+)\s*(?:mm|m)/i)![1]}mm`
+                                  : material.name}
+                              </span>
+                              {isSelected && (
+                                <div className="w-4 h-4 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[9px] font-black shrink-0">
+                                  ✓
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {(editingLog.selectedShrinks || []).length > 0 && (
+                      <div className="space-y-3 p-4 border border-indigo-150 rounded-xl bg-indigo-50/20">
+                        <h5 className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">
+                          Usage and Wastage per Selected Shrink
+                        </h5>
+                        <div className="grid grid-cols-1 gap-2">
+                          {(editingLog.selectedShrinks || []).map((shrink: any) => (
+                            <div key={shrink.shrinkId} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-2">
+                              <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">{shrink.shrinkName}</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Usage</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={shrink.mmUsed}
+                                      onChange={(e) => handleEditingMmUsedChange(shrink.shrinkId, Number(e.target.value))}
+                                      className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 text-right"
+                                    />
+                                    <span className="text-[9px] font-bold text-slate-400">KG</span>
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Wastage</label>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      value={shrink.wastageKg || 0}
+                                      onChange={(e) => handleEditingWastageKgChange(shrink.shrinkId, Number(e.target.value))}
+                                      className="w-full h-10 bg-slate-50 border border-slate-200 rounded-lg px-2 text-xs font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 text-right"
+                                    />
+                                    <span className="text-[9px] font-bold text-slate-400">KG</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Wastage Count</label>
-                    <input
-                      type="number"
-                      value={editingLog.wastageCount}
-                      onChange={(e) => setEditingLog({ ...editingLog, wastageCount: Number(e.target.value) })}
-                      className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
-                    />
+                ) : (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Count</label>
+                      <input
+                        type="number"
+                        value={editingLog.primaryCount}
+                        onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Wastage Count</label>
+                      <input
+                        type="number"
+                        value={editingLog.wastageCount}
+                        onChange={(e) => setEditingLog({ ...editingLog, wastageCount: Number(e.target.value) })}
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Correction Reason</label>
@@ -460,7 +663,7 @@ export default function ProductionLogsManager() {
                   />
                 </div>
 
-                <button type="submit" disabled={correctMutation.isPending} className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-95">
+                <button type="submit" disabled={correctMutation.isPending || !isDirty} className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-95">
                   Commit Correction
                 </button>
               </form>
