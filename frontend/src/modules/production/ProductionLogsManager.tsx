@@ -663,8 +663,15 @@ export default function ProductionLogsManager() {
                   />
                 </div>
 
-                <button type="submit" disabled={correctMutation.isPending || !isDirty} className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-95">
-                  Commit Correction
+                 <button type="submit" disabled={correctMutation.isPending || !isDirty} className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-3xl font-black uppercase tracking-[0.2em] text-xs transition-all active:scale-95 flex items-center justify-center gap-2">
+                  {correctMutation.isPending ? (
+                    <>
+                      <Loader2 className="animate-spin" size={16} />
+                      Committing Correction...
+                    </>
+                  ) : (
+                    "Commit Correction"
+                  )}
                 </button>
               </form>
             </motion.div>

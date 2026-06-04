@@ -4,7 +4,7 @@ import { api } from '../../../services/api-client';
 import {
   X, Activity, Edit3,
   Check, AlertCircle, User, Clock,
-  TrendingUp, Layers, Tag, MapPin
+  TrendingUp, Layers, Tag, MapPin, Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -387,7 +387,11 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                                     disabled={editMutation.isPending || !editForm.remarks}
                                     className="w-8 h-8 bg-emerald-500 text-white rounded-lg flex items-center justify-center hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                   >
-                                    <Check className="w-4 h-4" />
+                                    {editMutation.isPending ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Check className="w-4 h-4" />
+                                    )}
                                   </button>
                                   <button
                                     onClick={() => setEditingLogId(null)}

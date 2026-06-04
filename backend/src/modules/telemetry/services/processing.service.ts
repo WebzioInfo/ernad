@@ -239,8 +239,12 @@ export class ProcessingService {
       // New Enterprise Material Logic
       await this.processEnterpriseInventory(tx, dto, log.id, userId);
 
-      // Recalculate simple inventory
-      await this.inventoryService.recalculateInventory(tx);
+      // Recalculate simple inventory in the background
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          this.logger.error(`Background recalculateInventory failed: ${err.message}`);
+        });
+      }, 50);
 
       // Fast-fail Redis increment
       if (this.redisService.getAvailability()) {
@@ -1058,7 +1062,11 @@ export class ProcessingService {
         shrinkWeightUsed: String(nextShrinkRollsUsed)
       }, userId, `Production Log #${logId} correction`);
 
-      await this.inventoryService.recalculateInventory(tx);
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          this.logger.error(`Background recalculateInventory failed: ${err.message}`);
+        });
+      }, 50);
 
       await this.auditService.logCorrection(
         userId,
@@ -1174,7 +1182,11 @@ export class ProcessingService {
         .where(eq(batchTotals.batchId, existing.batchId));
 
       await this.reverseRawMaterialUsage(tx, existing, userId, `VOID production log #${logId}: ${reason}`);
-      await this.inventoryService.recalculateInventory(tx);
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          this.logger.error(`Background recalculateInventory failed: ${err.message}`);
+        });
+      }, 50);
 
       // 3. Audit Log
       await this.auditService.logCorrection(

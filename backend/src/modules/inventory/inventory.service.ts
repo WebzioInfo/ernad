@@ -415,63 +415,80 @@ export class InventoryService {
   }
 
   async recalculateInventory(tx?: any) {
-    // Only runs manually or via night jobs now. Stock transactions are atomic.
     const runner = tx || db;
 
-    const rawMaterialRows = await runner.select({ id: rawMaterials.id }).from(rawMaterials);
-    for (const material of rawMaterialRows) {
-      const [balanceRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')`
-      })
-      .from(rawMaterialTransactions)
-      .where(eq(rawMaterialTransactions.materialId, material.id));
+    // 1. Bulk raw materials current stock recalculation in a single query
+    await runner.execute(sql`
+      UPDATE raw_materials rm
+      SET current_stock = COALESCE((
+        SELECT SUM(quantity_change)
+        FROM raw_material_transactions rmt
+        WHERE rmt.material_id = rm.id
+      ), 0),
+      updated_at = NOW()
+    `);
 
-      await runner.update(rawMaterials)
-        .set({ currentStock: Number(balanceRes.sum || 0), updatedAt: new Date() })
-        .where(eq(rawMaterials.id, material.id));
-    }
-
+    // 2. Ensure all products have a productionStock row
     const allProducts = await runner.select().from(products);
     for (const prod of allProducts) {
-      const productBatchesList = await runner.select({ id: productionBatches.id })
-        .from(productionBatches)
-        .where(and(eq(productionBatches.productId, prod.id), isNull(productionBatches.deletedAt)));
-      
-      let totalProduced = 0;
-      for (const b of productBatchesList) {
-        const [packedRes] = await runner.select({ sum: sql<string>`coalesce(sum(${productionLogs.casesProduced}), '0')` })
-          .from(productionLogs)
-          .where(and(eq(productionLogs.batchId, b.id), eq(productionLogs.station, 'PACKING'), isNull(productionLogs.deletedAt)));
-        totalProduced += parseInt(packedRes.sum, 10);
-      }
-      
-      const [dispatchRes] = await runner.select({ sum: sql<string>`coalesce(sum(${dispatchLogs.quantity}), '0')` })
-        .from(dispatchLogs).innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
-        .where(and(eq(productionBatches.productId, prod.id), isNull(productionBatches.deletedAt)));
-      
-      const [manualRes] = await runner.select({ sum: sql<string>`coalesce(sum(${productStockTransactions.quantityChange}), '0')` })
-        .from(productStockTransactions).where(eq(productStockTransactions.productId, prod.id));
-
-      const [salesRes] = await runner.select({
-        sum: sql<string>`coalesce(sum(case when ${salesTransactions.type} = 'RETURN' then ${salesTransactions.quantity} else -${salesTransactions.quantity} end), '0')`
-      }).from(salesTransactions).where(eq(salesTransactions.productId, prod.id));
-
-      const salesImpact = parseInt(salesRes.sum, 10);
-      const manualAdded = parseInt(manualRes.sum, 10);
-      const totalDispatched = parseInt(dispatchRes.sum, 10);
-      const availableStock = totalProduced + manualAdded - totalDispatched + salesImpact;
-      
       const existing = await runner.select().from(productionStock).where(eq(productionStock.productId, prod.id)).limit(1);
-      if (existing.length > 0) {
-        await runner.update(productionStock)
-          .set({ currentStock: availableStock, totalProduced, totalDispatched, updatedAt: new Date() })
-          .where(eq(productionStock.productId, prod.id));
-      } else {
+      if (existing.length === 0) {
         await runner.insert(productionStock).values({
-          productId: prod.id, currentStock: availableStock, totalProduced, totalDispatched, createdAt: new Date(), updatedAt: new Date()
+          productId: prod.id,
+          currentStock: '0',
+          totalProduced: '0',
+          totalDispatched: '0',
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
       }
     }
+
+    // 3. Bulk production stock totalProduced recalculation in a single query
+    await runner.execute(sql`
+      UPDATE production_stock ps
+      SET total_produced = COALESCE((
+        SELECT SUM(pl.cases_produced)
+        FROM production_logs pl
+        INNER JOIN production_batches pb ON pl.batch_id = pb.id
+        WHERE pb.product_id = ps.product_id
+          AND pl.station = 'PACKING'
+          AND pl.deleted_at IS NULL
+          AND pb.deleted_at IS NULL
+      ), 0),
+      updated_at = NOW()
+    `);
+
+    // 4. Bulk production stock totalDispatched recalculation in a single query
+    await runner.execute(sql`
+      UPDATE production_stock ps
+      SET total_dispatched = COALESCE((
+        SELECT SUM(dl.quantity)
+        FROM dispatch_logs dl
+        INNER JOIN production_batches pb ON dl.batch_id = pb.id
+        WHERE pb.product_id = ps.product_id
+          AND pb.deleted_at IS NULL
+      ), 0),
+      updated_at = NOW()
+    `);
+
+    // 5. Bulk production stock currentStock recalculation (availableStock) in a single query
+    await runner.execute(sql`
+      UPDATE production_stock ps
+      SET current_stock = ps.total_produced 
+          + COALESCE((
+              SELECT SUM(pst.quantity_change)
+              FROM product_stock_transactions pst
+              WHERE pst.product_id = ps.product_id
+            ), 0)
+          - ps.total_dispatched
+          + COALESCE((
+              SELECT SUM(CASE WHEN st.type = 'RETURN' THEN st.quantity ELSE -st.quantity END)
+              FROM sales_transactions st
+              WHERE st.product_id = ps.product_id
+            ), 0),
+      updated_at = NOW()
+    `);
   }
 
   async getProductLedger(productId: string) {

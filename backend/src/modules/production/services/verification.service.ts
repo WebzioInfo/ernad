@@ -87,7 +87,11 @@ export class VerificationService {
         payload: { status: 'REJECTED', reason }
       });
 
-      await this.inventoryService.recalculateInventory(tx);
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          console.error(`Background recalculateInventory failed:`, err);
+        });
+      }, 50);
 
       return updated;
     });
@@ -234,7 +238,11 @@ export class VerificationService {
         reason
       );
 
-      await this.inventoryService.recalculateInventory(tx);
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          console.error(`Background recalculateInventory failed:`, err);
+        });
+      }, 50);
 
       return updated;
     });

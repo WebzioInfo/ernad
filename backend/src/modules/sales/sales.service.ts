@@ -86,8 +86,12 @@ export class SalesService {
         updatedAt: new Date(),
       }).returning();
 
-      // 2. Recalculate inventory
-      await this.inventoryService.recalculateInventory(tx);
+      // 2. Recalculate inventory in the background
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          console.error(`Background recalculateInventory failed:`, err);
+        });
+      }, 50);
 
       // 3. Log Audit Action
       await this.auditService.logAction({
@@ -131,8 +135,12 @@ export class SalesService {
         .where(eq(salesTransactions.id, id))
         .returning();
 
-      // Recalculate inventory
-      await this.inventoryService.recalculateInventory(tx);
+      // Recalculate inventory in the background
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          console.error(`Background recalculateInventory failed:`, err);
+        });
+      }, 50);
 
       // Log Audit Action
       await this.auditService.logAction({
@@ -160,8 +168,12 @@ export class SalesService {
 
       await tx.delete(salesTransactions).where(eq(salesTransactions.id, id));
 
-      // Recalculate inventory
-      await this.inventoryService.recalculateInventory(tx);
+      // Recalculate inventory in the background
+      setTimeout(() => {
+        this.inventoryService.recalculateInventory().catch((err) => {
+          console.error(`Background recalculateInventory failed:`, err);
+        });
+      }, 50);
 
       // Log Audit Action
       await this.auditService.logAction({
