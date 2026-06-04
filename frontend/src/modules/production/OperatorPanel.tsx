@@ -108,6 +108,9 @@ export default function OperatorPanel() {
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
   const [bagsUsed, setBagsUsed] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
+  const [labelsUsed, setLabelsUsed] = useState(0);
+  const [glueUsedKg, setGlueUsedKg] = useState(0);
+  const [damagedLabelWeight, setDamagedLabelWeight] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
@@ -561,6 +564,7 @@ export default function OperatorPanel() {
       logEntry.rawMaterialId = selectedCapRawMaterialId;
     } else if (currentStation?.id === 'LABELING') {
       logEntry.labelsUsed = labelUsage;
+      logEntry.glueUsedKg = glueUsedKg;
       logEntry.rawMaterialId = selectedLabelRawMaterialId;
       logEntry.inkChanged = inkChanged;
       logEntry.makeupChanged = makeupChanged;
@@ -619,7 +623,8 @@ export default function OperatorPanel() {
       // Auto Reset Form
       setPrimaryCount(0);
       setRejectionCount(0);
-      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0);
+      setBottleLeakage(0);
+      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setGlueUsedKg(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
       setMakeupChanged(false);
@@ -964,6 +969,17 @@ export default function OperatorPanel() {
                           value={labelUsage}
                           onChange={setLabelUsage}
                           suffix="KG"
+                          compact
+                        />
+                      </div>
+
+                      <div className="space-y-1 mb-6">
+                        <IndustrialNumericInput
+                          label="GLUE USED (KG)"
+                          value={glueUsedKg}
+                          onChange={setGlueUsedKg}
+                          suffix="KG"
+                          step={0.001}
                           compact
                         />
                       </div>

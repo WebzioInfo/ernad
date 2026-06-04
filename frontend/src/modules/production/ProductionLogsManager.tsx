@@ -400,6 +400,9 @@ export default function ProductionLogsManager() {
                           {log.station === 'LABELING' && (
                             <>
                               <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bopRollUsage || log.labelStickerWeight || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Labels Used</span></div>
+                              {log.glueUsageKg && Number(log.glueUsageKg) > 0 ? (
+                                <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.glueUsageKg} KG</p><span className="text-[8px] font-bold text-slate-400 uppercase">Glue Used</span></div>
+                              ) : null}
                               {(log.inkUsage > 0 || log.solventUsage > 0) && <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.inkUsage || 0}ML / {log.solventUsage || 0}ML</p><span className="text-[8px] font-bold text-slate-400 uppercase">HTT Used</span></div>}
                             </>
                           )}
@@ -524,6 +527,9 @@ export default function ProductionLogsManager() {
                   payload.shrinkWastageKg = totalWastage;
                   payload.selectedShrinks = editingLog.selectedShrinks || [];
                 }
+                if (editingLog.station === 'LABELING') {
+                  payload.glueUsedKg = Number(editingLog.glueUsageKg || 0);
+                }
                 correctMutation.mutate({
                   id: editingLog.id,
                   data: payload,
@@ -629,6 +635,37 @@ export default function ProductionLogsManager() {
                         </div>
                       </div>
                     )}
+                  </div>
+                ) : editingLog.station === 'LABELING' ? (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Count</label>
+                      <input
+                        type="number"
+                        value={editingLog.primaryCount}
+                        onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Wastage Count</label>
+                      <input
+                        type="number"
+                        value={editingLog.wastageCount}
+                        onChange={(e) => setEditingLog({ ...editingLog, wastageCount: Number(e.target.value) })}
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-4 col-span-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Glue Used (KG)</label>
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={editingLog.glueUsageKg || 0}
+                        onChange={(e) => setEditingLog({ ...editingLog, glueUsageKg: e.target.value })}
+                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                      />
+                    </div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-8">

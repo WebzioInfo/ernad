@@ -35,6 +35,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
     remarks: string;
     shrinkWastageKg?: number;
     selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number }>;
+    glueUsageKg?: number;
   }>({ primaryCount: 0, wastageCount: 0, remarks: '' });
 
   // 1. Fetch Dossier (Metadata + Totals + Trend)
@@ -109,6 +110,9 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
         payload.shrinkWastageKg = totalWastage;
         payload.selectedShrinks = editForm.selectedShrinks || [];
       }
+      if (station === 'LABELING') {
+        payload.glueUsedKg = Number(editForm.glueUsageKg || 0);
+      }
       await api.post(`production/logs/${logId}/correct`, { newData: payload, reason: editForm.remarks });
     },
     onSuccess: () => {
@@ -129,7 +133,8 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
       wastageCount: log.station === 'PACKING' ? Number(log.shrinkWastageKg || 0) : log.wastageCount,
       remarks: log.remarks || '',
       shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
-      selectedShrinks: log.selectedShrinks ? JSON.parse(JSON.stringify(log.selectedShrinks)) : []
+      selectedShrinks: log.selectedShrinks ? JSON.parse(JSON.stringify(log.selectedShrinks)) : [],
+      glueUsageKg: log.glueUsageKg !== undefined ? Number(log.glueUsageKg) : 0
     });
   };
 
@@ -510,16 +515,30 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                         {isEditing && !isPacking && (
                           <tr className="bg-slate-50/50">
                             <td colSpan={6} className="px-8 py-4 border-b border-slate-100">
-                              <div className="max-w-md space-y-1 text-left">
-                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Correction Reason (Required)</label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={editForm.remarks}
-                                  onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
-                                  placeholder="Explain the correction reason..."
-                                  className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
-                                />
+                              <div className="flex flex-col sm:flex-row gap-4 w-full">
+                                {log.station === 'LABELING' && (
+                                  <div className="flex-1 space-y-1 text-left">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Glue Used (KG)</label>
+                                    <input
+                                      type="number"
+                                      step="0.001"
+                                      value={editForm.glueUsageKg || 0}
+                                      onChange={(e) => setEditForm(prev => ({ ...prev, glueUsageKg: Number(e.target.value) }))}
+                                      className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 space-y-1 text-left">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Correction Reason (Required)</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={editForm.remarks}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, remarks: e.target.value }))}
+                                    placeholder="Explain the correction reason..."
+                                    className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
+                                  />
+                                </div>
                               </div>
                             </td>
                           </tr>

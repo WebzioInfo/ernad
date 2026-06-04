@@ -204,6 +204,7 @@ export class ProcessingService {
         damagedLabelWeight: dto.damagedLabelWeight ? String(dto.damagedLabelWeight) : null,
         inkChanged: dto.inkChanged || false,
         makeupChanged: dto.makeupChanged || false,
+        glueUsageKg: dto.glueUsedKg ? String(dto.glueUsedKg) : null,
 
         // New Packing Station Fields
         shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
@@ -726,6 +727,7 @@ export class ProcessingService {
       damagedLabelWeight: productionLogs.damagedLabelWeight,
       inkChanged: productionLogs.inkChanged,
       makeupChanged: productionLogs.makeupChanged,
+      glueUsageKg: productionLogs.glueUsageKg,
       inkUsage: productionLogs.inkUsage,
       solventUsage: productionLogs.solventUsage,
       
@@ -868,6 +870,7 @@ export class ProcessingService {
         damagedLabelWeight: l.damagedLabelWeight,
         inkChanged: l.inkChanged,
         makeupChanged: l.makeupChanged,
+        glueUsageKg: l.glueUsageKg,
         inkUsage: l.inkUsage,
         solventUsage: l.solventUsage,
         // Packing specific
@@ -1005,7 +1008,7 @@ export class ProcessingService {
     return feedEvents.slice(0, limit);
   }
 
-  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number }) {
+  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; glueUsedKg?: number }) {
     return await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(productionLogs).where(eq(productionLogs.id, logId)).for('update');
       if (!existing) throw new BadRequestException('Production log not found.');
@@ -1029,6 +1032,7 @@ export class ProcessingService {
           ...(dto.capBoxUsage !== undefined && { capBoxUsage: dto.capBoxUsage }),
           ...(dto.labelsUsed !== undefined && { bopRollUsage: String(dto.labelsUsed), labelUsage: Math.round(Number(dto.labelsUsed || 0)) }),
           ...(dto.shrinkRollsUsed !== undefined && { shrinkWeightUsed: String(dto.shrinkRollsUsed) }),
+          ...(dto.glueUsedKg !== undefined && { glueUsageKg: String(dto.glueUsedKg) }),
           updatedBy: userId,
           updatedAt: new Date()
         })
@@ -1132,6 +1136,7 @@ export class ProcessingService {
       inkUsageMl: productionLogs.inkUsageMl,
       makeupChanged: productionLogs.makeupChanged,
       makeupUsageMl: productionLogs.makeupUsageMl,
+      glueUsageKg: productionLogs.glueUsageKg,
       
       // Packing specific
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,

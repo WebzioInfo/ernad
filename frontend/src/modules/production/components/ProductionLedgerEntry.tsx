@@ -123,6 +123,12 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
                 <span className="text-[#1A9A91] font-black">{log.bopRollUsage || log.labelStickerWeight} KG</span>
               </div>
             )}
+            {log.glueUsageKg !== undefined && Number(log.glueUsageKg) > 0 && (
+              <div className="flex justify-between col-span-2">
+                <span>Glue Used:</span>
+                <span className="text-[#1A9A91] font-black">{log.glueUsageKg} KG</span>
+              </div>
+            )}
             {/* HTT Used can refer to ink/makeup changes or solvent usage */}
             {(log.inkChanged || log.makeupChanged || Number(log.inkUsage) > 0 || Number(log.solventUsage) > 0) && (
               <div className="flex justify-between col-span-2">

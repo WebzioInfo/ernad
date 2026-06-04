@@ -263,6 +263,12 @@ export class TelemetryDto {
   @ApiProperty()
   @IsNumber()
   @IsOptional()
+  @Min(0)
+  glueUsedKg?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
   shrinkWasteWeight?: number;
 
   @ApiProperty()
