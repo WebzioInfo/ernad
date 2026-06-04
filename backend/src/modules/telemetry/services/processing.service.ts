@@ -739,6 +739,7 @@ export class ProcessingService {
       inkChanged: productionLogs.inkChanged,
       makeupChanged: productionLogs.makeupChanged,
       glueUsageKg: productionLogs.glueUsageKg,
+      rollsUsed: productionLogs.rollsUsed,
       inkUsage: productionLogs.inkUsage,
       solventUsage: productionLogs.solventUsage,
       

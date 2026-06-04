@@ -736,7 +736,7 @@ export default function OperatorPanel() {
         }
         sidebar={
           <ActivityFeed
-            history={history || []}
+            history={history ? history.map((h: any) => ({ ...h, lineName: line?.name })) : []}
             onRefresh={() => {
               refetchHistory();
               queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
@@ -1205,7 +1205,7 @@ export default function OperatorPanel() {
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <ActivityFeed
-                  history={history || []}
+                  history={history ? history.map((h: any) => ({ ...h, lineName: line?.name })) : []}
                   onRefresh={() => {
                     refetchHistory();
                     queryClient.invalidateQueries({ queryKey: ['station-log-history'] });

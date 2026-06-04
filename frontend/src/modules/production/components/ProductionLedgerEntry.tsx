@@ -115,6 +115,12 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
         {/* === LABELING STATION === */}
         {station === 'LABELING' && (
           <>
+            {log.rawMaterialName && (
+              <div className="flex justify-between col-span-2 border-b border-slate-200/60 pb-0.5 mb-0.5">
+                <span>Material:</span>
+                <span className="text-[#1A9A91] font-black truncate max-w-[165px]">{log.rawMaterialName}</span>
+              </div>
+            )}
             {hasRejects && (
               <div className="flex justify-between col-span-2">
                 <span>Rejects:</span>
