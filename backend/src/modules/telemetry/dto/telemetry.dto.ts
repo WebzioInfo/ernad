@@ -269,6 +269,12 @@ export class TelemetryDto {
   @ApiProperty()
   @IsNumber()
   @IsOptional()
+  @Min(0)
+  rollsUsed?: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsOptional()
   shrinkWasteWeight?: number;
 
   @ApiProperty()

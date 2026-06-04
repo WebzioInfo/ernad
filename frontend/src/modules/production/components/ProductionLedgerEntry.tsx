@@ -33,6 +33,9 @@ export interface LedgerLog {
   selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
   shrinkWastageKg?: string | number;
   glueUsageKg?: string | number;
+  rollsUsed?: string | number;
+  lineName?: string;
+  line?: { name: string };
 }
 
 interface ProductionLedgerEntryProps {
@@ -124,10 +127,16 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
                 <span className="text-[#1A9A91] font-black">{log.bopRollUsage || log.labelStickerWeight} KG</span>
               </div>
             )}
-            {log.glueUsageKg !== undefined && Number(log.glueUsageKg) > 0 && (
+            {(!log.lineName && !log.line?.name ? true : !(log.lineName || log.line?.name)?.toLowerCase().includes('2')) && log.glueUsageKg !== undefined && Number(log.glueUsageKg) > 0 && (
               <div className="flex justify-between col-span-2">
                 <span>Glue Used:</span>
                 <span className="text-[#1A9A91] font-black">{log.glueUsageKg} KG</span>
+              </div>
+            )}
+            {(log.lineName || log.line?.name)?.toLowerCase().includes('2') && log.rollsUsed !== undefined && Number(log.rollsUsed) > 0 && (
+              <div className="flex justify-between col-span-2">
+                <span>Rolls Used:</span>
+                <span className="text-[#1A9A91] font-black">{log.rollsUsed}</span>
               </div>
             )}
             {/* HTT Used can refer to ink/makeup changes or solvent usage */}

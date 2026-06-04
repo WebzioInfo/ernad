@@ -400,8 +400,11 @@ export default function ProductionLogsManager() {
                           {log.station === 'LABELING' && (
                             <>
                               <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bopRollUsage || log.labelStickerWeight || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Labels Used</span></div>
-                              {log.glueUsageKg && Number(log.glueUsageKg) > 0 ? (
+                              {(!log.lineName && !log.line?.name ? true : !(log.lineName || log.line?.name)?.toLowerCase().includes('2')) && log.glueUsageKg && Number(log.glueUsageKg) > 0 ? (
                                 <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.glueUsageKg} KG</p><span className="text-[8px] font-bold text-slate-400 uppercase">Glue Used</span></div>
+                              ) : null}
+                              {(log.lineName || log.line?.name)?.toLowerCase().includes('2') && log.rollsUsed && Number(log.rollsUsed) > 0 ? (
+                                <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.rollsUsed}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Rolls Used</span></div>
                               ) : null}
                               {(log.inkUsage > 0 || log.solventUsage > 0) && <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.inkUsage || 0}ML / {log.solventUsage || 0}ML</p><span className="text-[8px] font-bold text-slate-400 uppercase">HTT Used</span></div>}
                             </>
@@ -529,6 +532,7 @@ export default function ProductionLogsManager() {
                 }
                 if (editingLog.station === 'LABELING') {
                   payload.glueUsedKg = Number(editingLog.glueUsageKg || 0);
+                  payload.rollsUsed = Number(editingLog.rollsUsed || 0);
                 }
                 correctMutation.mutate({
                   id: editingLog.id,
@@ -643,7 +647,10 @@ export default function ProductionLogsManager() {
                       <input
                         type="number"
                         value={editingLog.primaryCount}
-                        onChange={(e) => setEditingLog({ ...editingLog, primaryCount: Number(e.target.value) })}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setEditingLog({ ...editingLog, primaryCount: val, bopRollUsage: String(val + Number(editingLog.wastageCount || 0)) });
+                        }}
                         className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
                       />
                     </div>
@@ -652,19 +659,39 @@ export default function ProductionLogsManager() {
                       <input
                         type="number"
                         value={editingLog.wastageCount}
-                        onChange={(e) => setEditingLog({ ...editingLog, wastageCount: Number(e.target.value) })}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setEditingLog({ ...editingLog, wastageCount: val, bopRollUsage: String(Number(editingLog.primaryCount || 0) + val) });
+                        }}
                         className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
                       />
                     </div>
-                    <div className="space-y-4 col-span-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Glue Used (KG)</label>
-                      <input
-                        type="number"
-                        step="0.001"
-                        value={editingLog.glueUsageKg || 0}
-                        onChange={(e) => setEditingLog({ ...editingLog, glueUsageKg: e.target.value })}
-                        className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
-                      />
+                    <div className="flex flex-col sm:flex-row gap-4 w-full col-span-2">
+                      {(!editingLog.lineName && !editingLog.line?.name ? true : !(editingLog.lineName || editingLog.line?.name)?.toLowerCase().includes('2')) && (
+                        <div className="flex-1 space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Glue Used (KG)</label>
+                          <input
+                            type="number"
+                            step="0.001"
+                            value={editingLog.glueUsageKg || 0}
+                            onChange={(e) => setEditingLog({ ...editingLog, glueUsageKg: e.target.value })}
+                            className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                          />
+                        </div>
+                      )}
+
+                      {(editingLog.lineName || editingLog.line?.name)?.toLowerCase().includes('2') && (
+                        <div className="flex-1 space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Rolls Used</label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={editingLog.rollsUsed || 0}
+                            onChange={(e) => setEditingLog({ ...editingLog, rollsUsed: e.target.value })}
+                            className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (

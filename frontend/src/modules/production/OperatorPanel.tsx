@@ -109,6 +109,7 @@ export default function OperatorPanel() {
   const [bagsUsed, setBagsUsed] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
   const [glueUsedKg, setGlueUsedKg] = useState(0);
+  const [rollsUsed, setRollsUsed] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
@@ -477,6 +478,13 @@ export default function OperatorPanel() {
     }
   }, [currentStation?.id, stationRawMaterials, activeBatch?.batch?.productName, selectedLabelRawMaterialId]);
 
+  // Auto Sticker Calculation for Labeling Station
+  useEffect(() => {
+    if (currentStation?.id === 'LABELING' && selectedLabelRawMaterialId) {
+      setLabelUsage(Number(primaryCount || 0) + Number(rejectionCount || 0));
+    }
+  }, [currentStation?.id, selectedLabelRawMaterialId, primaryCount, rejectionCount]);
+
   const handleSaveTelemetry = async (type: 'ALL' | 'COUNT' | 'EVENT' | 'WASTE' = 'ALL') => {
     if (overlay.isLocked) return;
     if (!activeBatch?.batch) return toast.error('No active batch found.');
@@ -563,6 +571,7 @@ export default function OperatorPanel() {
     } else if (currentStation?.id === 'LABELING') {
       logEntry.labelsUsed = labelUsage;
       logEntry.glueUsedKg = glueUsedKg;
+      logEntry.rollsUsed = rollsUsed;
       logEntry.rawMaterialId = selectedLabelRawMaterialId;
       logEntry.inkChanged = inkChanged;
       logEntry.makeupChanged = makeupChanged;
@@ -622,7 +631,7 @@ export default function OperatorPanel() {
       setPrimaryCount(0);
       setRejectionCount(0);
       setBottleLeakage(0);
-      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setGlueUsedKg(0);
+      setCapBoxUsage(0); setSelectedCapRawMaterialId(''); setSelectedRawMaterialId(''); setBagsUsed(0); setLabelUsage(0); setGlueUsedKg(0); setRollsUsed(0);
       setCasesProduced(0); setPhValue(0); setTdsValue(0);
       setInkChanged(false);
       setMakeupChanged(false);
@@ -971,16 +980,30 @@ export default function OperatorPanel() {
                         />
                       </div>
 
-                      <div className="space-y-1 mb-6">
-                        <IndustrialNumericInput
-                          label="GLUE USED (KG)"
-                          value={glueUsedKg}
-                          onChange={setGlueUsedKg}
-                          suffix="KG"
-                          step={0.001}
-                          compact
-                        />
-                      </div>
+                      {(!line?.name || !line.name.toLowerCase().includes('2')) && (
+                        <div className="space-y-1 mb-6">
+                          <IndustrialNumericInput
+                            label="GLUE USED (KG)"
+                            value={glueUsedKg}
+                            onChange={setGlueUsedKg}
+                            suffix="KG"
+                            step={0.001}
+                            compact
+                          />
+                        </div>
+                      )}
+
+                      {line?.name && line.name.toLowerCase().includes('2') && (
+                        <div className="space-y-1 mb-6">
+                          <IndustrialNumericInput
+                            label="ROLLS USED"
+                            value={rollsUsed}
+                            onChange={setRollsUsed}
+                            step={1}
+                            compact
+                          />
+                        </div>
+                      )}
 
                       <div className="p-4 border border-[#1A9A91]/15 rounded-xl bg-[#1A9A91]/5 space-y-4">
                         <label className="flex items-center gap-3 cursor-pointer">

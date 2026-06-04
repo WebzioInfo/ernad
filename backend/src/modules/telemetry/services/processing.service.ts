@@ -205,6 +205,7 @@ export class ProcessingService {
         inkChanged: dto.inkChanged || false,
         makeupChanged: dto.makeupChanged || false,
         glueUsageKg: dto.glueUsedKg ? String(dto.glueUsedKg) : null,
+        rollsUsed: dto.rollsUsed || 0,
 
         // New Packing Station Fields
         shrinkWasteWeight: dto.shrinkWasteWeight ? String(dto.shrinkWasteWeight) : null,
@@ -396,6 +397,16 @@ export class ProcessingService {
       const inkMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Ink')).limit(1);
       if (inkMat.length > 0) {
         directDeductions.push({ materialId: inkMat[0].id, qty: 1, remarks: `Ink changed in Labeling Station (Log #${logId})` });
+      }
+    }
+
+    // 6. Labeling (Glue)
+    if (dto.station === 'LABELING' && dto.glueUsedKg && dto.glueUsedKg > 0) {
+      const glueMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Glue')).limit(1);
+      if (glueMat.length > 0) {
+        directDeductions.push({ materialId: glueMat[0].id, qty: dto.glueUsedKg, remarks: `Glue used in Labeling Station (Log #${logId})` });
+      } else {
+        this.logger.warn(`[LABELING RESOLUTION] Glue raw material not found for deduction.`);
       }
     }
 
@@ -1008,7 +1019,7 @@ export class ProcessingService {
     return feedEvents.slice(0, limit);
   }
 
-  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; glueUsedKg?: number }) {
+  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; glueUsedKg?: number; rollsUsed?: number }) {
     return await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(productionLogs).where(eq(productionLogs.id, logId)).for('update');
       if (!existing) throw new BadRequestException('Production log not found.');
@@ -1033,6 +1044,7 @@ export class ProcessingService {
           ...(dto.labelsUsed !== undefined && { bopRollUsage: String(dto.labelsUsed), labelUsage: Math.round(Number(dto.labelsUsed || 0)) }),
           ...(dto.shrinkRollsUsed !== undefined && { shrinkWeightUsed: String(dto.shrinkRollsUsed) }),
           ...(dto.glueUsedKg !== undefined && { glueUsageKg: String(dto.glueUsedKg) }),
+          ...(dto.rollsUsed !== undefined && { rollsUsed: dto.rollsUsed }),
           updatedBy: userId,
           updatedAt: new Date()
         })

@@ -36,6 +36,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
     shrinkWastageKg?: number;
     selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number }>;
     glueUsageKg?: number;
+    rollsUsed?: number;
   }>({ primaryCount: 0, wastageCount: 0, remarks: '' });
 
   // 1. Fetch Dossier (Metadata + Totals + Trend)
@@ -112,6 +113,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
       }
       if (station === 'LABELING') {
         payload.glueUsedKg = Number(editForm.glueUsageKg || 0);
+        payload.rollsUsed = Number(editForm.rollsUsed || 0);
       }
       await api.post(`production/logs/${logId}/correct`, { newData: payload, reason: editForm.remarks });
     },
@@ -134,7 +136,8 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
       remarks: log.remarks || '',
       shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
       selectedShrinks: log.selectedShrinks ? JSON.parse(JSON.stringify(log.selectedShrinks)) : [],
-      glueUsageKg: log.glueUsageKg !== undefined ? Number(log.glueUsageKg) : 0
+      glueUsageKg: log.glueUsageKg !== undefined ? Number(log.glueUsageKg) : 0,
+      rollsUsed: log.rollsUsed !== undefined ? Number(log.rollsUsed) : 0
     });
   };
 
@@ -516,14 +519,26 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                           <tr className="bg-slate-50/50">
                             <td colSpan={6} className="px-8 py-4 border-b border-slate-100">
                               <div className="flex flex-col sm:flex-row gap-4 w-full">
-                                {log.station === 'LABELING' && (
+                                {log.station === 'LABELING' && (!dossier?.batch?.line?.name ? true : !dossier.batch.line.name.toLowerCase().includes('2')) && (
                                   <div className="flex-1 space-y-1 text-left">
-                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Glue Used (KG)</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Glue Used (KG)</label>
                                     <input
                                       type="number"
                                       step="0.001"
                                       value={editForm.glueUsageKg || 0}
                                       onChange={(e) => setEditForm(prev => ({ ...prev, glueUsageKg: Number(e.target.value) }))}
+                                      className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
+                                    />
+                                  </div>
+                                )}
+                                {log.station === 'LABELING' && (!dossier?.batch?.line?.name ? true : dossier.batch.line.name.toLowerCase().includes('2')) && (
+                                  <div className="flex-1 space-y-1 text-left">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase">Rolls Used</label>
+                                    <input
+                                      type="number"
+                                      step="1"
+                                      value={editForm.rollsUsed || 0}
+                                      onChange={(e) => setEditForm(prev => ({ ...prev, rollsUsed: Number(e.target.value) }))}
                                       className="w-full h-10 bg-white border border-slate-200 rounded-lg px-3 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500/50"
                                     />
                                   </div>
