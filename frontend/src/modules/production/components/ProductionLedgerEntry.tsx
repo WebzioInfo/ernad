@@ -32,6 +32,7 @@ export interface LedgerLog {
   bottleLeakage?: number | string;
   selectedShrinks?: Array<{ shrinkId: string; shrinkName: string; mmUsed: number; wastageKg?: number }>;
   shrinkWastageKg?: string | number;
+  glueUsageKg?: string | number;
 }
 
 interface ProductionLedgerEntryProps {

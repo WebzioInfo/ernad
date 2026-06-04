@@ -108,9 +108,7 @@ export default function OperatorPanel() {
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState('');
   const [bagsUsed, setBagsUsed] = useState(0);
   const [capBoxUsage, setCapBoxUsage] = useState(0);
-  const [labelsUsed, setLabelsUsed] = useState(0);
   const [glueUsedKg, setGlueUsedKg] = useState(0);
-  const [damagedLabelWeight, setDamagedLabelWeight] = useState(0);
   const [labelUsage, setLabelUsage] = useState(0);
   const [casesProduced, setCasesProduced] = useState(0);
   const [phValue, setPhValue] = useState(0);
