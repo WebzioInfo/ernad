@@ -47,6 +47,25 @@ export class ReportsController {
     });
   }
 
+  @Get('production/details')
+  @Roles('ADMIN')
+  @Permissions('reports:view')
+  @ApiOperation({ summary: 'Get detailed production report breakdown' })
+  async getProductionReportDetails(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('lineId') lineId: string,
+    @Query('productId') productId: string
+  ) {
+    if (!lineId || !productId) throw new BadRequestException('lineId and productId are required');
+    const dates = this.validateDates(startDate, endDate);
+    return this.reportsService.getProductionReportDetails({
+      ...dates,
+      lineId,
+      productId
+    });
+  }
+
   @Get('batches')
   @Roles('ADMIN', 'MANAGER')
   @Permissions('reports:view')
@@ -57,6 +76,18 @@ export class ReportsController {
   ) {
     this.validateDates(startDate, endDate);
     return this.reportsService.getProductionBatches({ startDate, endDate });
+  }
+
+  @Get('operations-ledger')
+  @Roles('ADMIN')
+  @Permissions('reports:view')
+  @ApiOperation({ summary: 'Get complete production operations ledger' })
+  async getOperationsLedgerReport(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string
+  ) {
+    const dates = this.validateDates(startDate, endDate);
+    return this.reportsService.getOperationsLedgerReport(dates);
   }
 
   @Get('batch/:id')

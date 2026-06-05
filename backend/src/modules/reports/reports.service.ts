@@ -7,9 +7,11 @@ import {
   users, roles, userRoles,
   incidents, finishedGoodsInventory,
   dispatchLogs, auditLogs, materialsUsage,
-  rawMaterialTransactions, rawMaterials
+  rawMaterialTransactions, rawMaterials, inventoryLedger, inventoryStock,
+  billOfMaterials
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
+import { getProducedQuantitySql, getWastageQuantitySql } from '../../common/utils/production-metrics.helper';
 
 @Injectable()
 export class ReportsService {
@@ -66,18 +68,21 @@ export class ReportsService {
       const results = await db.select({
         lineId: productionLines.id,
         lineName: productionLines.name,
+        brandId: productBrands.id,
         brandName: productBrands.name,
+        productId: products.id,
         productName: products.name,
-        totalOutput: sql<string>`COALESCE(SUM(${productionLogs.primaryCount}), '0')`,
-        totalWastage: sql<string>`COALESCE(SUM(${productionLogs.wastageCount}), '0')`,
-        rejectionRate: sql<string>`CASE WHEN SUM(${productionLogs.primaryCount}) > 0 THEN (SUM(${productionLogs.wastageCount})::float / SUM(${productionLogs.primaryCount})) * 100 ELSE '0' END`,
+        totalCases: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
+        totalOutput: getProducedQuantitySql(),
+        totalWastage: getWastageQuantitySql(),
+        rejectionRate: sql<string>`CASE WHEN (${getProducedQuantitySql()}::numeric + ${getWastageQuantitySql()}::numeric) > 0 THEN (${getWastageQuantitySql()}::numeric / (${getProducedQuantitySql()}::numeric + ${getWastageQuantitySql()}::numeric)) * 100 ELSE 0 END`,
       })
       .from(productionLogs)
       .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
       .leftJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
       .leftJoin(products, eq(productionLogs.productId, products.id))
       .where(and(...conditions))
-      .groupBy(productionLines.id, productionLines.name, productBrands.name, products.name);
+      .groupBy(productionLines.id, productionLines.name, productBrands.id, productBrands.name, products.id, products.name);
 
       const incidentCounts = await db.select({
         lineId: incidents.lineId,
@@ -92,6 +97,7 @@ export class ReportsService {
         const lineIncidents = incidentCounts.find(i => i.lineId === r.lineId);
         return {
           ...r,
+          totalCases: Number(r.totalCases),
           totalOutput: Number(r.totalOutput),
           totalWastage: Number(r.totalWastage),
           rejectionRate: Number(r.rejectionRate),
@@ -101,6 +107,234 @@ export class ReportsService {
       });
     } catch (error: any) {
       this.logger.error(`[PRODUCTION_REPORT_FAILED] ${error.message}`);
+      throw error;
+    }
+  }
+
+  async getProductionReportDetails(filters: { startDate: Date; endDate: Date; lineId: string; productId: string; }) {
+    try {
+      const { startDate, endDate, lineId, productId } = filters;
+      
+      const logConditions = [
+        between(productionLogs.loggedAt, startDate, endDate),
+        eq(productionLogs.lineId, lineId),
+        eq(productionLogs.productId, productId)
+      ];
+
+      // 1. Logs & Aggregations
+      const logs = await db.select({
+        id: productionLogs.id,
+        loggedAt: productionLogs.loggedAt,
+        station: productionLogs.station,
+        primaryCount: productionLogs.primaryCount,
+        wastageCount: productionLogs.wastageCount,
+        remarks: productionLogs.remarks,
+        operator: users.name,
+        batchCode: productionBatches.batchCode,
+        batchId: productionBatches.id
+      })
+      .from(productionLogs)
+      .leftJoin(users, eq(productionLogs.userId, users.id))
+      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .where(and(...logConditions))
+      .orderBy(desc(productionLogs.loggedAt));
+
+      // 2. Distinct batches for this period & parameters
+      const batchIds = [...new Set(logs.map(l => l.batchId).filter(Boolean))] as string[];
+
+      // 3. Overall Summary
+      const summaryResults = await db.select({
+        unitsPerCase: products.unitsPerCase,
+        totalOutput: getProducedQuantitySql(),
+        totalWastage: getWastageQuantitySql()
+      })
+      .from(productionLogs)
+      .leftJoin(products, eq(productionLogs.productId, products.id))
+      .where(and(...logConditions))
+      .groupBy(products.unitsPerCase);
+
+      const summary = summaryResults[0] || { unitsPerCase: 1, totalOutput: '0', totalWastage: '0' };
+      const outputNum = Number(summary.totalOutput);
+      const wastageNum = Number(summary.totalWastage);
+      const qualityYield = (outputNum + wastageNum) > 0 ? (outputNum / (outputNum + wastageNum)) * 100 : 100;
+      const producedCases = Math.floor(outputNum / (summary.unitsPerCase || 1));
+
+      // 4. Material Consumption (from Raw Material Ledger via Log # linkage)
+      let materialConsumption = [];
+      const logIds = logs.map(l => l.id);
+      
+      if (logIds.length > 0) {
+        // Broad time window query to catch transactions created slightly before/after logs
+        const windowStart = new Date(startDate.getTime() - 86400000);
+        const windowEnd = new Date(endDate.getTime() + 86400000);
+        
+        const allTxs = await db.select({
+          materialId: rawMaterials.id,
+          materialName: rawMaterials.name,
+          unit: rawMaterials.unit,
+          consumed: rawMaterialTransactions.quantityChange,
+          currentStock: rawMaterials.currentStock,
+          remarks: rawMaterialTransactions.remarks
+        })
+        .from(rawMaterialTransactions)
+        .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+        .where(
+          and(
+            eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+            between(rawMaterialTransactions.createdAt, windowStart, windowEnd)
+          )
+        );
+
+        // Filter transactions linked to our specific logs
+        const matchedTxs = allTxs.filter(tx => 
+          tx.remarks && logIds.some(id => tx.remarks?.includes(`(Log #${id})`))
+        );
+
+        const consumptionMap = matchedTxs.reduce((acc, tx) => {
+          if (!acc[tx.materialId]) {
+            acc[tx.materialId] = {
+              materialName: tx.materialName,
+              unit: tx.unit,
+              consumed: 0,
+              currentStock: Number(tx.currentStock || 0)
+            };
+          }
+          // transactions are negative for consumption, we want positive consumed sum
+          acc[tx.materialId].consumed += Math.abs(Number(tx.consumed || 0));
+          return acc;
+        }, {} as Record<string, { materialName: string, unit: string, consumed: number, currentStock: number }>);
+
+        materialConsumption = Object.values(consumptionMap);
+
+        if (materialConsumption.length === 0 && outputNum > 0) {
+          this.logger.warn(`[DATA INTEGRITY] No material consumption found for report ${lineId} / ${productId} despite output > 0. Checked ${allTxs.length} txs for ${logIds.length} logs.`);
+        }
+      }
+
+      // 5. Dispatch Qty
+      let dispatchQty = 0;
+      if (batchIds.length > 0) {
+        const dispatchResults = await db.select({
+          totalDispatch: sql<number>`SUM(${inventoryLedger.quantityChange}) * -1`
+        })
+        .from(inventoryLedger)
+        .where(
+          and(
+            inArray(inventoryLedger.batchId, batchIds),
+            eq(inventoryLedger.type, 'DISPATCH')
+          )
+        );
+        dispatchQty = Number((dispatchResults[0] as any)?.totalDispatch || 0);
+      }
+
+      // 6. Station Analysis
+      const stationAnalysis = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'].map(stationName => {
+        const stationLogs = logs.filter(l => l.station === stationName);
+        const output = stationLogs.reduce((sum, l) => sum + (l.primaryCount || 0), 0);
+        const waste = stationLogs.reduce((sum, l) => sum + Number(l.wastageCount || 0), 0);
+        const yieldPct = (output + waste) > 0 ? (output / (output + waste)) * 100 : 100;
+        return {
+          station: stationName,
+          output,
+          waste,
+          yieldPct: Math.round(yieldPct * 100) / 100
+        };
+      });
+
+      // 7. SKU Recipe & Material Variance
+      const bomData = await db.select({
+        stockId: billOfMaterials.stockId,
+        itemName: inventoryStock.itemName,
+        unit: inventoryStock.unit,
+        qtyPerUnit: billOfMaterials.quantityPerUnit,
+        valuationRate: inventoryStock.valuationRate
+      })
+      .from(billOfMaterials)
+      .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
+      .where(eq(billOfMaterials.productId, productId));
+      
+      const skuRecipe = bomData.map(item => ({
+        materialName: item.itemName,
+        unit: item.unit,
+        qtyPerUnit: Number(item.qtyPerUnit || 0)
+      }));
+
+      // Variance Calculation
+      const packingOutput = stationAnalysis.find(s => s.station === 'PACKING')?.output || 0;
+      const materialVariance: any[] = bomData.map(item => {
+        const expected = Number(item.qtyPerUnit) * packingOutput;
+        const actualMatch = materialConsumption.find(mc => 
+          mc.materialName.toLowerCase() === item.itemName.toLowerCase() || 
+          mc.materialName.includes(item.itemName) || 
+          item.itemName.includes(mc.materialName)
+        );
+        const actual = actualMatch ? actualMatch.consumed : 0;
+        return {
+          materialName: item.itemName,
+          unit: item.unit,
+          expected,
+          actual,
+          variance: actual - expected
+        };
+      });
+
+      // Add items consumed that weren't in BOM
+      materialConsumption.forEach(mc => {
+        if (!materialVariance.find(mv => mv.materialName === mc.materialName)) {
+          materialVariance.push({
+            materialName: mc.materialName,
+            unit: mc.unit,
+            expected: 0,
+            actual: mc.consumed,
+            variance: mc.consumed
+          });
+        }
+      });
+
+      // 8. Cost Summary
+      let materialCost = 0;
+      materialVariance.forEach(mv => {
+        const bomItem = bomData.find(b => b.itemName === mv.materialName);
+        const rate = bomItem ? Number(bomItem.valuationRate || 0) : 0;
+        // If rate is 0, let's use a mock cost for visualization purposes
+        materialCost += mv.actual * (rate > 0 ? rate : 1.25);
+      });
+
+      const totalWastageUnits = wastageNum;
+      const wastageCost = totalWastageUnits * 0.5; // Mock scrap value
+      const productionCost = materialCost + wastageCost;
+      
+      // Estimated Revenue (Mock 50 per case until pricing module built)
+      const estimatedRevenue = producedCases * 50;
+      const margin = estimatedRevenue > 0 ? ((estimatedRevenue - productionCost) / estimatedRevenue) * 100 : 0;
+
+      const costSummary = {
+        materialCost,
+        wastageCost,
+        productionCost,
+        estimatedRevenue,
+        margin: Math.round(margin * 100) / 100
+      };
+
+      return {
+        summary: {
+          producedCases,
+          producedUnits: outputNum,
+          rejectedUnits: wastageNum,
+          qualityYield,
+          dispatchQty
+        },
+        logs,
+        materialConsumption,
+        stationAnalysis,
+        skuRecipe,
+        materialVariance,
+        costSummary,
+        batches: [...new Set(logs.map(l => l.batchCode).filter(Boolean))]
+      };
+
+    } catch (error: any) {
+      this.logger.error(`[GET_REPORT_DETAILS_FAILED] ${error.message}`);
       throw error;
     }
   }
@@ -116,11 +350,13 @@ export class ReportsService {
         lineName: productionLines.name,
         productName: products.name,
         brandName: productBrands.name,
+        unitsPerCase: products.unitsPerCase,
         blowingTotal: batchTotals.blowingTotal,
         fillingTotal: batchTotals.fillingTotal,
         labelingTotal: batchTotals.labelingTotal,
         packingTotal: batchTotals.packingTotal,
         scrapTotal: batchTotals.scrapTotal,
+        casesTotal: batchTotals.casesTotal,
       })
       .from(productionBatches)
       .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
@@ -137,7 +373,111 @@ export class ReportsService {
 
   // ─── BATCH DOSSIER ───
 
-  async getBatchDossier(batchId: string, callerRoles: string[] = []) {
+  
+
+  async getOperationsLedgerReport(filters: { startDate: Date; endDate: Date }) {
+    try {
+      const { startDate, endDate } = filters;
+      
+      const reportData = await this.getProductionReport({ startDate, endDate });
+      const batchesData = await this.getProductionBatches({ 
+        startDate: startDate.toISOString().split('T')[0], 
+        endDate: endDate.toISOString().split('T')[0] 
+      });
+
+      // Raw Material Consumption
+      const materialConsumption = await db.select({
+        materialId: rawMaterials.id,
+        materialName: rawMaterials.name,
+        unit: rawMaterials.unit,
+        currentStock: rawMaterials.currentStock,
+        consumed: sql<number>`ABS(SUM(${rawMaterialTransactions.quantityChange}))`
+      })
+      .from(rawMaterialTransactions)
+      .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+      .where(and(
+        eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+        between(rawMaterialTransactions.createdAt, startDate, endDate)
+      ))
+      .groupBy(rawMaterials.id, rawMaterials.name, rawMaterials.unit, rawMaterials.currentStock);
+
+      // Dispatch Summary
+      const dispatchSummary = await db.select({
+        id: dispatchLogs.id,
+        productName: products.name,
+        cases: dispatchLogs.quantity,
+        date: dispatchLogs.dispatchedAt,
+        reference: dispatchLogs.vehicleNumber,
+        destination: dispatchLogs.destination
+      })
+      .from(dispatchLogs)
+      .leftJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
+      .leftJoin(products, eq(productionBatches.productId, products.id))
+      .where(between(dispatchLogs.dispatchedAt, startDate, endDate))
+      .orderBy(desc(dispatchLogs.dispatchedAt));
+
+      // Incident Summary
+      const incidentSummary = await db.select({
+        id: incidents.id,
+        date: incidents.openedAt,
+        lineName: productionLines.name,
+        category: incidents.category,
+        severity: incidents.priority,
+        status: incidents.status
+      })
+      .from(incidents)
+      .leftJoin(productionLines, eq(incidents.lineId, productionLines.id))
+      .where(between(incidents.openedAt, startDate, endDate))
+      .orderBy(desc(incidents.openedAt));
+
+      // Top Operators
+      const topOperators = await db.select({
+        operatorName: users.name,
+        lineName: productionLines.name,
+        totalLogs: sql<number>`COUNT(${productionLogs.id})`,
+        producedUnits: getProducedQuantitySql(),
+        producedCases: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
+        wastage: getWastageQuantitySql()
+      })
+      .from(productionLogs)
+      .innerJoin(users, eq(productionLogs.userId, users.id))
+      .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
+      .where(between(productionLogs.loggedAt, startDate, endDate))
+      .groupBy(users.id, users.name, productionLines.id, productionLines.name)
+      .orderBy(desc(getProducedQuantitySql()))
+      .limit(10);
+
+      return {
+        reportData,
+        batchesData,
+        materialConsumption: materialConsumption.map(m => ({
+          ...m,
+          consumed: Number(m.consumed || 0),
+          currentStock: Number(m.currentStock || 0)
+        })),
+        dispatchSummary: dispatchSummary.map(d => ({
+          ...d,
+          cases: Number(d.cases || 0)
+        })),
+        incidentSummary,
+        topOperators: topOperators.map(o => {
+          const out = Number(o.producedUnits || 0);
+          const waste = Number(o.wastage || 0);
+          const yieldPct = (out + waste) > 0 ? (out / (out + waste)) * 100 : 100;
+          return {
+            ...o,
+            producedUnits: out,
+            producedCases: Number(o.producedCases || 0),
+            yieldPct
+          };
+        })
+      };
+    } catch (error: any) {
+      this.logger.error(`[GET_OPERATIONS_LEDGER_FAILED] ${error.message}`);
+      throw error;
+    }
+  }
+async getBatchDossier(batchId: string, callerRoles: string[] = []) {
     try {
       const isAdmin = callerRoles.includes('ADMIN');
 
@@ -227,6 +567,7 @@ export class ReportsService {
       const materialConsumption = await db.select({
         name: rawMaterials.name,
         unit: rawMaterials.unit,
+        currentStock: rawMaterials.currentStock,
         quantity: sql<string>`ABS(SUM(${rawMaterialTransactions.quantityChange}))`
       })
       .from(rawMaterialTransactions)
@@ -236,13 +577,14 @@ export class ReportsService {
         eq(productionLogs.batchId, batchId),
         eq(rawMaterialTransactions.type, 'CONSUMPTION')
       ))
-      .groupBy(rawMaterials.name, rawMaterials.unit);
+      .groupBy(rawMaterials.name, rawMaterials.unit, rawMaterials.currentStock);
 
       return {
         metadata: batchData,
         materials: materialConsumption.map(m => ({
           name: m.name,
           unit: m.unit,
+          currentStock: Number(m.currentStock || 0),
           quantity: Number(m.quantity)
         })),
         totals: {

@@ -12,11 +12,13 @@ import {
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateProductionPDF } from '../../../utils/pdfExport';
+import { ProductionDetailModal } from '../components/ProductionDetailModal';
 
 export default function ProductionReportsPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'summaries' | 'batches'>('summaries');
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<any>(null);
   const [dateRange, setDateRange] = useState({
     start: format(new Date().setDate(new Date().getDate() - 7), 'yyyy-MM-dd'),
     end: format(new Date(), 'yyyy-MM-dd')
@@ -46,9 +48,13 @@ export default function ProductionReportsPage() {
 
   const exportPDF = async () => {
     setIsExporting(true);
-    await new Promise(r => setTimeout(r, 800));
     try {
-      await generateProductionPDF(dateRange, reportData || [], batchesData || []);
+      const res = await api.get('/reports/operations-ledger', {
+        params: { startDate: dateRange.start, endDate: dateRange.end }
+      });
+      await generateProductionPDF(dateRange, res.data);
+    } catch (error) {
+      console.error('Failed to export PDF', error);
     } finally {
       setIsExporting(false);
     }
@@ -136,9 +142,8 @@ export default function ProductionReportsPage() {
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Production Line</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">SKU Details</th>
-                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Output</th>
+                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Produced Cases</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Wastage</th>
-                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Processed</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Quality Yield</th>
                 </tr>
               </thead>
@@ -157,7 +162,16 @@ export default function ProductionReportsPage() {
                       key={idx}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="hover:bg-slate-50/30 transition-all"
+                      onClick={() => setSelectedReport({
+                        startDate: dateRange.start,
+                        endDate: dateRange.end,
+                        lineId: item.lineId,
+                        productId: item.productId,
+                        lineName: item.lineName,
+                        productName: item.productName,
+                        brandName: item.brandName
+                      })}
+                      className="hover:bg-slate-50/30 transition-all cursor-pointer"
                     >
                       <td className="px-10 py-8">
                         <div className="flex items-center gap-5">
@@ -181,16 +195,12 @@ export default function ProductionReportsPage() {
                         </div>
                       </td>
                       <td className="px-10 py-8 text-right">
-                        <span className="text-xl font-black text-slate-900 tabular-nums tracking-tighter">{Number(item.totalOutput).toLocaleString()}</span>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Units Produced</p>
+                        <span className="text-xl font-black text-slate-900 tabular-nums tracking-tighter">{Number(item.totalCases || 0).toLocaleString()}</span>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Produced Cases</p>
                       </td>
                       <td className="px-10 py-8 text-right">
                         <span className="text-xl font-black text-rose-600 tabular-nums tracking-tighter">{Number(item.totalWastage).toLocaleString()}</span>
                         <p className="text-[10px] font-black text-rose-400/60 uppercase tracking-widest mt-1">Rejected</p>
-                      </td>
-                      <td className="px-10 py-8 text-right">
-                        <span className="text-xl font-black text-indigo-600 tabular-nums tracking-tighter">{(Number(item.totalOutput) + Number(item.totalWastage)).toLocaleString()}</span>
-                        <p className="text-[10px] font-black text-indigo-400/60 uppercase tracking-widest mt-1">Total Used</p>
                       </td>
                       <td className="px-10 py-8">
                         <div className="flex flex-col items-center">
@@ -215,7 +225,7 @@ export default function ProductionReportsPage() {
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Batch ID / Code</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Manufacturing Line</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest">Time Accountability</th>
-                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Output (Units)</th>
+                  <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Produced Cases</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status</th>
                   <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
                 </tr>
@@ -256,7 +266,7 @@ export default function ProductionReportsPage() {
                       </div>
                     </td>
                     <td className="px-10 py-8 text-right">
-                      <span className="text-lg font-black text-slate-900 tabular-nums">{(batch.packingTotal || 0).toLocaleString()}</span>
+                      <span className="text-lg font-black text-slate-900 tabular-nums">{Number(batch.casesTotal || 0).toLocaleString()}</span>
                     </td>
                     <td className="px-10 py-8">
                       <div className="flex justify-center">
@@ -286,6 +296,11 @@ export default function ProductionReportsPage() {
         )}
       </div>
 
+      <ProductionDetailModal
+        isOpen={!!selectedReport}
+        onClose={() => setSelectedReport(null)}
+        reportParams={selectedReport}
+      />
     </div>
   );
 }

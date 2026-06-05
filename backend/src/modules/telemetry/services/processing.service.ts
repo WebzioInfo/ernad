@@ -334,8 +334,8 @@ export class ProcessingService {
     }
 
     // 2. Capping (Boxes)
-    if (dto.station === 'FILLING' && dto.rawMaterialId && dto.boxesUsed && dto.boxesUsed > 0) {
-      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.boxesUsed, remarks: `Boxes used in Capping Station (Log #${logId})` });
+    if (dto.station === 'FILLING' && dto.rawMaterialId && dto.capBoxUsage && dto.capBoxUsage > 0) {
+      directDeductions.push({ materialId: dto.rawMaterialId, qty: dto.capBoxUsage, remarks: `Boxes used in Capping Station (Log #${logId})` });
     }
 
     // 3. Packing (Shrink Rolls)
@@ -1128,7 +1128,7 @@ export class ProcessingService {
       conditions.push(isNull(productionLogs.deletedAt));
     }
 
-    return await db.select({
+    const logs = await db.select({
       id: productionLogs.id,
       batchId: productionLogs.batchId,
       batchCode: productionBatches.batchCode,
@@ -1168,6 +1168,38 @@ export class ProcessingService {
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(productionLogs.loggedAt))
       .limit(limit);
+
+    if (logs.length === 0) return [];
+
+    const logIds = logs.map(l => l.id);
+    const idsString = logIds.join('|');
+    const rmts = await db.execute(sql`
+      SELECT rmt.remarks, rmt.quantity_change, rm.name, rm.unit 
+      FROM raw_material_transactions rmt
+      JOIN raw_materials rm ON rm.id = rmt.material_id
+      WHERE rmt.remarks ~ ${'\\(Log #(' + idsString + ')\\)'}
+    `);
+
+    return logs.map(log => {
+      const consumption: any[] = [];
+      const pattern = new RegExp(`\\\\(Log #${log.id}\\\\)`);
+      
+      rmts.forEach((rmt: any) => {
+        if (pattern.test(rmt.remarks)) {
+          const qty = Math.abs(Number(rmt.quantity_change));
+          consumption.push({
+            name: rmt.name,
+            quantity: qty,
+            unit: rmt.unit
+          });
+        }
+      });
+
+      return {
+        ...log,
+        materialConsumption: consumption
+      };
+    });
   }
 
   async voidLog(logId: number, userId: string, reason: string) {

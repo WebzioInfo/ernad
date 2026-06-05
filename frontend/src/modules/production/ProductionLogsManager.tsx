@@ -70,6 +70,7 @@ export default function ProductionLogsManager() {
   const [rejectingLog, setRejectingLog] = useState<any>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [verificationRemarks, setVerificationRemarks] = useState('');
+  const [viewingLog, setViewingLog] = useState<any>(null);
 
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials-packing'],
@@ -342,8 +343,12 @@ export default function ProductionLogsManager() {
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Identification</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Line / Batch</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Station</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Yield & Scrap</th>
-                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Station Metrics</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Production</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Wastage</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Material Usage</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Remarks</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                  <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Time</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
                   <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
@@ -356,14 +361,15 @@ export default function ProductionLogsManager() {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.02 }}
+                      onClick={() => setViewingLog(log)}
                       className={cn(
-                        "hover:bg-slate-50/80 transition-colors group",
+                        "hover:bg-slate-50/80 transition-colors group cursor-pointer",
                         log.deletedAt && "opacity-40 grayscale pointer-events-none"
                       )}
                     >
                       <td className="px-8 py-6">
                         <p className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight truncate max-w-[150px]">{log.userName || log.user?.name || 'Operator'}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">#{log.id} • {format(new Date(log.loggedAt), 'HH:mm')}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">#{log.id}</p>
                       </td>
                       <td className="px-8 py-6">
                         <p className="text-xs font-black text-slate-600 uppercase tracking-tight truncate max-w-[120px]">{log.lineName || log.line?.name}</p>
@@ -373,25 +379,31 @@ export default function ProductionLogsManager() {
                         <Badge variant="indigo">{log.station}</Badge>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="flex items-center gap-4">
-                          <div>
-                            <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
-                            <p className="text-[8px] font-black text-slate-400 uppercase">Production</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{formatDecimal(log.wastageCount)}</p>
-                            <p className="text-[8px] font-black text-slate-400 uppercase">Wastage</p>
-                          </div>
-                        </div>
+                        <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
+                      </td>
+                      <td className="px-8 py-6">
+                        <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{formatDecimal(log.wastageCount)}</p>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex flex-col gap-1.5">
-                          {log.station === 'BLOWING' && (
+                          {log.materialConsumption && log.materialConsumption.length > 0 ? (
+                            log.materialConsumption.map((mc: any, idx: number) => (
+                              <div key={idx} className="flex flex-col mb-1">
+                                <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase" title={mc.name}>{mc.name}</p>
+                                <div className="flex gap-1 items-baseline">
+                                  <p className="text-sm font-black text-indigo-600 font-mono">{formatDecimal(mc.quantity)}</p>
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase">{mc.unit} USED</span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
                             <>
-                              {log.rawMaterial?.name && <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase">{log.rawMaterial.name}</p>}
-                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bagsUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Bags Used</span></div>
-                            </>
-                          )}
+                              {log.station === 'BLOWING' && (
+                                <>
+                                  {log.rawMaterial?.name && <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase">{log.rawMaterial.name}</p>}
+                                  <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bagsUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Bags Used</span></div>
+                                </>
+                              )}
                           {log.station === 'FILLING' && (
                             <>
                               <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.capUsage || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Caps Used</span></div>
@@ -430,7 +442,43 @@ export default function ProductionLogsManager() {
                               )}
                             </>
                           )}
-                        </div>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                      <td className="px-8 py-6">
+                        {log.remarks ? (
+                          <div className="group relative inline-block">
+                            <p className="text-xs font-bold text-slate-600 truncate max-w-[150px] cursor-help">
+                              {log.remarks.length > 50 ? `${log.remarks.substring(0, 50)}...` : log.remarks}
+                            </p>
+                            {log.remarks.length > 50 && (
+                              <div className="absolute z-50 invisible group-hover:visible bg-slate-900 text-white text-[10px] font-bold p-3 rounded-xl -top-10 left-0 whitespace-nowrap shadow-xl">
+                                {log.remarks}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 font-black">—</span>
+                        )}
+                      </td>
+                      <td className="px-8 py-6">
+                        {log.loggedAt || log.createdAt || log.timestamp ? (
+                          <span className="text-xs font-bold text-slate-600">
+                            {format(new Date(log.loggedAt || log.createdAt || log.timestamp), 'MMM dd, yyyy')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-black">—</span>
+                        )}
+                      </td>
+                      <td className="px-8 py-6">
+                        {log.loggedAt || log.createdAt || log.timestamp ? (
+                          <span className="text-xs font-bold text-slate-600 uppercase">
+                            {format(new Date(log.loggedAt || log.createdAt || log.timestamp), 'hh:mm a')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-black">—</span>
+                        )}
                       </td>
                       <td className="px-8 py-6">
                         <Badge variant={
@@ -447,7 +495,7 @@ export default function ProductionLogsManager() {
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             {log.status !== 'VERIFIED' && log.userId !== user?.id && (
                               <button
-                                onClick={() => setVerifyingLog(log)}
+                                onClick={(e) => { e.stopPropagation(); setVerifyingLog(log); }}
                                 className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg transition-all"
                                 title="Verify Log"
                               >
@@ -456,7 +504,7 @@ export default function ProductionLogsManager() {
                             )}
                             {log.status === 'SUBMITTED' && log.userId !== user?.id && (
                               <button
-                                onClick={() => setRejectingLog(log)}
+                                onClick={(e) => { e.stopPropagation(); setRejectingLog(log); }}
                                 className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-lg transition-all"
                                 title="Reject Log"
                               >
@@ -464,7 +512,8 @@ export default function ProductionLogsManager() {
                               </button>
                             )}
                             <button
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 const selectedShrinksCopy = log.selectedShrinks 
                                   ? JSON.parse(JSON.stringify(log.selectedShrinks))
                                   : [];
@@ -803,6 +852,143 @@ export default function ProductionLogsManager() {
                     'Confirm Reject'
                   )}
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* View Modal */}
+      <AnimatePresence>
+        {viewingLog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setViewingLog(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-2xl max-h-[90vh] flex flex-col"
+            >
+              <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10">
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">Production Log #{viewingLog.id}</h2>
+                  <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">{viewingLog.station} • {viewingLog.lineName || viewingLog.line?.name} • {viewingLog.batchCode || viewingLog.batch?.batchCode}</p>
+                </div>
+                <button
+                  onClick={() => setViewingLog(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Station</p>
+                    <div className="mt-1">
+                      <Badge variant="indigo">{viewingLog.station}</Badge>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Operator</p>
+                    <p className="text-sm font-bold text-slate-900 truncate" title={viewingLog.userName || viewingLog.user?.name}>{viewingLog.userName || viewingLog.user?.name || 'Operator'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch</p>
+                    <p className="text-sm font-bold text-slate-900 font-mono uppercase">{viewingLog.batchCode || viewingLog.batch?.batchCode || '—'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Line</p>
+                    <p className="text-sm font-bold text-slate-900 uppercase">{viewingLog.lineName || viewingLog.line?.name || '—'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date</p>
+                    <p className="text-sm font-bold text-slate-900">{viewingLog.loggedAt ? format(new Date(viewingLog.loggedAt), 'MMM dd, yyyy') : '—'}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Time</p>
+                    <p className="text-sm font-bold text-slate-900 uppercase">{viewingLog.loggedAt ? format(new Date(viewingLog.loggedAt), 'hh:mm a') : '—'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Production Summary</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                      <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Production</p>
+                      <p className="text-2xl font-black text-indigo-600 font-mono">{(viewingLog.primaryCount || 0).toLocaleString()}</p>
+                    </div>
+                    <div className="bg-rose-50 p-4 rounded-2xl border border-rose-100">
+                      <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1">Waste</p>
+                      <p className="text-2xl font-black text-rose-600 font-mono">{formatDecimal(viewingLog.wastageCount)}</p>
+                    </div>
+                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</p>
+                      <div>
+                        <Badge variant={viewingLog.status === 'VERIFIED' ? 'success' : viewingLog.status === 'REJECTED' ? 'danger' : viewingLog.status === 'CORRECTED' ? 'warning' : 'indigo'}>{viewingLog.status || 'SUBMITTED'}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Material Consumption</h3>
+                  {viewingLog.materialConsumption && viewingLog.materialConsumption.length > 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100">
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Raw Material Name</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Consumed Quantity</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {viewingLog.materialConsumption.map((mc: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-slate-50/50">
+                              <td className="px-4 py-3 text-sm font-bold text-slate-700">{mc.name}</td>
+                              <td className="px-4 py-3 text-sm font-black text-indigo-600 font-mono text-right">{formatDecimal(mc.quantity)}</td>
+                              <td className="px-4 py-3 text-xs font-bold text-slate-400 uppercase">{mc.unit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 p-8 rounded-2xl border border-slate-100 text-center">
+                      <p className="text-sm font-bold text-slate-400">No material consumption recorded for this log.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Remarks</h3>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                    <p className="text-sm font-bold text-slate-700 whitespace-pre-wrap">{viewingLog.remarks || <span className="text-slate-400 italic">No remarks provided</span>}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Timeline</h3>
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Created</p>
+                      <p className="text-xs font-bold text-slate-600">{viewingLog.createdAt ? format(new Date(viewingLog.createdAt), 'MMM dd, yyyy hh:mm a') : '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Submitted / Logged</p>
+                      <p className="text-xs font-bold text-slate-600">{viewingLog.loggedAt ? format(new Date(viewingLog.loggedAt), 'MMM dd, yyyy hh:mm a') : '—'}</p>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </motion.div>
           </div>

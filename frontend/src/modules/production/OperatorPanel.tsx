@@ -177,7 +177,8 @@ export default function OperatorPanel() {
   const { data: batchData, isLoading: isLoadingBatch } = useQuery({
     queryKey: ['active-batch', lineId],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(lineId!))).data,
-    enabled: !!lineId,    retry: 1
+    enabled: !!lineId,
+    retry: 1
   });
 
   const activeBatch = batchData;
@@ -188,7 +189,8 @@ export default function OperatorPanel() {
       if (!activeBatch?.batch?.id) return [];
       return (await api.get(ENDPOINTS.TELEMETRY.ACTIVE_EVENTS(activeBatch.batch.id))).data;
     },
-    enabled: !!activeBatch?.batch?.id,  });
+    enabled: !!activeBatch?.batch?.id,
+  });
 
   const endSessionMutation = useMutation({
     mutationFn: () => api.post(ENDPOINTS.OPERATOR_SESSIONS.END),
@@ -363,7 +365,8 @@ export default function OperatorPanel() {
         return null;
       }
     },
-    enabled: !!lineId && !!currentStation.id,  });
+    enabled: !!lineId && !!currentStation.id,
+  });
 
   const handleHandoverSubmit = async () => {
     if (overlay.isLocked) return;
@@ -595,8 +598,8 @@ export default function OperatorPanel() {
       const rawMaterialName = currentStation?.id === 'BLOWING'
         ? rawMaterials?.find((material: any) => material.id === selectedRawMaterialId)?.name
         : currentStation?.id === 'LABELING'
-        ? rawMaterials?.find((material: any) => material.id === selectedLabelRawMaterialId)?.name
-        : selectedCapRawMaterial?.name;
+          ? rawMaterials?.find((material: any) => material.id === selectedLabelRawMaterialId)?.name
+          : selectedCapRawMaterial?.name;
 
       if (committedLog) {
         queryClient.setQueryData<any[]>(historyQueryKey, (previous = []) => {
@@ -607,14 +610,14 @@ export default function OperatorPanel() {
             rawMaterialName: committedLog.rawMaterial?.name || rawMaterialName,
             userName: committedLog.user?.name || activeOperator?.name || user?.name || 'Operator',
           };
-          
+
           const withoutDuplicate = previous.filter((entry: any) => entry.id !== exactRecord.id);
           return [exactRecord, ...withoutDuplicate].slice(0, 50);
         });
       }
 
       await overlay.showSuccess('Production Recorded');
-      
+
       const warnings = response.data?.warnings;
       if (warnings && warnings.length > 0) {
         warnings.forEach((warning: any) => {
@@ -626,7 +629,7 @@ export default function OperatorPanel() {
       }
       refetchHistory();
       queryClient.invalidateQueries({ queryKey: ['active-batch'] });
-      
+
       // Auto Reset Form
       setPrimaryCount(0);
       setRejectionCount(0);
@@ -1079,11 +1082,10 @@ export default function OperatorPanel() {
                                   key={material.id}
                                   type="button"
                                   onClick={() => toggleShrink(material)}
-                                  className={`w-28 px-3 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all duration-300 relative overflow-hidden h-12 cursor-pointer ${
-                                    isSelected
+                                  className={`w-28 px-3 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all duration-300 relative overflow-hidden h-12 cursor-pointer ${isSelected
                                       ? 'bg-[#1A9A91]/10 border-[#1A9A91] shadow-md shadow-[#1A9A91]/5'
                                       : 'bg-white border-slate-200 hover:border-[#1A9A91]/45'
-                                  }`}
+                                    }`}
                                 >
                                   <span className={`text-xs font-black uppercase tracking-wider ${isSelected ? 'text-[#1A9A91]' : 'text-slate-700'}`}>
                                     {material.name.match(/(\d+)\s*(?:mm|m)/i)
@@ -1147,7 +1149,7 @@ export default function OperatorPanel() {
               <div className="bg-[#1A9A91]/5 border border-[#1A9A91]/15 rounded-2xl p-4 md:p-5">
                 <div className="flex items-center gap-3 mb-3">
                   <AlertTriangle className="text-[#1A9A91]" size={18} />
-                  <h4 className="text-xs font-black text-[#1A9A91] uppercase tracking-widest">Anomaly Signature</h4>
+                  <h4 className="text-xs font-black text-[#1A9A91] uppercase tracking-widest">Remarks</h4>
                 </div>
                 <textarea
                   value={remarks}
@@ -1687,7 +1689,7 @@ export default function OperatorPanel() {
       <ConfirmationModal isOpen={pendingTelemetry} onClose={() => setPendingTelemetry(false)} onConfirm={() => { setPendingTelemetry(false); handleSaveTelemetry('ALL'); }} title="Commit Telemetry Log" message="Are you sure you want to commit this telemetry log to the ledger? Ensure all numbers are correct." variant="primary" confirmText="Yes, Commit" />
       <ConfirmationModal isOpen={pendingStartBatch} onClose={() => setPendingStartBatch(false)} onConfirm={() => {
         if (startBatchMutation.isPending) return;
-        
+
         let isoTime: string;
         try {
           if (!startStartTime) throw new Error("Start Time is required.");
@@ -1697,12 +1699,12 @@ export default function OperatorPanel() {
           setPendingStartBatch(false);
           return;
         }
-        
+
         startBatchMutation.mutate({
-          shiftId: startShift, 
-          brandId: startBrand, 
+          shiftId: startShift,
+          brandId: startBrand,
           productId: startProduct,
-          batchCode: startBatchCode || undefined, 
+          batchCode: startBatchCode || undefined,
           remarks: startRemarks || undefined,
           startTime: isoTime
         }, {
@@ -1753,7 +1755,7 @@ export default function OperatorPanel() {
 
       <ConfirmationModal isOpen={pendingCompleteChangeover} onClose={() => setPendingCompleteChangeover(false)} onConfirm={() => {
         if (completeChangeoverMutation.isPending) return;
-        completeChangeoverMutation.mutate(undefined, { 
+        completeChangeoverMutation.mutate(undefined, {
           onSuccess: () => { setPendingCompleteChangeover(false); setShowLineControl(false); },
           onError: () => setPendingCompleteChangeover(false)
         });
