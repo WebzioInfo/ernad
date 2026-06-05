@@ -385,67 +385,34 @@ export default function ProductionLogsManager() {
                         <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{formatDecimal(log.wastageCount)}</p>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap gap-1.5 max-w-[250px]">
                           {log.materialConsumption && log.materialConsumption.length > 0 ? (
-                            log.materialConsumption.map((mc: any, idx: number) => (
-                              <div key={idx} className="flex flex-col mb-1">
-                                <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase" title={mc.name}>{mc.name}</p>
-                                <div className="flex gap-1 items-baseline">
-                                  <p className="text-sm font-black text-indigo-600 font-mono">{formatDecimal(mc.quantity)}</p>
-                                  <span className="text-[8px] font-bold text-slate-400 uppercase">{mc.unit} USED</span>
+                            log.materialConsumption.map((mc: any, idx: number) => {
+                              const nameLower = (mc.name || '').toLowerCase();
+                              let icon = '📦';
+                              if (nameLower.includes('label')) icon = '🏷️';
+                              else if (nameLower.includes('cap')) icon = '🧴';
+                              else if (nameLower.includes('shrink')) icon = '🔥';
+                              else if (nameLower.includes('glue')) icon = '🧪';
+                              else if (nameLower.includes('preform')) icon = '🧪';
+
+                              return (
+                                <div 
+                                  key={idx} 
+                                  className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 rounded-md"
+                                  title={`${mc.name}\n${formatDecimal(mc.quantity)} ${mc.unit}`}
+                                >
+                                  <span className="text-xs">{icon}</span>
+                                  <span className="text-[10px] font-black text-slate-700">{formatDecimal(mc.quantity)}</span>
+                                  <span className="text-[9px] font-bold text-slate-500 uppercase truncate max-w-[80px]">{mc.name.includes('Shrink') ? 'Shrink' : mc.name.includes('Label') ? 'Labels' : mc.name.includes('Cap') ? 'Caps' : mc.name.includes('Preform') ? 'Bags' : mc.unit}</span>
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           ) : (
-                            <>
-                              {log.station === 'BLOWING' && (
-                                <>
-                                  {log.rawMaterial?.name && <p className="text-[10px] font-black text-slate-600 truncate max-w-[140px] uppercase">{log.rawMaterial.name}</p>}
-                                  <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bagsUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Bags Used</span></div>
-                                </>
-                              )}
-                          {log.station === 'FILLING' && (
-                            <>
-                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.capUsage || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Caps Used</span></div>
-                            </>
+                            <span className="text-[10px] font-bold text-slate-400">No Material Record</span>
                           )}
-                          {log.station === 'LABELING' && (
-                            <>
-                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.bopRollUsage || log.labelStickerWeight || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Labels Used</span></div>
-                              {(!log.lineName && !log.line?.name ? true : !(log.lineName || log.line?.name)?.toLowerCase().includes('2')) && log.glueUsageKg && Number(log.glueUsageKg) > 0 ? (
-                                <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.glueUsageKg} KG</p><span className="text-[8px] font-bold text-slate-400 uppercase">Glue Used</span></div>
-                              ) : null}
-                              {(log.lineName || log.line?.name)?.toLowerCase().includes('2') && log.rollsUsed && Number(log.rollsUsed) > 0 ? (
-                                <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.rollsUsed}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Rolls Used</span></div>
-                              ) : null}
-                              {(log.inkUsage > 0 || log.solventUsage > 0) && <div className="flex gap-1 items-baseline"><p className="text-[10px] font-black text-indigo-600 font-mono">{log.inkUsage || 0}ML / {log.solventUsage || 0}ML</p><span className="text-[8px] font-bold text-slate-400 uppercase">HTT Used</span></div>}
-                            </>
-                          )}
-                          {log.station === 'PACKING' && (
-                            <>
-                              <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.secondaryPackagingCount || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Boxes Used</span></div>
-                              {log.selectedShrinks && log.selectedShrinks.length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {log.selectedShrinks.map((s: any, idx: number) => (
-                                    <div key={idx} className="flex gap-1 items-baseline text-[9px] text-slate-500 font-bold uppercase flex-wrap">
-                                      <span>{s.mmUsed} KG</span>
-                                      {s.wastageKg ? <span className="text-rose-500 font-bold">+{s.wastageKg} KG W</span> : null}
-                                      <span className="text-[8px] font-normal text-slate-450 truncate max-w-[80px]">{s.shrinkName}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-indigo-600 font-mono">{log.shrinkWeightUsed || 0}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Shrink (KG)</span></div>
-                              )}
-                              {log.shrinkWastageKg !== undefined && Number(log.shrinkWastageKg) > 0 && (
-                                <div className="flex gap-1 items-baseline"><p className="text-sm font-black text-rose-500 font-mono">{log.shrinkWastageKg}</p><span className="text-[8px] font-bold text-slate-400 uppercase">Wastage (KG)</span></div>
-                              )}
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </td>
+                        </div>
+                      </td>
                       <td className="px-8 py-6">
                         {log.remarks ? (
                           <div className="group relative inline-block">
@@ -963,7 +930,7 @@ export default function ProductionLogsManager() {
                     </div>
                   ) : (
                     <div className="bg-slate-50 p-8 rounded-2xl border border-slate-100 text-center">
-                      <p className="text-sm font-bold text-slate-400">No material consumption recorded for this log.</p>
+                      <p className="text-sm font-bold text-slate-400">No Material Record</p>
                     </div>
                   )}
                 </div>

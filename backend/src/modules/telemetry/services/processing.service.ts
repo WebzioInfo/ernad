@@ -1182,7 +1182,7 @@ export class ProcessingService {
 
     return logs.map(log => {
       const consumption: any[] = [];
-      const pattern = new RegExp(`\\\\(Log #${log.id}\\\\)`);
+      const pattern = new RegExp(`\\(Log #${log.id}\\)`);
       
       rmts.forEach((rmt: any) => {
         if (pattern.test(rmt.remarks)) {
