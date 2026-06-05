@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import {
@@ -607,6 +607,22 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
     phoneNumber: user?.phoneNumber || '',
     pin: '',
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        username: user.username || '',
+        email: user.email || '',
+        roles: user.roles || ['OPERATOR'],
+        assignedLines: user.assignedLines || [],
+        department: user.department || '',
+        jobTitle: user.jobTitle || '',
+        phoneNumber: user.phoneNumber || '',
+        pin: '',
+      });
+    }
+  }, [user]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const queryClient = useQueryClient();

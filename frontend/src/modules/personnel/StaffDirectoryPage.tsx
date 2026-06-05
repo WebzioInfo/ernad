@@ -27,6 +27,7 @@ export default function StaffDirectoryPage() {
   const canRegisterStaff = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
   const [searchTerm, setSearchTerm] = useState('');
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<Staff | null>(null);
 
   const { data: staffData, isLoading } = useQuery({
     queryKey: ['staff-directory', searchTerm],
@@ -209,7 +210,9 @@ export default function StaffDirectoryPage() {
                         {person.status}
                       </span>
 
-                      <button className="p-1 text-slate-400 hover:text-slate-650 hover:bg-slate-100 rounded transition-all">
+                      <button 
+                        onClick={() => setEditingUser(person)}
+                        className="p-1 text-slate-400 hover:text-slate-650 hover:bg-slate-100 rounded transition-all">
                         <MoreHorizontal className="w-4 h-4" />
                       </button>
                     </div>
@@ -271,6 +274,9 @@ export default function StaffDirectoryPage() {
 
       {isRegisterModalOpen && (
         <UserFormModal onClose={() => setIsRegisterModalOpen(false)} />
+      )}
+      {editingUser && (
+        <UserFormModal user={editingUser as any} onClose={() => setEditingUser(null)} />
       )}
     </div>
   );
