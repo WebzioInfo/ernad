@@ -226,6 +226,7 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
                     <Tooltip
                       contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '1rem', color: '#fff' }}
                       itemStyle={{ color: '#818cf8' }}
+                      formatter={(value: number) => [`${value} Output`, 'Produced']}
                     />
                     <Line
                       type="monotone"

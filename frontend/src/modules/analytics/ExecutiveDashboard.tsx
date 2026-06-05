@@ -249,9 +249,12 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      formatter={(value: number) => [`${value} Cases`, 'Produced']}
                       labelFormatter={(val) => {
                         try {
-                          return format(parseISO(val), 'PPpp');
+                          const date = parseISO(val);
+                          if (filters.timeRange === 'live' || filters.timeRange === 'today') return format(date, 'MMM d, yyyy - HH:mm');
+                          return format(date, 'MMM d, yyyy');
                         } catch (e) {
                           return val;
                         }

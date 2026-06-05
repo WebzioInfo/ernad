@@ -120,7 +120,7 @@ export class DashboardService {
               : timeRange === 'month' 
                 ? sql`date_trunc('day', pl.logged_at)` 
                 : sql`date_trunc('hour', pl.logged_at)`} as time,
-          coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.cases_produced, 0) else 0 end), 0)::int as produced
+          coalesce(sum(pl.cases_produced), 0)::int as produced
         from production_logs pl
         where pl.deleted_at is null and pl.logged_at >= ${startIso}
         group by 1
