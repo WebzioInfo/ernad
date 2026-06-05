@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { BarChart3, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const analyticsConfig: ModuleConfig = {
@@ -11,11 +11,6 @@ export const analyticsConfig: ModuleConfig = {
     {
       path: 'overview',
       element: lazy(() => import('./ExecutiveDashboard')),
-      allowedRoles: ['ADMIN', 'MANAGER']
-    },
-    {
-      path: 'analytics',
-      element: lazy(() => import('./EfficiencyDashboardPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
     }
   ],
@@ -29,19 +24,6 @@ export const analyticsConfig: ModuleConfig = {
           label: 'Dashboard',
           icon: Globe,
           path: '/overview',
-          allowedRoles: ['ADMIN', 'MANAGER']
-        }
-      ]
-    },
-    {
-      id: 'production',
-      label: 'Production',
-      items: [
-        {
-          id: 'analytics',
-          label: 'Efficiency',
-          icon: BarChart3,
-          path: '/analytics',
           allowedRoles: ['ADMIN', 'MANAGER']
         }
       ]

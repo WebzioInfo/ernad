@@ -30,6 +30,7 @@ import { OperatorSessionsModule } from './modules/operator-sessions/operator-ses
 import { SystemModule } from './modules/system/system.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 import { AppController } from './app.controller';
 
@@ -56,6 +57,7 @@ import { AppController } from './app.controller';
     SystemModule,
     NotesModule,
     IncidentsModule,
+    DashboardModule,
 
     ReportsModule,
     SalesModule,

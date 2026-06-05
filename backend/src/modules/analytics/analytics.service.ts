@@ -4,7 +4,7 @@ import {
   productionLogs, batchTotals, productionBatches, 
   materialsUsage, productBrands, products, userLines,
   productionLines, downtimeLogs, inventoryStock,
-  billOfMaterials, inventoryTransactions
+  billOfMaterials, inventoryTransactions, rawMaterials
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, between, desc, inArray, isNull } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
@@ -295,13 +295,32 @@ export class AnalyticsService {
 
   // ── NEW: INDUSTRIAL CONTROL CENTER LOGIC ──
 
-  async getFactoryOverview() {
+  async getFactoryOverview(timeRange: string = 'today') {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch(timeRange) {
+        case 'live':
+          // Current active shift - fall back to last 12 hours if no strict shift logic exists
+          startDate = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+          break;
+        case 'week':
+          startDate.setHours(0, 0, 0, 0);
+          startDate.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+          break;
+        case 'month':
+          startDate.setHours(0, 0, 0, 0);
+          startDate.setDate(1); // Start of month
+          break;
+        case 'today':
+        default:
+          startDate.setHours(0, 0, 0, 0);
+          break;
+      }
 
-      // 1. Aggregated Production Stream (Today)
-      const [productionToday] = await db.select({
+      // 1. Aggregated Production Stream
+      const [productionAggregates] = await db.select({
         blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
         filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
         packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
@@ -309,7 +328,7 @@ export class AnalyticsService {
       })
       .from(productionLogs)
       .where(and(
-        gte(productionLogs.loggedAt, today), 
+        gte(productionLogs.loggedAt, startDate), 
         isNull(productionLogs.deletedAt)
       ));
 
@@ -322,7 +341,7 @@ export class AnalyticsService {
         totalDowntimeToday: sql<number>`COALESCE(SUM(${downtimeLogs.durationMinutes}), 0)`
       }).from(downtimeLogs)
       .where(and(
-        gte(downtimeLogs.startTime, today),
+        gte(downtimeLogs.startTime, startDate),
         isNull(downtimeLogs.deletedAt)
       ));
 
@@ -359,10 +378,17 @@ export class AnalyticsService {
           : 0
       }));
 
-      const lowStock = await db.select()
-        .from(inventoryStock)
-        .where(sql`${inventoryStock.quantity} <= ${inventoryStock.minimumStock}`)
-        .limit(5);
+      // Fix lowStockAlerts to use rawMaterials table
+      const lowStock = await db.select({
+        id: rawMaterials.id,
+        itemName: rawMaterials.name,
+        quantity: rawMaterials.currentStock,
+        unit: rawMaterials.unit,
+        minimumStock: sql<number>`1000` // Hardcoded minimum for now as rawMaterials schema doesn't have minimumStock
+      })
+      .from(rawMaterials)
+      .where(sql`${rawMaterials.currentStock} <= 1000`)
+      .limit(5);
 
       const activeDowntimes = await db.select({
         id: downtimeLogs.id,
@@ -391,10 +417,10 @@ export class AnalyticsService {
 
       return {
         counters: {
-          blowing: Number(productionToday?.blowing || 0),
-          filling: Number(productionToday?.filling || 0),
-          packing: Number(productionToday?.packing || 0),
-          rejection: Number(productionToday?.rejection || 0)
+          blowing: Number(productionAggregates?.blowing || 0),
+          filling: Number(productionAggregates?.filling || 0),
+          packing: Number(productionAggregates?.packing || 0),
+          rejection: Number(productionAggregates?.rejection || 0)
         },
         activeBatches: batchesWithProgress,
         lowStockAlerts: lowStock,

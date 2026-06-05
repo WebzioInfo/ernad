@@ -22,7 +22,7 @@ export default function ExecutiveDashboard() {
   const isManager = userRoles.includes('MANAGER');
 
   const renderDashboard = () => {
-    if (isManager) return <ManagerDashboard />;
+    if (isManager) return <ManagerDashboard filters={filters} />;
     return <AdminDashboard filters={filters} />;
   };
 

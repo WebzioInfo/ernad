@@ -91,8 +91,8 @@ export class AnalyticsController {
 
   @Get('factory/live')
   @Permissions('analytics:view')
-  async getFactoryOverview() {
-    return this.analyticsService.getFactoryOverview();
+  async getFactoryOverview(@Query('timeRange') timeRange?: string) {
+    return this.analyticsService.getFactoryOverview(timeRange);
   }
 
   @Get('factory/efficiency')

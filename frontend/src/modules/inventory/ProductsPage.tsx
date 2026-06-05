@@ -150,9 +150,9 @@ export default function ProductsPage() {
   // Calculate totals for dashboard summary cards
   const { totalAvailableStock, totalProducedAllTime, totalDispatchedAllTime } = useMemo(() => {
     return {
-      totalAvailableStock: productionStock?.reduce((acc: number, cur: any) => acc + cur.currentStock, 0) || 0,
-      totalProducedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + cur.totalProduced, 0) || 0,
-      totalDispatchedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + cur.totalDispatched, 0) || 0
+      totalAvailableStock: productionStock?.reduce((acc: number, cur: any) => acc + Number(cur.currentStock || 0), 0) || 0,
+      totalProducedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + Number(cur.totalProduced || 0), 0) || 0,
+      totalDispatchedAllTime: productionStock?.reduce((acc: number, cur: any) => acc + Number(cur.totalDispatched || 0), 0) || 0
     };
   }, [productionStock]);
 

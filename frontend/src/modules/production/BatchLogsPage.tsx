@@ -25,6 +25,7 @@ interface ProductionBatchRow {
   line?: { id: string; name: string } | null;
   product?: { name?: string | null } | null;
   brand?: { name?: string | null } | null;
+  shift?: { name?: string | null; startTime?: string; endTime?: string } | null;
 }
 
 interface BatchHistoryEvent {
@@ -301,10 +302,17 @@ export default function BatchLogsPage() {
       </section>
 
       {batch && (
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white border border-slate-200 rounded-lg p-4">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Brand</p>
             <p className="mt-1 text-sm font-black text-slate-900">{batch.brand?.name || 'Unknown Brand'}</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Shift</p>
+            <p className="mt-1 text-sm font-black text-slate-900">
+              {batch.shift?.name || 'Unknown Shift'} 
+              {batch.shift?.startTime && batch.shift?.endTime ? ` (${batch.shift.startTime} - ${batch.shift.endTime})` : ''}
+            </p>
           </div>
           <div className="bg-white border border-slate-200 rounded-lg p-4">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Started</p>

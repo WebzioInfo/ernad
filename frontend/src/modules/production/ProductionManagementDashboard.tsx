@@ -35,6 +35,7 @@ interface ProductionBatchRow {
   line?: ProductionLine | null;
   product?: { id?: string | null; name?: string | null } | null;
   brand?: { id?: string | null; name?: string | null } | null;
+  shift?: { name?: string | null } | null;
 }
 
 const statusClass = (status: BatchStatus) => {
@@ -78,7 +79,7 @@ export default function ProductionManagementDashboard() {
   const basePath = user?.role === 'MANAGER' ? '/manager' : '/admin';
 
   const [selectedLineId, setSelectedLineId] = useState('ALL');
-  const [selectedBatchId, setSelectedBatchId] = useState('ALL');
+  const [selectedBatchCode, setSelectedBatchCode] = useState('ALL');
   const [batchScope, setBatchScope] = useState<'ALL' | 'PREVIOUS'>('ALL');
   const [search, setSearch] = useState('');
 
@@ -97,7 +98,7 @@ export default function ProductionManagementDashboard() {
 
     return batches.filter((batch) => {
       const matchesLine = selectedLineId === 'ALL' || batch.lineId === selectedLineId;
-      const matchesBatch = selectedBatchId === 'ALL' || batch.id === selectedBatchId;
+      const matchesBatch = selectedBatchCode === 'ALL' || batch.batchCode === selectedBatchCode;
       const matchesScope = batchScope === 'ALL' || !['RUNNING', 'CHANGEOVER'].includes(batch.status);
       const matchesSearch =
         !term ||
@@ -108,7 +109,7 @@ export default function ProductionManagementDashboard() {
 
       return matchesLine && matchesBatch && matchesScope && matchesSearch;
     });
-  }, [batches, batchScope, search, selectedBatchId, selectedLineId]);
+  }, [batches, batchScope, search, selectedBatchCode, selectedLineId]);
 
   const overview = useMemo(() => {
     const running = filteredBatches.filter((batch) => ['RUNNING', 'CHANGEOVER'].includes(batch.status)).length;
@@ -152,15 +153,15 @@ export default function ProductionManagementDashboard() {
             type="button"
             onClick={() => {
               setBatchScope('ALL');
-              setSelectedBatchId('ALL');
+              setSelectedBatchCode('ALL');
             }}
             className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${
-              batchScope === 'ALL' && selectedBatchId === 'ALL'
+              batchScope === 'ALL' && selectedBatchCode === 'ALL'
                 ? 'bg-[#1A9A91] text-white'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
-            {batchScope === 'ALL' && selectedBatchId === 'ALL' ? <Check className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+            {batchScope === 'ALL' && selectedBatchCode === 'ALL' ? <Check className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
             All
           </button>
 
@@ -168,7 +169,7 @@ export default function ProductionManagementDashboard() {
             type="button"
             onClick={() => {
               setBatchScope('PREVIOUS');
-              setSelectedBatchId('ALL');
+              setSelectedBatchCode('ALL');
             }}
             className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${
               batchScope === 'PREVIOUS'
@@ -181,17 +182,17 @@ export default function ProductionManagementDashboard() {
           </button>
 
           <select
-            value={selectedBatchId}
+            value={selectedBatchCode}
             onChange={(event) => {
-              setSelectedBatchId(event.target.value);
+              setSelectedBatchCode(event.target.value);
               if (event.target.value !== 'ALL') setBatchScope('ALL');
             }}
             className="h-10 min-w-[210px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] focus:ring-2 focus:ring-[#1A9A91]/15"
           >
             <option value="ALL">All Batches</option>
-            {batches.map((batch) => (
-              <option key={batch.id} value={batch.id}>
-                {batch.batchCode} - {batch.line?.name || 'Unassigned'}
+            {Array.from(new Set(batches.map(b => b.batchCode))).map((code) => (
+              <option key={code} value={code}>
+                {code}
               </option>
             ))}
           </select>
@@ -246,6 +247,7 @@ export default function ProductionManagementDashboard() {
               <tr className="bg-slate-50 border-b border-slate-200">
                 <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Batch</th>
                 <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Line</th>
+                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Shift</th>
                 <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Product</th>
                 <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Brand</th>
                 <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Target</th>
@@ -266,6 +268,7 @@ export default function ProductionManagementDashboard() {
                     <p className="text-[10px] font-semibold text-slate-400 mt-0.5">ID: {batch.id.slice(0, 8)}</p>
                   </td>
                   <td className="px-5 py-4 text-xs font-bold text-slate-700">{batch.line?.name || 'Unassigned'}</td>
+                  <td className="px-5 py-4 text-xs font-bold text-slate-500">{batch.shift?.name || 'Unknown Shift'}</td>
                   <td className="px-5 py-4 text-xs font-bold text-slate-700">{batch.product?.name || 'Unknown Product'}</td>
                   <td className="px-5 py-4 text-xs font-bold text-slate-500">{batch.brand?.name || 'Unknown Brand'}</td>
                   <td className="px-5 py-4 text-xs font-black tabular-nums text-slate-900">
@@ -287,7 +290,7 @@ export default function ProductionManagementDashboard() {
 
               {filteredBatches.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-14 text-center">
+                  <td colSpan={9} className="px-5 py-14 text-center">
                     <div className="mx-auto h-12 w-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
                       <Database className="h-6 w-6" />
                     </div>

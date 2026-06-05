@@ -1,253 +1,234 @@
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
-import { motion } from 'framer-motion';
 import {
-  Package, AlertTriangle,
-  Users, Activity, Clock,
-  Layers, RefreshCw, LayoutDashboard,
-  Play, BarChart3,
-  History, ShieldCheck, Gauge,
-  ChevronRight, ArrowUpRight,
-  Cpu, Database, TrendingUp, CheckCircle2
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  ChevronRight,
+  Clock,
+  Database,
+  Gauge,
+  History,
+  LayoutDashboard,
+  Package,
+  Play,
+  RefreshCw,
+  ShieldCheck,
+  Users,
+  Wrench,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import useAuthStore from '../auth/auth.store';
-import { useRawMaterials, useProductionStock } from '../../hooks/useApi';
 
-const ManagerDashboard = memo(() => {
+type TimeRange = 'live' | 'today' | 'week' | 'month';
+
+type DashboardOverview = {
+  timeRange: TimeRange;
+  kpis: {
+    activeLines: number;
+    runningBatches: number;
+    machineOee: number;
+    unitsPacked: number;
+    systemAlerts: number;
+    staffActive: number;
+    downtimeMinutes: number;
+  };
+  materials: {
+    preformsAvailable: number;
+    capsAvailable: number;
+    jar20LStock: number;
+    producedDuringPeriod: number;
+    preformsUsedDuringPeriod: number;
+    capsUsedDuringPeriod: number;
+    preformPiecesUsedDuringPeriod: number;
+    capPiecesUsedDuringPeriod: number;
+    shrinkUsedDuringPeriod: number;
+    labelsUsedDuringPeriod: number;
+  };
+  activeProduction: Array<{
+    id: string;
+    batchCode: string;
+    line: string;
+    shift: string;
+    product: string;
+    currentOutput: number;
+    status: string;
+    runtimeMinutes: number;
+  }>;
+  alerts: Array<{
+    id: string;
+    type: string;
+    title: string;
+    detail: string;
+    severity: string;
+    target: string;
+  }>;
+  activity: {
+    dispatchQuantity: number;
+    damageQuantity: number;
+    returnQuantity: number;
+  };
+};
+
+const number = (value: number) => new Intl.NumberFormat('en-IN').format(Math.round(Number(value || 0)));
+
+const ManagerDashboard = memo(({ filters }: { filters?: { timeRange?: TimeRange } }) => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const roleBase = user?.role?.toLowerCase() === 'manager' ? '/manager' : '/admin';
+  const timeRange = filters?.timeRange || 'today';
 
-  // Parallel Fetching with Independent Error Handling
-  const factoryQuery = useQuery({
-    queryKey: ['factory-live-manager'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,    retry: 1
-  });
-
-  const machineQuery = useQuery({
-    queryKey: ['machine-efficiency'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_EFFICIENCY)).data,
+  const overviewQuery = useQuery({
+    queryKey: ['dashboard-overview', timeRange],
+    queryFn: async () => (await api.get<DashboardOverview>(ENDPOINTS.DASHBOARD.OVERVIEW, { params: { timeRange } })).data,
+    refetchInterval: timeRange === 'live' ? 30000 : false,
+    staleTime: timeRange === 'live' ? 10000 : 60000,
     retry: 1,
-    staleTime: 60000
   });
 
-  const avgEfficiency = useMemo(() => {
-    if (!machineQuery.data || machineQuery.data.length === 0) return 0;
-    const sum = machineQuery.data.reduce((acc: number, m: any) => acc + (m.efficiency || 0), 0);
-    return Math.round(sum / machineQuery.data.length);
-  }, [machineQuery.data]);
-
-  const rawMaterialsQuery = useRawMaterials();
-  const productionStockQuery = useProductionStock();
-
-  const { startOfMonthStr, endOfMonthStr } = useMemo(() => {
-    const start = new Date();
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date();
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
-    end.setHours(23, 59, 59, 999);
-    return {
-      startOfMonthStr: start.toISOString(),
-      endOfMonthStr: end.toISOString()
-    };
-  }, []);
-
-  const monthlyKPIQuery = useQuery({
-    queryKey: ['monthly-kpis-summary-manager', startOfMonthStr, endOfMonthStr],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.KPIS, {
-      params: { 
-        startDate: startOfMonthStr, 
-        endDate: endOfMonthStr 
-      }
-    })).data,
-    staleTime: 60000
-  });
-
-  const preformsStock = rawMaterialsQuery.data?.filter((r: any) => r.materialType === 'PREFORM').reduce((sum, r) => sum + (Number(r.currentStock) || 0), 0) ?? 0;
-  const capsStock = rawMaterialsQuery.data?.filter((r: any) => r.materialType === 'CAP').reduce((sum, r) => sum + (Number(r.currentStock) || 0), 0) ?? 0;
-  const jarStock = productionStockQuery.data?.find((p: any) => p.productName?.toLowerCase().includes('20l'))?.currentStock ?? 0;
-  const monthlyProduced = monthlyKPIQuery.data?.throughput ?? 0;
-
-  const alerts = useMemo(() => {
-    const list = [];
-    if (factoryQuery.data?.activeDowntimes?.length > 0) {
-      list.push({ type: 'DOWNTIME', count: factoryQuery.data.activeDowntimes.length, label: 'Active Stops', color: 'rose' });
-    }
-    if (factoryQuery.data?.lowStockAlerts?.length > 0) {
-      list.push({ type: 'STOCK', count: factoryQuery.data.lowStockAlerts.length, label: 'Low Stock', color: 'amber' });
-    }
-    return list;
-  }, [factoryQuery.data]);
+  const data = overviewQuery.data;
+  const loadingValue = overviewQuery.isLoading ? '...' : undefined;
+  const nav = {
+    production: `${roleBase}/production`,
+    batches: `${roleBase}/management`,
+    logs: `${roleBase}/production-logs`,
+    operators: `${roleBase}/operators`,
+    rawMaterials: `${roleBase}/raw-materials`,
+    incidents: `${roleBase}/incidents`,
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-
-      {/* ─── 1. HERO SUMMARY SECTION ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <CompactKPICard label="Active Lines" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.summary?.activeLinesCount || 0)} icon={Activity} color="indigo" />
-        <CompactKPICard label="Running Batches" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.activeBatches?.length || 0)} icon={Layers} color="blue" />
-        <CompactKPICard label="Machine OEE" value={machineQuery.isLoading ? '...' : `${avgEfficiency}%`} icon={Gauge} color="emerald" sub="Avg" isAlert={machineQuery.isError} />
-        <CompactKPICard label="Units Packed" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.counters?.packing?.toLocaleString() || 0)} icon={Package} color="slate" />
-        <CompactKPICard label="System Alerts" value={factoryQuery.isLoading ? '...' : alerts.reduce((a, b) => a + b.count, 0)} icon={AlertTriangle} color="rose" isAlert={alerts.length > 0 || factoryQuery.isError} />
-        <CompactKPICard label="Staff Active" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.summary?.activeOperatorsCount || 0)} icon={Users} color="cyan" />
-        <CompactKPICard label="Downtime Today" value={factoryQuery.isLoading ? '...' : `${factoryQuery.data?.summary?.totalDowntimeToday || 0}m`} icon={Clock} color="amber" />
+        <CompactKPICard label="Active Lines" value={loadingValue ?? number(data?.kpis.activeLines || 0)} icon={Activity} color="indigo" />
+        <CompactKPICard label="Running Batches" value={loadingValue ?? number(data?.kpis.runningBatches || 0)} icon={LayoutDashboard} color="blue" />
+        <CompactKPICard label="Machine OEE" value={loadingValue ?? `${data?.kpis.machineOee || 0}%`} icon={Gauge} color="emerald" />
+        <CompactKPICard label="Units Packed" value={loadingValue ?? number(data?.kpis.unitsPacked || 0)} icon={Package} color="slate" />
+        <CompactKPICard label="System Alerts" value={loadingValue ?? number(data?.kpis.systemAlerts || 0)} icon={AlertTriangle} color="rose" isAlert={(data?.kpis.systemAlerts || 0) > 0 || overviewQuery.isError} />
+        <CompactKPICard label="Staff Active" value={loadingValue ?? number(data?.kpis.staffActive || 0)} icon={Users} color="cyan" />
+        <CompactKPICard label="Downtime" value={loadingValue ?? `${number(data?.kpis.downtimeMinutes || 0)}m`} icon={Clock} color="amber" />
       </div>
 
       <div className="grid grid-cols-12 gap-8">
-
-        {/* Left Column: Actions & Pipeline */}
         <div className="col-span-12 lg:col-span-8 space-y-8">
-
-          {/* ─── 2. QUICK ACTION ZONE ─── */}
           <section className="space-y-4">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Strategic Interventions</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <ActionTile icon={LayoutDashboard} label="Production Floor" path={`${roleBase}/production`} color="indigo" />
-              <ActionTile icon={Play} label="Start New Batch" path={`${roleBase}/production?action=start`} color="emerald" />
-              <ActionTile icon={BarChart3} label="OEE Analytics" path={`${roleBase}/analytics`} color="violet" />
-              <ActionTile icon={Package} label="Raw Materials" path={`${roleBase}/raw-materials`} color="amber" />
-              {/* TEMP DISABLED - Future Admin Feature
-              // Preserved for future implementation
-              <ActionTile icon={ShieldCheck} label="Quality Control" path={`${roleBase}/quality`} color="rose" />
-              */}
-              <ActionTile icon={History} label="Production History" path={`${roleBase}/management`} color="slate" />
-              <ActionTile icon={Users} label="Operator Sessions" path={`${roleBase}/${user?.role?.toLowerCase() === 'manager' ? 'operators' : 'users'}`} color="cyan" />
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+              <ActionTile icon={LayoutDashboard} label="Production Floor" path={nav.production} color="indigo" />
+              <ActionTile icon={Play} label="Start New Batch" path={nav.batches} color="emerald" />
+              <ActionTile icon={History} label="Production History" path={nav.logs} color="slate" />
+              <ActionTile icon={Users} label="Operator Sessions" path={nav.operators} color="cyan" />
+              <ActionTile icon={Database} label="Raw Materials" path={nav.rawMaterials} color="amber" />
             </div>
           </section>
 
-          {/* ─── LIVE MATERIAL & PRODUCTION STOCK ─── */}
           <section className="space-y-4">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Material & Production Stock</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <CompactKPICard label="Preforms Available" value={rawMaterialsQuery.isLoading ? '...' : `${preformsStock.toLocaleString()} Bags`} icon={Database} color="indigo" />
-              <CompactKPICard label="Caps Available" value={rawMaterialsQuery.isLoading ? '...' : `${capsStock.toLocaleString()} Boxes`} icon={Cpu} color="blue" />
-              <CompactKPICard label="20L Jar Stock" value={productionStockQuery.isLoading ? '...' : jarStock.toLocaleString()} icon={Package} color="emerald" />
-              <CompactKPICard label="Produced Today" value={factoryQuery.isLoading ? '...' : (factoryQuery.data?.counters?.packing?.toLocaleString() || 0)} icon={CheckCircle2} color="indigo" />
-              <CompactKPICard label="Produced This Month" value={monthlyKPIQuery.isLoading ? '...' : monthlyProduced.toLocaleString()} icon={TrendingUp} color="amber" />
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Material & Stock</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+              <CompactKPICard label="20L Jar Stock" value={loadingValue ?? number(data?.materials.jar20LStock || 0)} icon={Package} color="emerald" />
+              <CompactKPICard label="Produced During Period" value={loadingValue ?? number(data?.materials.producedDuringPeriod || 0)} icon={Activity} color="amber" />
+              <CompactKPICard label="Preforms Used" value={loadingValue ?? number(data?.materials.preformsUsedDuringPeriod || data?.materials.preformPiecesUsedDuringPeriod || 0)} icon={Database} color="slate" />
+              <CompactKPICard label="Caps Used" value={loadingValue ?? number(data?.materials.capsUsedDuringPeriod || data?.materials.capPiecesUsedDuringPeriod || 0)} icon={Package} color="cyan" />
+              <CompactKPICard label="Shrink Used" value={loadingValue ?? `${number(data?.materials.shrinkUsedDuringPeriod || 0)} kg`} icon={Package} color="indigo" />
+              <CompactKPICard label="Labels Used" value={loadingValue ?? number(data?.materials.labelsUsedDuringPeriod || 0)} icon={Database} color="blue" />
             </div>
           </section>
 
-          {/* ─── 4. LIVE FACTORY SNAPSHOT ─── */}
           <section className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Active Production Snapshot</h3>
-              <button onClick={() => navigate(`${roleBase}/production`)} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1">
-                Full Control View <ArrowUpRight className="w-3 h-3" />
+              <button onClick={() => navigate(nav.production)} className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline flex items-center gap-1">
+                Live Production <ArrowUpRight className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="space-y-3 min-h-[100px] relative">
-              {factoryQuery.isLoading ? (
-                <div className="py-20 flex flex-col items-center justify-center bg-slate-50/30 rounded-[2.5rem] border border-slate-100">
-                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Polling Factory Stream...</p>
+            <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+              <div className="grid grid-cols-7 gap-3 px-5 py-3 bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <span>Line</span>
+                <span>Shift</span>
+                <span>Batch</span>
+                <span className="col-span-2">Product</span>
+                <span>Output</span>
+                <span>Status</span>
+              </div>
+              {overviewQuery.isLoading ? (
+                <div className="py-14 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Loading production records...</div>
+              ) : overviewQuery.isError ? (
+                <div className="py-14 text-center">
+                  <AlertTriangle className="w-7 h-7 text-rose-500 mx-auto mb-3" />
+                  <button onClick={() => overviewQuery.refetch()} className="text-[10px] font-black uppercase tracking-widest text-rose-600">Retry dashboard sync</button>
                 </div>
-              ) : factoryQuery.isError ? (
-                <div className="py-20 flex flex-col items-center justify-center bg-rose-50/30 rounded-[2.5rem] border border-rose-100">
-                  <AlertTriangle className="w-8 h-8 text-rose-500 mb-4" />
-                  <p className="text-rose-600 text-[10px] font-black uppercase tracking-widest">Connectivity Error</p>
-                  <button onClick={() => factoryQuery.refetch()} className="mt-4 px-4 py-2 bg-rose-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-rose-900/20">Retry Sync</button>
-                </div>
-              ) : !factoryQuery.data?.activeBatches?.length ? (
-                <div className="py-16 text-center bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200">
-                  <Package className="w-10 h-10 text-slate-200 mx-auto mb-4" />
-                  <p className="text-slate-400 font-bold italic text-sm">Factory currently on standby.</p>
-                </div>
+              ) : !data?.activeProduction.length ? (
+                <div className="py-14 text-center text-sm font-bold text-slate-400">No running batches for this selection.</div>
               ) : (
-                factoryQuery.data.activeBatches.map((batch: any, i: number) => (
-                  <PipelineCard
+                data.activeProduction.map((batch) => (
+                  <button
                     key={batch.id}
-                    batch={batch}
-                    machines={machineQuery.data}
-                    i={i}
-                    machineError={machineQuery.isError}
-                    isLoading={machineQuery.isLoading}
-                  />
+                    onClick={() => navigate(`${roleBase}/reports/batch/${batch.id}`)}
+                    className="grid grid-cols-7 gap-3 w-full px-5 py-4 border-t border-slate-100 text-left hover:bg-indigo-50/40 transition-colors"
+                  >
+                    <span className="text-xs font-black text-slate-800 truncate">{batch.line}</span>
+                    <span className="text-xs font-bold text-slate-500 truncate">{batch.shift}</span>
+                    <span className="text-xs font-black text-indigo-600 truncate">{batch.batchCode}</span>
+                    <span className="col-span-2 text-xs font-bold text-slate-700 truncate">{batch.product}</span>
+                    <span className="text-xs font-black text-slate-900">{number(batch.currentOutput)}</span>
+                    <span>
+                      <span className="inline-flex px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-widest">
+                        {batch.status} / {number(batch.runtimeMinutes)}m
+                      </span>
+                    </span>
+                  </button>
                 ))
               )}
             </div>
           </section>
         </div>
 
-        {/* Right Column: Alerts & Sync */}
         <div className="col-span-12 lg:col-span-4 space-y-8">
-
-          {/* ─── 3. ALERTS PANEL ─── */}
-          <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm p-8 h-full flex flex-col min-h-[400px]">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 min-h-[420px] flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-3">
                 <AlertTriangle className="w-5 h-5 text-rose-500" />
                 Critical Alerts
               </h3>
               <button
-                onClick={() => factoryQuery.refetch()}
-                className={cn(
-                  "p-2 rounded-xl transition-all",
-                  factoryQuery.isFetching ? "bg-indigo-50 text-indigo-600" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                )}
+                onClick={() => overviewQuery.refetch()}
+                className={cn('p-2 rounded-xl transition-all', overviewQuery.isFetching ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-50 text-slate-400 hover:bg-slate-100')}
               >
-                <RefreshCw className={cn("w-4 h-4", factoryQuery.isFetching && "animate-spin")} />
+                <RefreshCw className={cn('w-4 h-4', overviewQuery.isFetching && 'animate-spin')} />
               </button>
             </div>
 
-            <div className="space-y-4 flex-1 overflow-y-auto no-scrollbar">
-              {factoryQuery.isLoading ? (
-                <div className="flex flex-col items-center justify-center h-48 animate-pulse">
-                  <div className="w-full h-12 bg-slate-50 rounded-2xl mb-4" />
-                  <div className="w-full h-12 bg-slate-50 rounded-2xl" />
-                </div>
-              ) : (alerts.length === 0 && !factoryQuery.isError) ? (
-                <div className="flex flex-col items-center justify-center h-48 text-center px-6">
+            <div className="space-y-3 flex-1">
+              {overviewQuery.isLoading ? (
+                <div className="h-40 rounded-xl bg-slate-50 animate-pulse" />
+              ) : overviewQuery.isError ? (
+                <div className="py-14 text-center text-[10px] font-black uppercase tracking-widest text-rose-500">Dashboard endpoint failed</div>
+              ) : !data?.alerts.length ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center">
                   <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-4">
                     <ShieldCheck className="w-6 h-6" />
                   </div>
-                  <p className="text-slate-400 text-xs font-bold leading-relaxed uppercase tracking-widest">
-                    Operational Integrity Optimal
-                  </p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">No critical alerts</p>
                 </div>
-              ) : factoryQuery.isError ? (
-                <div className="text-center py-10">
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Alert Sync Failed</p>
-                </div>
-              ) : null}
-
-              {factoryQuery.data?.activeDowntimes?.map((stop: any) => (
-                <AlertItem
-                  key={stop.id}
-                  type="DOWNTIME"
-                  title={`Stop: ${stop.reason?.replace('_', ' ')}`}
-                  sub={`${stop.line} • ${stop.station}`}
-                  onClick={() => navigate(`${roleBase}/production`)}
-                />
-              ))}
-
-              {factoryQuery.data?.lowStockAlerts?.map((item: any) => (
-                <AlertItem
-                  key={item.id}
-                  type="STOCK"
-                  title={`Low Stock: ${item.itemName}`}
-                  sub={`${item.quantity} ${item.unit} left`}
-                  onClick={() => navigate(`${roleBase}/raw-materials`)}
-                />
-              ))}
+              ) : (
+                data.alerts.map((alert) => (
+                  <AlertItem
+                    key={`${alert.type}-${alert.id}`}
+                    alert={alert}
+                    onClick={() => navigate(resolveAlertPath(roleBase, alert.target))}
+                  />
+                ))
+              )}
             </div>
 
-            <div className="mt-10 pt-10 border-t border-slate-50">
-              <div className="p-6 bg-slate-900 rounded-3xl text-white relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-                  <Activity className="w-16 h-16" />
-                </div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Shift Performance</p>
-                <p className="text-sm font-bold leading-relaxed text-slate-300">
-                  The morning shift has achieved <span className="text-emerald-400">104% of target</span>. No critical staff shortages reported.
-                </p>
-              </div>
+            <div className="mt-6 pt-6 border-t border-slate-100 grid grid-cols-3 gap-2">
+              <MiniStat label="Dispatch" value={number(data?.activity.dispatchQuantity || 0)} />
+              <MiniStat label="Damage" value={number(data?.activity.damageQuantity || 0)} />
+              <MiniStat label="Returns" value={number(data?.activity.returnQuantity || 0)} />
             </div>
           </section>
         </div>
@@ -256,9 +237,14 @@ const ManagerDashboard = memo(() => {
   );
 });
 
-// ─── HELPER COMPONENTS ───
+const resolveAlertPath = (roleBase: string, target: string) => {
+  if (target === 'raw-materials') return `${roleBase}/raw-materials`;
+  if (target === 'incidents') return `${roleBase}/incidents`;
+  if (target === 'reports') return `${roleBase}/production-logs`;
+  return `${roleBase}/production`;
+};
 
-const CompactKPICard = ({ label, value, icon: Icon, color, sub, isAlert }: any) => {
+const CompactKPICard = ({ label, value, icon: Icon, color, isAlert }: any) => {
   const colorMap: Record<string, string> = {
     indigo: 'bg-indigo-50 text-indigo-600',
     blue: 'bg-blue-50 text-blue-600',
@@ -269,138 +255,56 @@ const CompactKPICard = ({ label, value, icon: Icon, color, sub, isAlert }: any) 
     amber: 'bg-amber-50 text-amber-600',
   };
 
-  const alertClasses = 'bg-rose-500 text-white';
-  const normalClasses = colorMap[color] || 'bg-slate-50 text-slate-600';
-
   return (
-    <div className={cn(
-      "bg-white rounded-2xl p-4 border shadow-sm transition-all hover:shadow-md",
-      isAlert ? "border-rose-200 bg-rose-50/30" : "border-slate-100"
-    )}>
-      <div className="flex items-center gap-3 mb-2">
-        <div className={cn(
-          "w-7 h-7 rounded-lg flex items-center justify-center",
-          isAlert ? alertClasses : normalClasses
-        )}>
+    <div className={cn('bg-white rounded-2xl p-4 border shadow-sm transition-all hover:shadow-md min-w-0', isAlert ? 'border-rose-200 bg-rose-50/30' : 'border-slate-100')}>
+      <div className="flex items-center gap-3 mb-2 min-w-0">
+        <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center shrink-0', isAlert ? 'bg-rose-500 text-white' : colorMap[color] || colorMap.slate)}>
           <Icon className="w-3.5 h-3.5" />
         </div>
         <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest truncate">{label}</p>
       </div>
-      <div className="flex items-baseline gap-1.5">
-        <h4 className={cn("text-xl font-black tracking-tight", isAlert ? "text-rose-600" : "text-slate-900")}>
-          {value}
-        </h4>
-        {sub && <span className="text-[8px] font-bold text-slate-400 uppercase">{sub}</span>}
-      </div>
+      <h4 className={cn('text-xl font-black tracking-tight truncate', isAlert ? 'text-rose-600' : 'text-slate-900')}>{value}</h4>
     </div>
   );
 };
 
 const ActionTile = ({ icon: Icon, label, path, color }: any) => {
   const navigate = useNavigate();
-  
-  // Tailwind static class mapping to avoid dynamic compilation issues
   const colorClasses = {
     indigo: 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white',
     emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white',
-    violet: 'bg-violet-50 text-violet-600 group-hover:bg-violet-600 group-hover:text-white',
     amber: 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white',
-    rose: 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white',
     slate: 'bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white',
     cyan: 'bg-cyan-50 text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white',
   }[color as string] || 'bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white';
 
   return (
-    <button
-      onClick={() => navigate(path)}
-      className="flex flex-col items-center gap-3 p-5 bg-white border border-slate-100 rounded-3xl hover:border-indigo-200 hover:shadow-lg transition-all group active:scale-95"
-    >
-      <div className={cn(
-        "w-10 h-10 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm",
-        colorClasses
-      )}>
+    <button onClick={() => navigate(path)} className="flex flex-col items-center gap-3 p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-200 hover:shadow-lg transition-all group active:scale-95">
+      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 shadow-sm', colorClasses)}>
         <Icon className="w-5 h-5" />
       </div>
-      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest text-center leading-tight">
-        {label}
-      </span>
+      <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest text-center leading-tight">{label}</span>
     </button>
   );
 };
 
-const PipelineCard = ({ batch, machines, i, machineError, isLoading }: any) => {
-  const navigate = useNavigate();
-  const machine = machines?.find((m: any) => m.name === batch.line);
-  const efficiency = machine?.efficiency || 0;
-  const progress = batch.progress || 0;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 * i }}
-      onClick={() => {
-        const { user } = useAuthStore.getState();
-        const roleBase = user?.role?.toLowerCase() === 'manager' ? '/manager' : '/admin';
-        navigate(`${roleBase}/reports/batch/${batch.id}`);
-      }}
-      className="p-5 bg-white rounded-2xl border border-slate-100 flex items-center justify-between gap-6 group hover:shadow-xl hover:shadow-slate-200/40 transition-all cursor-pointer"
-    >
-      <div className="flex items-center gap-5 min-w-[200px]">
-        <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-lg text-slate-400 border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">
-          {batch.line?.split(' ')[1] || '1'}
-        </div>
-        <div>
-          <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">{batch.batchCode}</p>
-          <h4 className="text-sm font-black text-slate-900 truncate group-hover:text-indigo-600 transition-colors">{batch.product}</h4>
-        </div>
-      </div>
-
-      <div className="flex-1 hidden sm:block max-w-[200px]">
-        <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">
-          <span>Progress</span>
-          <span>{Math.round(progress)}%</span>
-        </div>
-        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            className="h-full bg-indigo-500 rounded-full"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-6">
-        <div className="text-right">
-          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">OEE</p>
-          <p className={cn(
-            "text-sm font-black tracking-tighter",
-            machineError ? "text-rose-400" : "text-emerald-600"
-          )}>
-            {isLoading ? '...' : (machineError ? 'ERR' : `${efficiency.toFixed(0)}%`)}
-          </p>
-        </div>
-        <div className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black uppercase tracking-widest">
-          {batch.status}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-const AlertItem = ({ type, title, sub, onClick }: any) => (
-  <div onClick={onClick} className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-50 rounded-2xl hover:bg-white hover:border-slate-200 transition-all group cursor-pointer">
-    <div className={cn(
-      "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-      type === 'DOWNTIME' ? "bg-rose-500 text-white" : "bg-amber-500 text-white"
-    )}>
-      {type === 'DOWNTIME' ? <Activity className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+const AlertItem = ({ alert, onClick }: { alert: DashboardOverview['alerts'][number]; onClick: () => void }) => (
+  <button onClick={onClick} className="flex items-center gap-4 p-4 w-full bg-slate-50 border border-slate-50 rounded-2xl hover:bg-white hover:border-slate-200 transition-all group text-left">
+    <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm text-white', alert.severity === 'critical' ? 'bg-rose-500' : 'bg-amber-500')}>
+      {alert.type === 'MACHINE_DOWNTIME' ? <Wrench className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
     </div>
     <div className="flex-1 min-w-0">
-      <p className="text-[10px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase truncate">{title}</p>
-      <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">{sub}</p>
+      <p className="text-[10px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase truncate">{alert.title}</p>
+      <p className="text-[9px] font-bold text-slate-400 mt-0.5 truncate">{alert.detail}</p>
     </div>
     <ChevronRight className="w-3 h-3 text-slate-300 group-hover:translate-x-1 transition-transform" />
+  </button>
+);
+
+const MiniStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-xl bg-slate-50 px-3 py-2 min-w-0">
+    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 truncate">{label}</p>
+    <p className="text-sm font-black text-slate-900 truncate">{value}</p>
   </div>
 );
 

@@ -109,6 +109,9 @@ export const ENDPOINTS = {
     FACTORY_LIVE: 'analytics/factory/live',
     FACTORY_EFFICIENCY: 'analytics/factory/efficiency',
   },
+  DASHBOARD: {
+    OVERVIEW: 'dashboard/overview',
+  },
   MASTER_DATA: {
     LINES: 'master-data/lines',
     LINE: (id: string) => `master-data/lines/${id}`,

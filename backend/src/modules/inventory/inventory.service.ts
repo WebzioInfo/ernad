@@ -468,6 +468,11 @@ export class InventoryService {
         INNER JOIN production_batches pb ON dl.batch_id = pb.id
         WHERE pb.product_id = ps.product_id
           AND pb.deleted_at IS NULL
+      ), 0) + COALESCE((
+        SELECT SUM(st.quantity)
+        FROM sales_transactions st
+        WHERE st.product_id = ps.product_id
+          AND st.type = 'SALES_DISPATCH'
       ), 0),
       updated_at = NOW()
     `);
@@ -483,7 +488,11 @@ export class InventoryService {
             ), 0)
           - ps.total_dispatched
           + COALESCE((
-              SELECT SUM(CASE WHEN st.type = 'RETURN' THEN st.quantity ELSE -st.quantity END)
+              SELECT SUM(CASE 
+                WHEN st.type = 'RETURN' THEN st.quantity 
+                WHEN st.type = 'DAMAGE' THEN -st.quantity 
+                ELSE 0 
+              END)
               FROM sales_transactions st
               WHERE st.product_id = ps.product_id
             ), 0),

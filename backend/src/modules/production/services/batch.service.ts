@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import {
   productionBatches, batchTotals, productionLines,
-  productBrands, products, operatorSessions, billOfMaterials, inventoryStock
+  productBrands, products, operatorSessions, billOfMaterials, inventoryStock, shifts
 } from '../../../database/schema';
 import { eq, and, sql, desc, inArray, or } from 'drizzle-orm';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -167,11 +167,13 @@ export class BatchService {
       line: productionLines,
       product: products,
       brand: productBrands,
+      shift: shifts,
     })
       .from(productionBatches)
       .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
       .leftJoin(products, eq(productionBatches.productId, products.id))
       .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+      .leftJoin(shifts, eq(productionBatches.shiftId, shifts.id))
       .orderBy(desc(productionBatches.startTime))
       .limit(limit);
 
@@ -179,7 +181,8 @@ export class BatchService {
       ...row.batch,
       line: row.line,
       product: row.product || { name: 'Unknown Product', id: null, targetBPM: 120 },
-      brand: row.brand || { name: 'Unknown Brand', id: null }
+      brand: row.brand || { name: 'Unknown Brand', id: null },
+      shift: row.shift || { name: 'Unknown Shift', startTime: '', endTime: '' }
     }));
   }
 

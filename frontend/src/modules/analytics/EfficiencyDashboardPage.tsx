@@ -11,8 +11,10 @@ import {
   ArrowUpRight, ArrowDownRight, Zap
 } from 'lucide-react';
 
+import { TimeRangeSelector } from './components/TimeRangeSelector';
+
 export default function EfficiencyDashboardPage() {
-  const { filters } = useOutletContext<{ filters: any }>();
+  const { filters, setFilters } = useOutletContext<{ filters: any; setFilters: (f: any) => void }>();
   const isLive = filters.timeRange === 'live';
 
   const { data: stats, isLoading } = useQuery({
@@ -102,6 +104,12 @@ export default function EfficiencyDashboardPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-center mb-10">
+        <TimeRangeSelector
+          value={filters.timeRange}
+          onChange={(val) => setFilters({ timeRange: val })}
+        />
+      </div>
       {/* Top Metrics */}
       <div className="grid grid-cols-4 gap-6">
         <MetricCard
