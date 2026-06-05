@@ -79,7 +79,7 @@ export class DashboardService {
         ),
         produced_period as (
           select
-            coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.primary_count, 0) else 0 end), 0)::int produced,
+            coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.cases_produced, 0) else 0 end), 0)::int produced,
             coalesce(sum(case when pl.station = 'BLOWING' then coalesce(pl.bags_used, 0)::numeric else 0 end), 0)::numeric preforms_used,
             coalesce(sum(case when pl.station = 'FILLING' then coalesce(pl.cap_box_usage, pl.cap_usage, 0) else 0 end), 0)::numeric caps_used,
             coalesce(sum(coalesce(pl.preform_usage, 0)), 0)::numeric preform_pieces_used,
@@ -186,9 +186,7 @@ export class DashboardService {
     start.setHours(0, 0, 0, 0);
 
     if (timeRange === 'week') {
-      const day = start.getDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      start.setDate(start.getDate() + diff);
+      start.setDate(start.getDate() - 6);
     }
 
     if (timeRange === 'month') {

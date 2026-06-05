@@ -271,6 +271,7 @@ export class AnalyticsService {
 
     const [stats] = await db.select({
       totalProduction: sql<number>`SUM(${productionLogs.primaryCount})`,
+      totalCases: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END)`,
       totalWastage: sql<number>`SUM(${productionLogs.wastageCount})`,
       avgEfficiency: sql<number>`AVG(${productionLines.currentEfficiency})`, // Simplified OEE proxy
     })
@@ -284,7 +285,7 @@ export class AnalyticsService {
       : 100;
 
     return {
-      throughput: stats.totalProduction || 0,
+      throughput: stats.totalCases || 0,
       wastage: stats.totalWastage || 0,
       oee: Math.round(stats.avgEfficiency || 85),
       quality: Math.round(qualityYield),
