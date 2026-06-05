@@ -6,7 +6,8 @@ import {
   products, productBrands, productionLines,
   users, roles, userRoles,
   incidents, finishedGoodsInventory,
-  dispatchLogs, auditLogs, materialsUsage
+  dispatchLogs, auditLogs, materialsUsage,
+  rawMaterialTransactions, rawMaterials
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
 
@@ -158,6 +159,13 @@ export class ReportsService {
 
       if (!batchData) return null;
 
+      const [extraTotals] = await db.select({
+        boxCountTotal: sql<string>`COALESCE(SUM(${productionLogs.boxCount}), '0')`,
+        labelUsageTotal: sql<string>`COALESCE(SUM(${productionLogs.labelUsage}), '0')`
+      })
+      .from(productionLogs)
+      .where(eq(productionLogs.batchId, batchId));
+
       // Filter privileged names post-query for safety
       const excludedIds = await this.getExcludedUserIds();
       if (!isAdmin) {
@@ -216,9 +224,32 @@ export class ReportsService {
       
       const damagesTotal = [{ quantity: '0' }];
 
+      const materialConsumption = await db.select({
+        name: rawMaterials.name,
+        unit: rawMaterials.unit,
+        quantity: sql<string>`ABS(SUM(${rawMaterialTransactions.quantityChange}))`
+      })
+      .from(rawMaterialTransactions)
+      .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+      .innerJoin(productionLogs, sql`position('(Log #' || ${productionLogs.id} || ')' in ${rawMaterialTransactions.remarks}) > 0`)
+      .where(and(
+        eq(productionLogs.batchId, batchId),
+        eq(rawMaterialTransactions.type, 'CONSUMPTION')
+      ))
+      .groupBy(rawMaterials.name, rawMaterials.unit);
+
       return {
         metadata: batchData,
-        totals: totals || {},
+        materials: materialConsumption.map(m => ({
+          name: m.name,
+          unit: m.unit,
+          quantity: Number(m.quantity)
+        })),
+        totals: {
+          ...(totals || {}),
+          boxCountTotal: Number(extraTotals?.boxCountTotal || 0),
+          labelUsageTotal: Number(extraTotals?.labelUsageTotal || 0)
+        },
         hourlyTrend: performance.map(p => ({
           ...p,
           count: Number(p.count),

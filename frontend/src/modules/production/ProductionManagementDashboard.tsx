@@ -13,7 +13,8 @@ import {
   Search,
   Clock,
   Activity,
-  Box
+  Box,
+  ArrowLeft
 } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
@@ -206,8 +207,8 @@ export default function ProductionManagementDashboard() {
               setSelectedBatchCode('ALL');
             }}
             className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${batchScope === 'ALL' && selectedBatchCode === 'ALL'
-                ? 'bg-[#1A9A91] text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              ? 'bg-[#1A9A91] text-white'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
           >
             {batchScope === 'ALL' && selectedBatchCode === 'ALL' ? <Check className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
@@ -221,8 +222,8 @@ export default function ProductionManagementDashboard() {
               setSelectedBatchCode('ALL');
             }}
             className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${batchScope === 'PREVIOUS'
-                ? 'bg-[#1A9A91] text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              ? 'bg-[#1A9A91] text-white'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
               }`}
           >
             <Database className="h-4 w-4" />
@@ -282,7 +283,7 @@ export default function ProductionManagementDashboard() {
       </div>
 
       {isSingleBatchView && singleBatchSummary ? (
-        <SingleBatchView summary={singleBatchSummary} selectedLineId={selectedLineId} selectedStation={selectedStation} />
+        <SingleBatchView summary={singleBatchSummary} selectedLineId={selectedLineId} selectedStation={selectedStation} onBack={() => setSelectedBatchCode('ALL')} />
       ) : (
         <section className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -373,7 +374,7 @@ export default function ProductionManagementDashboard() {
   );
 }
 
-const SingleBatchView = ({ summary, selectedLineId, selectedStation }: any) => {
+const SingleBatchView = ({ summary, selectedLineId, selectedStation, onBack }: any) => {
   const { data: dossiers = [], isLoading } = useQuery({
     queryKey: ['batch-dossiers', summary.batchCode],
     queryFn: async () => {
@@ -412,7 +413,16 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation }: any) => {
       <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8 border-b border-slate-100 pb-6">
           <div>
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">Batch Information</h3>
+            <div className="flex items-center gap-3 mb-1">
+              <button 
+                onClick={onBack}
+                className="p-1.5 -ml-1.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Back to All Batches"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Batch Information</h3>
+            </div>
             <div className="flex items-center gap-4">
               <h2 className="text-3xl font-black text-slate-900">{summary.batchCode}</h2>
               <span className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full ${statusClass(summary.status)}`}>
@@ -540,7 +550,7 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation }: any) => {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center border-b border-slate-50 pb-2">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                              {station.station === 'PACKING' ? 'Produced Cases' : 'Output'}
+                              {station.station === 'PACKING' ? 'Produced Cases' : 'Production Unit Count'}
                             </span>
                             <span className="text-sm font-black text-slate-900">
                               {station.station === 'PACKING' && station.cases !== undefined
@@ -576,22 +586,20 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation }: any) => {
                     <Box className="w-4 h-4" /> Material Consumption
                   </h4>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                      <span className="text-xs font-bold text-slate-600">Preforms</span>
-                      <span className="text-sm font-black text-slate-900">{Number(dossier?.totals?.preformTotal || 0).toLocaleString()} <span className="text-[10px] text-slate-400">Pcs</span></span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                      <span className="text-xs font-bold text-slate-600">Caps</span>
-                      <span className="text-sm font-black text-slate-900">{Number(dossier?.totals?.capTotal || 0).toLocaleString()} <span className="text-[10px] text-slate-400">Pcs</span></span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                      <span className="text-xs font-bold text-slate-600">Labels (BOP)</span>
-                      <span className="text-sm font-black text-slate-900">{Number(dossier?.totals?.bopRollTotal || 0).toLocaleString()} <span className="text-[10px] text-slate-400">Kg</span></span>
-                    </div>
-                    <div className="flex justify-between items-center border-b border-slate-50 pb-3">
-                      <span className="text-xs font-bold text-slate-600">Shrink</span>
-                      <span className="text-sm font-black text-slate-900">{Number(dossier?.totals?.shrinkWeightTotal || 0).toLocaleString()} <span className="text-[10px] text-slate-400">Kg</span></span>
-                    </div>
+                    {dossier?.materials && dossier.materials.length > 0 ? (
+                      dossier.materials.map((mat: any, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0 last:pb-0">
+                          <span className="text-xs font-bold text-slate-600">{mat.name}</span>
+                          <span className="text-sm font-black text-slate-900">
+                            {mat.quantity.toLocaleString()} <span className="text-[10px] text-slate-400">{mat.unit}</span>
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-4">
+                        <span className="text-xs font-bold text-slate-400">No material consumption recorded for this batch yet.</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

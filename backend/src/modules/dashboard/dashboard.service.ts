@@ -118,7 +118,7 @@ export class DashboardService {
             : timeRange === 'week' 
               ? sql`date_trunc('day', pl.logged_at)` 
               : timeRange === 'month' 
-                ? sql`date_trunc('week', pl.logged_at)` 
+                ? sql`date_trunc('day', pl.logged_at)` 
                 : sql`date_trunc('hour', pl.logged_at)`} as time,
           coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.cases_produced, 0) else 0 end), 0)::int as produced
         from production_logs pl
@@ -183,10 +183,7 @@ export class DashboardService {
         damageQuantity: Number(activity.damageQuantity || 0),
         returnQuantity: Number(activity.returnQuantity || 0),
       },
-      trend: this.rows(trendRows).map(t => ({
-        time: t.time ? new Date(t.time).toISOString() : new Date().toISOString(),
-        produced: Number(t.produced || 0)
-      })),
+      trend: this.fillTimeSeriesGaps(trendRows, normalizedRange, start, end),
       formulas: {
         machineOee: 'min(100, (packing output / sum(target BPM * batch runtime minutes)) * (packing output / (packing output + wastage)) * 100)',
         unitsPacked: 'sum PACKING logs using finished_goods_produced, cases_produced, then primary_count',
@@ -194,6 +191,46 @@ export class DashboardService {
         systemAlerts: 'open incidents + stock alerts + generated critical alert rows',
       },
     };
+  }
+
+  private fillTimeSeriesGaps(rawTrend: unknown, timeRange: DashboardTimeRange, start: Date, end: Date) {
+    const rows = this.rows(rawTrend);
+    const trendMap = new Map<number, number>();
+    rows.forEach(t => {
+      let timeStr = t.time;
+      if (typeof timeStr === 'string' && !timeStr.includes('T') && !timeStr.endsWith('Z')) {
+        timeStr = timeStr.replace(' ', 'T') + 'Z';
+      } else if (typeof timeStr === 'string' && !timeStr.endsWith('Z')) {
+        timeStr += 'Z';
+      }
+      trendMap.set(new Date(timeStr).getTime(), Number(t.produced || 0));
+    });
+
+    const trend = [];
+    const current = new Date(start);
+
+    if (timeRange === 'live' || timeRange === 'today') {
+      current.setUTCMinutes(0, 0, 0);
+      while (current <= end) {
+        trend.push({
+          time: current.toISOString(),
+          produced: trendMap.get(current.getTime()) || 0
+        });
+        current.setUTCHours(current.getUTCHours() + 1);
+      }
+    } else {
+      current.setUTCHours(0, 0, 0, 0);
+      const endTrunc = new Date(end);
+      endTrunc.setUTCHours(0, 0, 0, 0);
+      while (current <= endTrunc) {
+        trend.push({
+          time: current.toISOString(),
+          produced: trendMap.get(current.getTime()) || 0
+        });
+        current.setUTCDate(current.getUTCDate() + 1);
+      }
+    }
+    return trend;
   }
 
   private normalizeRange(timeRange: string): DashboardTimeRange {
