@@ -4,7 +4,8 @@ import {
   productionLogs, batchTotals, productionBatches, 
   materialsUsage, productBrands, products, userLines,
   productionLines, downtimeLogs, inventoryStock,
-  billOfMaterials, inventoryTransactions, rawMaterials
+  billOfMaterials, inventoryTransactions, rawMaterials, salesTransactions,
+  operatorSessions
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, between, desc, inArray, isNull } from 'drizzle-orm';
 import { RedisService } from '../../providers/redis/redis.service';
@@ -308,7 +309,7 @@ export class AnalyticsService {
           break;
         case 'week':
           startDate.setHours(0, 0, 0, 0);
-          startDate.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+          startDate.setDate(now.getDate() - 6); // Rolling 7 days
           break;
         case 'month':
           startDate.setHours(0, 0, 0, 0);
@@ -324,7 +325,7 @@ export class AnalyticsService {
       const [productionAggregates] = await db.select({
         blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
         filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
-        packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
         rejection: sql<number>`COALESCE(SUM(${productionLogs.wastageCount}), 0)`
       })
       .from(productionLogs)
@@ -335,8 +336,12 @@ export class AnalyticsService {
 
       // 1.5 Additional Summary Metrics
       const [{ activeOperatorsCount }] = await db.select({ 
-        activeOperatorsCount: sql<number>`count(distinct ${userLines.userId})` 
-      }).from(userLines);
+        activeOperatorsCount: sql<number>`COALESCE(count(distinct ${operatorSessions.userId}), 0)` 
+      }).from(operatorSessions)
+      .where(and(
+        eq(operatorSessions.isActive, true),
+        isNull(operatorSessions.endTime)
+      ));
 
       const [{ totalDowntimeToday }] = await db.select({
         totalDowntimeToday: sql<number>`COALESCE(SUM(${downtimeLogs.durationMinutes}), 0)`
@@ -345,6 +350,12 @@ export class AnalyticsService {
         gte(downtimeLogs.startTime, startDate),
         isNull(downtimeLogs.deletedAt)
       ));
+
+      // 1.6 Total Dispatch Today
+      const [{ totalDispatchToday }] = await db.select({
+        totalDispatchToday: sql<number>`COALESCE(SUM(CASE WHEN ${salesTransactions.type} = 'SALES_DISPATCH' THEN ${salesTransactions.quantity} ELSE 0 END), 0)`
+      }).from(salesTransactions)
+      .where(gte(salesTransactions.createdAt, startDate));
 
       // 2. Active Batch State
       const activeBatches = await db.select({
@@ -416,17 +427,46 @@ export class AnalyticsService {
       .orderBy(desc(downtimeLogs.startTime))
       .limit(5);
 
+      // 3. Dynamic Trend Aggregation
+      let timeGroupSql;
+      if (timeRange === 'live') {
+        timeGroupSql = sql`to_timestamp(floor(extract(epoch from ${productionLogs.loggedAt}) / 900) * 900)`;
+      } else if (timeRange === 'week') {
+        timeGroupSql = sql`date_trunc('day', ${productionLogs.loggedAt})`;
+      } else if (timeRange === 'month') {
+        timeGroupSql = sql`date_trunc('week', ${productionLogs.loggedAt})`;
+      } else {
+        timeGroupSql = sql`date_trunc('hour', ${productionLogs.loggedAt})`;
+      }
+
+      const trendData = await db.select({
+        time: timeGroupSql,
+        produced: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`
+      })
+      .from(productionLogs)
+      .where(and(
+        gte(productionLogs.loggedAt, startDate),
+        isNull(productionLogs.deletedAt)
+      ))
+      .groupBy(timeGroupSql)
+      .orderBy(timeGroupSql);
+
       return {
         counters: {
           blowing: Number(productionAggregates?.blowing || 0),
           filling: Number(productionAggregates?.filling || 0),
           packing: Number(productionAggregates?.packing || 0),
-          rejection: Number(productionAggregates?.rejection || 0)
+          rejection: Number(productionAggregates?.rejection || 0),
+          dispatch: Number(totalDispatchToday || 0)
         },
         activeBatches: batchesWithProgress,
         lowStockAlerts: lowStock,
         activeDowntimes,
         latestStops,
+        trend: trendData.map(t => ({
+          time: new Date(t.time as any).toISOString(),
+          produced: Number(t.produced || 0)
+        })),
         summary: {
           activeLinesCount: new Set(activeBatches.map(b => b.line)).size,
           activeOperatorsCount: Number(activeOperatorsCount),
@@ -443,6 +483,7 @@ export class AnalyticsService {
         lowStockAlerts: [],
         activeDowntimes: [],
         latestStops: [],
+        trend: [],
         summary: { activeLinesCount: 0, activeOperatorsCount: 0, totalDowntimeToday: 0 },
         timestamp: new Date(),
         error: "Analytics partially unavailable"

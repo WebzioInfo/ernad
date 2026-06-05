@@ -48,7 +48,7 @@ export class ReportsController {
   }
 
   @Get('batches')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get list of production batches' })
   async getProductionBatches(
@@ -60,7 +60,7 @@ export class ReportsController {
   }
 
   @Get('batch/:id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   @Permissions('reports:view')
   @ApiOperation({ summary: 'Get immutable batch dossier' })
   async getBatchDossier(@Req() req: any, @Param('id') id: string) {

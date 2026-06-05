@@ -4,16 +4,14 @@ import { api } from '../../services/api-client';
 import { ENDPOINTS } from '../../constants/endpoints';
 import useAuthStore from '../../modules/auth/auth.store';
 import {
-  Activity, TrendingUp,
-  Database, HardDrive, Cpu,
-  Gauge, Clock, AlertTriangle,
-  CheckCircle2, RefreshCw, Package
+  Activity, Database, AlertTriangle, RefreshCw, Package, Users, Truck, Factory, Server, FileText, Users2, LayoutList, CheckCircle2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { KPICard } from './components/DashboardCards';
 import ManagerDashboard from './ManagerDashboard';
 import { TimeRangeSelector } from './components/TimeRangeSelector';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Link } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format, parseISO } from 'date-fns';
 
 export default function ExecutiveDashboard() {
   const { user } = useAuthStore();
@@ -27,8 +25,8 @@ export default function ExecutiveDashboard() {
   };
 
   return (
-    <div className="space-y-10">
-      <div className="flex justify-center mb-10">
+    <div className="space-y-8">
+      <div className="flex justify-center mb-8">
         <TimeRangeSelector
           value={filters.timeRange}
           onChange={(val) => setFilters({ timeRange: val })}
@@ -39,11 +37,36 @@ export default function ExecutiveDashboard() {
   );
 }
 
-// Admin dashboard
+// Compact Executive Card
+const ExecCard = ({ title, value, subtitle, icon: Icon, colorClass }: any) => (
+  <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-start justify-between">
+    <div>
+      <p className="text-xs font-semibold text-slate-500 mb-1">{title}</p>
+      <h4 className="text-2xl font-black text-slate-900">{value}</h4>
+      {subtitle && <p className="text-[10px] font-semibold text-slate-400 mt-1 uppercase tracking-wider">{subtitle}</p>}
+    </div>
+    <div className={`p-3 rounded-xl ${colorClass}`}>
+      <Icon className="w-5 h-5" />
+    </div>
+  </div>
+);
+
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const { data: factoryLive, refetch: refetchLive } = useQuery({
-    queryKey: ['factory-live-overview'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data
+    queryKey: ['factory-live-overview', filters.timeRange],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: filters.timeRange } })).data
+  });
+
+  const { data: todayKPI } = useQuery({
+    queryKey: ['today-kpis-summary'],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: 'today' } })).data,
+    staleTime: 60000
+  });
+
+  const { data: weeklyKPI } = useQuery({
+    queryKey: ['weekly-kpis-summary'],
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: 'week' } })).data,
+    staleTime: 60000
   });
 
   const { data: efficiency } = useQuery({
@@ -53,11 +76,13 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
 
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials-kpis'],
-    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.RAW_MATERIALS)).data,  });
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.RAW_MATERIALS)).data,
+  });
 
   const { data: productionStock } = useQuery({
     queryKey: ['production-stock-kpis'],
-    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.PRODUCTION_STOCK)).data,  });
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.PRODUCTION_STOCK)).data,
+  });
 
   const { startOfMonthStr, endOfMonthStr } = useMemo(() => {
     const start = new Date();
@@ -84,13 +109,9 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
     staleTime: 60000
   });
 
-  const isLive = filters.timeRange === 'live';
-
   const displayStats = {
-    blowing: factoryLive?.counters?.blowing || 0,
-    filling: factoryLive?.counters?.filling || 0,
     packing: factoryLive?.counters?.packing || 0,
-    rejection: factoryLive?.counters?.rejection || 0,
+    dispatch: factoryLive?.counters?.dispatch || 0,
     yield: factoryLive?.counters?.blowing > 0 ? ((factoryLive?.counters?.packing / factoryLive?.counters?.blowing) * 100).toFixed(1) : '100'
   };
 
@@ -98,226 +119,286 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const capsStock = rawMaterials?.find((r: any) => r.name === 'Caps')?.currentStock ?? 0;
   const jarStock = productionStock?.find((p: any) => p.productName?.toLowerCase().includes('20l'))?.currentStock ?? 0;
   const monthlyProduced = monthlyKPI?.throughput ?? 0;
+  const todayProduced = todayKPI?.counters?.packing ?? 0;
+  const weeklyProduced = weeklyKPI?.counters?.packing ?? 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="space-y-10 pb-20"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8 pb-20"
     >
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+      {/* Header */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-5xl font-black text-slate-900 tracking-tighter flex items-center gap-5">
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-indigo-900 text-white rounded-3xl flex items-center justify-center shadow-2xl shadow-indigo-200">
-              <Activity className="w-9 h-9" />
-            </div>
-            Factory Control Center
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            Executive Summary
           </h2>
-          <p className="text-slate-500 font-bold mt-4 ml-1 text-lg flex items-center gap-2">
-            {isLive && <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
-            {isLive ? 'Live Industrial Terminal' : 'Historical Production Terminal'} • <span className="text-slate-400 font-medium">Synchronized across {efficiency?.length || 0} production lines</span>
+          <p className="text-slate-500 font-medium mt-1 text-sm">
+            High-level overview of factory operations and inventory.
           </p>
         </div>
-
-        <div className="flex items-center gap-4 bg-white p-3 rounded-[2.5rem] shadow-2xl border border-slate-50">
-          <button 
-             onClick={() => refetchLive()}
-             className="ml-2 w-12 h-12 bg-slate-50 hover:bg-indigo-600 hover:text-white text-slate-400 rounded-2xl flex items-center justify-center transition-all group active:scale-95"
-             title="Manual Sync"
-           >
-              <RefreshCw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
-           </button>
-          <div className="flex flex-col items-end px-8">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Yield</span>
-            <span className="text-3xl font-black text-emerald-600">{displayStats.yield}%</span>
-          </div>
-        </div>
+        <button 
+           onClick={() => refetchLive()}
+           className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-600 rounded-lg shadow-sm border border-slate-200 flex items-center gap-2 transition-all font-semibold text-sm"
+         >
+            <RefreshCw className="w-4 h-4 text-slate-400" />
+            Refresh Data
+         </button>
       </header>
 
-      {/* Material & Production Stock Status */}
-      <section className="space-y-4">
-        <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Live Material & Production Stock</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
-          <KPICard label="Preforms Available" value={preformsStock.toLocaleString()} trend="Raw Stock" icon={Database} color="indigo" chartColor="#6366f1" delay={0.1} />
-          <KPICard label="Caps Available" value={capsStock.toLocaleString()} trend="Raw Stock" icon={Cpu} color="blue" chartColor="#3b82f6" delay={0.2} />
-          <KPICard label="20L Jar Available Stock" value={jarStock.toLocaleString()} trend="Finished Goods" icon={Package} color="emerald" chartColor="#10b981" delay={0.3} />
-          <KPICard label="Total Bottles Produced Today" value={displayStats.packing.toLocaleString()} trend="Today" icon={CheckCircle2} color="indigo" chartColor="#6366f1" delay={0.4} />
-          <KPICard label="Total Produced This Month" value={monthlyProduced.toLocaleString()} trend="This Month" icon={TrendingUp} color="amber" chartColor="#f59e0b" delay={0.5} />
-        </div>
-      </section>
-
-      {/* Main Industrial Counters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        <KPICard label="Today's Blowing" value={displayStats.blowing.toLocaleString()} trend="+12.4%" icon={Gauge} color="blue" chartColor="#1A9A91" delay={0.1} />
-        <KPICard label="Today's Filling" value={displayStats.filling.toLocaleString()} trend="+8.1%" icon={TrendingUp} color="emerald" chartColor="#10b981" delay={0.2} />
-        <KPICard label="Today's Packing" value={displayStats.packing.toLocaleString()} trend="Optimal" icon={CheckCircle2} color="indigo" chartColor="#1A9A91" delay={0.3} />
-        <KPICard label="Process Rejections" value={displayStats.rejection.toLocaleString()} trend="High" icon={Activity} color="rose" chartColor="#f43f5e" delay={0.4} />
+      {/* SECTION 1: Top KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <ExecCard 
+          title="Total Production" 
+          value={displayStats.packing.toLocaleString()} 
+          subtitle="Cases Produced"
+          icon={Activity} 
+          colorClass="bg-indigo-50 text-indigo-600" 
+        />
+        <ExecCard 
+          title="Total Dispatch" 
+          value={displayStats.dispatch.toLocaleString()} 
+          subtitle="Cases Dispatched"
+          icon={Truck} 
+          colorClass="bg-blue-50 text-blue-600" 
+        />
+        <ExecCard 
+          title="Today Produced Cases" 
+          value={todayProduced.toLocaleString()} 
+          subtitle="Finished Goods"
+          icon={Package} 
+          colorClass="bg-emerald-50 text-emerald-600" 
+        />
+        <ExecCard 
+          title="Active Batches" 
+          value={factoryLive?.activeBatches?.length || 0} 
+          subtitle="Running currently"
+          icon={Factory} 
+          colorClass="bg-amber-50 text-amber-600" 
+        />
+        <ExecCard 
+          title="Active Operators" 
+          value={factoryLive?.summary?.activeOperatorsCount || 0} 
+          subtitle="On Shift"
+          icon={Users} 
+          colorClass="bg-violet-50 text-violet-600" 
+        />
+        <ExecCard 
+          title="Factory Yield" 
+          value={`${displayStats.yield}%`} 
+          subtitle="Global Efficiency"
+          icon={CheckCircle2} 
+          colorClass="bg-emerald-50 text-emerald-600" 
+        />
       </div>
 
-      <div className="grid grid-cols-12 gap-10">
-        {/* Active Batches & Progress */}
-        <div className="col-span-12 lg:col-span-8 space-y-10">
-          <div className="bg-white rounded-[3.5rem] p-10 shadow-xl border border-slate-50 relative overflow-hidden">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                <Database className="w-6 h-6 text-indigo-600" />
-                Active Production Batches
-              </h3>
-              <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                {factoryLive?.activeBatches?.length || 0} Running
-              </span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
+        
+        {/* Left Column: Overviews */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* SECTION 2: Production Overview */}
+          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-indigo-500" />
+              Production Overview
+            </h3>
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Today</p>
+                <p className="text-2xl font-black text-slate-900">{todayProduced.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">This Week</p>
+                <p className="text-2xl font-black text-slate-900">{weeklyProduced.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">This Month</p>
+                <p className="text-2xl font-black text-indigo-600">{monthlyProduced.toLocaleString()}</p>
+              </div>
             </div>
-
-            <div className="space-y-6">
-              {factoryLive?.activeBatches?.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 font-bold">No active batches on floor.</div>
+            {/* Trend Chart */}
+            <div className="mt-8 h-64 w-full">
+              {factoryLive?.trend && factoryLive.trend.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={factoryLive.trend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="time" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                      tickFormatter={(val) => {
+                         try {
+                           const date = parseISO(val);
+                           if (filters.timeRange === 'live' || filters.timeRange === 'today') return format(date, 'HH:mm');
+                           if (filters.timeRange === 'week') return format(date, 'EEE');
+                           return format(date, 'MMM d');
+                         } catch (e) {
+                           return val;
+                         }
+                      }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                      dx={-10}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelFormatter={(val) => {
+                        try {
+                          return format(parseISO(val), 'PPpp');
+                        } catch (e) {
+                          return val;
+                        }
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="produced" 
+                      stroke="#6366f1" 
+                      strokeWidth={3} 
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               ) : (
-                factoryLive?.activeBatches?.map((batch: any) => {
-                  const elapsed = Math.round((new Date().getTime() - new Date(batch.startTime).getTime()) / 60000);
-                  const netTime = Math.max(0, elapsed - (batch.totalDowntimeMins || 0));
-
-                  return (
-                    <div key={batch.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 group hover:bg-white hover:shadow-xl transition-all">
-                      <div className="flex items-center gap-6 w-full md:w-auto">
-                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm font-black text-indigo-600">
-                          {batch.line?.split(' ')[1] || '1'}
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Batch: {batch.batchCode}</p>
-                          <p className="text-lg font-black text-slate-900 truncate max-w-[200px]">{batch.product}</p>
-                        </div>
-                      </div>
-
-                      <div className="flex-1 w-full md:max-w-md px-0 md:px-10">
-                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-3 h-3 text-indigo-500" />
-                            <span>Production: <span className="text-slate-900">{Math.floor(netTime / 60)}h {netTime % 60}m</span></span>
-                          </div>
-                          {batch.totalDowntimeMins > 0 && (
-                            <span className="text-rose-500">Stop: {batch.totalDowntimeMins}m</span>
-                          )}
-                        </div>
-                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-1000 ${batch.totalDowntimeMins > 30 ? 'bg-amber-500' : 'bg-indigo-500'}`}
-                            style={{ width: '65%' }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                        <div className="text-right">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Elapsed</p>
-                          <p className="text-xs font-bold text-slate-600">{Math.floor(elapsed / 60)}h {elapsed % 60}m</p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${batch.status === 'RUNNING' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                          {batch.status}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
+                <div className="h-full w-full bg-slate-50 rounded-xl border border-slate-100 border-dashed flex items-center justify-center">
+                  <p className="text-sm font-semibold text-slate-400">No production trend data</p>
+                </div>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Machine Health Grid */}
-          <div className="grid grid-cols-2 gap-8">
-            {efficiency?.slice(0, 4).map((line: any) => (
-              <div key={line.id} className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-indigo-500/20 transition-all" />
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Line Efficiency</p>
-                    <h4 className="text-xl font-black">{line.name}</h4>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${line.status === 'RUNNING' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                    {line.status}
-                  </div>
-                </div>
-                <div className="flex items-end gap-3">
-                  <span className="text-4xl font-black tracking-tighter">{line.efficiency}%</span>
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">OEE</span>
-                </div>
+          {/* SECTION 3: Inventory Overview */}
+          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+              <Database className="w-5 h-5 text-indigo-500" />
+              Inventory Overview
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Finished Goods</p>
+                <p className="text-xl font-black text-slate-900">{jarStock.toLocaleString()}</p>
               </div>
-            ))}
-          </div>
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Raw Materials</p>
+                <p className="text-xl font-black text-slate-900">{(preformsStock + capsStock).toLocaleString()}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Packaging</p>
+                <p className="text-xl font-black text-slate-900">0</p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Low Stock</p>
+                <p className="text-xl font-black text-amber-700">{factoryLive?.lowStockAlerts?.length || 0}</p>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 4: Factory Operations */}
+          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+              <Server className="w-5 h-5 text-indigo-500" />
+              Factory Operations
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-l-indigo-500">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Running Batches</p>
+                <p className="text-xl font-black text-slate-900">{factoryLive?.activeBatches?.length || 0}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-l-emerald-500">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Active Lines</p>
+                <p className="text-xl font-black text-slate-900">{efficiency?.length || 0}</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-l-amber-500">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Open Incidents</p>
+                <p className="text-xl font-black text-slate-900">0</p>
+              </div>
+              <div className="p-4 bg-slate-50 rounded-2xl border-l-4 border-l-rose-500">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Maintenance Issues</p>
+                <p className="text-xl font-black text-slate-900">{factoryLive?.activeDowntimes?.length || 0}</p>
+              </div>
+            </div>
+          </section>
+
         </div>
 
-        {/* Alerts & Inventory Right Rail */}
-        <div className="col-span-12 lg:col-span-4 space-y-10">
-          <div className="bg-rose-500 rounded-[3rem] p-10 text-white shadow-2xl shadow-rose-200 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-20">
-              <Cpu className="w-32 h-32" />
-            </div>
-            <h3 className="text-2xl font-black mb-2 flex items-center gap-3">
-              <HardDrive className="w-6 h-6" />
-              Material Alerts
-            </h3>
-            <p className="text-white/60 font-bold text-sm mb-10 tracking-tight">Critical items requiring immediate inwarding.</p>
-
-            <div className="space-y-4">
-              {factoryLive?.lowStockAlerts?.length === 0 ? (
-                <p className="text-white/40 text-[10px] font-black uppercase tracking-widest py-4">No low stock alerts.</p>
-              ) : (
-                factoryLive?.lowStockAlerts?.map((item: any) => (
-                  <div key={item.id} className="p-4 bg-white/10 rounded-2xl border border-white/20 backdrop-blur-md flex justify-between items-center">
-                    <div>
-                      <p className="text-xs font-black">{item.itemName}</p>
-                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Min: {item.minimumStock} {item.unit}</p>
-                    </div>
-                    <span className="text-lg font-black">{item.quantity}</span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* TEMP DISABLED - Future Admin Feature
-            // Preserved for future implementation
-            <button className="w-full mt-10 py-5 bg-white text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all active:scale-95">
-              View Inventory Ledger
-            </button>
-            */}
-          </div>
-
-          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl">
-            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3">
+        {/* Right Column: Alerts & Actions */}
+        <div className="space-y-8">
+          
+          {/* SECTION 5: Alerts Center */}
+          <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-rose-500" />
-              Latest Machine Stops
+              Alerts & Exceptions
             </h3>
-            <div className="space-y-6">
-              {factoryLive?.latestStops?.length === 0 ? (
-                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest text-center py-4">No recent stops recorded.</p>
+            <div className="space-y-4">
+              {factoryLive?.lowStockAlerts?.length === 0 && factoryLive?.latestStops?.length === 0 ? (
+                <p className="text-sm font-semibold text-slate-400 text-center py-8">No active alerts.</p>
               ) : (
-                factoryLive?.latestStops?.map((stop: any) => (
-                  <div key={stop.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group hover:bg-white hover:shadow-lg transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] ${stop.duration ? 'bg-slate-200 text-slate-600' : 'bg-rose-500 text-white animate-pulse shadow-lg shadow-rose-200'
-                        }`}>
-                        {stop.duration ? `${stop.duration}m` : 'LIVE'}
-                      </div>
+                <>
+                  {factoryLive?.lowStockAlerts?.map((item: any) => (
+                    <div key={item.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                       <div>
-                        <p className="text-xs font-black text-slate-900">{stop.reason.replace('_', ' ')}</p>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stop.station} • {stop.batchCode}</p>
+                        <p className="text-sm font-bold text-slate-900">{item.itemName}</p>
+                        <p className="text-xs font-medium text-slate-600">Low stock: {item.quantity} {item.unit}</p>
                       </div>
                     </div>
-                    <Clock className="w-4 h-4 text-slate-300" />
-                  </div>
-                ))
+                  ))}
+                  {factoryLive?.latestStops?.map((stop: any) => (
+                    <div key={stop.id} className="flex items-start gap-3 p-3 bg-rose-50 rounded-xl border border-rose-100">
+                      <Activity className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{stop.reason.replace('_', ' ')}</p>
+                        <p className="text-xs font-medium text-slate-600">{stop.station} - {stop.duration}m</p>
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
-            {/* TEMP DISABLED - Future Admin Feature
-            // Preserved for future implementation
-            <button className="w-full mt-8 py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all">
-              Full Downtime Analysis
-            </button>
-            */}
-          </div>
+          </section>
+
+          {/* SECTION 6: Quick Actions */}
+          <section className="bg-slate-900 rounded-3xl p-6 shadow-sm">
+            <h3 className="text-lg font-black text-white mb-6">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <Link to="/admin/live" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <Factory className="w-5 h-5 text-indigo-400" />
+                <span className="text-xs font-bold text-white group-hover:text-indigo-300">Production Floor</span>
+              </Link>
+              <Link to="/admin/batches" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <LayoutList className="w-5 h-5 text-blue-400" />
+                <span className="text-xs font-bold text-white group-hover:text-blue-300">Batches</span>
+              </Link>
+              <Link to="/admin/logs" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <span className="text-xs font-bold text-white group-hover:text-emerald-300">Production Logs</span>
+              </Link>
+              <Link to="/admin/inventory/raw-materials" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <Database className="w-5 h-5 text-amber-400" />
+                <span className="text-xs font-bold text-white group-hover:text-amber-300">Raw Materials</span>
+              </Link>
+              <Link to="/admin/inventory/products" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <Package className="w-5 h-5 text-rose-400" />
+                <span className="text-xs font-bold text-white group-hover:text-rose-300">Products</span>
+              </Link>
+              <Link to="/admin/operators" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+                <Users2 className="w-5 h-5 text-violet-400" />
+                <span className="text-xs font-bold text-white group-hover:text-violet-300">Operators</span>
+              </Link>
+            </div>
+          </section>
+
         </div>
       </div>
     </motion.div>
   );
 });
-

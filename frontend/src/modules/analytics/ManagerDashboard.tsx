@@ -22,6 +22,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import useAuthStore from '../auth/auth.store';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format, parseISO } from 'date-fns';
 
 type TimeRange = 'live' | 'today' | 'week' | 'month';
 
@@ -71,6 +73,10 @@ type DashboardOverview = {
     damageQuantity: number;
     returnQuantity: number;
   };
+  trend: Array<{
+    time: string;
+    produced: number;
+  }>;
 };
 
 const number = (value: number) => new Intl.NumberFormat('en-IN').format(Math.round(Number(value || 0)));
@@ -122,6 +128,64 @@ const ManagerDashboard = memo(({ filters }: { filters?: { timeRange?: TimeRange 
               <ActionTile icon={History} label="Production History" path={nav.logs} color="slate" />
               <ActionTile icon={Users} label="Operator Sessions" path={nav.operators} color="cyan" />
               <ActionTile icon={Database} label="Raw Materials" path={nav.rawMaterials} color="amber" />
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Production Trend</h3>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 h-72">
+              {data?.trend && data.trend.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.trend}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="time" 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                      tickFormatter={(val) => {
+                         try {
+                           const date = parseISO(val);
+                           if (timeRange === 'live' || timeRange === 'today') return format(date, 'HH:mm');
+                           if (timeRange === 'week') return format(date, 'EEE');
+                           return format(date, 'MMM d');
+                         } catch (e) {
+                           return val;
+                         }
+                      }}
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
+                      dx={-10}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      labelFormatter={(val) => {
+                        try {
+                          return format(parseISO(val), 'PPpp');
+                        } catch (e) {
+                          return val;
+                        }
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="produced" 
+                      stroke="#6366f1" 
+                      strokeWidth={3} 
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full bg-slate-50 rounded-xl border border-slate-100 border-dashed flex items-center justify-center">
+                  <p className="text-sm font-semibold text-slate-400">No production trend data</p>
+                </div>
+              )}
             </div>
           </section>
 

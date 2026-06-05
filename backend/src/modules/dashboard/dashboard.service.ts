@@ -36,6 +36,7 @@ export class DashboardService {
       stockRows,
       alertRows,
       activityRows,
+      trendRows,
     ] = await Promise.all([
       this.getKpis(start, end, live, rangeClause, batchRangeClause, downtimeRangeClause),
       db.execute(sql`
@@ -110,6 +111,21 @@ export class DashboardService {
       `),
       this.getCriticalAlerts(incidentRangeClause, downtimeRangeClause, rangeClause),
       this.getSalesActivity(start, end),
+      db.execute(sql`
+        select
+          ${live 
+            ? sql`to_timestamp(floor(extract(epoch from pl.logged_at) / 900) * 900)` 
+            : timeRange === 'week' 
+              ? sql`date_trunc('day', pl.logged_at)` 
+              : timeRange === 'month' 
+                ? sql`date_trunc('week', pl.logged_at)` 
+                : sql`date_trunc('hour', pl.logged_at)`} as time,
+          coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.cases_produced, 0) else 0 end), 0)::int as produced
+        from production_logs pl
+        where pl.deleted_at is null and pl.logged_at >= ${startIso}
+        group by 1
+        order by 1;
+      `)
     ]);
 
     const kpis = this.first(kpiRows);
@@ -167,6 +183,10 @@ export class DashboardService {
         damageQuantity: Number(activity.damageQuantity || 0),
         returnQuantity: Number(activity.returnQuantity || 0),
       },
+      trend: this.rows(trendRows).map(t => ({
+        time: t.time ? new Date(t.time).toISOString() : new Date().toISOString(),
+        produced: Number(t.produced || 0)
+      })),
       formulas: {
         machineOee: 'min(100, (packing output / sum(target BPM * batch runtime minutes)) * (packing output / (packing output + wastage)) * 100)',
         unitsPacked: 'sum PACKING logs using finished_goods_produced, cases_produced, then primary_count',

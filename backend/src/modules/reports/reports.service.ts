@@ -5,7 +5,8 @@ import {
   salesOrders, salesOrderItems, customers,
   products, productBrands, productionLines,
   users, roles, userRoles,
-  incidents, finishedGoodsInventory
+  incidents, finishedGoodsInventory,
+  dispatchLogs, auditLogs, materialsUsage
 } from '../../database/schema';
 import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
 
@@ -153,23 +154,13 @@ export class ReportsService {
       .leftJoin(users, eq(productionBatches.createdBy, users.id))
       .$dynamic();
 
-      if (!isAdmin) {
-        const excludedIds = await this.getExcludedUserIds();
-        if (excludedIds.length > 0) {
-          // If the creator is privileged, we hide their name by making the join result null
-          // However, drizzle's leftJoin with select fields doesn't easily support case-when for the whole join.
-          // For simplicity, we can filter the result post-query or use a more complex select.
-          // Let's use a simpler approach: if the creator is in excludedIds, we set their name to 'System' or 'Hidden' in the result mapping.
-        }
-      }
-
       const [batchData] = await query.where(eq(productionBatches.id, batchId));
 
       if (!batchData) return null;
 
       // Filter privileged names post-query for safety
+      const excludedIds = await this.getExcludedUserIds();
       if (!isAdmin) {
-        const excludedIds = await this.getExcludedUserIds();
         if (excludedIds.includes(batchData.batch.createdBy)) {
           batchData.creator = 'SYSTEM';
         }
@@ -187,6 +178,44 @@ export class ReportsService {
       .groupBy(sql`date_trunc('hour', ${productionLogs.loggedAt})`)
       .orderBy(sql`date_trunc('hour', ${productionLogs.loggedAt})`);
 
+      // ENHANCED BATCH DOSSIER DATA
+      
+      const stationLogsRaw = await db.select({
+        station: productionLogs.station,
+        count: sql<string>`COALESCE(SUM(${productionLogs.primaryCount}), '0')`,
+        cases: sql<string>`COALESCE(SUM(${productionLogs.casesProduced}), '0')`,
+        waste: sql<string>`COALESCE(SUM(${productionLogs.wastageCount}), '0')`,
+        operatorName: users.name,
+      })
+      .from(productionLogs)
+      .leftJoin(users, eq(productionLogs.userId, users.id))
+      .where(eq(productionLogs.batchId, batchId))
+      .groupBy(productionLogs.station, users.name);
+
+      const timelineRaw = await db.select({
+        time: productionLogs.loggedAt,
+        type: productionLogs.eventType,
+        station: productionLogs.station,
+        remarks: productionLogs.remarks,
+        user: users.name,
+      })
+      .from(productionLogs)
+      .leftJoin(users, eq(productionLogs.userId, users.id))
+      .where(eq(productionLogs.batchId, batchId))
+      .orderBy(productionLogs.loggedAt);
+
+      const dispatchInfo = await this.hasTable('dispatch_logs') ? await db.select({
+        quantity: dispatchLogs.quantity,
+        destination: dispatchLogs.destination,
+        date: dispatchLogs.dispatchedAt
+      })
+      .from(dispatchLogs)
+      .where(eq(dispatchLogs.batchId, batchId)) : [];
+
+      const dispatchTotal = dispatchInfo.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+      
+      const damagesTotal = [{ quantity: '0' }];
+
       return {
         metadata: batchData,
         totals: totals || {},
@@ -194,7 +223,20 @@ export class ReportsService {
           ...p,
           count: Number(p.count),
           waste: Number(p.waste)
-        }))
+        })),
+        stationLogs: stationLogsRaw.map(s => ({
+           station: s.station,
+           count: Number(s.count),
+           cases: Number(s.cases),
+           waste: Number(s.waste),
+           operator: !isAdmin && excludedIds?.includes(s.operatorName) ? 'SYSTEM' : s.operatorName
+        })),
+        timeline: timelineRaw.map(t => ({
+           ...t,
+           user: !isAdmin && excludedIds?.includes(t.user) ? 'SYSTEM' : t.user
+        })),
+        dispatch: { total: dispatchTotal, logs: dispatchInfo },
+        quality: { damages: Number(damagesTotal[0]?.quantity || 0), returns: 0 } // Returns 0 until separate integration
       };
     } catch (error: any) {
       this.logger.error(`[BATCH_DOSSIER_FAILED] ${error.message}`);
