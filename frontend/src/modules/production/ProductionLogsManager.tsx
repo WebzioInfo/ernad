@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
 import { ENDPOINTS } from '../../constants/endpoints';
 import { toast } from 'sonner';
+import { Pagination } from '../../components/common/Pagination';
 
 // --- COMPONENTS ---
 
@@ -71,6 +72,13 @@ export default function ProductionLogsManager() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [verificationRemarks, setVerificationRemarks] = useState('');
   const [viewingLog, setViewingLog] = useState<any>(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, search, pageSize]);
 
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials-packing'],
@@ -205,6 +213,13 @@ export default function ProductionLogsManager() {
       String(l.id).includes(search)
     );
   }, [logs, search]);
+
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredLogs.length / pageSize);
 
   if (loadingLogs) return (
     <div className="h-screen w-full bg-[#f8fafc] flex flex-col items-center justify-center relative overflow-hidden text-slate-900">
@@ -355,7 +370,7 @@ export default function ProductionLogsManager() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 <AnimatePresence>
-                  {filteredLogs.map((log: any, i: number) => (
+                  {paginatedLogs.map((log: any, i: number) => (
                     <motion.tr
                       key={log.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -516,7 +531,14 @@ export default function ProductionLogsManager() {
               </tbody>
             </table>
           </div>
-
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalRecords={filteredLogs.length}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={setPageSize}
+          />
           {filteredLogs.length === 0 && !loadingLogs && (
             <div className="py-24 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
