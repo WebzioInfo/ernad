@@ -728,6 +728,7 @@ export class ProcessingService {
       wastageCount: productionLogs.wastageCount,
       bottleLeakage: productionLogs.bottleLeakage,
       capWastage: productionLogs.capWastage,
+      casesProduced: productionLogs.casesProduced,
       eventType: productionLogs.eventType,
       secondaryPackagingCount: productionLogs.secondaryPackagingCount,
       remarks: productionLogs.remarks,
@@ -869,6 +870,7 @@ export class ProcessingService {
         wastageCount: l.wastageCount,
         bottleLeakage: l.bottleLeakage,
         capWastage: l.capWastage,
+        casesProduced: l.casesProduced,
         eventType: l.eventType,
         secondaryPackagingCount: l.secondaryPackagingCount,
         remarks: l.remarks,
@@ -1139,6 +1141,7 @@ export class ProcessingService {
       wastageCount: productionLogs.wastageCount,
       bottleLeakage: productionLogs.bottleLeakage,
       capWastage: productionLogs.capWastage,
+      casesProduced: productionLogs.casesProduced,
       eventType: productionLogs.eventType,
       remarks: productionLogs.remarks,
 

@@ -317,8 +317,7 @@ export default function BatchForensicsPage() {
               <div className="bg-white/5 border border-white/10 p-6 rounded-[2rem] flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Produced Cases</p>
-                  <p className="text-3xl font-black tabular-nums">{Math.floor((totals?.packingTotal || 0) / (metadata?.product?.unitsPerCase || 1)).toLocaleString()}</p>
-                  <p className="text-[10px] font-bold text-slate-500 mt-2">Produced Units: {(totals?.packingTotal || 0).toLocaleString()}</p>
+                  <p className="text-3xl font-black tabular-nums">{(totals?.casesTotal || 0).toLocaleString()}</p>
                 </div>
                 <div className="w-12 h-12 bg-emerald-500/20 text-emerald-500 rounded-2xl flex items-center justify-center">
                   <Check className="w-6 h-6" />

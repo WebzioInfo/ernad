@@ -277,8 +277,8 @@ export function BatchDossierModal({ batchId, onClose }: BatchDossierModalProps) 
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100">
-                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Produced</p>
-                  <p className="text-2xl font-black text-indigo-700 tracking-tighter">{(totals?.packingTotal || 0).toLocaleString()}</p>
+                  <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1">Total Cases Produced</p>
+                  <p className="text-2xl font-black text-indigo-700 tracking-tighter">{(totals?.casesTotal || 0).toLocaleString()}</p>
                 </div>
                 <div className="bg-rose-50/50 p-6 rounded-3xl border border-rose-100">
                   <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Total Waste</p>

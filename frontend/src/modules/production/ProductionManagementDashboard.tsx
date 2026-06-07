@@ -1,13 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
   BarChart3,
-  Check,
   ChevronRight,
   Database,
   Factory,
-  Layers,
   Loader2,
   PackageCheck,
   Search,
@@ -76,39 +74,38 @@ const StatCard = ({ label, value, icon: Icon }: { label: string; value: string |
 );
 
 export default function ProductionManagementDashboard() {
-  const [selectedLineId, setSelectedLineId] = useState('ALL');
   const [selectedBatchCode, setSelectedBatchCode] = useState('ALL');
-  const [batchScope, setBatchScope] = useState<'ALL' | 'PREVIOUS'>('ALL');
-  const [selectedStation, setSelectedStation] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data: batches = [], isLoading: loadingBatches } = useQuery<ProductionBatchRow[]>({
     queryKey: ['production-batches-all'],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES)).data,
   });
 
-  const { data: lines = [] } = useQuery<ProductionLine[]>({
-    queryKey: ['master-data-lines'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data,
-  });
-
   const filteredBatches = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch.trim().toLowerCase();
 
     return batches.filter((batch) => {
-      const matchesLine = selectedLineId === 'ALL' || batch.lineId === selectedLineId;
       const matchesBatch = selectedBatchCode === 'ALL' || batch.batchCode === selectedBatchCode;
-      const matchesScope = batchScope === 'ALL' || !['RUNNING', 'CHANGEOVER'].includes(batch.status);
       const matchesSearch =
         !term ||
         batch.batchCode?.toLowerCase().includes(term) ||
         batch.product?.name?.toLowerCase().includes(term) ||
         batch.brand?.name?.toLowerCase().includes(term) ||
-        batch.line?.name?.toLowerCase().includes(term);
+        batch.line?.name?.toLowerCase().includes(term) ||
+        batch.shift?.name?.toLowerCase().includes(term) ||
+        batch.status?.toLowerCase().includes(term) ||
+        (batch.startTime && formatDate(batch.startTime)?.toLowerCase().includes(term));
 
-      return matchesLine && matchesBatch && matchesScope && matchesSearch;
+      return matchesBatch && matchesSearch;
     });
-  }, [batches, batchScope, search, selectedBatchCode, selectedLineId]);
+  }, [batches, debouncedSearch, selectedBatchCode]);
 
   const overview = useMemo(() => {
     const running = filteredBatches.filter((batch) => ['RUNNING', 'CHANGEOVER'].includes(batch.status)).length;
@@ -171,7 +168,9 @@ export default function ProductionManagementDashboard() {
       products,
       totalTarget,
       runningDurationMinutes,
-      lines: filteredBatches
+      lines: filteredBatches,
+      lineName: linesRunning > 1 ? 'Multiple Lines' : firstBatch.line?.name || 'Unassigned',
+      productionConfig: products.join(', ') || 'Unknown'
     };
   }, [isSingleBatchView, filteredBatches]);
 
@@ -200,42 +199,9 @@ export default function ProductionManagementDashboard() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setBatchScope('ALL');
-              setSelectedBatchCode('ALL');
-            }}
-            className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${batchScope === 'ALL' && selectedBatchCode === 'ALL'
-              ? 'bg-[#1A9A91] text-white'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            {batchScope === 'ALL' && selectedBatchCode === 'ALL' ? <Check className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
-            All
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setBatchScope('PREVIOUS');
-              setSelectedBatchCode('ALL');
-            }}
-            className={`h-10 px-4 rounded-lg text-xs font-black uppercase tracking-widest shadow-sm flex items-center gap-2 transition-colors ${batchScope === 'PREVIOUS'
-              ? 'bg-[#1A9A91] text-white'
-              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
-          >
-            <Database className="h-4 w-4" />
-            Previous Batches
-          </button>
-
           <select
             value={selectedBatchCode}
-            onChange={(event) => {
-              setSelectedBatchCode(event.target.value);
-              if (event.target.value !== 'ALL') setBatchScope('ALL');
-            }}
+            onChange={(event) => setSelectedBatchCode(event.target.value)}
             className="h-10 min-w-[210px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] focus:ring-2 focus:ring-[#1A9A91]/15"
           >
             <option value="ALL">All Batches</option>
@@ -246,32 +212,15 @@ export default function ProductionManagementDashboard() {
             ))}
           </select>
 
-          <select
-            value={selectedLineId}
-            onChange={(event) => setSelectedLineId(event.target.value)}
-            className="h-10 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] focus:ring-2 focus:ring-[#1A9A91]/15"
-          >
-            <option value="ALL">All Lines</option>
-            {lines.map((line) => (
-              <option key={line.id} value={line.id}>
-                {line.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedStation}
-            onChange={(event) => setSelectedStation(event.target.value)}
-            className="h-10 min-w-[150px] rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-[#1A9A91] focus:ring-2 focus:ring-[#1A9A91]/15"
-          >
-            <option value="ALL">All Stations</option>
-            <option value="BLOWING">Blowing</option>
-            <option value="FILLING">Filling</option>
-            <option value="LABELING">Labeling</option>
-            <option value="PACKING">Packing</option>
-            <option value="DISPATCH">Dispatch</option>
-            <option value="QUALITY">Quality</option>
-          </select>
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search batches, products, status..."
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white shadow-sm pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none focus:border-[#1A9A91] focus:ring-2 focus:ring-[#1A9A91]/15"
+            />
+          </div>
         </div>
       </div>
 
@@ -283,27 +232,15 @@ export default function ProductionManagementDashboard() {
       </div>
 
       {isSingleBatchView && singleBatchSummary ? (
-        <SingleBatchView summary={singleBatchSummary} selectedLineId={selectedLineId} selectedStation={selectedStation} onBack={() => setSelectedBatchCode('ALL')} />
+        <SingleBatchView summary={singleBatchSummary} selectedLineId="ALL" selectedStation="ALL" onBack={() => setSelectedBatchCode('ALL')} />
       ) : (
         <section className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Batches</h3>
               <p className="text-xs text-slate-500 mt-1">
-                {selectedLineId === 'ALL'
-                  ? 'Showing all line data'
-                  : `Showing data for ${lines.find((line) => line.id === selectedLineId)?.name || 'selected line'}`}
+                Overview of all production records
               </p>
-            </div>
-
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search batch, product, brand..."
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-700 outline-none focus:border-[#1A9A91] focus:bg-white focus:ring-2 focus:ring-[#1A9A91]/15"
-              />
             </div>
           </div>
 
@@ -311,15 +248,13 @@ export default function ProductionManagementDashboard() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Batch</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Line</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Shift</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Product</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Brand</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Target</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Start Time</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Logs</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[15%]">Batch</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[25%]">Product</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[15%]">Brand</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[15%]">Target</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[15%]">Start Time</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 w-[10%]">Status</th>
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right w-[5%]">Logs</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -331,11 +266,8 @@ export default function ProductionManagementDashboard() {
                   >
                     <td className="px-5 py-4">
                       <p className="text-sm font-black text-slate-900">{batch.batchCode}</p>
-                      <p className="text-[10px] font-semibold text-slate-400 mt-0.5">{batch.linesCount} Lines</p>
                     </td>
-                    <td className="px-5 py-4 text-xs font-bold text-slate-700">{batch.linesCount > 1 ? 'Multiple' : (batch.line?.name || 'Unassigned')}</td>
-                    <td className="px-5 py-4 text-xs font-bold text-slate-500">{batch.shift?.name || 'Unknown Shift'}</td>
-                    <td className="px-5 py-4 text-xs font-bold text-slate-700 truncate max-w-[150px]">{batch.productsDisplay || 'Unknown Product'}</td>
+                    <td className="px-5 py-4 text-xs font-bold text-slate-700 truncate max-w-[250px]">{batch.productsDisplay || 'Unknown Product'}</td>
                     <td className="px-5 py-4 text-xs font-bold text-slate-500">{batch.brand?.name || 'Unknown Brand'}</td>
                     <td className="px-5 py-4 text-xs font-black tabular-nums text-slate-900">
                       {Number(batch.totalTarget || 0).toLocaleString()}
@@ -356,7 +288,7 @@ export default function ProductionManagementDashboard() {
 
                 {groupedBatches.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-5 py-14 text-center">
+                    <td colSpan={7} className="px-5 py-14 text-center">
                       <div className="mx-auto h-12 w-12 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
                         <Database className="h-6 w-6" />
                       </div>
@@ -430,10 +362,22 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation, onBack }: a
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-6 text-right">
+          <div className="flex flex-wrap items-center justify-end gap-6 text-right">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Line Name</p>
+              <p className="text-sm font-bold text-slate-900">{summary.lineName}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Number of Lines</p>
+              <p className="text-sm font-bold text-slate-900">{summary.linesRunning}</p>
+            </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Shift</p>
               <p className="text-sm font-bold text-slate-900">{summary.shift}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Config</p>
+              <p className="text-sm font-bold text-slate-900 truncate max-w-[200px]" title={summary.productionConfig}>{summary.productionConfig}</p>
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Started</p>
@@ -484,8 +428,9 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation, onBack }: a
       <div className="space-y-8">
         {filteredDossiers.map(({ lineId, batchRow, dossier }) => {
           const target = Number(batchRow.targetQuantity || 1);
-          const produced = Number(dossier?.totals?.packingTotal || 0);
-          const efficiency = target > 0 ? ((produced / target) * 100).toFixed(1) : '0.0';
+          const producedUnits = Number(dossier?.totals?.packingTotal || 0);
+          const producedCases = Number(dossier?.totals?.casesTotal || 0);
+          const efficiency = target > 0 ? ((producedUnits / target) * 100).toFixed(1) : '0.0';
 
           const timeline = dossier?.timeline || [];
           const stationLogs = dossier?.stationLogs || [];
@@ -526,9 +471,9 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation, onBack }: a
                     <p className="text-xl font-black text-[#1A9A91] tabular-nums">{efficiency}%</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Produced</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Produced Cases</p>
                     <p className="text-xl font-black text-slate-900 tabular-nums">
-                      {produced.toLocaleString()} <span className="text-xs text-slate-400">/ {target.toLocaleString()}</span>
+                      {producedCases.toLocaleString()}
                     </p>
                   </div>
                 </div>

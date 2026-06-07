@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Database, Search, RefreshCw,
-  Edit3, AlertCircle, Loader2,
+  AlertCircle, Loader2,
   X, ShieldCheck
 } from 'lucide-react';
 import useAuthStore from '../../modules/auth/auth.store';
@@ -379,7 +379,17 @@ export default function ProductionLogsManager() {
                         <Badge variant="indigo">{log.station}</Badge>
                       </td>
                       <td className="px-8 py-6">
-                        <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
+                        {log.station === 'PACKING' ? (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.casesProduced || 0).toLocaleString()}</p>
+                            <span className="text-[9px] font-black uppercase text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded">Cases</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-black text-slate-900 tabular-nums font-mono">{(log.primaryCount || 0).toLocaleString()}</p>
+                            <span className="text-[9px] font-black uppercase text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Units</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-8 py-6">
                         <p className="text-sm font-black text-rose-600 tabular-nums font-mono">{formatDecimal(log.wastageCount)}</p>
@@ -459,23 +469,23 @@ export default function ProductionLogsManager() {
                       </td>
                       <td className="px-8 py-6">
                         {!log.deletedAt && (
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex flex-col xl:flex-row items-end xl:items-center justify-end gap-2 opacity-100 visible">
                             {log.status !== 'VERIFIED' && log.userId !== user?.id && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setVerifyingLog(log); }}
-                                className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-lg transition-all"
-                                title="Verify Log"
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
+                                aria-label="Approve Production Log"
                               >
-                                <ShieldCheck size={14} />
+                                Approve
                               </button>
                             )}
                             {log.status === 'SUBMITTED' && log.userId !== user?.id && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setRejectingLog(log); }}
-                                className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-lg transition-all"
-                                title="Reject Log"
+                                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
+                                aria-label="Void Production Log"
                               >
-                                <X size={14} />
+                                Void
                               </button>
                             )}
                             <button
@@ -492,9 +502,10 @@ export default function ProductionLogsManager() {
                                 setEditingLog(logCopy);
                                 setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
                               }}
-                              className="p-2 bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 border border-slate-200 rounded-lg transition-all"
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
+                              aria-label="Edit Production Log"
                             >
-                              <Edit3 size={14} />
+                              Edit
                             </button>
                           </div>
                         )}
