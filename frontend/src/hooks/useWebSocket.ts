@@ -41,6 +41,8 @@ export const useWebSocket = (lineId?: string) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['station-log-history'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
+      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
     };
 
     const handleDataChanged = (data: any) => {

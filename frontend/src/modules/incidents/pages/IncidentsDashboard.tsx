@@ -21,7 +21,7 @@ import ConfirmationModal from '../../../components/common/ConfirmationModal';
 
 type Category = 'FACTORY' | 'LINE' | 'STATION';
 type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-type Status = 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+type Status = 'OPEN' | 'ACKNOWLEDGED' | 'INVESTIGATING' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
 
 interface IncidentType {
   id: string;
@@ -53,7 +53,7 @@ interface Incident {
 }
 
 const stations = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'];
-const statusFlow: Status[] = ['ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+const statusFlow: Status[] = ['ACKNOWLEDGED', 'INVESTIGATING', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED'];
 
 const priorityClass: Record<Priority, string> = {
   CRITICAL: 'bg-rose-50 text-rose-700 border-rose-100',
@@ -65,9 +65,11 @@ const priorityClass: Record<Priority, string> = {
 const statusClass: Record<Status, string> = {
   OPEN: 'bg-rose-50 text-rose-700 border-rose-100',
   ACKNOWLEDGED: 'bg-sky-50 text-sky-700 border-sky-100',
+  INVESTIGATING: 'bg-purple-50 text-purple-700 border-purple-100',
   IN_PROGRESS: 'bg-indigo-50 text-indigo-700 border-indigo-100',
   RESOLVED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   CLOSED: 'bg-slate-100 text-slate-600 border-slate-200',
+  CANCELLED: 'bg-gray-100 text-gray-500 border-gray-200',
 };
 
 const fmtMinutes = (value?: number) => `${Math.round(Number(value || 0))}m`;
@@ -152,11 +154,17 @@ export default function IncidentsDashboard() {
   const isOperatorView = role === 'OPERATOR';
 
   const visibleNextStatuses = useMemo(() => {
-    return (incident: Incident) => statusFlow.filter(status => {
-      if (incident.status === 'CLOSED') return false;
-      if (!isManager && status !== 'RESOLVED') return false;
-      return true;
-    });
+    return (incident: Incident) => {
+      const allowed = statusFlow.filter(status => {
+        if (incident.status === 'CLOSED' || incident.status === 'CANCELLED') return false;
+        if (!isManager && status !== 'RESOLVED') return false;
+        return true;
+      });
+      if (isManager && (incident.status === 'RESOLVED' || incident.status === 'CLOSED' || incident.status === 'CANCELLED')) {
+        allowed.push('OPEN'); // Reopen
+      }
+      return allowed.filter(s => s !== incident.status);
+    };
   }, [isManager]);
 
   return (

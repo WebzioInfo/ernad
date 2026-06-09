@@ -130,6 +130,8 @@ export default function ProductionLogsManager() {
     if (editingLog.wastageCount !== originalLog.wastageCount) return true;
     if (editingLog.remarks !== originalLog.remarks) return true;
     if (editingLog.shrinkWastageKg !== originalLog.shrinkWastageKg) return true;
+    if (editingLog.editDate !== originalLog.editDate) return true;
+    if (editingLog.editTime !== originalLog.editTime) return true;
 
     const origShrinks = originalLog.selectedShrinks || [];
     const editShrinks = editingLog.selectedShrinks || [];
@@ -509,10 +511,13 @@ export default function ProductionLogsManager() {
                                 const selectedShrinksCopy = log.selectedShrinks 
                                   ? JSON.parse(JSON.stringify(log.selectedShrinks))
                                   : [];
+                                const dateObj = new Date(log.loggedAt);
                                 const logCopy = {
                                   ...log,
                                   selectedShrinks: selectedShrinksCopy,
-                                  shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0
+                                  shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
+                                  editDate: format(dateObj, 'yyyy-MM-dd'),
+                                  editTime: format(dateObj, 'HH:mm')
                                 };
                                 setEditingLog(logCopy);
                                 setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
@@ -575,6 +580,12 @@ export default function ProductionLogsManager() {
                   wastageCount: totalWastage,
                   remarks: editingLog.remarks
                 };
+                
+                const newTimestamp = new Date(`${editingLog.editDate}T${editingLog.editTime}`);
+                if (newTimestamp.getTime() !== new Date(originalLog.loggedAt).getTime()) {
+                  payload.loggedAt = newTimestamp.toISOString();
+                }
+
                 if (editingLog.station === 'PACKING') {
                   payload.shrinkWastageKg = totalWastage;
                   payload.selectedShrinks = editingLog.selectedShrinks || [];
@@ -589,6 +600,36 @@ export default function ProductionLogsManager() {
                   reason: editingLog.remarks
                 });
               }}>
+                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Date</label>
+                    <input
+                      type="date"
+                      value={editingLog.editDate}
+                      onChange={(e) => setEditingLog({ ...editingLog, editDate: e.target.value })}
+                      className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Production Time</label>
+                    <input
+                      type="time"
+                      value={editingLog.editTime}
+                      onChange={(e) => setEditingLog({ ...editingLog, editTime: e.target.value })}
+                      className="w-full h-12 bg-white border border-slate-200 rounded-xl px-4 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                    />
+                  </div>
+                  {originalLog && (editingLog.editDate !== originalLog.editDate || editingLog.editTime !== originalLog.editTime) && (
+                    <div className="col-span-2 mt-2 text-xs font-bold text-amber-600 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                      <AlertCircle className="inline-block w-4 h-4 mr-1 mb-0.5" />
+                      Changing production date/time will recalculate reports and analytics.
+                      <div className="mt-1 flex flex-col gap-1 text-[10px] text-slate-500 font-mono">
+                        <div>Original: {format(new Date(originalLog.loggedAt), 'dd-MM-yyyy HH:mm')}</div>
+                        <div className="text-amber-700">New: {format(new Date(`${editingLog.editDate}T${editingLog.editTime}`), 'dd-MM-yyyy HH:mm')}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 {editingLog.station === 'PACKING' ? (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

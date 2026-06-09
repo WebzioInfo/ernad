@@ -4,6 +4,7 @@ import { productionLogs, users, batchTotals, rawMaterials, rawMaterialTransactio
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../../audit/audit.service';
 import { InventoryService } from '../../inventory/inventory.service';
+import { ProductionEventsService } from '../../../realtime/production.gateway';
 
 @Injectable()
 export class VerificationService {
@@ -11,7 +12,8 @@ export class VerificationService {
 
   constructor(
     private readonly audit: AuditService,
-    private readonly inventoryService: InventoryService
+    private readonly inventoryService: InventoryService,
+    private readonly eventsService: ProductionEventsService
   ) {}
 
   async verifyLog(logId: number, verifierId: string, remarks?: string) {
@@ -112,6 +114,16 @@ export class VerificationService {
         } else if (newData.shrinkWastageKg !== undefined) {
           newData.wastageCount = String(newData.shrinkWastageKg);
         }
+      }
+
+      // Check date modification rules
+      let newLoggedAt: Date | undefined;
+      if (newData.loggedAt) {
+        newLoggedAt = new Date(newData.loggedAt);
+        if (newLoggedAt > new Date()) {
+          throw new BadRequestException('Production date cannot be in the future.');
+        }
+        newData.loggedAt = newLoggedAt;
       }
 
       // Reconcile selected shrinks if updated for PACKING station
@@ -237,6 +249,8 @@ export class VerificationService {
         updated,
         reason
       );
+
+      this.eventsService.emitProductionUpdated(updated.batchId, updated.lineId);
 
       setTimeout(() => {
         this.inventoryService.recalculateInventory().catch((err) => {

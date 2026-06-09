@@ -25,9 +25,11 @@ export enum IncidentPriorityDto {
 export enum IncidentStatusDto {
   OPEN = 'OPEN',
   ACKNOWLEDGED = 'ACKNOWLEDGED',
+  INVESTIGATING = 'INVESTIGATING',
   IN_PROGRESS = 'IN_PROGRESS',
   RESOLVED = 'RESOLVED',
   CLOSED = 'CLOSED',
+  CANCELLED = 'CANCELLED',
 }
 
 export class CreateIncidentTypeDto {

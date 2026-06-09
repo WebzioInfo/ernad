@@ -333,6 +333,10 @@ export class IncidentsService {
       patch.closedBy = userId;
       patch.closedAt = now;
     }
+    if (dto.status === 'CANCELLED') {
+      patch.closedBy = userId;
+      patch.closedAt = now;
+    }
 
     const updated = await db.transaction(async (tx) => {
       const [row] = await tx.update(incidents).set(patch).where(eq(incidents.id, id)).returning();
@@ -345,6 +349,20 @@ export class IncidentsService {
             updatedAt: now,
           })
           .where(eq(downtimeLogs.id, incident.downtimeLogId));
+      }
+
+      if (dto.status === 'CLOSED' && incident.productionImpact && incident.downtimeLogId) {
+        await tx.update(downtimeLogs)
+          .set({
+            endTime: now,
+            durationMinutes: Math.max(0, Math.round((now.getTime() - incident.openedAt.getTime()) / 60000)),
+            updatedAt: now,
+          })
+          .where(and(eq(downtimeLogs.id, incident.downtimeLogId), isNull(downtimeLogs.endTime)));
+      }
+
+      if (dto.status === 'CANCELLED' && incident.downtimeLogId) {
+        await tx.delete(downtimeLogs).where(eq(downtimeLogs.id, incident.downtimeLogId));
       }
 
       await tx.insert(incidentHistory).values({
@@ -402,7 +420,7 @@ export class IncidentsService {
 
     const [summary] = await db.select({
       total: sql<number>`count(*)`,
-      open: sql<number>`count(*) filter (where ${incidents.status} in ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS'))`,
+      open: sql<number>`count(*) filter (where ${incidents.status} in ('OPEN', 'ACKNOWLEDGED', 'INVESTIGATING', 'IN_PROGRESS'))`,
       critical: sql<number>`count(*) filter (where ${incidents.priority} = 'CRITICAL')`,
       factory: sql<number>`count(*) filter (where ${incidents.category} = 'FACTORY')`,
       downtime: sql<number>`coalesce(sum(${incidents.durationMinutes}), 0)`,

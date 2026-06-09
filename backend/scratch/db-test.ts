@@ -1,20 +1,15 @@
 import { db } from '../src/database/db';
 import { sql } from 'drizzle-orm';
 
-async function test() {
+async function main() {
   try {
-    const rmts = await db.execute(sql`
-      SELECT rmt.remarks, rmt.quantity_change, rm.name, rm.unit 
-      FROM raw_material_transactions rmt
-      JOIN raw_materials rm ON rm.id = rmt.material_id
-      LIMIT 1
-    `);
-    console.log("Is array?", Array.isArray(rmts));
-    console.log("Keys:", Object.keys(rmts));
-    console.log("Value:", rmts);
+    await db.execute(sql`ALTER TYPE incident_status ADD VALUE IF NOT EXISTS 'INVESTIGATING';`);
+    console.log("Added INVESTIGATING");
+    await db.execute(sql`ALTER TYPE incident_status ADD VALUE IF NOT EXISTS 'CANCELLED';`);
+    console.log("Added CANCELLED");
   } catch (err) {
-    console.error(err);
+    console.error("Error altering type:", err);
   }
   process.exit(0);
 }
-test();
+main();

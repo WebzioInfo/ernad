@@ -5,7 +5,7 @@ import { downtimeLogs } from './production';
 
 export const incidentCategoryEnum = pgEnum('incident_category', ['FACTORY', 'LINE', 'STATION']);
 export const incidentPriorityEnum = pgEnum('incident_priority', ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']);
-export const incidentStatusEnum = pgEnum('incident_status', ['OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']);
+export const incidentStatusEnum = pgEnum('incident_status', ['OPEN', 'ACKNOWLEDGED', 'INVESTIGATING', 'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'CANCELLED']);
 
 export const incidentTypes = pgTable('incident_types', {
   id: uuid('id').defaultRandom().primaryKey(),
