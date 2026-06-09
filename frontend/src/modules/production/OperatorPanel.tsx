@@ -233,28 +233,33 @@ export default function OperatorPanel() {
     queryKey: ['line', lineId],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINE(lineId!))).data,
     enabled: !!lineId,
-    retry: 1
+    retry: 1,
+    staleTime: 60000
   });
 
   const { data: brands } = useQuery({
     queryKey: ['brands'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.BRANDS)).data,
+    staleTime: 300000
   });
 
   const { data: products } = useQuery({
     queryKey: ['products'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.PRODUCTS)).data,
+    staleTime: 300000
   });
 
   const { data: shifts } = useQuery({
     queryKey: ['shifts'],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data
+    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.SHIFTS)).data,
+    staleTime: 300000
   });
 
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials', currentStationId],
     queryFn: async () => (await api.get(`${ENDPOINTS.MASTER_DATA.RAW_MATERIALS}?station=${currentStationId}`)).data,
     enabled: ['BLOWING', 'FILLING', 'LABELING', 'PACKING'].includes(currentStationId),
+    staleTime: 60000
   });
 
   // Backend handles station filtering via central filter
@@ -264,6 +269,7 @@ export default function OperatorPanel() {
   const { data: operatorsList } = useQuery({
     queryKey: ['operators-list'],
     queryFn: async () => (await api.get(ENDPOINTS.TERMINALS.OPERATORS)).data,
+    staleTime: 300000
   });
 
   // Line Control Mutations

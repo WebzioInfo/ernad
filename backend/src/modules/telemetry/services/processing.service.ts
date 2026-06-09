@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { NonRetryableBusinessError } from '../../../common/errors/non-retryable-business.error';
 import { AuditService } from '../../audit/audit.service';
 import { db } from '../../../database/db';
-import { eq, sql, and, isNull, desc, gte, lte } from 'drizzle-orm';
+import { eq, sql, and, isNull, desc, gte, lte, or, ilike } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import {
   productionLogs,
@@ -1112,7 +1112,14 @@ export class ProcessingService {
     endDate?: string;
     eventType?: string;
     isDeleted?: boolean;
-  }, limit = 100) {
+    page?: string | number;
+    limit?: string | number;
+    search?: string;
+  }) {
+    const page = Number(filters.page || 1);
+    const limit = Number(filters.limit || 15);
+    const offset = (page - 1) * limit;
+
     const conditions = [];
 
     if (filters.lineId) conditions.push(eq(productionLogs.lineId, filters.lineId));
@@ -1123,12 +1130,27 @@ export class ProcessingService {
     if (filters.startDate) conditions.push(gte(productionLogs.loggedAt, new Date(filters.startDate)));
     if (filters.endDate) conditions.push(lte(productionLogs.loggedAt, new Date(filters.endDate)));
     if (filters.eventType) conditions.push(eq(productionLogs.eventType, filters.eventType as any));
+    if (filters.search) {
+      conditions.push(or(
+        ilike(users.name, `%${filters.search}%`),
+        ilike(productionLogs.remarks, `%${filters.search}%`),
+        sql`CAST(${productionLogs.id} AS TEXT) LIKE ${'%' + filters.search + '%'}`
+      ));
+    }
 
     if (filters.isDeleted === true) {
       conditions.push(sql`${productionLogs.deletedAt} IS NOT NULL`);
     } else {
       conditions.push(isNull(productionLogs.deletedAt));
     }
+
+    // 1. Get total record count for pagination footer
+    const [countResult] = await db.select({ count: sql<number>`count(*)` })
+      .from(productionLogs)
+      .leftJoin(users, eq(productionLogs.userId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    const totalCount = Number(countResult?.count || 0);
 
     const logs = await db.select({
       id: productionLogs.id,
@@ -1144,8 +1166,6 @@ export class ProcessingService {
       casesProduced: productionLogs.casesProduced,
       eventType: productionLogs.eventType,
       remarks: productionLogs.remarks,
-
-      // Label specific
       labelStickerWeight: productionLogs.labelStickerWeight,
       damagedLabelWeight: productionLogs.damagedLabelWeight,
       inkChanged: productionLogs.inkChanged,
@@ -1153,11 +1173,8 @@ export class ProcessingService {
       makeupChanged: productionLogs.makeupChanged,
       makeupUsageMl: productionLogs.makeupUsageMl,
       glueUsageKg: productionLogs.glueUsageKg,
-      
-      // Packing specific
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
       sourceBatchNumber: productionLogs.sourceBatchNumber,
-
       loggedAt: productionLogs.loggedAt,
       userName: users.name,
       updatedAt: productionLogs.updatedAt,
@@ -1170,9 +1187,10 @@ export class ProcessingService {
       .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(productionLogs.loggedAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
-    if (logs.length === 0) return [];
+    if (logs.length === 0) return { data: [], total: 0 };
 
     const logIds = logs.map(l => l.id);
     const idsString = logIds.join('|');
@@ -1183,7 +1201,7 @@ export class ProcessingService {
       WHERE rmt.remarks ~ ${'\\(Log #(' + idsString + ')\\)'}
     `);
 
-    return logs.map(log => {
+    const data = logs.map(log => {
       const consumption: any[] = [];
       const pattern = new RegExp(`\\(Log #${log.id}\\)`);
       
@@ -1203,6 +1221,8 @@ export class ProcessingService {
         materialConsumption: consumption
       };
     });
+
+    return { data, total: totalCount };
   }
 
   async voidLog(logId: number, userId: string, reason: string) {

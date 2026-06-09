@@ -31,14 +31,88 @@ export class DashboardService {
       : sql`dl.start_time >= ${startIso} and dl.start_time <= ${endIso}`;
 
     const [
-      kpiRows,
+      dashboardRows,
       activeBatchRows,
       stockRows,
       alertRows,
-      activityRows,
       trendRows,
     ] = await Promise.all([
-      this.getKpis(start, end, live, rangeClause, batchRangeClause, downtimeRangeClause),
+      db.execute(sql`
+        SELECT
+          -- Production KPIs
+          (
+            select coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.primary_count, 0) else 0 end), 0)::int
+            from production_logs pl
+            join production_batches pb on pb.id = pl.batch_id and pb.deleted_at is null
+            where pl.deleted_at is null and ${rangeClause}
+          ) as units_packed,
+          (
+            select coalesce(sum(coalesce(pl.primary_count, 0)), 0)::int
+            from production_logs pl
+            join production_batches pb on pb.id = pl.batch_id and pb.deleted_at is null
+            where pl.deleted_at is null and ${rangeClause}
+          ) as total_output,
+          (
+            select coalesce(sum(coalesce(pl.wastage_count, 0)::numeric), 0)::numeric
+            from production_logs pl
+            join production_batches pb on pb.id = pl.batch_id and pb.deleted_at is null
+            where pl.deleted_at is null and ${rangeClause}
+          ) as wastage,
+          (
+            select count(distinct pb.line_id)::int
+            from production_batches pb
+            where pb.deleted_at is null and ${batchRangeClause}
+          ) as active_lines,
+          (
+            select count(*) filter (where pb.status in ('RUNNING', 'CHANGEOVER'))::int
+            from production_batches pb
+            where pb.deleted_at is null and ${batchRangeClause}
+          ) as running_batches,
+          (
+            select coalesce(sum(coalesce(dl.duration_minutes, greatest(0, extract(epoch from (coalesce(dl.end_time, now()) - dl.start_time)) / 60.0))), 0)::numeric
+            from downtime_logs dl
+            join production_batches pb on pb.id = dl.batch_id and pb.deleted_at is null
+            where dl.deleted_at is null and ${downtimeRangeClause}
+          ) as downtime_minutes,
+          (
+            select count(*)::int
+            from operator_sessions os
+            where os.is_active = true and os.end_time is null
+          ) as staff_active,
+          (
+            select count(*)::int
+            from incidents i
+            where i.deleted_at is null and i.status in ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS')
+          ) as open_incidents,
+          (
+            select count(*)::int
+            from inventory_stock s
+            where s.quantity::numeric < 0
+              or (s.minimum_stock::numeric > 0 and s.quantity::numeric <= s.minimum_stock::numeric)
+          ) as stock_alerts,
+          (
+            select coalesce(sum(greatest(0, extract(epoch from (coalesce(pb.end_time, pb.closed_at, ${sql.raw(`'${endIso}'`)}) - pb.start_time)) / 60.0) * p.target_bpm), 0)::numeric
+            from production_batches pb
+            join products p on p.id = pb.product_id
+            where pb.deleted_at is null and ${batchRangeClause}
+          ) as planned_units,
+          -- Sales Activity
+          (
+            select coalesce(sum(case when type = 'SALES_DISPATCH' then quantity else 0 end), 0)::int
+            from sales_transactions
+            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+          ) as dispatch_quantity,
+          (
+            select coalesce(sum(case when type = 'DAMAGE' then quantity else 0 end), 0)::int
+            from sales_transactions
+            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+          ) as damage_quantity,
+          (
+            select coalesce(sum(case when type = 'RETURN' then quantity else 0 end), 0)::int
+            from sales_transactions
+            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+          ) as return_quantity
+      `),
       db.execute(sql`
         select
           pb.id,
@@ -109,8 +183,87 @@ export class DashboardService {
           (select labels_used from produced_period) labels_used_period
         from raw_stock;
       `),
-      this.getCriticalAlerts(incidentRangeClause, downtimeRangeClause, rangeClause),
-      this.getSalesActivity(start, end),
+      db.execute(sql`
+        with alerts as (
+          select
+            'NEGATIVE_STOCK'::text type,
+            s.id::text id,
+            s.item_name::text title,
+            concat(s.quantity, ' ', s.unit, ' available')::text detail,
+            'critical'::text severity,
+            'raw-materials'::text target
+          from inventory_stock s
+          where s.quantity::numeric < 0
+          
+          union all
+          
+          select
+            'LOW_RAW_MATERIAL'::text type,
+            s.id::text id,
+            s.item_name::text title,
+            concat(s.quantity, ' ', s.unit, ' below minimum ', s.minimum_stock)::text detail,
+            'warning'::text severity,
+            'raw-materials'::text target
+          from inventory_stock s
+          where s.quantity::numeric >= 0
+            and s.minimum_stock::numeric > 0
+            and s.quantity::numeric <= s.minimum_stock::numeric
+            
+          union all
+          
+          select
+            'OPEN_INCIDENT'::text type,
+            i.id::text id,
+            i.title::text title,
+            concat(i.priority, ' incident ', i.incident_number)::text detail,
+            lower(i.priority::text)::text severity,
+            'incidents'::text target
+          from incidents i
+          where i.deleted_at is null
+            and i.status in ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS')
+            and ${incidentRangeClause}
+            
+          union all
+          
+          select
+            'MACHINE_DOWNTIME'::text type,
+            dl.id::text id,
+            dl.reason::text title,
+            concat(l.name, ' / ', dl.station)::text detail,
+            'critical'::text severity,
+            'production'::text target
+          from downtime_logs dl
+          join production_lines l on l.id = dl.line_id
+          where dl.deleted_at is null and ${downtimeRangeClause}
+          
+          union all
+          
+          select
+            'FAILED_BATCH'::text type,
+            pl.batch_id::text id,
+            pb.batch_code::text title,
+            concat(count(*)::int, ' rejected production logs')::text detail,
+            'warning'::text severity,
+            'reports'::text target
+          from production_logs pl
+          join production_batches pb on pb.id = pl.batch_id
+          where pl.deleted_at is null
+            and pl.status = 'REJECTED'
+            and ${rangeClause}
+          group by pl.batch_id, pb.batch_code
+        )
+        select type, id, title, detail, severity, target
+        from alerts
+        order by case 
+          when severity = 'critical' then 1 
+          when severity = 'high' then 2 
+          when severity = 'warning' then 3 
+          when severity = 'medium' then 4 
+          when severity = 'low' then 5 
+          else 9 
+        end
+        limit 25;
+      `),
       db.execute(sql`
         select
           ${live 
@@ -128,9 +281,8 @@ export class DashboardService {
       `)
     ]);
 
-    const kpis = this.first(kpiRows);
+    const kpis = this.first(dashboardRows);
     const stock = this.first(stockRows);
-    const activity = this.first(activityRows);
     const activeBatches = this.rows(activeBatchRows).map((row) => ({
       id: row.id,
       batchCode: row.batch_code,
@@ -179,9 +331,9 @@ export class DashboardService {
       activeProduction: activeBatches,
       alerts,
       activity: {
-        dispatchQuantity: Number(activity.dispatchQuantity || 0),
-        damageQuantity: Number(activity.damageQuantity || 0),
-        returnQuantity: Number(activity.returnQuantity || 0),
+        dispatchQuantity: Number(kpis.dispatch_quantity || 0),
+        damageQuantity: Number(kpis.damage_quantity || 0),
+        returnQuantity: Number(kpis.return_quantity || 0),
       },
       trend: this.fillTimeSeriesGaps(trendRows, normalizedRange, start, end),
       formulas: {
@@ -260,205 +412,5 @@ export class DashboardService {
 
   private first(result: unknown): AnyRow {
     return this.rows(result)[0] || {};
-  }
-
-  private async getKpis(
-    start: Date,
-    end: Date,
-    live: boolean,
-    rangeClause: any,
-    batchRangeClause: any,
-    downtimeRangeClause: any,
-  ) {
-    try {
-      const [productionRows, batchRows, downtimeRows, staffRows, incidentRows, stockAlertRows, plannedRows] = await Promise.all([
-        db.execute(sql`
-          select
-            coalesce(sum(case when pl.station = 'PACKING' then coalesce(pl.primary_count, 0) else 0 end), 0)::int units_packed,
-            coalesce(sum(coalesce(pl.primary_count, 0)), 0)::int total_output,
-            coalesce(sum(coalesce(pl.wastage_count, 0)::numeric), 0)::numeric wastage
-          from production_logs pl
-          join production_batches pb on pb.id = pl.batch_id and pb.deleted_at is null
-          where pl.deleted_at is null and ${rangeClause};
-        `),
-        db.execute(sql`
-          select
-            count(distinct pb.line_id)::int active_lines,
-            count(*) filter (where pb.status in ('RUNNING', 'CHANGEOVER'))::int running_batches
-          from production_batches pb
-          where pb.deleted_at is null and ${batchRangeClause};
-        `),
-        db.execute(sql`
-          select coalesce(sum(coalesce(dl.duration_minutes, greatest(0, extract(epoch from (coalesce(dl.end_time, now()) - dl.start_time)) / 60.0))), 0)::numeric downtime_minutes
-          from downtime_logs dl
-          join production_batches pb on pb.id = dl.batch_id and pb.deleted_at is null
-          where dl.deleted_at is null and ${downtimeRangeClause};
-        `),
-        db.execute(sql`
-          select count(*)::int staff_active
-          from operator_sessions os
-          where os.is_active = true and os.end_time is null;
-        `),
-        db.execute(sql`
-          select count(*)::int open_incidents
-          from incidents i
-          where i.deleted_at is null and i.status in ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS');
-        `),
-        db.execute(sql`
-          select count(*)::int stock_alerts
-          from inventory_stock s
-          where s.quantity::numeric < 0
-            or (s.minimum_stock::numeric > 0 and s.quantity::numeric <= s.minimum_stock::numeric);
-        `),
-        db.execute(sql`
-          select coalesce(sum(greatest(0, extract(epoch from (coalesce(pb.end_time, pb.closed_at, ${end.toISOString()}) - pb.start_time)) / 60.0) * p.target_bpm), 0)::numeric planned_units
-          from production_batches pb
-          join products p on p.id = pb.product_id
-          where pb.deleted_at is null and ${batchRangeClause};
-        `),
-      ]);
-
-      const production = this.first(productionRows);
-      const batches = this.first(batchRows);
-      const downtime = this.first(downtimeRows);
-      const staff = this.first(staffRows);
-      const incidents = this.first(incidentRows);
-      const stockAlerts = this.first(stockAlertRows);
-      const planned = this.first(plannedRows);
-
-      return [{
-        units_packed: production.units_packed || 0,
-        total_output: production.total_output || 0,
-        wastage: production.wastage || 0,
-        active_lines: live ? (batches.active_lines || 0) : 0,
-        running_batches: batches.running_batches || 0,
-        downtime_minutes: downtime.downtime_minutes || 0,
-        staff_active: staff.staff_active || 0,
-        open_incidents: incidents.open_incidents || 0,
-        stock_alerts: stockAlerts.stock_alerts || 0,
-        planned_units: planned.planned_units || 0,
-      }];
-    } catch (error: any) {
-      this.logger.error(`Dashboard KPI aggregate failed: ${error?.message || error}`);
-      return [{
-        units_packed: 0,
-        total_output: 0,
-        wastage: 0,
-        active_lines: 0,
-        running_batches: 0,
-        downtime_minutes: 0,
-        staff_active: 0,
-        open_incidents: 0,
-        stock_alerts: 0,
-        planned_units: 0,
-      }];
-    }
-  }
-
-  private async getSalesActivity(start: Date, end: Date) {
-    try {
-      return await db.select({
-        dispatchQuantity: sql<number>`coalesce(sum(case when ${salesTransactions.type} = 'SALES_DISPATCH' then ${salesTransactions.quantity} else 0 end), 0)::int`,
-        damageQuantity: sql<number>`coalesce(sum(case when ${salesTransactions.type} = 'DAMAGE' then ${salesTransactions.quantity} else 0 end), 0)::int`,
-        returnQuantity: sql<number>`coalesce(sum(case when ${salesTransactions.type} = 'RETURN' then ${salesTransactions.quantity} else 0 end), 0)::int`,
-      })
-      .from(salesTransactions)
-      .where(sql`${salesTransactions.createdAt} >= ${start.toISOString()} and ${salesTransactions.createdAt} <= ${end.toISOString()}`);
-    } catch (error: any) {
-      this.logger.warn(`Sales activity aggregate unavailable for dashboard: ${error?.message || error}`);
-      return [{ dispatchQuantity: 0, damageQuantity: 0, returnQuantity: 0 }];
-    }
-  }
-
-  private async getCriticalAlerts(incidentRangeClause: any, downtimeRangeClause: any, rangeClause: any) {
-    try {
-      const [negativeStock, lowStock, openIncidents, machineDowntime, failedBatches] = await Promise.all([
-        db.execute(sql`
-          select
-            'NEGATIVE_STOCK'::text type,
-            s.id::text id,
-            s.item_name::text title,
-            concat(s.quantity, ' ', s.unit, ' available')::text detail,
-            'critical'::text severity,
-            'raw-materials'::text target
-          from inventory_stock s
-          where s.quantity::numeric < 0
-          limit 10;
-        `),
-        db.execute(sql`
-          select
-            'LOW_RAW_MATERIAL'::text type,
-            s.id::text id,
-            s.item_name::text title,
-            concat(s.quantity, ' ', s.unit, ' below minimum ', s.minimum_stock)::text detail,
-            'warning'::text severity,
-            'raw-materials'::text target
-          from inventory_stock s
-          where s.quantity::numeric >= 0
-            and s.minimum_stock::numeric > 0
-            and s.quantity::numeric <= s.minimum_stock::numeric
-          limit 10;
-        `),
-        db.execute(sql`
-          select
-            'OPEN_INCIDENT'::text type,
-            i.id::text id,
-            i.title::text title,
-            concat(i.priority, ' incident ', i.incident_number)::text detail,
-            lower(i.priority::text)::text severity,
-            'incidents'::text target
-          from incidents i
-          where i.deleted_at is null
-            and i.status in ('OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS')
-            and ${incidentRangeClause}
-          order by i.opened_at desc
-          limit 10;
-        `),
-        db.execute(sql`
-          select
-            'MACHINE_DOWNTIME'::text type,
-            dl.id::text id,
-            dl.reason::text title,
-            concat(l.name, ' / ', dl.station)::text detail,
-            'critical'::text severity,
-            'production'::text target
-          from downtime_logs dl
-          join production_lines l on l.id = dl.line_id
-          where dl.deleted_at is null and ${downtimeRangeClause}
-          order by dl.start_time desc
-          limit 10;
-        `),
-        db.execute(sql`
-          select
-            'FAILED_BATCH'::text type,
-            pl.batch_id::text id,
-            pb.batch_code::text title,
-            concat(count(*)::int, ' rejected production logs')::text detail,
-            'warning'::text severity,
-            'reports'::text target
-          from production_logs pl
-          join production_batches pb on pb.id = pl.batch_id
-          where pl.deleted_at is null
-            and pl.status = 'REJECTED'
-            and ${rangeClause}
-          group by pl.batch_id, pb.batch_code
-          limit 10;
-        `),
-      ]);
-
-      const severityRank: Record<string, number> = { critical: 1, high: 2, warning: 3, medium: 4, low: 5 };
-      return [
-        ...this.rows(negativeStock),
-        ...this.rows(lowStock),
-        ...this.rows(openIncidents),
-        ...this.rows(machineDowntime),
-        ...this.rows(failedBatches),
-      ]
-        .sort((a, b) => (severityRank[a.severity] || 9) - (severityRank[b.severity] || 9))
-        .slice(0, 25);
-    } catch (error: any) {
-      this.logger.warn(`Critical alert aggregate unavailable for dashboard: ${error?.message || error}`);
-      return [];
-    }
   }
 }

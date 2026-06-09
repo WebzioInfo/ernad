@@ -54,19 +54,22 @@ const ExecCard = ({ title, value, subtitle, icon: Icon, colorClass }: any) => (
 const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const { data: factoryLive, refetch: refetchLive } = useQuery({
     queryKey: ['factory-live-overview', filters.timeRange],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: filters.timeRange } })).data
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: filters.timeRange } })).data,
+    staleTime: 30000
   });
 
   const { data: todayKPI } = useQuery({
     queryKey: ['today-kpis-summary'],
     queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: 'today' } })).data,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: filters.timeRange !== 'today'
   });
 
   const { data: weeklyKPI } = useQuery({
     queryKey: ['weekly-kpis-summary'],
     queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE, { params: { timeRange: 'week' } })).data,
-    staleTime: 60000
+    staleTime: 60000,
+    enabled: filters.timeRange !== 'week'
   });
 
   const { data: efficiency } = useQuery({
@@ -119,8 +122,8 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
   const capsStock = rawMaterials?.find((r: any) => r.name === 'Caps')?.currentStock ?? 0;
   const jarStock = productionStock?.find((p: any) => p.productName?.toLowerCase().includes('20l'))?.currentStock ?? 0;
   const monthlyProduced = monthlyKPI?.throughput ?? 0;
-  const todayProduced = todayKPI?.counters?.packing ?? 0;
-  const weeklyProduced = weeklyKPI?.counters?.packing ?? 0;
+  const todayProduced = filters.timeRange === 'today' ? (factoryLive?.counters?.packing ?? 0) : (todayKPI?.counters?.packing ?? 0);
+  const weeklyProduced = filters.timeRange === 'week' ? (factoryLive?.counters?.packing ?? 0) : (weeklyKPI?.counters?.packing ?? 0);
 
   return (
     <motion.div

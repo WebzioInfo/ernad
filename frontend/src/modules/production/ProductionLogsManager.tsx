@@ -148,15 +148,19 @@ export default function ProductionLogsManager() {
   }, [editingLog, originalLog]);
 
   // --- DATA FETCHING ---
-  const { data: logs, isLoading: loadingLogs, refetch } = useQuery({
-    queryKey: ['production-logs-all', filters],
+  const { data: logsData, isLoading: loadingLogs, refetch } = useQuery({
+    queryKey: ['production-logs-all', filters, currentPage, pageSize, search],
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, val]) => {
         if (val) params.append(key, String(val));
       });
+      params.append('page', String(currentPage));
+      params.append('limit', String(pageSize));
+      if (search) params.append('search', search);
       return (await api.get(`${ENDPOINTS.TELEMETRY.LOGS}?${params.toString()}`)).data;
-    }
+    },
+    staleTime: 10000,
   });
 
   const { data: batches } = useQuery({
@@ -206,22 +210,9 @@ export default function ProductionLogsManager() {
   });
 
   // --- UI LOGIC ---
-  const filteredLogs = useMemo(() => {
-    if (!logs) return [];
-    if (!search) return logs;
-    return logs.filter((l: any) =>
-      l.userName?.toLowerCase().includes(search.toLowerCase()) ||
-      l.remarks?.toLowerCase().includes(search.toLowerCase()) ||
-      String(l.id).includes(search)
-    );
-  }, [logs, search]);
-
-  const paginatedLogs = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredLogs.slice(start, start + pageSize);
-  }, [filteredLogs, currentPage, pageSize]);
-
-  const totalPages = Math.ceil(filteredLogs.length / pageSize);
+  const paginatedLogs = logsData?.data || [];
+  const totalRecords = logsData?.total || 0;
+  const totalPages = Math.ceil(totalRecords / pageSize);
 
   if (loadingLogs) return (
     <div className="h-screen w-full bg-[#f8fafc] flex flex-col items-center justify-center relative overflow-hidden text-slate-900">
@@ -540,11 +531,11 @@ export default function ProductionLogsManager() {
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalRecords={filteredLogs.length}
+            totalRecords={totalRecords}
             onPageChange={setCurrentPage}
             onPageSizeChange={setPageSize}
           />
-          {filteredLogs.length === 0 && !loadingLogs && (
+          {paginatedLogs.length === 0 && !loadingLogs && (
             <div className="py-24 text-center">
               <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                 <Database className="w-8 h-8 text-slate-300" />

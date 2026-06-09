@@ -199,24 +199,25 @@ export class InventoryService {
 
   async getRawMaterials() {
     try {
-      const materials = await db.select({
+      const materialsWithStock = await db.select({
         id: rawMaterials.id,
         name: rawMaterials.name,
         unit: rawMaterials.unit,
         updatedAt: rawMaterials.updatedAt,
+        currentStockSum: sql<string>`COALESCE(SUM(${rawMaterialTransactions.quantityChange}), '0')`
       })
       .from(rawMaterials)
+      .leftJoin(rawMaterialTransactions, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+      .groupBy(rawMaterials.id, rawMaterials.name, rawMaterials.unit, rawMaterials.updatedAt)
       .orderBy(rawMaterials.name);
 
-      const result = [];
-      for (const m of materials) {
-        const currentStock = await this.getCurrentMaterialBalance(m.id);
-        result.push({
-          ...m,
-          currentStock,
-        });
-      }
-      return result;
+      return materialsWithStock.map(m => ({
+        id: m.id,
+        name: m.name,
+        unit: m.unit,
+        updatedAt: m.updatedAt,
+        currentStock: Number(m.currentStockSum || 0),
+      }));
     } catch (error) {
       console.error('getRawMaterials CRASH:', error);
       throw error;
@@ -504,69 +505,79 @@ export class InventoryService {
     const [prod] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (!prod) return [];
 
-    // 1. Fetch manual product stock transactions
-    const manualTxs = await db.select({
-      id: productStockTransactions.id,
-      type: productStockTransactions.type,
-      quantityChange: productStockTransactions.quantityChange,
-      remarks: productStockTransactions.remarks,
-      createdAt: productStockTransactions.createdAt,
-      userName: users.name
-    })
-    .from(productStockTransactions)
-    .leftJoin(users, eq(productStockTransactions.performedBy, users.id))
-    .where(eq(productStockTransactions.productId, productId));
+    const [stock] = await db.select({ currentStock: productionStock.currentStock })
+      .from(productionStock)
+      .where(eq(productionStock.productId, productId))
+      .limit(1);
+    const totalCurrentStock = Number(stock?.currentStock || 0);
 
-    // 2. Fetch packing logs (Production Output in cases)
-    const packingLogs = await db.select({
-      id: productionLogs.id,
-      casesProduced: productionLogs.casesProduced,
-      createdAt: productionLogs.loggedAt,
-      userName: users.name,
-      batchCode: productionBatches.batchCode
-    })
-    .from(productionLogs)
-    .leftJoin(users, eq(productionLogs.userId, users.id))
-    .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
-    .where(and(
-      eq(productionLogs.productId, productId),
-      eq(productionLogs.station, 'PACKING'),
-      isNull(productionLogs.deletedAt)
-    ));
+    // Fetch in parallel with 100 limit each to prevent event loop blocking
+    const [manualTxs, packingLogs, dispatches, salesTxs] = await Promise.all([
+      db.select({
+        id: productStockTransactions.id,
+        type: productStockTransactions.type,
+        quantityChange: productStockTransactions.quantityChange,
+        remarks: productStockTransactions.remarks,
+        createdAt: productStockTransactions.createdAt,
+        userName: users.name
+      })
+      .from(productStockTransactions)
+      .leftJoin(users, eq(productStockTransactions.performedBy, users.id))
+      .where(eq(productStockTransactions.productId, productId))
+      .orderBy(desc(productStockTransactions.createdAt))
+      .limit(100),
 
-    // 3. Fetch dispatches. Finished goods are counted as packed cases;
-    // bottle-level leakage/rejection is already upstream of the packing count.
-    const dispatches = await db.select({
-      id: dispatchLogs.id,
-      quantity: dispatchLogs.quantity,
-      createdAt: dispatchLogs.dispatchedAt,
-      userName: users.name,
-      batchCode: productionBatches.batchCode
-    })
-    .from(dispatchLogs)
-    .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
-    .leftJoin(users, eq(dispatchLogs.dispatchManagerId, users.id))
-    .where(and(
-      eq(productionBatches.productId, productId),
-      isNull(productionBatches.deletedAt)
-    ));
+      db.select({
+        id: productionLogs.id,
+        casesProduced: productionLogs.casesProduced,
+        createdAt: productionLogs.loggedAt,
+        userName: users.name,
+        batchCode: productionBatches.batchCode
+      })
+      .from(productionLogs)
+      .leftJoin(users, eq(productionLogs.userId, users.id))
+      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .where(and(
+        eq(productionLogs.productId, productId),
+        eq(productionLogs.station, 'PACKING'),
+        isNull(productionLogs.deletedAt)
+      ))
+      .orderBy(desc(productionLogs.loggedAt))
+      .limit(100),
 
-    // 4. Fetch sales transactions
-    const salesTxs = await db.select({
-      id: salesTransactions.id,
-      type: salesTransactions.type,
-      quantity: salesTransactions.quantity,
-      createdAt: salesTransactions.createdAt,
-      userName: users.name
-    })
-    .from(salesTransactions)
-    .leftJoin(users, eq(salesTransactions.performedBy, users.id))
-    .where(eq(salesTransactions.productId, productId));
+      db.select({
+        id: dispatchLogs.id,
+        quantity: dispatchLogs.quantity,
+        createdAt: dispatchLogs.dispatchedAt,
+        userName: users.name,
+        batchCode: productionBatches.batchCode
+      })
+      .from(dispatchLogs)
+      .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
+      .leftJoin(users, eq(dispatchLogs.dispatchManagerId, users.id))
+      .where(and(
+        eq(productionBatches.productId, productId),
+        isNull(productionBatches.deletedAt)
+      ))
+      .orderBy(desc(dispatchLogs.dispatchedAt))
+      .limit(100),
 
-    // Merge and format
+      db.select({
+        id: salesTransactions.id,
+        type: salesTransactions.type,
+        quantity: salesTransactions.quantity,
+        createdAt: salesTransactions.createdAt,
+        userName: users.name
+      })
+      .from(salesTransactions)
+      .leftJoin(users, eq(salesTransactions.performedBy, users.id))
+      .where(eq(salesTransactions.productId, productId))
+      .orderBy(desc(salesTransactions.createdAt))
+      .limit(100)
+    ]);
+
     const ledgerEntries: any[] = [];
 
-    // Sales transactions
     salesTxs.forEach(t => {
       let typeLabel = '';
       let quantityChange = 0;
@@ -596,7 +607,6 @@ export class InventoryService {
       });
     });
 
-    // Manual transactions
     manualTxs.forEach(t => {
       ledgerEntries.push({
         id: t.id,
@@ -608,7 +618,6 @@ export class InventoryService {
       });
     });
 
-    // Production (Packing)
     packingLogs.forEach(l => {
       const casesProduced = Number(l.casesProduced || 0);
       if (casesProduced <= 0) return;
@@ -622,7 +631,6 @@ export class InventoryService {
       });
     });
 
-    // Dispatches
     dispatches.forEach(d => {
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
@@ -634,20 +642,20 @@ export class InventoryService {
       });
     });
 
-    // Sort ascending by date to compute running balance
-    ledgerEntries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    // Sort descending by date
+    ledgerEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const limitedEntries = ledgerEntries.slice(0, 100);
 
-    let balance = 0;
-    const sortedLedger = ledgerEntries.map(entry => {
-      balance += entry.quantityChange;
-      return {
-        ...entry,
-        balanceAfter: balance
-      };
-    });
+    // Compute running balance backwards starting from current live stock balance
+    let balance = totalCurrentStock;
+    const sortedLedger = [];
+    for (const entry of limitedEntries) {
+      entry.balanceAfter = balance;
+      balance -= entry.quantityChange;
+      sortedLedger.push(entry);
+    }
 
-    // Sort descending for display (newest first)
-    return sortedLedger.reverse();
+    return sortedLedger;
   }
 
   async getStationConsumption() {

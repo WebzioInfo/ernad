@@ -46,29 +46,24 @@ export class AnalyticsService {
          return { throughput: 0, oee: 0, activeOperators: 0, timeline: [], bpm: 0, availability: 0, performance: 0, quality: 0, stats: [] };
       }
 
-      let totalBlowing = 0, totalFilling = 0, totalLabeling = 0, totalPacking = 0;
-      let totalCurrentBPM = 0;
-      let targetBPM = 0;
-      let activeOperators = 0;
-      const allRecentLogs: any[] = [];
+      const batchIds = batches.map(b => b.id);
+      const uniqueLineIds = Array.from(new Set(batches.map(b => b.lineId).filter(Boolean))) as string[];
 
-      for (const batch of batches) {
-        targetBPM += batch.targetBPM || 120;
-        
-        // Distinct operators who logged data for this batch
-        const operatorResult = await db.select({ count: sql<number>`COUNT(DISTINCT ${productionLogs.userId})` })
-          .from(productionLogs)
-          .where(and(
-            eq(productionLogs.batchId, batch.id),
-            isNull(productionLogs.deletedAt)
-          ));
-        
-        if (operatorResult && operatorResult.length > 0) {
-          activeOperators += Number(operatorResult[0].count || 0);
-        }
+      // Fetch all aggregates in parallel to solve N+1 loops
+      const [operatorCounts, logStatsList, latestLogs, recentLogsForLines] = await Promise.all([
+        db.select({ 
+          batchId: productionLogs.batchId,
+          count: sql<number>`COUNT(DISTINCT ${productionLogs.userId})` 
+        })
+        .from(productionLogs)
+        .where(and(
+          inArray(productionLogs.batchId, batchIds),
+          isNull(productionLogs.deletedAt)
+        ))
+        .groupBy(productionLogs.batchId),
 
-        // Direct aggregation from productionLogs instead of batchTotals cache
-        const [logStats] = await db.select({
+        db.select({
+          batchId: productionLogs.batchId,
           blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
           filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
           labeling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
@@ -76,39 +71,77 @@ export class AnalyticsService {
         })
         .from(productionLogs)
         .where(and(
-          eq(productionLogs.batchId, batch.id),
+          inArray(productionLogs.batchId, batchIds),
           isNull(productionLogs.deletedAt)
-        ));
+        ))
+        .groupBy(productionLogs.batchId),
 
-        totalBlowing += Number(logStats?.blowing || 0);
-        totalFilling += Number(logStats?.filling || 0);
-        totalLabeling += Number(logStats?.labeling || 0);
-        totalPacking += Number(logStats?.packing || 0);
-
-        // Fetch recent logs for timeline
-        const latestLogs = await db.select({
+        db.select({
           station: productionLogs.station,
           count: productionLogs.primaryCount,
           timestamp: productionLogs.loggedAt
         })
         .from(productionLogs)
         .where(and(
-          eq(productionLogs.batchId, batch.id),
+          inArray(productionLogs.batchId, batchIds),
           isNull(productionLogs.deletedAt)
         ))
         .orderBy(desc(productionLogs.loggedAt))
-        .limit(15);
-        
-        allRecentLogs.push(...latestLogs);
+        .limit(15),
 
-        totalCurrentBPM += await this.calculateCurrentBPM(batch.lineId as string);
+        uniqueLineIds.length > 0 
+          ? db.select({
+              lineId: productionLogs.lineId,
+              count: sql<number>`SUM(${productionLogs.primaryCount})`,
+              minTime: sql<Date>`MIN(${productionLogs.loggedAt})`,
+              maxTime: sql<Date>`MAX(${productionLogs.loggedAt})`
+            })
+            .from(productionLogs)
+            .where(and(
+              inArray(productionLogs.lineId, uniqueLineIds),
+              eq(productionLogs.station, 'PACKING'),
+              gte(productionLogs.loggedAt, new Date(Date.now() - 10 * 60000)),
+              isNull(productionLogs.deletedAt)
+            ))
+            .groupBy(productionLogs.lineId)
+          : Promise.resolve([])
+      ]);
+
+      const operatorMap = new Map(operatorCounts.map(o => [o.batchId, Number(o.count || 0)]));
+      const statsMap = new Map(logStatsList.map(s => [s.batchId, s]));
+      
+      const lineBpmMap = new Map<string, number>();
+      for (const res of recentLogsForLines) {
+        if (res.lineId && res.count && res.minTime && res.maxTime) {
+          const timeDiffMin = (new Date(res.maxTime).getTime() - new Date(res.minTime).getTime()) / 60000;
+          const bpm = timeDiffMin > 0 ? (Number(res.count) / timeDiffMin) : 0;
+          lineBpmMap.set(res.lineId, bpm);
+        }
+      }
+
+      let totalBlowing = 0, totalFilling = 0, totalLabeling = 0, totalPacking = 0;
+      let totalCurrentBPM = 0;
+      let targetBPM = 0;
+      let activeOperators = 0;
+
+      for (const batch of batches) {
+        targetBPM += batch.targetBPM || 120;
+        activeOperators += operatorMap.get(batch.id) || 0;
+
+        const logStats = statsMap.get(batch.id);
+        totalBlowing += Number(logStats?.blowing || 0);
+        totalFilling += Number(logStats?.filling || 0);
+        totalLabeling += Number(logStats?.labeling || 0);
+        totalPacking += Number(logStats?.packing || 0);
+
+        totalCurrentBPM += lineBpmMap.get(batch.lineId as string) || 0;
       }
 
       if (lineId === 'all' && batches.length > 0) {
         targetBPM = targetBPM / batches.length; // Average target BPM
       }
 
-      // 2. Real OEE Calculation (Phase 5)
+      // Real OEE Calculation
       const quality = totalBlowing > 0 ? (totalPacking / totalBlowing) : 0;
       const performance = targetBPM > 0 ? Math.min(totalCurrentBPM / targetBPM, 1) : 0;
       const availability = 0.92;
@@ -131,17 +164,20 @@ export class AnalyticsService {
         ],
         generatedAt: new Date(),
         activeOperators: activeOperators,
-        recentLogs: allRecentLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 15),
+        recentLogs: latestLogs.map(l => ({
+          station: l.station,
+          count: l.count,
+          timestamp: l.timestamp
+        })),
         timeline: [],
         yesterday: {
-          oee: 84, // Placeholder for historical data
+          oee: 84,
           totalOutput: 42000,
           downtimeMins: 45
         }
       };
     } catch (error: any) {
-      console.error("LINE PERFORMANCE ERROR");
-      console.error(error);
+      console.error("LINE PERFORMANCE ERROR", error);
       return { throughput: 0, oee: 0, activeOperators: 0, timeline: [], bpm: 0, availability: 0, performance: 0, quality: 0, stats: [] };
     }
   }
@@ -321,114 +357,8 @@ export class AnalyticsService {
           break;
       }
 
-      // 1. Aggregated Production Stream
-      const [productionAggregates] = await db.select({
-        blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
-        filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
-        packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
-        rejection: sql<number>`COALESCE(SUM(${productionLogs.wastageCount}), 0)`
-      })
-      .from(productionLogs)
-      .where(and(
-        gte(productionLogs.loggedAt, startDate), 
-        isNull(productionLogs.deletedAt)
-      ));
-
-      // 1.5 Additional Summary Metrics
-      const [{ activeOperatorsCount }] = await db.select({ 
-        activeOperatorsCount: sql<number>`COALESCE(count(distinct ${operatorSessions.userId}), 0)` 
-      }).from(operatorSessions)
-      .where(and(
-        eq(operatorSessions.isActive, true),
-        isNull(operatorSessions.endTime)
-      ));
-
-      const [{ totalDowntimeToday }] = await db.select({
-        totalDowntimeToday: sql<number>`COALESCE(SUM(${downtimeLogs.durationMinutes}), 0)`
-      }).from(downtimeLogs)
-      .where(and(
-        gte(downtimeLogs.startTime, startDate),
-        isNull(downtimeLogs.deletedAt)
-      ));
-
-      // 1.6 Total Dispatch Today
-      const [{ totalDispatchToday }] = await db.select({
-        totalDispatchToday: sql<number>`COALESCE(SUM(CASE WHEN ${salesTransactions.type} = 'SALES_DISPATCH' THEN ${salesTransactions.quantity} ELSE 0 END), 0)`
-      }).from(salesTransactions)
-      .where(gte(salesTransactions.createdAt, startDate));
-
-      // 2. Active Batch State
-      const activeBatches = await db.select({
-        id: productionBatches.id,
-        batchCode: productionBatches.batchCode,
-        product: products.name,
-        line: productionLines.name,
-        status: productionBatches.status,
-        startTime: productionBatches.startTime,
-        targetQuantity: productionBatches.targetQuantity,
-        packingTotal: batchTotals.packingTotal,
-        totalDowntimeMins: sql<number>`COALESCE((
-          SELECT SUM(dl.duration_minutes) 
-          FROM downtime_logs dl
-          WHERE dl.batch_id = production_batches.id 
-          AND dl.deleted_at IS NULL
-        ), 0)`
-      })
-      .from(productionBatches)
-      .leftJoin(products, eq(productionBatches.productId, products.id))
-      .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
-      .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
-      .where(and(
-        inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']),
-        isNull(productionBatches.deletedAt)
-      ));
-
-      const batchesWithProgress = activeBatches.map(b => ({
-        ...b,
-        progress: b.targetQuantity && b.targetQuantity > 0 
-          ? Math.min(Math.round((Number(b.packingTotal || 0) / b.targetQuantity) * 100), 100) 
-          : 0
-      }));
-
-      // Fix lowStockAlerts to use rawMaterials table
-      const lowStock = await db.select({
-        id: rawMaterials.id,
-        itemName: rawMaterials.name,
-        quantity: rawMaterials.currentStock,
-        unit: rawMaterials.unit,
-        minimumStock: sql<number>`1000` // Hardcoded minimum for now as rawMaterials schema doesn't have minimumStock
-      })
-      .from(rawMaterials)
-      .where(sql`${rawMaterials.currentStock} <= 1000`)
-      .limit(5);
-
-      const activeDowntimes = await db.select({
-        id: downtimeLogs.id,
-        reason: downtimeLogs.reason,
-        station: downtimeLogs.station,
-        line: productionLines.name,
-      })
-      .from(downtimeLogs)
-      .leftJoin(productionLines, eq(downtimeLogs.lineId, productionLines.id))
-      .where(and(isNull(downtimeLogs.endTime), isNull(downtimeLogs.deletedAt)))
-      .limit(5);
-
-      const latestStops = await db.select({
-        id: downtimeLogs.id,
-        batchCode: productionBatches.batchCode,
-        station: downtimeLogs.station,
-        reason: downtimeLogs.reason,
-        duration: downtimeLogs.durationMinutes,
-        startTime: downtimeLogs.startTime
-      })
-      .from(downtimeLogs)
-      .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
-      .where(isNull(downtimeLogs.deletedAt))
-      .orderBy(desc(downtimeLogs.startTime))
-      .limit(5);
-
       // 3. Dynamic Trend Aggregation
-      let timeGroupSql;
+      let timeGroupSql: any;
       if (timeRange === 'live') {
         timeGroupSql = sql`to_timestamp(floor(extract(epoch from ${productionLogs.loggedAt}) / 900) * 900)`;
       } else if (timeRange === 'week') {
@@ -439,17 +369,136 @@ export class AnalyticsService {
         timeGroupSql = sql`date_trunc('hour', ${productionLogs.loggedAt})`;
       }
 
-      const trendData = await db.select({
-        time: timeGroupSql,
-        produced: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`
-      })
-      .from(productionLogs)
-      .where(and(
-        gte(productionLogs.loggedAt, startDate),
-        isNull(productionLogs.deletedAt)
-      ))
-      .groupBy(timeGroupSql)
-      .orderBy(timeGroupSql);
+      // Parallelize all queries in a single Promise.all execution to collapse the waterfall
+      const [
+        productionAggregatesRows,
+        activeOperatorsCountRows,
+        totalDowntimeTodayRows,
+        totalDispatchTodayRows,
+        activeBatches,
+        lowStock,
+        activeDowntimes,
+        latestStops,
+        trendData
+      ] = await Promise.all([
+        db.select({
+          blowing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+          filling: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+          packing: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
+          rejection: sql<number>`COALESCE(SUM(${productionLogs.wastageCount}), 0)`
+        })
+        .from(productionLogs)
+        .where(and(
+          gte(productionLogs.loggedAt, startDate), 
+          isNull(productionLogs.deletedAt)
+        )),
+
+        db.select({ 
+          activeOperatorsCount: sql<number>`COALESCE(count(distinct ${operatorSessions.userId}), 0)` 
+        }).from(operatorSessions)
+        .where(and(
+          eq(operatorSessions.isActive, true),
+          isNull(operatorSessions.endTime)
+        )),
+
+        db.select({
+          totalDowntimeToday: sql<number>`COALESCE(SUM(${downtimeLogs.durationMinutes}), 0)`
+        }).from(downtimeLogs)
+        .where(and(
+          gte(downtimeLogs.startTime, startDate),
+          isNull(downtimeLogs.deletedAt)
+        )),
+
+        db.select({
+          totalDispatchToday: sql<number>`COALESCE(SUM(CASE WHEN ${salesTransactions.type} = 'SALES_DISPATCH' THEN ${salesTransactions.quantity} ELSE 0 END), 0)`
+        }).from(salesTransactions)
+        .where(gte(salesTransactions.createdAt, startDate)),
+
+        db.select({
+          id: productionBatches.id,
+          batchCode: productionBatches.batchCode,
+          product: products.name,
+          line: productionLines.name,
+          status: productionBatches.status,
+          startTime: productionBatches.startTime,
+          targetQuantity: productionBatches.targetQuantity,
+          packingTotal: batchTotals.packingTotal,
+          totalDowntimeMins: sql<number>`COALESCE((
+            SELECT SUM(dl.duration_minutes) 
+            FROM downtime_logs dl
+            WHERE dl.batch_id = production_batches.id 
+            AND dl.deleted_at IS NULL
+          ), 0)`
+        })
+        .from(productionBatches)
+        .leftJoin(products, eq(productionBatches.productId, products.id))
+        .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+        .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
+        .where(and(
+          inArray(productionBatches.status, ['RUNNING', 'CHANGEOVER']),
+          isNull(productionBatches.deletedAt)
+        )),
+
+        db.select({
+          id: rawMaterials.id,
+          itemName: rawMaterials.name,
+          quantity: rawMaterials.currentStock,
+          unit: rawMaterials.unit,
+          minimumStock: sql<number>`1000`
+        })
+        .from(rawMaterials)
+        .where(sql`${rawMaterials.currentStock} <= 1000`)
+        .limit(5),
+
+        db.select({
+          id: downtimeLogs.id,
+          reason: downtimeLogs.reason,
+          station: downtimeLogs.station,
+          line: productionLines.name,
+        })
+        .from(downtimeLogs)
+        .leftJoin(productionLines, eq(downtimeLogs.lineId, productionLines.id))
+        .where(and(isNull(downtimeLogs.endTime), isNull(downtimeLogs.deletedAt)))
+        .limit(5),
+
+        db.select({
+          id: downtimeLogs.id,
+          batchCode: productionBatches.batchCode,
+          station: downtimeLogs.station,
+          reason: downtimeLogs.reason,
+          duration: downtimeLogs.durationMinutes,
+          startTime: downtimeLogs.startTime
+        })
+        .from(downtimeLogs)
+        .leftJoin(productionBatches, eq(downtimeLogs.batchId, productionBatches.id))
+        .where(isNull(downtimeLogs.deletedAt))
+        .orderBy(desc(downtimeLogs.startTime))
+        .limit(5),
+
+        db.select({
+          time: timeGroupSql,
+          produced: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`
+        })
+        .from(productionLogs)
+        .where(and(
+          gte(productionLogs.loggedAt, startDate),
+          isNull(productionLogs.deletedAt)
+        ))
+        .groupBy(timeGroupSql)
+        .orderBy(timeGroupSql)
+      ]);
+
+      const productionAggregates = productionAggregatesRows[0];
+      const activeOperatorsCount = activeOperatorsCountRows[0]?.activeOperatorsCount || 0;
+      const totalDowntimeToday = totalDowntimeTodayRows[0]?.totalDowntimeToday || 0;
+      const totalDispatchToday = totalDispatchTodayRows[0]?.totalDispatchToday || 0;
+
+      const batchesWithProgress = activeBatches.map(b => ({
+        ...b,
+        progress: b.targetQuantity && b.targetQuantity > 0 
+          ? Math.min(Math.round((Number(b.packingTotal || 0) / b.targetQuantity) * 100), 100) 
+          : 0
+      }));
 
       return {
         counters: {

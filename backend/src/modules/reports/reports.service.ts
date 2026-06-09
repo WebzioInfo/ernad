@@ -564,20 +564,73 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
       
       const damagesTotal = [{ quantity: '0' }];
 
-      const materialConsumption = await db.select({
-        name: rawMaterials.name,
-        unit: rawMaterials.unit,
-        currentStock: rawMaterials.currentStock,
-        quantity: sql<string>`ABS(SUM(${rawMaterialTransactions.quantityChange}))`
-      })
-      .from(rawMaterialTransactions)
-      .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
-      .innerJoin(productionLogs, sql`position('(Log #' || ${productionLogs.id} || ')' in ${rawMaterialTransactions.remarks}) > 0`)
-      .where(and(
-        eq(productionLogs.batchId, batchId),
-        eq(rawMaterialTransactions.type, 'CONSUMPTION')
-      ))
-      .groupBy(rawMaterials.name, rawMaterials.unit, rawMaterials.currentStock);
+      // Fetch all log IDs for this batch first
+      const logs = await db.select({ id: productionLogs.id })
+        .from(productionLogs)
+        .where(eq(productionLogs.batchId, batchId));
+      
+      let materialConsumption: any[] = [];
+      if (logs.length > 0) {
+        const logIds = logs.map(l => l.id);
+        const startTime = batchData.batch.startTime;
+        const endTime = batchData.batch.endTime || new Date();
+        const bufferStart = new Date(startTime.getTime() - 2 * 60 * 60 * 1000);
+        const bufferEnd = new Date(endTime.getTime() + 24 * 60 * 60 * 1000);
+
+        // Fetch transaction records within the timeframe using index
+        const txs = await db.select({
+          name: rawMaterials.name,
+          unit: rawMaterials.unit,
+          currentStock: rawMaterials.currentStock,
+          quantityChange: rawMaterialTransactions.quantityChange,
+          remarks: rawMaterialTransactions.remarks
+        })
+        .from(rawMaterialTransactions)
+        .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+        .where(and(
+          eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+          gte(rawMaterialTransactions.createdAt, bufferStart),
+          lte(rawMaterialTransactions.createdAt, bufferEnd)
+        ));
+
+        // Filter and aggregate in memory to completely bypass the substring scan
+        const logIdStrings = new Set(logIds.map(id => `Log #${id}`));
+        const materialGroups = new Map<string, { name: string; unit: string; currentStock: string; sum: number }>();
+        
+        for (const tx of txs) {
+          if (!tx.remarks) continue;
+          const index = tx.remarks.indexOf('Log #');
+          if (index === -1) continue;
+
+          let end = index + 5;
+          while (end < tx.remarks.length && tx.remarks.charCodeAt(end) >= 48 && tx.remarks.charCodeAt(end) <= 57) {
+            end++;
+          }
+          const parsedId = tx.remarks.substring(index + 5, end);
+          if (logIdStrings.has(`Log #${parsedId}`)) {
+            const key = tx.name;
+            const qty = Math.abs(Number(tx.quantityChange || 0));
+            const existing = materialGroups.get(key);
+            if (existing) {
+              existing.sum += qty;
+            } else {
+              materialGroups.set(key, {
+                name: tx.name,
+                unit: tx.unit,
+                currentStock: String(tx.currentStock || 0),
+                sum: qty
+              });
+            }
+          }
+        }
+
+        materialConsumption = Array.from(materialGroups.values()).map(g => ({
+          name: g.name,
+          unit: g.unit,
+          currentStock: g.currentStock,
+          quantity: String(g.sum)
+        }));
+      }
 
       return {
         metadata: batchData,
