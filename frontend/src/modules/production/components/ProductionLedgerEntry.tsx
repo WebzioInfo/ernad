@@ -56,13 +56,13 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
   // Station specific rendering logic
   const renderStationFields = () => {
     const station = log.station?.toUpperCase();
-    
+
     // Ensure all fields are numbers for logic checks
     const hasRejects = (Number(log.wastageCount) || 0) > 0;
 
     return (
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 py-1.5 px-2 bg-slate-50/70 border border-slate-100 rounded-lg mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        
+
         {/* === BLOWING STATION === */}
         {station === 'BLOWING' && (
           <>
@@ -150,7 +150,7 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
               <div className="flex justify-between col-span-2">
                 <span>HTT Used:</span>
                 <span className="text-[#1A9A91] font-black">
-                   {Number(log.inkUsage) > 0 ? `${log.inkUsage} ML` : 'YES'}
+                  {Number(log.inkUsage) > 0 ? `${log.inkUsage} ML` : 'YES'}
                 </span>
               </div>
             )}
@@ -199,10 +199,10 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
 
         {/* Fallback for unknown stations or general anomalies with rejects */}
         {(!['BLOWING', 'FILLING', 'LABELING', 'PACKING'].includes(station || '')) && hasRejects && (
-           <div className="flex justify-between col-span-2">
-             <span>Rejects:</span>
-             <span className="text-rose-500 font-black">{formatWastageValue(log.wastageCount)}</span>
-           </div>
+          <div className="flex justify-between col-span-2">
+            <span>Rejects:</span>
+            <span className="text-rose-500 font-black">{formatWastageValue(log.wastageCount)}</span>
+          </div>
         )}
       </div>
     );
@@ -213,10 +213,10 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
     return (
       <div className="flex flex-col gap-1 w-full">
         <div className="flex justify-between items-center w-full">
-           <span className="text-xs font-bold text-slate-800 uppercase">{log.eventType.replace(/_/g, ' ')}</span>
-           {isNormalProd && log.primaryCount > 0 && (
-             <span className="text-sm font-black text-[#1A9A91]">+{log.primaryCount}</span>
-           )}
+          <span className="text-xs font-bold text-slate-800 uppercase">{log.eventType.replace(/_/g, ' ')}</span>
+          {isNormalProd && log.primaryCount > 0 && (
+            <span className="text-sm font-black text-[#1A9A91]">+{log.primaryCount}</span>
+          )}
         </div>
         {renderStationFields()}
         {log.remarks && (
@@ -255,7 +255,7 @@ export const ProductionLedgerEntry: React.FC<ProductionLedgerEntryProps> = ({ lo
             <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">Units</span>
           </div>
         )}
-        
+
         {log.eventType === 'MATERIAL_ASSIGNMENT' && log.primaryCount > 0 && (
           <div className="flex items-baseline gap-1 text-[#1A9A91]">
             <Package size={10} className="self-center mr-0.5" />

@@ -842,11 +842,11 @@ export default function OperatorPanel() {
                       compact
                     />
                     <IndustrialNumericInput
-                      label="Label Wastage"
+                      label={line?.name === 'LINE 2' ? 'No. of Sticker Rejection' : 'Label Wastage'}
                       value={rejectionCount}
                       onChange={setRejectionCount}
-                      suffix="KG"
-                      step={0.01}
+                      suffix={line?.name === 'LINE 2' ? 'PCS' : 'GM'}
+                      step={line?.name === 'LINE 2' ? 1 : 0.01}
                       compact
                     />
                   </>
@@ -975,10 +975,11 @@ export default function OperatorPanel() {
 
                       <div className="space-y-1 mb-6">
                         <IndustrialNumericInput
-                          label="Labels Used (KG)"
+                          label={line?.name === 'LINE 2' ? 'No. of Stickers Used' : 'Labels Used (KG)'}
                           value={labelUsage}
                           onChange={setLabelUsage}
-                          suffix="KG"
+                          suffix={line?.name === 'LINE 2' ? 'PCS' : 'KG'}
+                          step={line?.name === 'LINE 2' ? 1 : undefined}
                           compact
                         />
                       </div>
@@ -1083,8 +1084,8 @@ export default function OperatorPanel() {
                                   type="button"
                                   onClick={() => toggleShrink(material)}
                                   className={`w-28 px-3 py-2.5 rounded-xl border text-left flex items-center justify-between transition-all duration-300 relative overflow-hidden h-12 cursor-pointer ${isSelected
-                                      ? 'bg-[#1A9A91]/10 border-[#1A9A91] shadow-md shadow-[#1A9A91]/5'
-                                      : 'bg-white border-slate-200 hover:border-[#1A9A91]/45'
+                                    ? 'bg-[#1A9A91]/10 border-[#1A9A91] shadow-md shadow-[#1A9A91]/5'
+                                    : 'bg-white border-slate-200 hover:border-[#1A9A91]/45'
                                     }`}
                                 >
                                   <span className={`text-xs font-black uppercase tracking-wider ${isSelected ? 'text-[#1A9A91]' : 'text-slate-700'}`}>
