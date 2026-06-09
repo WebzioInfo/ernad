@@ -100,17 +100,17 @@ export class DashboardService {
           (
             select coalesce(sum(case when type = 'SALES_DISPATCH' then quantity else 0 end), 0)::int
             from sales_transactions
-            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+            where sales_date >= ${sql.raw(`'${startIso}'`)} and sales_date <= ${sql.raw(`'${endIso}'`)}
           ) as dispatch_quantity,
           (
             select coalesce(sum(case when type = 'DAMAGE' then quantity else 0 end), 0)::int
             from sales_transactions
-            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+            where sales_date >= ${sql.raw(`'${startIso}'`)} and sales_date <= ${sql.raw(`'${endIso}'`)}
           ) as damage_quantity,
           (
             select coalesce(sum(case when type = 'RETURN' then quantity else 0 end), 0)::int
             from sales_transactions
-            where created_at >= ${sql.raw(`'${startIso}'`)} and created_at <= ${sql.raw(`'${endIso}'`)}
+            where sales_date >= ${sql.raw(`'${startIso}'`)} and sales_date <= ${sql.raw(`'${endIso}'`)}
           ) as return_quantity
       `),
       db.execute(sql`

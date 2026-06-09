@@ -21,6 +21,7 @@ export default function SalesAnalyticsPage() {
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [transactionType, setTransactionType] = useState<'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'>('SALES_DISPATCH');
   const [quantity, setQuantity] = useState<string>('');
+  const [salesDate, setSalesDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   // Dialog states for Admin Edit/Delete
@@ -95,7 +96,7 @@ export default function SalesAnalyticsPage() {
   const handleSave = () => {
     if (overlay.isLocked) return;
 
-    if (!selectedBrandId || !selectedProductId || !transactionType || quantityInt <= 0) {
+    if (!selectedBrandId || !selectedProductId || !transactionType || quantityInt <= 0 || !salesDate) {
       setErrorMsg('All fields are required and quantity must be greater than zero.');
       setTimeout(() => setErrorMsg(''), 5000);
       return;
@@ -109,6 +110,7 @@ export default function SalesAnalyticsPage() {
         productId: selectedProductId,
         type: transactionType as any,
         quantity: quantityInt,
+        salesDate,
       },
       {
         onSuccess: async () => {
@@ -118,6 +120,7 @@ export default function SalesAnalyticsPage() {
           setSelectedBrandId('');
           setSelectedProductId('');
           setTransactionType('SALES_DISPATCH');
+          setSalesDate(format(new Date(), 'yyyy-MM-dd'));
           setErrorMsg('');
         },
         onError: (err: any) => {
@@ -197,10 +200,21 @@ export default function SalesAnalyticsPage() {
             </div>
           </div>
 
-          {/* Section 3 & 4: Transaction Type & Quantity */}
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 transition-opacity duration-300 ${!selectedProductId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          {/* Section 3, 4 & 5: Sales Date, Transaction Type & Quantity */}
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-6 transition-opacity duration-300 ${!selectedProductId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
             <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">3. Transaction Type</h3>
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">3. Sales Date *</h3>
+              <input
+                type="date"
+                value={salesDate}
+                onChange={(e) => setSalesDate(e.target.value)}
+                required
+                className="w-full px-5 py-4 rounded-2xl border border-slate-200 text-base font-black text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm bg-slate-50 cursor-pointer transition-colors"
+              />
+            </div>
+
+            <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">4. Transaction Type</h3>
               <select
                 value={transactionType}
                 onChange={(e) => setTransactionType(e.target.value as any)}
@@ -213,7 +227,7 @@ export default function SalesAnalyticsPage() {
             </div>
 
             <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">4. Quantity (Cases)</h3>
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">5. Quantity (Cases)</h3>
               <input
                 type="number"
                 value={quantity}
@@ -340,7 +354,7 @@ export default function SalesAnalyticsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest">Date & Time</th>
+                  <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest">Sales Date</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Brand</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Product</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
@@ -360,7 +374,7 @@ export default function SalesAnalyticsPage() {
                   filteredTransactions.map((tx: any) => (
                     <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-all">
                       <td className="py-4 px-8 text-sm font-semibold text-slate-700">
-                        {format(new Date(tx.createdAt), 'MMM d, yyyy hh:mm a')}
+                        {formatSalesDate(tx.salesDate)}
                       </td>
                       <td className="py-4 px-6 text-sm font-black text-slate-800">{tx.brandName}</td>
                       <td className="py-4 px-6 text-sm font-semibold text-slate-600">{tx.productName}</td>
@@ -454,13 +468,14 @@ function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSal
   const [productId, setProductId] = useState(transaction.productId);
   const [type, setType] = useState(transaction.type);
   const [quantity, setQuantity] = useState(String(transaction.quantity));
+  const [salesDate, setSalesDate] = useState(transaction.salesDate || format(new Date(), 'yyyy-MM-dd'));
   const [errorMsg, setErrorMsg] = useState('');
 
   const updateTxMutation = useUpdateSalesTransaction();
 
   const handleUpdate = () => {
     const qtyInt = parseInt(quantity, 10) || 0;
-    if (!brandId || !productId || !type || qtyInt <= 0) {
+    if (!brandId || !productId || !type || qtyInt <= 0 || !salesDate) {
       setErrorMsg('All fields are required and quantity must be greater than zero.');
       return;
     }
@@ -468,7 +483,7 @@ function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSal
     updateTxMutation.mutate(
       {
         id: transaction.id,
-        payload: { brandId, productId, type, quantity: qtyInt }
+        payload: { brandId, productId, type, quantity: qtyInt, salesDate }
       },
       {
         onSuccess: () => {
@@ -569,6 +584,30 @@ function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSal
               placeholder="Enter cases"
               min="1"
             />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sales Date *</label>
+            <input
+              type="date"
+              value={salesDate}
+              onChange={(e) => setSalesDate(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* Admin Audit Trail */}
+        <div className="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] space-y-2 font-semibold">
+          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Audit Trail</div>
+          <div className="flex justify-between">
+            <span className="text-slate-400">Entered At (Created):</span>
+            <span className="text-slate-700">{format(new Date(transaction.createdAt), 'dd-MMM-yyyy hh:mm a')}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400">Last Updated:</span>
+            <span className="text-slate-700">{format(new Date(transaction.updatedAt), 'dd-MMM-yyyy hh:mm a')}</span>
           </div>
         </div>
 
@@ -696,3 +735,15 @@ function ConfirmDeleteModal({ onClose, transaction }: ConfirmDeleteModalProps) {
     </motion.div>
   );
 }
+
+// Timezone-safe local sales date formatter
+const formatSalesDate = (dateStr: string) => {
+  if (!dateStr) return '-';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  const date = new Date(year, month, day);
+  return format(date, 'dd-MMM-yyyy');
+};

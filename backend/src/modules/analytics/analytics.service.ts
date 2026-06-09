@@ -369,6 +369,8 @@ export class AnalyticsService {
         timeGroupSql = sql`date_trunc('hour', ${productionLogs.loggedAt})`;
       }
 
+      const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+
       // Parallelize all queries in a single Promise.all execution to collapse the waterfall
       const [
         productionAggregatesRows,
@@ -412,7 +414,7 @@ export class AnalyticsService {
         db.select({
           totalDispatchToday: sql<number>`COALESCE(SUM(CASE WHEN ${salesTransactions.type} = 'SALES_DISPATCH' THEN ${salesTransactions.quantity} ELSE 0 END), 0)`
         }).from(salesTransactions)
-        .where(gte(salesTransactions.createdAt, startDate)),
+        .where(gte(salesTransactions.salesDate, startDateStr)),
 
         db.select({
           id: productionBatches.id,

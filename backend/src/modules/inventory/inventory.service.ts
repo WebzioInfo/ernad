@@ -566,13 +566,14 @@ export class InventoryService {
         id: salesTransactions.id,
         type: salesTransactions.type,
         quantity: salesTransactions.quantity,
+        salesDate: salesTransactions.salesDate,
         createdAt: salesTransactions.createdAt,
         userName: users.name
       })
       .from(salesTransactions)
       .leftJoin(users, eq(salesTransactions.performedBy, users.id))
       .where(eq(salesTransactions.productId, productId))
-      .orderBy(desc(salesTransactions.createdAt))
+      .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt))
       .limit(100)
     ]);
 
@@ -602,7 +603,7 @@ export class InventoryService {
         type: typeLabel,
         quantityChange,
         remarks,
-        createdAt: t.createdAt,
+        createdAt: t.salesDate,
         userName: t.userName || 'Manager'
       });
     });

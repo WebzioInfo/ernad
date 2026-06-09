@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, decimal, integer, index, text, pgEnum, date } from 'drizzle-orm/pg-core';
 import { products, productBrands } from './master-data';
 import { users } from './users';
 import { productionBatches } from './production';
@@ -70,12 +70,13 @@ export const salesTransactions = pgTable('sales_transactions', {
   type: salesTransactionTypeEnum('type').notNull(),
   quantity: integer('quantity').notNull(),
   performedBy: uuid('performed_by').references(() => users.id).notNull(),
+  salesDate: date('sales_date').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => {
   return [
     index('idx_sales_transactions_brand').on(table.brandId),
     index('idx_sales_transactions_product').on(table.productId),
-    index('idx_sales_transactions_date').on(table.createdAt),
+    index('idx_sales_transactions_date').on(table.salesDate),
   ];
 });

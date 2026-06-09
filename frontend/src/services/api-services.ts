@@ -482,6 +482,7 @@ export interface CreateSalesTransactionPayload {
   productId: string;
   type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
   quantity: number;
+  salesDate: string;
 }
 
 export interface SalesTransaction {
@@ -494,6 +495,7 @@ export interface SalesTransaction {
   quantity: number;
   performedBy: string;
   userName: string;
+  salesDate: string;
   createdAt: string;
   updatedAt: string;
 }

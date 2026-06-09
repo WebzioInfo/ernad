@@ -58,6 +58,7 @@ export class SalesService {
       quantity: salesTransactions.quantity,
       performedBy: salesTransactions.performedBy,
       userName: users.name,
+      salesDate: salesTransactions.salesDate,
       createdAt: salesTransactions.createdAt,
       updatedAt: salesTransactions.updatedAt,
     })
@@ -65,13 +66,13 @@ export class SalesService {
     .innerJoin(productBrands, eq(salesTransactions.brandId, productBrands.id))
     .innerJoin(products, eq(salesTransactions.productId, products.id))
     .innerJoin(users, eq(salesTransactions.performedBy, users.id))
-    .orderBy(desc(salesTransactions.createdAt));
+    .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt));
   }
 
-  async createSalesTransaction(dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number }, userId: string) {
-    const { brandId, productId, type, quantity } = dto;
-    if (!brandId || !productId || !type || quantity <= 0) {
-      throw new BadRequestException('Invalid input parameters');
+  async createSalesTransaction(dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number; salesDate: string }, userId: string) {
+    const { brandId, productId, type, quantity, salesDate } = dto;
+    if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate))) {
+      throw new BadRequestException('Invalid input parameters or salesDate');
     }
 
     return await db.transaction(async (tx) => {
@@ -82,6 +83,7 @@ export class SalesService {
         type,
         quantity,
         performedBy: userId,
+        salesDate,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
@@ -105,6 +107,7 @@ export class SalesService {
           productId,
           type,
           quantity,
+          salesDate,
         },
       });
 
@@ -112,10 +115,10 @@ export class SalesService {
     });
   }
 
-  async updateSalesTransaction(id: string, dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number }, userId: string) {
-    const { brandId, productId, type, quantity } = dto;
-    if (!brandId || !productId || !type || quantity <= 0) {
-      throw new BadRequestException('Invalid input parameters');
+  async updateSalesTransaction(id: string, dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number; salesDate: string }, userId: string) {
+    const { brandId, productId, type, quantity, salesDate } = dto;
+    if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate))) {
+      throw new BadRequestException('Invalid input parameters or salesDate');
     }
 
     return await db.transaction(async (tx) => {
@@ -130,6 +133,7 @@ export class SalesService {
           productId,
           type,
           quantity,
+          salesDate,
           updatedAt: new Date(),
         })
         .where(eq(salesTransactions.id, id))
