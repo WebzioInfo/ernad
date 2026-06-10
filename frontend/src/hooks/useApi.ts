@@ -451,6 +451,13 @@ export function useMarkNotificationRead() {
 
 // ─── SALES HOOKS ──────────────────────────────────────────────────────────────
 
+export function useCustomers() {
+  return useQuery({
+    queryKey: ['sales-customers'],
+    queryFn: () => SalesService.getCustomers(),
+  });
+}
+
 export function useSalesTransactions() {
   return useQuery({
     queryKey: QK.SALES_TRANSACTIONS,

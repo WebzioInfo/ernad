@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Package, Search, Trash2, Edit2, AlertTriangle, X, CheckCircle2, Loader2, Activity
+  Package, Search, AlertTriangle, X, CheckCircle2, Loader2, Activity
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +12,8 @@ import {
   useSalesTransactions,
   useCreateSalesTransaction,
   useUpdateSalesTransaction,
-  useDeleteSalesTransaction
+  useDeleteSalesTransaction,
+  useCustomers
 } from '../../../hooks/useApi';
 import { useTransactionOverlay } from '../../../components/TransactionOverlay';
 
@@ -38,14 +39,16 @@ export default function SalesAnalyticsPage() {
   const { data: brands, isLoading: isBrandsLoading } = useBrands();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: productionStock } = useProductionStock();
+  const { data: customers, isLoading: isCustomersLoading } = useCustomers();
 
   const { user } = useAuthStore();
   const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
+  const canEdit = isAdmin || user?.roles?.includes('MANAGER') || user?.role === 'MANAGER';
 
   const overlay = useTransactionOverlay();
   const createTxMutation = useCreateSalesTransaction();
 
-  if (isLedgerLoading || isBrandsLoading || isProductsLoading) {
+  if (isLedgerLoading || isBrandsLoading || isProductsLoading || isCustomersLoading) {
     return (
       <div className="h-96 flex items-center justify-center animate-pulse text-slate-400 font-black uppercase tracking-widest text-xs">
         Loading POS Terminal...
@@ -92,6 +95,8 @@ export default function SalesAnalyticsPage() {
   const quantityInt = parseInt(quantity, 10) || 0;
   const isDeduction = transactionType === 'SALES_DISPATCH' || transactionType === 'DAMAGE';
   const projectedStock = isDeduction ? currentStock - quantityInt : currentStock + quantityInt;
+
+
 
   const handleSave = () => {
     if (overlay.isLocked) return;
@@ -359,14 +364,15 @@ export default function SalesAnalyticsPage() {
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Product</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Quantity</th>
+                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Logged By</th>
-                  {isAdmin && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
+                  {canEdit && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="py-20 text-center text-slate-400 font-bold text-sm">
+                    <td colSpan={canEdit ? 8 : 7} className="py-20 text-center text-slate-400 font-bold text-sm">
                       No sales transaction logs found.
                     </td>
                   </tr>
@@ -390,8 +396,18 @@ export default function SalesAnalyticsPage() {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-sm font-black text-slate-900 text-right">{tx.quantity.toLocaleString()} cases</td>
-                      <td className="py-4 px-6 text-sm font-semibold text-slate-500">{tx.userName}</td>
-                      {isAdmin && (
+                      <td className="py-4 px-6 text-sm font-bold text-slate-700 text-right">
+                        {tx.unitPrice && Number(tx.unitPrice) > 0 ? `₹${(Number(tx.unitPrice) * tx.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                      </td>
+                      <td className="py-4 px-6 text-sm font-semibold text-slate-500">
+                        {tx.userName}
+                        {tx.customerName && (
+                          <span className="block text-[10px] text-slate-400 font-bold mt-0.5">
+                            To: {tx.customerName}
+                          </span>
+                        )}
+                      </td>
+                      {canEdit && (
                         <td className="py-4 px-8 text-sm text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -399,21 +415,21 @@ export default function SalesAnalyticsPage() {
                                 setSelectedTransaction(tx);
                                 setIsEditModalOpen(true);
                               }}
-                              className="p-2 hover:bg-slate-100 text-slate-600 rounded-lg transition-all"
-                              title="Edit entry"
+                              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all"
                             >
-                              <Edit2 className="w-4 h-4" />
+                              Edit
                             </button>
-                            <button
-                              onClick={() => {
-                                setSelectedTransaction(tx);
-                                setIsDeleteModalOpen(true);
-                              }}
-                              className="p-2 hover:bg-rose-50 text-rose-600 rounded-lg transition-all"
-                              title="Delete entry"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => {
+                                  setSelectedTransaction(tx);
+                                  setIsDeleteModalOpen(true);
+                                }}
+                                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-all"
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -437,6 +453,7 @@ export default function SalesAnalyticsPage() {
             transaction={selectedTransaction}
             brands={brands}
             products={products}
+            customers={customers}
           />
         )}
 
@@ -454,36 +471,54 @@ export default function SalesAnalyticsPage() {
   );
 }
 
-// ─── EDIT SALES ENTRY MODAL (ADMIN ONLY) ─────────────────────────────────────
+// ─── EDIT SALES ENTRY MODAL ──────────────────────────────────────────────────
 
 interface EditSalesEntryModalProps {
   onClose: () => void;
   transaction: any;
   brands: any[] | undefined;
   products: any[] | undefined;
+  customers: any[] | undefined;
 }
 
-function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSalesEntryModalProps) {
+function EditSalesEntryModal({ onClose, transaction, brands, products, customers }: EditSalesEntryModalProps) {
   const [brandId, setBrandId] = useState(transaction.brandId);
   const [productId, setProductId] = useState(transaction.productId);
   const [type, setType] = useState(transaction.type);
   const [quantity, setQuantity] = useState(String(transaction.quantity));
   const [salesDate, setSalesDate] = useState(transaction.salesDate || format(new Date(), 'yyyy-MM-dd'));
+  const [unitPrice, setUnitPrice] = useState(String(transaction.unitPrice || '0.00'));
+  const [customerId, setCustomerId] = useState(transaction.customerId || '');
+  const [remarks, setRemarks] = useState(transaction.remarks || '');
   const [errorMsg, setErrorMsg] = useState('');
 
   const updateTxMutation = useUpdateSalesTransaction();
 
   const handleUpdate = () => {
     const qtyInt = parseInt(quantity, 10) || 0;
+    const priceNum = parseFloat(unitPrice) || 0;
     if (!brandId || !productId || !type || qtyInt <= 0 || !salesDate) {
       setErrorMsg('All fields are required and quantity must be greater than zero.');
+      return;
+    }
+    if (priceNum < 0) {
+      setErrorMsg('Unit price must be a non-negative number.');
       return;
     }
 
     updateTxMutation.mutate(
       {
         id: transaction.id,
-        payload: { brandId, productId, type, quantity: qtyInt, salesDate }
+        payload: {
+          brandId,
+          productId,
+          type,
+          quantity: qtyInt,
+          salesDate,
+          unitPrice: priceNum,
+          customerId: customerId || undefined,
+          remarks: remarks || undefined,
+        }
       },
       {
         onSuccess: () => {
@@ -507,7 +542,7 @@ function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSal
         initial={{ scale: 0.95, y: 15 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.95, y: 15 }}
-        className="bg-white rounded-[2.5rem] p-10 max-w-md w-full border border-slate-100 shadow-2xl relative flex flex-col"
+        className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full border border-slate-100 shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto"
       >
         <button
           onClick={onClose}
@@ -527,73 +562,118 @@ function EditSalesEntryModal({ onClose, transaction, brands, products }: EditSal
         )}
 
         <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Brand</label>
+              <select
+                value={brandId}
+                onChange={(e) => {
+                  setBrandId(e.target.value);
+                  setProductId('');
+                }}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+              >
+                <option value="">Select Brand</option>
+                {brands?.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Product</label>
+              <select
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+                disabled={!brandId}
+              >
+                <option value="">Select Product</option>
+                {products
+                  ?.filter((p) => p.brandId === brandId)
+                  .map((prod) => (
+                    <option key={prod.id} value={prod.id}>{prod.name}</option>
+                  ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as any)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+              >
+                <option value="SALES_DISPATCH">Sales Dispatch</option>
+                <option value="RETURN">Product Return</option>
+                <option value="DAMAGE">Damaged Goods</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sales Date *</label>
+              <input
+                type="date"
+                value={salesDate}
+                onChange={(e) => setSalesDate(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm cursor-pointer"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Quantity (Cases) *</label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+                placeholder="Enter cases"
+                min="1"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Unit Price (₹) *</label>
+              <input
+                type="number"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+                placeholder="0.00"
+                min="0"
+                step="0.01"
+                required
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Brand</label>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Customer / Distributor</label>
             <select
-              value={brandId}
-              onChange={(e) => {
-                setBrandId(e.target.value);
-                setProductId('');
-              }}
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
             >
-              <option value="">Select Brand</option>
-              {brands?.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
+              <option value="">Select Customer (Optional)</option>
+              {customers?.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.code || 'No Code'})</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Product</label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
-              disabled={!brandId}
-            >
-              <option value="">Select Product</option>
-              {products
-                ?.filter((p) => p.brandId === brandId)
-                .map((prod) => (
-                  <option key={prod.id} value={prod.id}>{prod.name}</option>
-                ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as any)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
-            >
-              <option value="SALES_DISPATCH">Sales Dispatch</option>
-              <option value="RETURN">Product Return</option>
-              <option value="DAMAGE">Damaged Goods</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Quantity (Cases)</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
-              placeholder="Enter cases"
-              min="1"
-            />
-          </div>
-
-          <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Sales Date *</label>
-            <input
-              type="date"
-              value={salesDate}
-              onChange={(e) => setSalesDate(e.target.value)}
-              required
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm cursor-pointer"
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Remarks / Notes</label>
+            <textarea
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm min-h-[70px]"
+              placeholder="Add optional notes..."
             />
           </div>
         </div>
@@ -679,7 +759,7 @@ function ConfirmDeleteModal({ onClose, transaction }: ConfirmDeleteModalProps) {
           <X className="w-5 h-5" />
         </button>
 
-        <div className="w-14 h-14 bg-rose-550 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-rose-100">
+        <div className="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-rose-100">
           <AlertTriangle className="w-8 h-8" />
         </div>
 

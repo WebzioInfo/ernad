@@ -477,12 +477,24 @@ export const ReportService = {
 
 // ─── SALES TRANSACTIONS ───────────────────────────────────────────────────────
 
+export interface Customer {
+  id: string;
+  name: string;
+  code?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}
+
 export interface CreateSalesTransactionPayload {
   brandId: string;
   productId: string;
   type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
   quantity: number;
   salesDate: string;
+  customerId?: string;
+  unitPrice?: number;
+  remarks?: string;
 }
 
 export interface SalesTransaction {
@@ -496,6 +508,11 @@ export interface SalesTransaction {
   performedBy: string;
   userName: string;
   salesDate: string;
+  customerId?: string;
+  customerName?: string;
+  unitPrice?: string;
+  remarks?: string;
+  updatedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -512,4 +529,7 @@ export const SalesService = {
 
   deleteSalesTransaction: (id: string) =>
     api.delete<{ success: boolean }>(ENDPOINTS.SALES.TRANSACTION(id)).then(r => r.data),
+
+  getCustomers: () =>
+    api.get<Customer[]>(ENDPOINTS.SALES.CUSTOMERS).then(r => r.data),
 };

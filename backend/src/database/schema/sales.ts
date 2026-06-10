@@ -71,6 +71,10 @@ export const salesTransactions = pgTable('sales_transactions', {
   quantity: integer('quantity').notNull(),
   performedBy: uuid('performed_by').references(() => users.id).notNull(),
   salesDate: date('sales_date').notNull(),
+  customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'restrict' }),
+  unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).default('0.00'),
+  remarks: text('remarks'),
+  updatedBy: uuid('updated_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => {

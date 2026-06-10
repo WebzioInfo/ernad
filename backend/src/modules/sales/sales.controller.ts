@@ -65,8 +65,8 @@ export class SalesController {
   }
 
   @Patch('transactions/:id')
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Update an existing sales transaction (Admin only)' })
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Update an existing sales transaction' })
   async updateSalesTransaction(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
     return await this.salesService.updateSalesTransaction(id, dto, req.user.id);
   }

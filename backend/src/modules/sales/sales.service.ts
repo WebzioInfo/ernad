@@ -59,6 +59,11 @@ export class SalesService {
       performedBy: salesTransactions.performedBy,
       userName: users.name,
       salesDate: salesTransactions.salesDate,
+      customerId: salesTransactions.customerId,
+      customerName: customers.name,
+      unitPrice: salesTransactions.unitPrice,
+      remarks: salesTransactions.remarks,
+      updatedBy: salesTransactions.updatedBy,
       createdAt: salesTransactions.createdAt,
       updatedAt: salesTransactions.updatedAt,
     })
@@ -66,13 +71,26 @@ export class SalesService {
     .innerJoin(productBrands, eq(salesTransactions.brandId, productBrands.id))
     .innerJoin(products, eq(salesTransactions.productId, products.id))
     .innerJoin(users, eq(salesTransactions.performedBy, users.id))
+    .leftJoin(customers, eq(salesTransactions.customerId, customers.id))
     .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt));
   }
 
-  async createSalesTransaction(dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number; salesDate: string }, userId: string) {
-    const { brandId, productId, type, quantity, salesDate } = dto;
+  async createSalesTransaction(dto: {
+    brandId: string;
+    productId: string;
+    type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
+    quantity: number;
+    salesDate: string;
+    customerId?: string;
+    unitPrice?: number;
+    remarks?: string;
+  }, userId: string) {
+    const { brandId, productId, type, quantity, salesDate, customerId, unitPrice, remarks } = dto;
     if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate))) {
       throw new BadRequestException('Invalid input parameters or salesDate');
+    }
+    if (unitPrice !== undefined && (isNaN(unitPrice) || unitPrice < 0)) {
+      throw new BadRequestException('unitPrice must be a non-negative number');
     }
 
     return await db.transaction(async (tx) => {
@@ -84,6 +102,9 @@ export class SalesService {
         quantity,
         performedBy: userId,
         salesDate,
+        customerId: customerId || null,
+        unitPrice: unitPrice !== undefined ? String(unitPrice) : '0.00',
+        remarks: remarks || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();
@@ -108,6 +129,9 @@ export class SalesService {
           type,
           quantity,
           salesDate,
+          customerId,
+          unitPrice,
+          remarks,
         },
       });
 
@@ -115,10 +139,22 @@ export class SalesService {
     });
   }
 
-  async updateSalesTransaction(id: string, dto: { brandId: string; productId: string; type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'; quantity: number; salesDate: string }, userId: string) {
-    const { brandId, productId, type, quantity, salesDate } = dto;
+  async updateSalesTransaction(id: string, dto: {
+    brandId: string;
+    productId: string;
+    type: 'SALES_DISPATCH' | 'RETURN' | 'DAMAGE';
+    quantity: number;
+    salesDate: string;
+    customerId?: string;
+    unitPrice?: number;
+    remarks?: string;
+  }, userId: string) {
+    const { brandId, productId, type, quantity, salesDate, customerId, unitPrice, remarks } = dto;
     if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate))) {
       throw new BadRequestException('Invalid input parameters or salesDate');
+    }
+    if (unitPrice !== undefined && (isNaN(unitPrice) || unitPrice < 0)) {
+      throw new BadRequestException('unitPrice must be a non-negative number');
     }
 
     return await db.transaction(async (tx) => {
@@ -134,6 +170,10 @@ export class SalesService {
           type,
           quantity,
           salesDate,
+          customerId: customerId || null,
+          unitPrice: unitPrice !== undefined ? String(unitPrice) : '0.00',
+          remarks: remarks || null,
+          updatedBy: userId,
           updatedAt: new Date(),
         })
         .where(eq(salesTransactions.id, id))
@@ -146,16 +186,44 @@ export class SalesService {
         });
       }, 50);
 
+      // Construct Diff summary for audit logs
+      const changes: string[] = [];
+      if (existing.quantity !== updated.quantity) {
+        changes.push(`Quantity: ${existing.quantity} → ${updated.quantity}`);
+      }
+      if (existing.salesDate !== updated.salesDate) {
+        changes.push(`Sales Date: ${existing.salesDate} → ${updated.salesDate}`);
+      }
+      if (existing.productId !== updated.productId) {
+        changes.push(`Product ID: ${existing.productId} → ${updated.productId}`);
+      }
+      if (existing.brandId !== updated.brandId) {
+        changes.push(`Brand ID: ${existing.brandId} → ${updated.brandId}`);
+      }
+      if (existing.type !== updated.type) {
+        changes.push(`Type: ${existing.type} → ${updated.type}`);
+      }
+      if (existing.unitPrice !== updated.unitPrice) {
+        changes.push(`Unit Price: ${existing.unitPrice} → ${updated.unitPrice}`);
+      }
+      if (existing.customerId !== updated.customerId) {
+        changes.push(`Customer ID: ${existing.customerId || 'None'} → ${updated.customerId || 'None'}`);
+      }
+      if (existing.remarks !== updated.remarks) {
+        changes.push(`Remarks: "${existing.remarks || ''}" → "${updated.remarks || ''}"`);
+      }
+
       // Log Audit Action
       await this.auditService.logAction({
         userId,
-        action: 'SALES_TRANSACTION_UPDATE',
+        action: 'SALES_ENTRY_UPDATED',
         entityType: 'sales_transactions',
         entityId: id,
         category: 'SALES',
         payload: {
           before: existing,
           after: updated,
+          changes: changes.join(', '),
         },
       });
 
