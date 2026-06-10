@@ -5,9 +5,11 @@ import { toast } from 'sonner';
 import { ENDPOINTS } from '../../constants/endpoints';
 import {
   Settings, Tags, Box, Factory, Clock,
-  Plus, Trash2, Loader2
+  Plus, Trash2, Loader2, Database
 } from 'lucide-react';
 import ConfirmationModal from '../../components/common/ConfirmationModal';
+import useAuthStore from '../auth/auth.store';
+import BackupRestoreTab from './BackupRestoreTab';
 
 // --- Shared Types ---
 type Brand = { id: string; name: string; description: string; isActive: boolean };
@@ -465,13 +467,17 @@ const ShiftsTab = () => {
 // --- Main Page Component ---
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'brands' | 'products' | 'lines' | 'shifts'>('brands');
+  const { user } = useAuthStore();
+  const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
+
+  const [activeTab, setActiveTab] = useState<'brands' | 'products' | 'lines' | 'shifts' | 'backup'>('brands');
 
   const tabs = [
     { id: 'brands', label: 'Brands', icon: Tags },
     { id: 'products', label: 'Products', icon: Box },
     { id: 'lines', label: 'Production Lines', icon: Factory },
     { id: 'shifts', label: 'Shifts', icon: Clock },
+    ...(isAdmin ? [{ id: 'backup', label: 'Backup & Restore', icon: Database }] : []),
   ] as const;
 
   return (
@@ -523,6 +529,7 @@ export default function SettingsPage() {
             {activeTab === 'products' && <ProductsTab />}
             {activeTab === 'lines' && <LinesTab />}
             {activeTab === 'shifts' && <ShiftsTab />}
+            {activeTab === 'backup' && isAdmin && <BackupRestoreTab />}
           </div>
         </div>
 

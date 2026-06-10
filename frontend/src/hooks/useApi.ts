@@ -19,6 +19,7 @@ import {
   NotesService,
   NotificationService,
   SalesService,
+  BackupService,
   type StartBatchPayload,
   type CloseBatchPayload,
   type TelemetryLogPayload,
@@ -495,6 +496,52 @@ export function useDeleteSalesTransaction() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.SALES_TRANSACTIONS });
       qc.invalidateQueries({ queryKey: QK.PRODUCTION_STOCK });
+    },
+  });
+}
+
+// ─── BACKUP & RESTORE HOOKS ───────────────────────────────────────────────────
+
+export function useBackupHistory() {
+  return useQuery({
+    queryKey: ['backup-history'],
+    queryFn: () => BackupService.getHistory(),
+  });
+}
+
+export function useCreateBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => BackupService.createBackup(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['backup-history'] });
+    },
+  });
+}
+
+export function useDeleteBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (filename: string) => BackupService.deleteBackup(filename),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['backup-history'] });
+    },
+  });
+}
+
+export function useRestoreBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (param: { filename?: string; file?: File; onProgress?: (percent: number) => void }) => {
+      if (param.file) {
+        return BackupService.restoreFromFile(param.file, param.onProgress);
+      } else if (param.filename) {
+        return BackupService.restoreFromHistory(param.filename);
+      }
+      throw new Error('Must specify either filename or file to restore.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries(); // Invalidate all query cache since data is overwritten
     },
   });
 }

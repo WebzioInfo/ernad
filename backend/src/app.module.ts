@@ -31,6 +31,7 @@ import { SystemModule } from './modules/system/system.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { BackupModule } from './modules/backup/backup.module';
 
 import { AppController } from './app.controller';
 
@@ -64,6 +65,7 @@ import { AppController } from './app.controller';
     ProcurementModule,
     WarehousingModule,
     AuditModule,
+    BackupModule,
     ScheduleModule.forRoot(),
   ],
 

@@ -161,6 +161,14 @@ export const ENDPOINTS = {
     MARK_READ: (id: string) => `notifications/${id}/read`,
     TOKENS: 'notifications/tokens',
   },
+  BACKUP: {
+    HISTORY: 'backup',
+    CREATE: 'backup',
+    DOWNLOAD: (file: string) => `backup/download/${file}`,
+    DELETE: (file: string) => `backup/${file}`,
+    RESTORE_FILE: 'backup/restore-file',
+    RESTORE: (file: string) => `backup/restore/${file}`,
+  },
   ATTENDANCE: {
     LIST: 'attendance/all',
     SYNC: 'attendance/sync',

@@ -533,3 +533,53 @@ export const SalesService = {
   getCustomers: () =>
     api.get<Customer[]>(ENDPOINTS.SALES.CUSTOMERS).then(r => r.data),
 };
+
+// ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
+
+export interface BackupHistoryEntry {
+  filename: string;
+  size: string;
+  createdAt: string;
+  userId: string;
+  userName: string;
+  status: 'SUCCESS' | 'FAILED';
+}
+
+export interface BackupHistoryResponse {
+  backups: BackupHistoryEntry[];
+  databaseSize: string;
+  totalBackups: number;
+  lastBackupDate: string;
+  backupStorageUsed: string;
+  lastRestoreDate: string;
+}
+
+export const BackupService = {
+  getHistory: () =>
+    api.get<BackupHistoryResponse>(ENDPOINTS.BACKUP.HISTORY).then(r => r.data),
+
+  createBackup: () =>
+    api.post<BackupHistoryEntry>(ENDPOINTS.BACKUP.CREATE).then(r => r.data),
+
+  deleteBackup: (filename: string) =>
+    api.delete<{ success: boolean }>(ENDPOINTS.BACKUP.DELETE(filename)).then(r => r.data),
+
+  restoreFromHistory: (filename: string) =>
+    api.post<{ success: boolean }>(ENDPOINTS.BACKUP.RESTORE(filename)).then(r => r.data),
+
+  restoreFromFile: (file: File, onProgress?: (percent: number) => void) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post<{ success: boolean }>(ENDPOINTS.BACKUP.RESTORE_FILE, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percent);
+        }
+      },
+    }).then(r => r.data);
+  },
+};
