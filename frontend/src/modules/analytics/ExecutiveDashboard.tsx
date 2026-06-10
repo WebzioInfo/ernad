@@ -12,6 +12,59 @@ import { TimeRangeSelector } from './components/TimeRangeSelector';
 import { useOutletContext, Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, parseISO } from 'date-fns';
+import { Wifi } from 'lucide-react';
+
+const DiagnosticWidget = () => {
+  const { data } = useQuery({
+    queryKey: ['diagnostics-summary'],
+    queryFn: async () => {
+      try {
+        return (await api.get('/diagnostics/summary')).data;
+      } catch (e) {
+        return null;
+      }
+    },
+    refetchInterval: 30000
+  });
+
+  if (!data) return null;
+
+  return (
+    <section className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm mt-8">
+      <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
+        <Wifi className="w-5 h-5 text-indigo-500" />
+        Network Diagnostics
+      </h3>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="p-4 bg-slate-50 rounded-2xl">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Connected</p>
+          <p className="text-xl font-black text-emerald-600">{data?.connected || 0}</p>
+        </div>
+        <div className="p-4 bg-slate-50 rounded-2xl">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Failed</p>
+          <p className="text-xl font-black text-rose-600">{data?.failed || 0}</p>
+        </div>
+      </div>
+      {data?.mostCommonErrors?.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-slate-500 uppercase">Common Errors</p>
+          {data.mostCommonErrors.map((e: any, i: number) => (
+            <div key={i} className="text-xs flex justify-between bg-rose-50 text-rose-700 p-2 rounded">
+              <span className="truncate mr-2" title={e.error}>{e.error}</span>
+              <span className="font-bold">{e.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {data?.currentServiceWorker && (
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs font-bold text-slate-500 uppercase mb-1">Latest Service Worker</p>
+          <p className="text-xs font-mono text-slate-600 truncate" title={data.currentServiceWorker.activeScripts?.[0]}>{data.currentServiceWorker.activeScripts?.[0] || 'None'}</p>
+        </div>
+      )}
+    </section>
+  );
+};
 
 export default function ExecutiveDashboard() {
   const { user } = useAuthStore();
@@ -402,6 +455,9 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
               </Link>
             </div>
           </section>
+
+          {/* SECTION 7: Diagnostics Widget */}
+          <DiagnosticWidget />
 
         </div>
       </div>

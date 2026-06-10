@@ -16,8 +16,7 @@ const LineSelectionPage = lazy(() => import('../modules/production/LineSelection
 const StationSelectionPage = lazy(() => import('../modules/production/StationSelectionPage'));
 const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
 const IncidentsDashboard = lazy(() => import('../modules/incidents/pages/IncidentsDashboard'));
-
-
+const DiagnosticsPage = lazy(() => import('./DiagnosticsPage'));
 
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
@@ -149,6 +148,9 @@ export function AppRoutes() {
         >
           <Route index element={<TerminalDashboard />} />
         </Route>
+
+        {/* Diagnostics & Public Tools */}
+        <Route path="/debug" element={<DiagnosticsPage />} />
 
         {/* Catch-all */}
         <Route path="*" element={<SmartRedirect />} />
