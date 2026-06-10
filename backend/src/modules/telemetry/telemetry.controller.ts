@@ -92,7 +92,7 @@ export class TelemetryController {
   async patchLog(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number }
+    @Body() dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; damagedLabelWeight?: number; shrinkWastageKg?: number; selectedShrinks?: any[]; glueUsedKg?: number; rollsUsed?: number }
   ) {
     return this.processingService.updateLog(id, req.user.sub, dto);
   }

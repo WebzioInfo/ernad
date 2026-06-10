@@ -623,6 +623,10 @@ export class ProcessingService {
       performedBy,
       createdAt: new Date()
     });
+
+    await tx.update(rawMaterials)
+      .set({ currentStock: balanceAfter, updatedAt: new Date() })
+      .where(eq(rawMaterials.id, materialId));
   }
 
   private async reverseRawMaterialUsage(tx: any, log: any, userId: string, remarks: string) {
@@ -689,26 +693,40 @@ export class ProcessingService {
       return;
     }
 
-    if (before) {
-      await this.insertRawMaterialTransaction(
-        tx,
-        before.materialId,
-        before.qty,
-        'REVERSAL',
-        `${remarks} - reverse previous usage`,
-        userId,
-      );
-    }
+    if (before && after && before.materialId === after.materialId) {
+      const delta = before.qty - after.qty;
+      if (delta !== 0) {
+        await this.insertRawMaterialTransaction(
+          tx,
+          before.materialId,
+          delta,
+          'CORRECTION',
+          `${remarks} - net usage correction`,
+          userId,
+        );
+      }
+    } else {
+      if (before) {
+        await this.insertRawMaterialTransaction(
+          tx,
+          before.materialId,
+          before.qty,
+          'REVERSAL',
+          `${remarks} - reverse previous usage`,
+          userId,
+        );
+      }
 
-    if (after) {
-      await this.insertRawMaterialTransaction(
-        tx,
-        after.materialId,
-        -after.qty,
-        'CONSUMPTION',
-        `${remarks} - apply corrected usage`,
-        userId,
-      );
+      if (after) {
+        await this.insertRawMaterialTransaction(
+          tx,
+          after.materialId,
+          -after.qty,
+          'CONSUMPTION',
+          `${remarks} - apply corrected usage`,
+          userId,
+        );
+      }
     }
   }
 
@@ -1028,7 +1046,7 @@ export class ProcessingService {
     return feedEvents.slice(0, limit);
   }
 
-  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; glueUsedKg?: number; rollsUsed?: number }) {
+  async updateLog(logId: number, userId: string, dto: { primaryCount?: number; wastageCount?: number; remarks?: string; rawMaterialId?: string | null; bagsUsed?: number; capBoxUsage?: number; labelsUsed?: number; shrinkRollsUsed?: number; glueUsedKg?: number; rollsUsed?: number; damagedLabelWeight?: number; shrinkWastageKg?: number; selectedShrinks?: any[]; loggedAt?: string }) {
     return await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(productionLogs).where(eq(productionLogs.id, logId)).for('update');
       if (!existing) throw new BadRequestException('Production log not found.');
@@ -1054,6 +1072,10 @@ export class ProcessingService {
           ...(dto.shrinkRollsUsed !== undefined && { shrinkWeightUsed: String(dto.shrinkRollsUsed) }),
           ...(dto.glueUsedKg !== undefined && { glueUsageKg: String(dto.glueUsedKg) }),
           ...(dto.rollsUsed !== undefined && { rollsUsed: dto.rollsUsed }),
+          ...(dto.damagedLabelWeight !== undefined && { damagedLabelWeight: String(dto.damagedLabelWeight) }),
+          ...(dto.shrinkWastageKg !== undefined && { shrinkWastageKg: String(dto.shrinkWastageKg) }),
+          ...(dto.selectedShrinks !== undefined && { selectedShrinks: dto.selectedShrinks }),
+          ...(dto.loggedAt !== undefined && { loggedAt: new Date(dto.loggedAt) }),
           updatedBy: userId,
           updatedAt: new Date()
         })
@@ -1084,7 +1106,11 @@ export class ProcessingService {
         bagsUsed: String(nextBagsUsed),
         capBoxUsage: nextCapBoxUsage,
         bopRollUsage: String(nextLabelsUsed),
-        shrinkWeightUsed: String(nextShrinkRollsUsed)
+        shrinkWeightUsed: String(nextShrinkRollsUsed),
+        damagedLabelWeight: dto.damagedLabelWeight !== undefined ? String(dto.damagedLabelWeight) : existing.damagedLabelWeight,
+        shrinkWastageKg: dto.shrinkWastageKg !== undefined ? String(dto.shrinkWastageKg) : existing.shrinkWastageKg,
+        wastageCount: dto.wastageCount !== undefined ? dto.wastageCount : existing.wastageCount,
+        selectedShrinks: dto.selectedShrinks !== undefined ? dto.selectedShrinks : existing.selectedShrinks
       }, userId, `Production Log #${logId} correction`);
 
       setTimeout(() => {

@@ -584,6 +584,14 @@ export default function ProductionLogsManager() {
                 if (editingLog.station === 'LABELING') {
                   payload.glueUsedKg = Number(editingLog.glueUsageKg || 0);
                   payload.rollsUsed = Number(editingLog.rollsUsed || 0);
+                  payload.labelsUsed = Number(editingLog.bopRollUsage || 0);
+                  payload.damagedLabelWeight = totalWastage;
+                }
+                if (editingLog.station === 'BLOWING') {
+                  payload.bagsUsed = editingLog.bagsUsed ? Number(editingLog.bagsUsed) : undefined;
+                }
+                if (editingLog.station === 'FILLING') {
+                  payload.capBoxUsage = editingLog.capBoxUsage ? Number(editingLog.capBoxUsage) : undefined;
                 }
                 correctMutation.mutate({
                   id: editingLog.id,
@@ -795,6 +803,29 @@ export default function ProductionLogsManager() {
                         className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-rose-600 outline-none focus:border-indigo-500/50 transition-all"
                       />
                     </div>
+                    {editingLog.station === 'BLOWING' && (
+                      <div className="space-y-4 col-span-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Bags Used</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingLog.bagsUsed || ''}
+                          onChange={(e) => setEditingLog({ ...editingLog, bagsUsed: e.target.value })}
+                          className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                        />
+                      </div>
+                    )}
+                    {editingLog.station === 'FILLING' && (
+                      <div className="space-y-4 col-span-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cap Boxes Used</label>
+                        <input
+                          type="number"
+                          value={editingLog.capBoxUsage || ''}
+                          onChange={(e) => setEditingLog({ ...editingLog, capBoxUsage: e.target.value ? Number(e.target.value) : undefined })}
+                          className="w-full h-16 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-xl font-mono font-black text-slate-900 outline-none focus:border-indigo-500/50 transition-all"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
