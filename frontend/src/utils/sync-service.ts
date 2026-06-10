@@ -36,23 +36,23 @@ export const db = new MESDatabase();
 
 export const syncOfflineLogs = async () => {
   const unsynced = await db.offlineLogs.where('synced').equals(0).toArray();
-  
+
   if (unsynced.length === 0) return;
 
   // Syncing logs quietly
 
   for (const log of unsynced) {
     try {
-      const baseURL = import.meta.env.VITE_API_URL || 'https://ernad-production.up.railway.app/api';
+      const baseURL = import.meta.env.VITE_API_URL || 'https://eranadapi.webziointernational.in/api';
       await axios.post(`${baseURL}/telemetry`, log, {
         withCredentials: true,
       });
-      
+
       await db.offlineLogs.update(log.id!, { synced: 1 });
       // Synced successfully
     } catch (error) {
       console.error(`Failed to sync log ${log.requestId}:`, error);
-      break; 
+      break;
     }
   }
 };

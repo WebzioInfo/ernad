@@ -25,9 +25,9 @@ export default function DiagnosticsPage() {
       const res = await fetch(url, options);
       let data = null;
       if (options?.headers && (options.headers as any)['Content-Type'] === 'application/json') {
-        try { data = await res.json(); } catch(e){}
+        try { data = await res.json(); } catch (e) { }
       } else if (url.includes('api.ipify.org')) {
-        try { data = await res.json(); } catch(e){}
+        try { data = await res.json(); } catch (e) { }
       }
       return {
         success: res.ok || res.type === 'opaque',
@@ -79,17 +79,17 @@ export default function DiagnosticsPage() {
 
     // 2. Railway Diagnostics
     diagReport.connectivity.railwayRoot = await measureFetch('https://ernad-production.up.railway.app', { mode: 'no-cors' });
-    diagReport.connectivity.railwayHealth = await measureFetch('https://ernad-production.up.railway.app/api/health');
+    diagReport.connectivity.railwayHealth = await measureFetch('https://eranadapi.webziointernational.in/api/health');
     diagReport.connectivity.dnsResolution = await measureFetch('https://ernad-production.up.railway.app/favicon.ico', { mode: 'no-cors' });
     diagReport.connectivity.vercel = await measureFetch('https://ernad.vercel.app', { mode: 'no-cors' });
 
     // 3. Auth Test
-    const authRes = await measureFetch('https://ernad-production.up.railway.app/api/auth/login', {
+    const authRes = await measureFetch('https://eranadapi.webziointernational.in/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identity: 'test', credential: 'test', type: 'PIN' })
     });
-    
+
     // Rejection 401 means API is reachable and logic is working
     diagReport.authTest.login = {
       success: authRes.success || authRes.status === 401,
@@ -130,7 +130,7 @@ export default function DiagnosticsPage() {
 
     // Try to send report to backend
     try {
-      await axios.post('https://ernad-production.up.railway.app/api/diagnostics/report', diagReport, {
+      await axios.post('https://eranadapi.webziointernational.in/api/diagnostics/report', diagReport, {
         headers: { 'Content-Type': 'application/json' }
       });
       toast.success('Diagnostics sent to server');
@@ -174,8 +174,8 @@ export default function DiagnosticsPage() {
             <h1 className="text-2xl font-black text-slate-800">System Diagnostics</h1>
             <p className="text-slate-500 text-sm">Offline-capable connectivity analysis</p>
           </div>
-          <button 
-            onClick={runDiagnostics} 
+          <button
+            onClick={runDiagnostics}
             disabled={isGenerating}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition flex items-center gap-2 disabled:opacity-50"
           >
@@ -194,9 +194,9 @@ export default function DiagnosticsPage() {
 
         {report && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
+
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Smartphone className="w-5 h-5 text-indigo-500"/> Device Info</h2>
+              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Smartphone className="w-5 h-5 text-indigo-500" /> Device Info</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">OS/Platform:</span> <span className="font-mono font-medium">{report.deviceInfo.platform}</span></div>
                 <div className="flex justify-between"><span className="text-slate-500">Language:</span> <span className="font-mono font-medium">{report.deviceInfo.language}</span></div>
@@ -206,7 +206,7 @@ export default function DiagnosticsPage() {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Wifi className="w-5 h-5 text-emerald-500"/> Connectivity</h2>
+              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Wifi className="w-5 h-5 text-emerald-500" /> Connectivity</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">Railway Root</span>
@@ -232,21 +232,21 @@ export default function DiagnosticsPage() {
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><HardDrive className="w-5 h-5 text-amber-500"/> Caching & Storage</h2>
+              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><HardDrive className="w-5 h-5 text-amber-500" /> Caching & Storage</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-slate-500">Service Worker:</span> <span className="font-mono font-medium">{report.serviceWorker.registeredCount > 0 ? 'Active' : 'None'}</span></div>
-                {report.serviceWorker.activeScripts && report.serviceWorker.activeScripts.map((url:string, i:number) => (
+                {report.serviceWorker.activeScripts && report.serviceWorker.activeScripts.map((url: string, i: number) => (
                   <div key={i} className="text-xs text-slate-400 font-mono break-all">{url}</div>
                 ))}
                 <div className="flex justify-between mt-2"><span className="text-slate-500">Cache Names:</span> <span className="font-mono font-medium">{report.cacheAudit.cacheNames?.length || 0}</span></div>
                 <div className="flex gap-2 flex-wrap mt-1">
-                  {report.cacheAudit.cacheNames?.map((c:string) => <span key={c} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">{c}</span>)}
+                  {report.cacheAudit.cacheNames?.map((c: string) => <span key={c} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">{c}</span>)}
                 </div>
               </div>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Server className="w-5 h-5 text-purple-500"/> Environment</h2>
+              <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Server className="w-5 h-5 text-purple-500" /> Environment</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex flex-col"><span className="text-slate-500 text-xs">Origin</span> <span className="font-mono text-slate-700">{report.envVars.currentFrontendUrl}</span></div>
                 <div className="flex flex-col"><span className="text-slate-500 text-xs">VITE_API_URL</span> <span className="font-mono text-slate-700 break-all">{report.envVars.configuredApiUrl}</span></div>
@@ -255,11 +255,11 @@ export default function DiagnosticsPage() {
 
             <div className="md:col-span-2 bg-slate-900 rounded-2xl p-6 text-slate-300 relative overflow-hidden">
               <div className="absolute top-4 right-4 flex gap-2">
-                <button 
+                <button
                   onClick={() => { navigator.clipboard.writeText(JSON.stringify(report, null, 2)); toast.success('Copied!'); }}
                   className="p-2 hover:bg-slate-800 rounded-lg transition" title="Copy JSON"
                 ><Copy className="w-4 h-4" /></button>
-                <button 
+                <button
                   onClick={() => {
                     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);

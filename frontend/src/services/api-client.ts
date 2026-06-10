@@ -8,14 +8,14 @@ const SYNC_QUEUE_KEY = 'mes-sync-queue';
 
 const isBackgroundPollUrl = (url: string | undefined): boolean => {
   if (!url) return false;
-  return url.includes('/analytics/factory/live') || 
-         url.includes('/analytics/factory/efficiency') ||
-         url.includes('/production/active-batch') ||
-         url.includes('/telemetry/active-events') ||
-         url.includes('/telemetry/history') ||
-         url.includes('/operator-sessions/handover/recent') ||
-         url.includes('/operator-sessions/active') ||
-         url.includes('/master-data/lines');
+  return url.includes('/analytics/factory/live') ||
+    url.includes('/analytics/factory/efficiency') ||
+    url.includes('/production/active-batch') ||
+    url.includes('/telemetry/active-events') ||
+    url.includes('/telemetry/history') ||
+    url.includes('/operator-sessions/handover/recent') ||
+    url.includes('/operator-sessions/active') ||
+    url.includes('/master-data/lines');
 };
 
 const getSyncQueue = (): any[] => {
@@ -42,14 +42,14 @@ const getBaseURL = () => {
   // 1. Explicit VITE_API_URL from environment (Priority)
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) return envUrl.endsWith('/') ? envUrl : `${envUrl}/`;
-  
+
   // 2. Automatic detection for Localhost
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:4000/api/';
   }
-  
+
   // 3. Fallback to Railway Production URL
-  return 'https://ernad-production.up.railway.app/api/';
+  return 'https://eranadapi.webziointernational.in/api/';
 };
 
 export const api = axios.create({
@@ -98,12 +98,12 @@ api.interceptors.response.use(
   },
   async (error: AxiosError) => {
     const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number };
-    
+
     // 1. Handle Network/CORS/Blocked/Timeout Errors
     if (!error.response) {
       const isTimeout = error.code === 'ECONNABORTED' || error.message.includes('timeout');
       const isNetworkError = error.code === 'ERR_NETWORK' || error.message === 'Network Error';
-      
+
       if (import.meta.env.DEV) {
         console.error(`%c[CONNECTIVITY_FAILURE]`, 'color: #ef4444; font-weight: bold;', {
           message: error.message,
@@ -118,7 +118,7 @@ api.interceptors.response.use(
       if (isTimeout) {
         // Skip global toast for high-frequency polling analytics to prevent "toast spam"
         const isBackgroundPoll = isBackgroundPollUrl(config?.url);
-        
+
         if (!isBackgroundPoll) {
           toast.error('Network Latency Detected', {
             id: 'network-latency',
@@ -134,12 +134,12 @@ api.interceptors.response.use(
             data: config.data,
             headers: config.headers
           });
-          
+
           toast.warning('Offline Sync Active', {
             description: 'Connectivity lost. Production data is being saved locally and will sync automatically.',
             duration: 4000
           });
-          
+
           return Promise.resolve({ data: { status: 'QUEUED_OFFLINE', requestId: config.headers['x-mes-request-id'] }, status: 202 });
         }
 
@@ -210,15 +210,15 @@ api.interceptors.response.use(
 let isSyncing = false;
 const processSyncQueue = async () => {
   if (isSyncing || !navigator.onLine) return;
-  
+
   const queue = getSyncQueue();
   if (queue.length === 0) return;
-  
+
   isSyncing = true;
   // Process sync queue quietly in production
-  
+
   const remaining: any[] = [];
-  
+
   for (const item of queue) {
     try {
       await api({
@@ -237,11 +237,11 @@ const processSyncQueue = async () => {
       }
     }
   }
-  
+
   localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(remaining));
   isSyncing = false;
   window.dispatchEvent(new Event('mes-sync-update'));
-  
+
   if (remaining.length === 0) {
     toast.success('Synchronization Complete', {
       description: 'All offline production data has been uploaded.'
