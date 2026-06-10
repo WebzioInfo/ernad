@@ -78,9 +78,9 @@ export default function DiagnosticsPage() {
     diagReport.publicIp = await measureFetch('https://api.ipify.org?format=json');
 
     // 2. Railway Diagnostics
-    diagReport.connectivity.railwayRoot = await measureFetch('https://ernad-production.up.railway.app', { mode: 'no-cors' });
+    diagReport.connectivity.railwayRoot = await measureFetch('https://eranadapi.webziointernational.in', { mode: 'no-cors' });
     diagReport.connectivity.railwayHealth = await measureFetch('https://eranadapi.webziointernational.in/api/health');
-    diagReport.connectivity.dnsResolution = await measureFetch('https://ernad-production.up.railway.app/favicon.ico', { mode: 'no-cors' });
+    diagReport.connectivity.dnsResolution = await measureFetch('https://eranadapi.webziointernational.in/favicon.ico', { mode: 'no-cors' });
     diagReport.connectivity.vercel = await measureFetch('https://ernad.vercel.app', { mode: 'no-cors' });
 
     // 3. Auth Test
