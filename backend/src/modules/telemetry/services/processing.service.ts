@@ -354,10 +354,13 @@ export class ProcessingService {
           }
         }
       } else if (dto.rawMaterialId && dto.shrinkRollsUsed && dto.shrinkRollsUsed > 0) {
+        const usage = dto.shrinkRollsUsed;
+        const wastage = dto.shrinkWastageKg || 0;
+        const totalDeduction = usage + wastage;
         directDeductions.push({
           materialId: dto.rawMaterialId,
-          qty: dto.shrinkRollsUsed,
-          remarks: `Shrink Rolls used in Packing Station (Log #${logId})`
+          qty: totalDeduction,
+          remarks: `Shrink Rolls used in Packing Station (Usage: ${usage} KG, Wastage: ${wastage} KG) (Log #${logId})`
         });
       }
     }
@@ -386,7 +389,10 @@ export class ProcessingService {
       }
 
       if (resolvedMaterialId) {
-        directDeductions.push({ materialId: resolvedMaterialId, qty: dto.labelsUsed, remarks: `Labels used in Labeling Station (Log #${logId})` });
+        const usage = dto.labelsUsed || 0;
+        const wastage = dto.damagedLabelWeight || dto.wastageCount || 0;
+        const totalDeduction = usage + wastage;
+        directDeductions.push({ materialId: resolvedMaterialId, qty: totalDeduction, remarks: `Labels used in Labeling Station (Usage: ${usage}, Wastage: ${wastage}) (Log #${logId})` });
       } else {
         this.logger.warn(`[LABELING RESOLUTION] Could not resolve label material for payload. Ignoring deduction.`);
       }
@@ -583,9 +589,9 @@ export class ProcessingService {
     } else if (log.station === 'FILLING') {
       qty = Number(log.capBoxUsage || 0);
     } else if (log.station === 'PACKING') {
-      qty = Number(log.shrinkWeightUsed || 0);
+      qty = Number(log.shrinkWeightUsed || 0) + Number(log.shrinkWastageKg || 0);
     } else if (log.station === 'LABELING') {
-      qty = Number(log.bopRollUsage || 0);
+      qty = Number(log.bopRollUsage || 0) + Number(log.damagedLabelWeight || log.wastageCount || 0);
     }
 
     if (qty <= 0) return null;
