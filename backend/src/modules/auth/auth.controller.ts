@@ -41,11 +41,13 @@ export class AuthController {
       
       const result = await this.authService.login(body.identity, body.credential, body.type);
       
+      const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
+      
       // Set HttpOnly Cookie
       response.cookie('ernad_session', result.access_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
@@ -66,7 +68,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Clear session cookie' })
   async logout(@Res({ passthrough: true }) response: Response) {
-    response.clearCookie('ernad_session');
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
+    response.clearCookie('ernad_session', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
+    });
     return { success: true };
   }
 

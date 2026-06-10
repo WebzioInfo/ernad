@@ -43,7 +43,7 @@ export const syncOfflineLogs = async () => {
 
   for (const log of unsynced) {
     try {
-      const baseURL = import.meta.env.VITE_API_URL || 'https://ernad-backend.vercel.app/api';
+      const baseURL = import.meta.env.VITE_API_URL || 'https://ernad-production.up.railway.app/api';
       await axios.post(`${baseURL}/telemetry`, log, {
         withCredentials: true,
       });

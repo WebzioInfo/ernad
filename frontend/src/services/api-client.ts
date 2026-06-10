@@ -48,8 +48,8 @@ const getBaseURL = () => {
     return 'http://localhost:4000/api/';
   }
   
-  // 3. Fallback to relative path (standard production structure)
-  return '/api/';
+  // 3. Fallback to Railway Production URL
+  return 'https://ernad-production.up.railway.app/api/';
 };
 
 export const api = axios.create({
