@@ -602,7 +602,7 @@ export class ProcessingService {
     tx: any,
     materialId: string,
     quantityChange: number,
-    type: 'CONSUMPTION' | 'REVERSAL',
+    type: 'CONSUMPTION' | 'REVERSAL' | 'CORRECTION',
     remarks: string,
     performedBy?: string,
   ) {
