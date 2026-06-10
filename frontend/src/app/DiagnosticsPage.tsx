@@ -19,13 +19,33 @@ export default function DiagnosticsPage() {
     }
   };
 
-  const measureTime = async (fn: () => Promise<any>) => {
+  const measureFetch = async (url: string, options?: RequestInit) => {
     const start = performance.now();
     try {
-      const res = await fn();
-      return { success: true, time: Math.round(performance.now() - start), data: res };
+      const res = await fetch(url, options);
+      let data = null;
+      if (options?.headers && (options.headers as any)['Content-Type'] === 'application/json') {
+        try { data = await res.json(); } catch(e){}
+      } else if (url.includes('api.ipify.org')) {
+        try { data = await res.json(); } catch(e){}
+      }
+      return {
+        success: res.ok || res.type === 'opaque',
+        time: Math.round(performance.now() - start),
+        status: res.status,
+        statusText: res.statusText,
+        data
+      };
     } catch (err: any) {
-      return { success: false, time: Math.round(performance.now() - start), error: err.message };
+      return {
+        success: false,
+        time: Math.round(performance.now() - start),
+        error: {
+          name: err.name,
+          message: err.message,
+          onLine: navigator.onLine
+        }
+      };
     }
   };
 
@@ -54,30 +74,29 @@ export default function DiagnosticsPage() {
       }
     };
 
-    // 1. Connectivity Tests
-    diagReport.connectivity.vercel = await measureTime(() => fetch('https://ernad.vercel.app', { mode: 'no-cors' }));
-    diagReport.connectivity.railway = await measureTime(() => fetch('https://ernad-production.up.railway.app', { mode: 'no-cors' }));
-    
-    // 2. API Health
-    diagReport.apiTest.health = await measureTime(async () => {
-      const res = await fetch('https://ernad-production.up.railway.app/api/health');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    });
+    // 1. IP Test
+    diagReport.publicIp = await measureFetch('https://api.ipify.org?format=json');
+
+    // 2. Railway Diagnostics
+    diagReport.connectivity.railwayRoot = await measureFetch('https://ernad-production.up.railway.app', { mode: 'no-cors' });
+    diagReport.connectivity.railwayHealth = await measureFetch('https://ernad-production.up.railway.app/api/health');
+    diagReport.connectivity.dnsResolution = await measureFetch('https://ernad-production.up.railway.app/favicon.ico', { mode: 'no-cors' });
+    diagReport.connectivity.vercel = await measureFetch('https://ernad.vercel.app', { mode: 'no-cors' });
 
     // 3. Auth Test
-    diagReport.authTest.login = await measureTime(async () => {
-      const res = await fetch('https://ernad-production.up.railway.app/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identity: 'test', credential: 'test', type: 'PIN' })
-      });
-      if (!res.ok) {
-         if (res.status === 401) return 'Auth Rejected (Normal)'; // Rejection means API is working!
-         throw new Error(`HTTP ${res.status}`);
-      }
-      return 'Success';
+    const authRes = await measureFetch('https://ernad-production.up.railway.app/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity: 'test', credential: 'test', type: 'PIN' })
     });
+    
+    // Rejection 401 means API is reachable and logic is working
+    diagReport.authTest.login = {
+      success: authRes.success || authRes.status === 401,
+      time: authRes.time,
+      status: authRes.status,
+      error: authRes.error
+    };
 
     // 4. Service Worker
     try {
@@ -190,20 +209,24 @@ export default function DiagnosticsPage() {
               <h2 className="font-bold flex items-center gap-2 text-slate-800 border-b border-slate-100 pb-2"><Wifi className="w-5 h-5 text-emerald-500"/> Connectivity</h2>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Frontend (Vercel)</span>
-                  {report.connectivity.vercel.success ? <span className="text-emerald-600 font-bold">{report.connectivity.vercel.time}ms</span> : <span className="text-rose-500 font-bold">FAIL</span>}
+                  <span className="text-slate-500">Railway Root</span>
+                  {report.connectivity.railwayRoot?.success ? <span className="text-emerald-600 font-bold">{report.connectivity.railwayRoot.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[150px] truncate" title={report.connectivity.railwayRoot?.error?.message}>FAIL</span>}
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Backend (Railway)</span>
-                  {report.connectivity.railway.success ? <span className="text-emerald-600 font-bold">{report.connectivity.railway.time}ms</span> : <span className="text-rose-500 font-bold">FAIL</span>}
+                  <span className="text-slate-500">Railway API Health</span>
+                  {report.connectivity.railwayHealth?.success ? <span className="text-emerald-600 font-bold">{report.connectivity.railwayHealth.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[150px] truncate" title={report.connectivity.railwayHealth?.error?.message}>FAIL</span>}
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">API Health</span>
-                  {report.apiTest.health.success ? <span className="text-emerald-600 font-bold">{report.apiTest.health.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[120px] truncate" title={report.apiTest.health.error}>FAIL</span>}
+                  <span className="text-slate-500">Railway DNS (favicon)</span>
+                  {report.connectivity.dnsResolution?.success ? <span className="text-emerald-600 font-bold">{report.connectivity.dnsResolution.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[150px] truncate" title={report.connectivity.dnsResolution?.error?.message}>FAIL</span>}
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Auth Check</span>
-                  {report.authTest.login.success ? <span className="text-emerald-600 font-bold">{report.authTest.login.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[120px] truncate" title={report.authTest.login.error}>FAIL</span>}
+                  <span className="text-slate-500">Frontend Vercel</span>
+                  {report.connectivity.vercel?.success ? <span className="text-emerald-600 font-bold">{report.connectivity.vercel.time}ms</span> : <span className="text-rose-500 font-bold text-xs max-w-[150px] truncate" title={report.connectivity.vercel?.error?.message}>FAIL</span>}
+                </div>
+                <div className="flex justify-between items-center mt-2 border-t border-slate-100 pt-2">
+                  <span className="text-slate-500">Public IP</span>
+                  <span className="font-mono font-medium text-slate-700">{report.publicIp?.data?.ip || 'Unknown'}</span>
                 </div>
               </div>
             </div>
