@@ -24,6 +24,9 @@ async function migrate() {
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verified_by" uuid REFERENCES "users"("id")`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verified_at" timestamp`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "verification_reason" varchar(500)`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "rejected_by" uuid REFERENCES "users"("id")`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "rejected_at" timestamp`);
+    await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "rejection_reason" varchar(500)`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_usage" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_box_usage" integer DEFAULT 0`);
     await db.execute(sql`ALTER TABLE "production_logs" ADD COLUMN IF NOT EXISTS "cap_wastage" integer DEFAULT 0`);

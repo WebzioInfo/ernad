@@ -59,9 +59,9 @@ export class VerificationService {
       const [updated] = await tx.update(productionLogs)
         .set({
           status: 'REJECTED',
-          verifiedBy: verifierId,
-          verifiedAt: new Date(),
-          verificationReason: reason,
+          rejectedBy: verifierId,
+          rejectedAt: new Date(),
+          rejectionReason: reason,
           updatedAt: new Date()
         })
         .where(eq(productionLogs.id, logId))

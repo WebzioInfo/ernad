@@ -73,6 +73,9 @@ export default function ProductionLogsManager() {
   const [verificationRemarks, setVerificationRemarks] = useState('');
   const [viewingLog, setViewingLog] = useState<any>(null);
 
+  const userRoles = [user?.role, ...(user?.roles || [])].map((r: any) => String(r).toUpperCase());
+  const canAct = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
@@ -472,13 +475,35 @@ export default function ProductionLogsManager() {
                               log.status === 'CORRECTED' ? 'warning' :
                                 'indigo'
                         }>
-                          {log.status || 'SUBMITTED'}
+                          {log.status === 'VERIFIED' ? 'APPROVED' : (log.status || 'SUBMITTED')}
                         </Badge>
                       </td>
                       <td className="px-8 py-6">
-                        {!log.deletedAt && (
-                          <div className="flex flex-col xl:flex-row items-end xl:items-center justify-end gap-2 opacity-100 visible">
-                            {log.status !== 'VERIFIED' && log.userId !== user?.id && (
+                        {!log.deletedAt && canAct && (
+                          <div className="flex flex-col xl:flex-row items-end xl:items-center justify-end gap-2 opacity-100 visible min-w-[220px]">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const selectedShrinksCopy = log.selectedShrinks 
+                                  ? JSON.parse(JSON.stringify(log.selectedShrinks))
+                                  : [];
+                                const dateObj = new Date(log.loggedAt || log.createdAt || log.timestamp || Date.now());
+                                const logCopy = {
+                                  ...log,
+                                  selectedShrinks: selectedShrinksCopy,
+                                  shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
+                                  editDate: format(dateObj, 'yyyy-MM-dd'),
+                                  editTime: format(dateObj, 'HH:mm')
+                                };
+                                setEditingLog(logCopy);
+                                setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
+                              }}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
+                              aria-label="Edit Production Log"
+                            >
+                              Edit
+                            </button>
+                            {log.status !== 'VERIFIED' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setVerifyingLog(log); }}
                                 className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
@@ -487,37 +512,13 @@ export default function ProductionLogsManager() {
                                 Approve
                               </button>
                             )}
-                            {log.status === 'SUBMITTED' && log.userId !== user?.id && (
+                            {log.status !== 'REJECTED' && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); setRejectingLog(log); }}
                                 className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
-                                aria-label="Void Production Log"
+                                aria-label="Reject Production Log"
                               >
-                                Void
-                              </button>
-                            )}
-                            {user?.role === 'Admin' && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const selectedShrinksCopy = log.selectedShrinks 
-                                    ? JSON.parse(JSON.stringify(log.selectedShrinks))
-                                    : [];
-                                  const dateObj = new Date(log.loggedAt || log.createdAt || log.timestamp || Date.now());
-                                  const logCopy = {
-                                    ...log,
-                                    selectedShrinks: selectedShrinksCopy,
-                                    shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
-                                    editDate: format(dateObj, 'yyyy-MM-dd'),
-                                    editTime: format(dateObj, 'HH:mm')
-                                  };
-                                  setEditingLog(logCopy);
-                                  setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
-                                }}
-                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
-                                aria-label="Edit Production Log"
-                              >
-                                Edit
+                                Reject
                               </button>
                             )}
                           </div>
@@ -885,7 +886,7 @@ export default function ProductionLogsManager() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-white border border-slate-200 rounded-[3rem] p-10 shadow-2xl">
               <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-6" />
               <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic text-center">Reject <span className="text-rose-600">Transaction</span></h3>
-              <p className="text-slate-500 font-bold mt-2 text-sm text-center mb-8">Voiding this record will reconcile batch totals.</p>
+              <p className="text-slate-500 font-bold mt-2 text-sm text-center mb-8">Rejecting this record will reconcile batch totals.</p>
 
               <textarea
                 placeholder="Reason for rejection (required)..."
@@ -997,7 +998,7 @@ export default function ProductionLogsManager() {
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</p>
                       <div>
-                        <Badge variant={viewingLog.status === 'VERIFIED' ? 'success' : viewingLog.status === 'REJECTED' ? 'danger' : viewingLog.status === 'CORRECTED' ? 'warning' : 'indigo'}>{viewingLog.status || 'SUBMITTED'}</Badge>
+                        <Badge variant={viewingLog.status === 'VERIFIED' ? 'success' : viewingLog.status === 'REJECTED' ? 'danger' : viewingLog.status === 'CORRECTED' ? 'warning' : 'indigo'}>{viewingLog.status === 'VERIFIED' ? 'APPROVED' : (viewingLog.status || 'SUBMITTED')}</Badge>
                       </div>
                     </div>
                   </div>

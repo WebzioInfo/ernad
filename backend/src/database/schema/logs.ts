@@ -39,6 +39,10 @@ export const productionLogs = pgTable('production_logs', {
   verifiedBy: uuid('verified_by').references(() => users.id),
   verifiedAt: timestamp('verified_at'),
   verificationReason: varchar('verification_reason', { length: 500 }),
+  
+  rejectedBy: uuid('rejected_by').references(() => users.id),
+  rejectedAt: timestamp('rejected_at'),
+  rejectionReason: varchar('rejection_reason', { length: 500 }),
 
   // Material Consumption Analytics (Enterprise Upgrade)
   capUsage: integer('cap_usage').default(0),
