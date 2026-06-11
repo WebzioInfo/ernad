@@ -580,22 +580,40 @@ export class ProcessingService {
     }
   }
 
-  private getRawMaterialUsageFromLog(log: any): { materialId: string; qty: number } | null {
-    if (!log?.rawMaterialId) return null;
+  private async getRawMaterialUsagesFromLog(tx: any, log: any): Promise<Array<{ materialId: string; qty: number }>> {
+    const usages: Array<{ materialId: string; qty: number }> = [];
 
-    let qty = 0;
-    if (log.station === 'BLOWING') {
-      qty = Number(log.bagsUsed || 0);
-    } else if (log.station === 'FILLING') {
-      qty = Number(log.capBoxUsage || 0);
-    } else if (log.station === 'PACKING') {
-      qty = Number(log.shrinkWeightUsed || 0) + Number(log.shrinkWastageKg || 0);
+    if (!log) return usages;
+
+    if (log.station === 'BLOWING' && log.rawMaterialId) {
+      const qty = Number(log.bagsUsed || 0);
+      if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
+    } else if (log.station === 'FILLING' && log.rawMaterialId) {
+      const qty = Number(log.capBoxUsage || 0);
+      if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
+    } else if (log.station === 'PACKING' && log.rawMaterialId) {
+      const qty = Number(log.shrinkWeightUsed || 0) + Number(log.shrinkWastageKg || 0);
+      if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
     } else if (log.station === 'LABELING') {
-      qty = Number(log.bopRollUsage || 0) + Number(log.damagedLabelWeight || log.wastageCount || 0);
+      if (log.rawMaterialId) {
+        const qty = Number(log.bopRollUsage || 0) + Number(log.damagedLabelWeight || log.wastageCount || 0);
+        if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
+      }
+      if (log.inkChanged) {
+        const inkMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Ink')).limit(1);
+        if (inkMat.length > 0) usages.push({ materialId: inkMat[0].id, qty: 1 });
+      }
+      if (log.glueUsageKg && Number(log.glueUsageKg) > 0) {
+        const glueMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Glue')).limit(1);
+        if (glueMat.length > 0) usages.push({ materialId: glueMat[0].id, qty: Number(log.glueUsageKg) });
+      }
+      if (log.makeupChanged) {
+        const makeupMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Makeup')).limit(1);
+        if (makeupMat.length > 0) usages.push({ materialId: makeupMat[0].id, qty: 1 });
+      }
     }
 
-    if (qty <= 0) return null;
-    return { materialId: log.rawMaterialId, qty };
+    return usages;
   }
 
   private async insertRawMaterialTransaction(
@@ -659,71 +677,60 @@ export class ProcessingService {
       return;
     }
 
-    const usage = this.getRawMaterialUsageFromLog(log);
-    if (!usage) return;
-
-    const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, usage.materialId)).for('update');
-    const currentQty = mat ? Number(mat.currentStock || 0) : 0;
-    const restoredQty = currentQty + usage.qty;
-
-    if (mat) {
-      await tx.update(rawMaterials)
-        .set({ currentStock: restoredQty, updatedAt: new Date() })
-        .where(eq(rawMaterials.id, usage.materialId));
+    const usages = await this.getRawMaterialUsagesFromLog(tx, log);
+    for (const usage of usages) {
+      await this.insertRawMaterialTransaction(
+        tx,
+        usage.materialId,
+        usage.qty,
+        'REVERSAL',
+        remarks,
+        userId,
+      );
     }
-
-    await this.insertRawMaterialTransaction(
-      tx,
-      usage.materialId,
-      usage.qty,
-      'REVERSAL',
-      remarks,
-      userId,
-    );
   }
 
   private async reconcileRawMaterialUsageChange(tx: any, beforeLog: any, afterLog: any, userId: string, remarks: string) {
-    const before = this.getRawMaterialUsageFromLog(beforeLog);
-    const after = this.getRawMaterialUsageFromLog(afterLog);
+    const beforeUsages = await this.getRawMaterialUsagesFromLog(tx, beforeLog);
+    const afterUsages = await this.getRawMaterialUsagesFromLog(tx, afterLog);
 
-    if (
-      before?.materialId === after?.materialId &&
-      before?.qty === after?.qty
-    ) {
-      return;
-    }
+    const allMaterialIds = Array.from(new Set([
+      ...beforeUsages.map(u => u.materialId),
+      ...afterUsages.map(u => u.materialId)
+    ]));
 
-    if (before && after && before.materialId === after.materialId) {
+    for (const materialId of allMaterialIds) {
+      const before = beforeUsages.find(u => u.materialId === materialId) || { qty: 0 };
+      const after = afterUsages.find(u => u.materialId === materialId) || { qty: 0 };
+
       const delta = before.qty - after.qty;
-      if (delta !== 0) {
+      if (delta === 0) continue;
+
+      if (before.qty > 0 && after.qty === 0) {
         await this.insertRawMaterialTransaction(
           tx,
-          before.materialId,
-          delta,
-          'CORRECTION',
-          `${remarks} - net usage correction`,
-          userId,
-        );
-      }
-    } else {
-      if (before) {
-        await this.insertRawMaterialTransaction(
-          tx,
-          before.materialId,
+          materialId,
           before.qty,
           'REVERSAL',
           `${remarks} - reverse previous usage`,
           userId,
         );
-      }
-
-      if (after) {
+      } else if (before.qty === 0 && after.qty > 0) {
         await this.insertRawMaterialTransaction(
           tx,
-          after.materialId,
+          materialId,
           -after.qty,
           'CONSUMPTION',
           `${remarks} - apply corrected usage`,
+          userId,
+        );
+      } else {
+        await this.insertRawMaterialTransaction(
+          tx,
+          materialId,
+          delta,
+          'CORRECTION',
+          `${remarks} - net usage correction`,
           userId,
         );
       }

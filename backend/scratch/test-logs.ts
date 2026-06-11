@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { productionLogs } from '../src/database/schema';
 
 async function main() {
-  const logs = await db.select().from(productionLogs).where(sql`station = 'LABELING'`).limit(10);
+  const logs = await db.select().from(productionLogs).where(sql`id IN (115, 116, 117, 118, 119, 120)`);
   
   if (logs.length === 0) return console.log('no logs');
 
