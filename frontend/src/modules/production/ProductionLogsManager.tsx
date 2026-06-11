@@ -496,28 +496,30 @@ export default function ProductionLogsManager() {
                                 Void
                               </button>
                             )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const selectedShrinksCopy = log.selectedShrinks 
-                                  ? JSON.parse(JSON.stringify(log.selectedShrinks))
-                                  : [];
-                                const dateObj = new Date(log.loggedAt);
-                                const logCopy = {
-                                  ...log,
-                                  selectedShrinks: selectedShrinksCopy,
-                                  shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
-                                  editDate: format(dateObj, 'yyyy-MM-dd'),
-                                  editTime: format(dateObj, 'HH:mm')
-                                };
-                                setEditingLog(logCopy);
-                                setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
-                              }}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
-                              aria-label="Edit Production Log"
-                            >
-                              Edit
-                            </button>
+                            {user?.role === 'Admin' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const selectedShrinksCopy = log.selectedShrinks 
+                                    ? JSON.parse(JSON.stringify(log.selectedShrinks))
+                                    : [];
+                                  const dateObj = new Date(log.loggedAt || log.createdAt || log.timestamp || Date.now());
+                                  const logCopy = {
+                                    ...log,
+                                    selectedShrinks: selectedShrinksCopy,
+                                    shrinkWastageKg: log.shrinkWastageKg !== undefined ? Number(log.shrinkWastageKg) : 0,
+                                    editDate: format(dateObj, 'yyyy-MM-dd'),
+                                    editTime: format(dateObj, 'HH:mm')
+                                  };
+                                  setEditingLog(logCopy);
+                                  setOriginalLog(JSON.parse(JSON.stringify(logCopy)));
+                                }}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border border-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-200 hover:-translate-y-[1px] active:scale-[0.98] cursor-pointer"
+                                aria-label="Edit Production Log"
+                              >
+                                Edit
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>

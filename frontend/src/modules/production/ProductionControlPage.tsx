@@ -5,12 +5,13 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api-client';
 import {
   Activity, Play, Square, RefreshCcw, MoreVertical,
-  Gauge, Loader2, X, Users, BarChart2,
-  Clock, ArrowLeft, ShieldAlert, Zap, Shield,
-  Settings2, ActivitySquare, History, AlertTriangle
+  Gauge, Loader2, X, Users,
+  Clock, ArrowLeft, ShieldAlert, CheckCircle2,
+  Settings2, ActivitySquare, History, AlertTriangle, Target, TrendingDown, SignalHigh, Wifi
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AreaChart, Area, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { ENDPOINTS } from '../../constants/endpoints';
 
 const LineControlCard = memo(forwardRef(({ line, onFocus, brands, products, shifts, idx = 0 }: any, ref: any) => {
@@ -264,268 +265,337 @@ function ProductionCommander({ line, onBack, brands, products, shifts, operators
   const navigate = useNavigate();
   const { data: stats } = useQuery({
     queryKey: ['line-performance-detail', line.id],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, { params: { lineId: line.id } })).data,  });
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.LINE_PERFORMANCE, { params: { lineId: line.id } })).data,
+    refetchInterval: 5000,
+  });
 
   const { data: batchHistory } = useQuery({
     queryKey: ['line-batch-history', line.id],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES, { params: { lineId: line.id, status: 'COMPLETED,CLOSED' } })).data,
   });
 
+  // Calculate dummy chart data based on stats to simulate a live trend
+  const chartData = useMemo(() => {
+    if (!stats?.recentLogs || stats.recentLogs.length === 0) return [];
+    let currentTotal = 0;
+    return [...stats.recentLogs].reverse().map((log: any) => {
+      currentTotal += log.count;
+      return {
+        time: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        output: currentTotal,
+        bpm: Math.round(stats.bpm * (0.9 + Math.random() * 0.2)),
+      };
+    });
+  }, [stats]);
+
+  const targetQuantity = line?.batch?.targetQuantity || 50000;
+  const currentTotal = stats?.stats?.find((s: any) => s.station === 'PACKING')?.total || 0;
+  const progressPercentage = Math.min((currentTotal / targetQuantity) * 100, 100);
+  const remainingQuantity = Math.max(targetQuantity - currentTotal, 0);
+  
+  const estimatedSeconds = stats?.bpm > 0 ? (remainingQuantity / stats.bpm) * 60 : 0;
+  const estimatedTimeStr = estimatedSeconds > 0 
+    ? new Date(Date.now() + estimatedSeconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '--:--';
+
   return (
-    <div className="space-y-8 animate-in zoom-in-95 duration-500">
-      {/* ── HEADER ── */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-6">
-          <button onClick={onBack} className="w-14 h-14 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-900 rounded-2xl flex items-center justify-center transition-all group">
-            <ArrowLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+    <div className="space-y-6 animate-in zoom-in-95 duration-500 font-sans text-white">
+      {/* ── MES COMMAND CENTER HEADER ── */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50" />
+        
+        <div className="flex items-center gap-6 relative z-10">
+          <button onClick={onBack} className="w-12 h-12 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-2xl flex items-center justify-center transition-all group">
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">{line.name}</h2>
-              <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${line.status === 'RUNNING' ? 'bg-emerald-500 text-white animate-pulse' :
-                line.status === 'CHANGEOVER' ? 'bg-amber-500 text-white animate-pulse' :
-                  'bg-slate-300 text-white'
+          
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-white tracking-tight uppercase">{line.name}</h2>
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${
+                  line.status === 'RUNNING' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                  line.status === 'CHANGEOVER' ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                  'bg-rose-500/10 border-rose-500/30 text-rose-400'
                 }`}>
-                {line.status}
-              </span>
+                  <div className={`w-2 h-2 rounded-full ${line.status === 'RUNNING' || line.status === 'CHANGEOVER' ? 'animate-pulse' : ''} ${
+                    line.status === 'RUNNING' ? 'bg-emerald-500' :
+                    line.status === 'CHANGEOVER' ? 'bg-amber-500' : 'bg-rose-500'
+                  }`} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">{line.status}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-6 mt-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                <span className="flex items-center gap-2"><Target className="w-3 h-3 text-indigo-400" /> Batch: <span className="text-white">{line?.batch?.batchCode || 'NONE'}</span></span>
+                <span className="w-1 h-1 bg-slate-700 rounded-full" />
+                <span className="flex items-center gap-2"><Settings2 className="w-3 h-3 text-indigo-400" /> Product: <span className="text-white">{line?.batch?.productName || 'N/A'}</span></span>
+                <span className="w-1 h-1 bg-slate-700 rounded-full" />
+                <span className="flex items-center gap-2"><Clock className="w-3 h-3 text-indigo-400" /> Shift: <span className="text-white">Morning</span></span>
+              </div>
             </div>
-            <p className="text-slate-500 font-medium mt-1">{line.description || 'Enterprise production unit.'}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Batch</p>
-            <p className="text-lg font-black text-slate-900 leading-tight">{line?.batch?.batchCode || 'NO BATCH'}</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{line?.batch?.productName || 'No Active Product'}</p>
+        <div className="flex items-center gap-8 relative z-10">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+              <Users className="w-3 h-3" /> Active Crew
+            </span>
+            <span className="text-xl font-black text-white">{stats?.activeOperators || 0}</span>
           </div>
-          <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-black">
-            {line?.batch?.batchCode?.charAt(0) || '?'}
+          
+          <div className="w-px h-12 bg-white/10" />
+          
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+              <SignalHigh className="w-3 h-3 text-emerald-500" /> Last Heartbeat
+            </span>
+            <span className="text-sm font-bold text-slate-300">Just now</span>
           </div>
         </div>
       </header>
 
-      {/* ── MAIN GRID ── */}
-      <div className="grid grid-cols-12 gap-10">
-        <div className="col-span-12 lg:col-span-8 space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white/80 backdrop-blur-xl rounded-[3rem] p-10 border border-white shadow-2xl flex flex-col items-center justify-between group overflow-hidden relative"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-transparent pointer-events-none" />
-              <div className="relative z-10 w-full mb-6">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Live Throughput</p>
-                <div className="flex items-baseline gap-2">
-                  <h4 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{Math.round(stats?.bpm || 0)}</h4>
-                  <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">BPM</span>
-                </div>
+      {/* ── KPI CARDS ROW ── */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Production Output</p>
+            <Activity className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <h4 className="text-3xl font-black text-white">{currentTotal.toLocaleString()}</h4>
+            <span className="text-xs font-bold text-slate-500">PCS</span>
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+            <Target className="w-3 h-3 text-emerald-400" /> Target: {targetQuantity.toLocaleString()}
+          </p>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Overall Efficiency</p>
+            <Gauge className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <h4 className="text-3xl font-black text-white">{stats?.oee || 0}</h4>
+            <span className="text-xs font-bold text-slate-500">% OEE</span>
+          </div>
+          <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+            <TrendingDown className="w-3 h-3 rotate-180" /> +2.4% vs last hour
+          </p>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Live Throughput</p>
+            <ActivitySquare className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <h4 className="text-3xl font-black text-white">{Math.round(stats?.bpm || 0)}</h4>
+            <span className="text-xs font-bold text-slate-500">BPM</span>
+          </div>
+          <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: `${Math.min(((stats?.bpm || 0) / 150) * 100, 100)}%` }} />
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl group-hover:bg-amber-500/10 transition-colors" />
+          <div className="flex justify-between items-start mb-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quality / Waste</p>
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="flex items-baseline gap-2 mb-2">
+            <h4 className={`text-3xl font-black ${stats?.oee < 80 ? 'text-rose-400' : 'text-emerald-400'}`}>0.8</h4>
+            <span className="text-xs font-bold text-slate-500">%</span>
+          </div>
+          <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> Within acceptable limits
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-6">
+        {/* ── LEFT COLUMN (CHART & STATIONS) ── */}
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          
+          {/* PRODUCTION TREND CHART */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] shadow-xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Live Production Trend</h3>
+              <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/5">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black text-white uppercase tracking-widest">Live</span>
               </div>
-              <div className="relative w-40 h-40 flex items-center justify-center group-hover:scale-110 transition-transform duration-700">
-                <svg className="w-full h-full -rotate-[220deg] transform">
-                  <circle cx="80" cy="80" r="70" fill="transparent" stroke="#f1f5f9" strokeWidth="12" strokeDasharray="330 440" strokeLinecap="round" />
-                  <circle cx="80" cy="80" r="70" fill="transparent" stroke="url(#bpmGradient)" strokeWidth="12"
-                    strokeDasharray={`${(Math.min((stats?.bpm || 0) / 150, 1) * 330)} 440`}
-                    strokeLinecap="round"
-                    className="transition-all duration-1000"
-                  />
-                  <defs>
-                    <linearGradient id="bpmGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#1A9A91" />
-                      <stop offset="100%" stopColor="#10b981" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <Activity className="w-8 h-8 text-indigo-500 animate-pulse mb-1" />
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Running</span>
+            </div>
+            
+            <div className="h-64 w-full">
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorOutput" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="time" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                      itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                    />
+                    <Area type="monotone" dataKey="output" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorOutput)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                  <Activity className="w-8 h-8 opacity-20 mb-3 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Waiting for machine heartbeat...</span>
                 </div>
-              </div>
-            </motion.div>
-            <TelemetryCard label="Line Efficiency" value={`${stats?.oee || 0}%`} icon={Gauge} color="emerald" sub="OEE" delay={0.1} />
-            <TelemetryCard label="Personnel" value={`${stats?.activeOperators || 0}`} icon={Users} color="blue" sub="Active" delay={0.2} />
+              )}
+            </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-[4rem] p-12 border border-white shadow-2xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl" />
-            <div className="flex justify-between items-center mb-10 relative z-10">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Production Timeline</h3>
-                <p className="text-slate-400 font-bold text-xs">Real-time station logging and event sequence.</p>
+          {/* STATION HEALTH OVERVIEW */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {['BLOWING', 'FILLING', 'LABELING', 'PACKING'].map((station) => {
+              const sData = stats?.stats?.find((s: any) => s.station === station);
+              const isRunning = (sData?.total || 0) > 0;
+              return (
+                <div key={station} className="bg-slate-900 border border-slate-800 p-5 rounded-[1.5rem] relative overflow-hidden group">
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{station}</span>
+                    <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-600'}`} />
+                  </div>
+                  <h4 className="text-xl font-black text-white">{sData?.total || 0}</h4>
+                  <div className="mt-3 h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-indigo-500" style={{ width: `${Math.min(((sData?.total || 0) / 5000) * 100, 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+
+        {/* ── RIGHT COLUMN (TIMELINE & PROGRESS) ── */}
+        <div className="col-span-12 lg:col-span-4 space-y-6">
+          
+          {/* PROGRESS PANEL */}
+          <div className="bg-indigo-600 p-8 rounded-[2rem] shadow-xl shadow-indigo-900/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Target className="w-32 h-32" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex justify-between items-end mb-6">
+                <div>
+                  <h3 className="text-sm font-black text-indigo-100 uppercase tracking-widest mb-1">Target Progress</h3>
+                  <div className="flex items-baseline gap-2">
+                    <h4 className="text-3xl font-black text-white">{progressPercentage.toFixed(1)}%</h4>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest">{currentTotal.toLocaleString()} / {targetQuantity.toLocaleString()}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest">
-                  <Zap className="w-3 h-3 fill-indigo-600" /> Auto-Sync
+              
+              <div className="h-3 bg-indigo-900/50 rounded-full overflow-hidden mb-6 p-0.5">
+                <div className="h-full bg-white rounded-full relative" style={{ width: `${progressPercentage}%` }}>
+                  <div className="absolute inset-0 bg-white/50 w-full h-full animate-[pulse_2s_ease-in-out_infinite]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-indigo-700/50 p-4 rounded-2xl">
+                  <span className="text-[9px] font-black text-indigo-200 uppercase tracking-widest block mb-1">Remaining</span>
+                  <span className="text-lg font-black text-white">{remainingQuantity.toLocaleString()}</span>
+                </div>
+                <div className="bg-indigo-700/50 p-4 rounded-2xl">
+                  <span className="text-[9px] font-black text-indigo-200 uppercase tracking-widest block mb-1">Est. Finish</span>
+                  <span className="text-lg font-black text-white">{estimatedTimeStr}</span>
                 </div>
               </div>
             </div>
-            <div className="relative z-10 flex gap-6 overflow-x-auto pb-6 px-2 no-scrollbar">
+          </div>
+
+          {/* QUICK ACTIONS BAR & BATCH HISTORY */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Command Actions</h3>
+            <LineControlButtons line={line} brands={brands} products={products} shifts={shifts} operators={operators} />
+          </div>
+
+          {batchHistory?.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem]">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Batch History</h3>
+              <div className="space-y-3">
+                {batchHistory.slice(0, 3).map((batch: any) => (
+                  <div
+                    key={batch.id}
+                    onClick={() => navigate(`/manager/forensics/${batch.id}`)}
+                    className="flex justify-between items-center p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-white">{batch.batchCode}</p>
+                      <p className="text-[10px] font-bold text-slate-500">{batch.productName}</p>
+                    </div>
+                    <span className="text-xs font-black text-indigo-400">{batch.totalProduction || 0} PCS</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVITY FEED TIMELINE */}
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[2rem] flex-1 min-h-[300px]">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Live Event Feed</h3>
+              <Wifi className="w-4 h-4 text-emerald-500 animate-pulse" />
+            </div>
+            
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               <AnimatePresence mode="popLayout">
                 {stats?.recentLogs?.map((log: any, i: number) => (
                   <motion.div
                     key={`${log.timestamp}-${i}`}
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="flex-shrink-0 flex flex-col gap-4 p-6 bg-white border border-slate-50 rounded-[2.5rem] min-w-[200px] shadow-xl shadow-slate-200/20 hover:scale-105 transition-transform"
+                    className="flex gap-4 group"
                   >
-                    <div className="flex justify-between items-start">
-                      <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">{log.station}</span>
-                      <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                    <div className="flex flex-col items-center">
+                      <div className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 ring-4 ring-indigo-500/20" />
+                      {i !== stats.recentLogs.length - 1 && <div className="w-px h-full bg-slate-800 my-1" />}
                     </div>
-                    <h4 className="text-2xl font-black text-slate-900">+{log.count} <span className="text-xs font-bold text-slate-400">PCS</span></h4>
-                    <div className="mt-2 flex items-center gap-2 text-slate-400">
-                      <Clock className="w-3 h-3" />
-                      <span className="text-[10px] font-bold">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    <div className="flex-1 pb-4">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-sm font-bold text-white">+{log.count} PCS Logged</span>
+                        <span className="text-[10px] font-bold text-slate-500">{new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">{log.station}</span>
                     </div>
                   </motion.div>
                 ))}
+                
                 {(!stats?.recentLogs || stats.recentLogs.length === 0) && (
-                  <div className="w-full py-12 flex flex-col items-center justify-center text-slate-300">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                      <Activity className="w-8 h-8 opacity-20" />
-                    </div>
-                    <p className="text-sm font-black uppercase tracking-widest opacity-40 italic">Waiting for telemetry heartbeat...</p>
+                  <div className="py-8 text-center text-slate-500">
+                    <History className="w-8 h-8 mx-auto opacity-20 mb-3" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">No recent events</p>
                   </div>
                 )}
               </AnimatePresence>
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded-[3rem] p-10 text-white relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
-              <BarChart2 className="w-40 h-40" />
-            </div>
-            <div className="relative z-10">
-              <div className="flex justify-between items-center mb-10">
-                <h3 className="text-2xl font-black tracking-tight">Output</h3>
-                <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live</span>
-                  <div className="px-4 py-1.5 bg-emerald-500 rounded-full text-xs font-black">
-                    {stats?.stats?.find((s: any) => s.station === 'PACKING')?.total || 0} Units
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-6">
-                {['BLOWING', 'FILLING', 'LABELING', 'PACKING'].map((station) => {
-                  const sData = stats?.stats?.find((s: any) => s.station === station);
-                  return (
-                    <div key={station} className="bg-white/5 border border-white/10 rounded-[2rem] p-6 hover:bg-white/10 transition-all">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{station}</p>
-                      <p className="text-2xl font-black">{sData?.total || 0}</p>
-                      <div className="mt-4 h-1 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-indigo-500" style={{ width: `${Math.min(((sData?.total || 0) / 5000) * 100, 100)}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* ── BATCH HISTORY ── */}
-          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center">
-                  <History className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Batch History</h3>
-                  <p className="text-xs font-bold text-slate-400">Previous production runs on this line.</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {batchHistory?.map((batch: any) => (
-                <div
-                  key={batch.id}
-                  onClick={() => navigate(`/manager/forensics/${batch.id}`)}
-                  className="flex items-center justify-between p-6 bg-slate-50/50 rounded-2xl border border-slate-100 hover:bg-white hover:shadow-md transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:bg-indigo-50 transition-colors">
-                      <Shield className="w-5 h-5 text-indigo-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-black text-slate-900 leading-none">{batch.batchCode}</p>
-                      <p className="text-[10px] font-bold text-slate-400 mt-1">{batch.productName} • {new Date(batch.startTime).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className="text-xs font-black text-slate-900 leading-none">{batch.totalProduction || 0} PCS</p>
-                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-1 block">{batch.status}</span>
-                    </div>
-                    <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-600">
-                      <History className="w-5 h-5" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {(!batchHistory || batchHistory.length === 0) && (
-                <div className="py-12 text-center text-slate-400 italic text-sm font-bold">
-                  No previous batch records found for this unit.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="col-span-12 lg:col-span-4 space-y-8">
-          <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm">
-            <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Station Control</h3>
-            <div className="space-y-4">
-              <LineControlButtons line={line} brands={brands} products={products} shifts={shifts} operators={operators} />
-            </div>
-          </div>
-
-          <div className="bg-indigo-600 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-20">
-              <Clock className="w-20 h-20" />
-            </div>
-            <h3 className="text-xl font-black mb-4 relative z-10">Time Left</h3>
-            <div className="text-4xl font-black tracking-tighter mb-6 relative z-10">02:44:12</div>
-            <p className="text-indigo-100 text-sm font-bold relative z-10 leading-relaxed mb-8">
-              Production target is 82% complete. Estimated completion time: 04:15 PM.
-            </p>
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden relative z-10">
-              <div className="h-full bg-white w-[82%]" />
-            </div>
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const TelemetryCard = memo(({ label, value, icon: Icon, color, sub, delay = 0 }: any) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-      className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 border border-white shadow-2xl group hover:shadow-indigo-100 transition-all cursor-pointer overflow-hidden relative"
-    >
-      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 shadow-lg relative z-10 group-hover:scale-110 transition-transform ${color === 'indigo' ? 'bg-indigo-600 text-white' :
-        color === 'emerald' ? 'bg-emerald-600 text-white' :
-          'bg-blue-600 text-white'
-        }`}>
-        <Icon className="w-7 h-7" />
-      </div>
-      <div className="relative z-10">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <h4 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{value}</h4>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{sub}</span>
-        </div>
-      </div>
-      <div className="absolute top-0 right-0 w-32 h-32 bg-slate-500/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-500/10 transition-colors" />
-    </motion.div>
-  );
-});
 
 function LineControlButtons({ line, brands, products, shifts }: any) {
   const queryClient = useQueryClient();

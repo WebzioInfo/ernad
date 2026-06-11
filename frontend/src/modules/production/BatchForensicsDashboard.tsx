@@ -14,6 +14,7 @@ import {
   Tooltip, ResponsiveContainer, AreaChart, Area
 } from 'recharts';
 import { api } from '@/services/api-client';
+import useAuthStore from '../auth/auth.store';
 
 const formatDecimal = (val: string | number | null | undefined) => {
   if (val === null || val === undefined) return '0';
@@ -23,6 +24,7 @@ const formatDecimal = (val: string | number | null | undefined) => {
 };
 
 export default function BatchForensicsDashboard() {
+  const { user } = useAuthStore();
   const { batchId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -273,17 +275,19 @@ export default function BatchForensicsDashboard() {
                           >
                             <History className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => {
-                              setSelectedEntry(entry);
-                              setCorrectionPrimary(entry.primaryCount);
-                              setCorrectionWastage(entry.wastageCount);
-                            }}
-                            className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-amber-600 transition-all border border-transparent hover:border-slate-200"
-                            title="Correct Record"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </button>
+                          {user?.role === 'Admin' && (
+                            <button
+                              onClick={() => {
+                                setSelectedEntry(entry);
+                                setCorrectionPrimary(entry.primaryCount);
+                                setCorrectionWastage(entry.wastageCount);
+                              }}
+                              className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-amber-600 transition-all border border-transparent hover:border-slate-200"
+                              title="Correct Record"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

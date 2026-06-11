@@ -1,277 +1,117 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Monitor,
-  Zap,
-  Clock,
-  Activity,
-  ShieldCheck,
-  Settings,
-  Cpu,
-  Target,
-  TrendingUp,
-  History,
-  Wind,
-  PackageOpen,
-  Box
-} from 'lucide-react';
+import { Activity, Wind, PackageOpen, Zap, Box, ArrowLeft } from 'lucide-react';
 import { api } from '../../services/api-client';
 import { cn } from '../../lib/utils';
 import { ENDPOINTS } from '../../constants/endpoints';
+import OperatorPanel from './OperatorPanel';
 
 export default function TerminalDashboard() {
-  const [manualSelection, setManualSelection] = useState<{ lineId: string; station: string; lineName: string } | null>(null);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [selectedStation, setSelectedStation] = useState<string | null>(null);
 
-  const terminalCode = new URLSearchParams(window.location.search).get('terminal');
-
-  const { data: terminal, isLoading: isLoadingTerminal } = useQuery({
-    queryKey: ['terminal-state', terminalCode],
-    queryFn: async () => (await api.get(ENDPOINTS.TERMINALS.STATE(terminalCode!))).data,
-    enabled: !!terminalCode,
-    retry: 1
-  });
-
-  const { data: allLines } = useQuery({
+  const { data: allLines, isLoading: isLoadingLines } = useQuery({
     queryKey: ['production-lines'],
     queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINES)).data,
-    enabled: !terminalCode && !manualSelection
   });
-
-  const currentLineId = terminal?.lineId || manualSelection?.lineId;
-  const currentStation = terminal?.department || manualSelection?.station;
-  const currentLineName = terminal?.lineName || manualSelection?.lineName;
-
-  const { data: batchData } = useQuery({
-    queryKey: ['active-batch', currentLineId],
-    queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.ACTIVE_BATCH(currentLineId!))).data,
-    enabled: !!currentLineId,    retry: 1
-  });
-
-  const lineData = useQuery({
-    queryKey: ['line', currentLineId],
-    queryFn: async () => (await api.get(ENDPOINTS.MASTER_DATA.LINE(currentLineId!))).data,
-    enabled: !!currentLineId,
-    retry: 1
-  }).data;
-
-  const activeBatch = batchData?.batch
-    ? {
-        ...batchData.batch,
-        target: batchData.target,
-        actual: batchData.actual,
-        rejectionTotal: batchData.rejectionTotal
-      }
-    : lineData?.batch;
 
   const stations = [
-    { id: 'BLOWING', title: 'Blowing', icon: Wind, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { id: 'FILLING', title: 'Filling', icon: PackageOpen, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    { id: 'LABELING', title: 'Labeling', icon: Zap, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
-    { id: 'PACKING', title: 'Packing', icon: Box, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+    { id: 'BLOWING', title: 'Blowing Station', icon: Wind, color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+    { id: 'FILLING', title: 'Filling Station', icon: PackageOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    { id: 'LABELING', title: 'Labeling Station', icon: Zap, color: 'text-indigo-500', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
+    { id: 'PACKING', title: 'Packing Station', icon: Box, color: 'text-amber-500', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   ];
 
-  if (!terminalCode && !manualSelection) {
+  if (selectedLineId && selectedStation) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] text-slate-900 pt-16 pb-8 px-6 sm:pt-24 sm:pb-12 sm:px-12 md:pt-28 md:pb-16 md:px-16 lg:pt-36 lg:pb-20 lg:px-20 font-sans relative overflow-hidden">
-        <div className="fixed inset-0 pointer-events-none opacity-[0.05]"
-          style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
-        />
-
-        <div className="max-w-7xl mx-auto relative z-10">
-          <header className="mb-10 sm:mb-12">
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tighter uppercase leading-none">Factory <span className="text-indigo-600">Overview</span></h1>
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px] sm:text-xs mt-3 flex items-center gap-2">
-              <Activity className="w-3.5 h-3.5 text-indigo-600" />
-              Real-time Production Monitoring
-            </p>
-          </header>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {allLines?.map((line: any) => (
-              <div key={line.id} className="bg-white border border-slate-200 p-5 sm:p-6 lg:p-8 rounded-[2rem] sm:rounded-[3rem] shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 transition-all group flex flex-col justify-between h-[360px] sm:h-[400px] lg:h-[420px]">
-                <div>
-                  <div className="flex justify-between items-start mb-6 sm:mb-10">
-                    <div className="p-4 sm:p-5 bg-indigo-50 rounded-2xl border border-indigo-100 group-hover:bg-indigo-600 transition-colors">
-                      <Cpu className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 group-hover:text-white" />
-                    </div>
-                    <div className={cn(
-                      "px-3 py-1 sm:px-4 sm:py-1.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-widest border",
-                      line.status === 'RUNNING' ? "bg-emerald-50 border-emerald-100 text-emerald-600" : "bg-slate-50 border-slate-100 text-slate-400"
-                    )}>
-                      {line.status}
-                    </div>
-                  </div>
-                  <h3 className="text-2xl sm:text-3xl font-black tracking-tighter uppercase mb-2 sm:mb-4">{line.name}</h3>
-                  <p className="text-slate-400 font-bold uppercase tracking-widest text-[8px] sm:text-[9px]">Select station for remote view</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-4 sm:mt-8">
-                  {stations.map(s => (
-                    <button
-                      key={s.id}
-                      onClick={() => setManualSelection({ lineId: line.id, station: s.id, lineName: line.name })}
-                      className="py-3 sm:py-4 bg-slate-50 border border-slate-100 rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 hover:bg-indigo-600 hover:text-white hover:border-indigo-700 transition-all"
-                    >
-                      {s.title}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="flex flex-col h-full bg-[#f8fafc]">
+        <div className="h-16 shrink-0 bg-white border-b border-slate-200 px-6 flex items-center sticky top-0 z-50">
+          <button
+            onClick={() => setSelectedStation(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Stations
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  if (isLoadingTerminal && terminalCode) {
-    return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
-        <Activity className="animate-spin w-10 h-10 sm:w-12 sm:h-12 text-indigo-600" />
+        <div className="flex-1 overflow-hidden">
+          <OperatorPanel lineId={selectedLineId} station={selectedStation} isAdminTerminal={true} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans relative">
-      {/* Background Grid */}
-      <div className="fixed inset-0 pointer-events-none opacity-[0.03]"
-        style={{ backgroundImage: `radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)`, backgroundSize: '40px 40px' }}
-      />
-
-      <header className="px-4 py-3 sm:px-8 sm:py-4 md:px-10 md:py-5 bg-white/80 border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-50 backdrop-blur-xl">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
-            <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg lg:text-xl font-black uppercase tracking-tight leading-none mb-1">
-              {terminal?.name || `${currentStation} - ${currentLineName}`}
-            </h1>
-            <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">
-              {currentStation} • {currentLineName}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 sm:gap-8 lg:gap-10">
-          <button
-            onClick={() => setManualSelection(null)}
-            className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl text-[8px] sm:text-[9px] font-black uppercase tracking-widest text-slate-500 transition-all border border-slate-200 shadow-sm"
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {selectedLineId && !selectedStation && (
+          <button 
+            onClick={() => setSelectedLineId(null)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all shadow-sm"
           >
-            <Settings className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> <span className="hidden sm:inline">Switch Unit</span><span className="sm:hidden">Switch</span>
+            <ArrowLeft className="w-4 h-4" /> Back to Lines
           </button>
-          <div className="flex items-center gap-3 sm:gap-4 border-l border-slate-100 pl-4 sm:pl-8 lg:pl-10">
-            <div className="flex flex-col items-end">
-              <span className="text-[7px] sm:text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-0.5">Terminal Code</span>
-              <span className="text-[10px] sm:text-xs font-mono font-bold text-slate-600">{terminal?.code || 'P-001'}</span>
-            </div>
-            <div className={cn(
-              "w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full shadow-lg",
-              (terminal?.status === 'ONLINE' || manualSelection) ? "bg-emerald-500 animate-pulse" : "bg-slate-300"
-            )} />
-          </div>
+        )}
+
+        <div className="bg-white border border-slate-200 p-8 rounded-[2rem] shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
+          <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-2">
+            {!selectedLineId ? 'Select Production Line' : 'Select Workstation'}
+          </h1>
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">
+            Admin Remote Terminal Access
+          </p>
         </div>
-      </header>
 
-      <main className="flex-1 p-4 sm:p-8 md:p-10 max-w-[1800px] mx-auto w-full grid grid-cols-12 gap-6 md:gap-10 relative z-10">
-        <div className="col-span-12 lg:col-span-8 flex flex-col gap-6 md:gap-10">
-          <section className="bg-white border border-slate-200 rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-10 md:p-12 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50/50 blur-[100px] -mr-40 -mt-40 pointer-events-none" />
-
-            <div className="flex justify-between items-start mb-8 sm:mb-12 md:mb-16 relative z-10">
-              <div>
-                <span className="text-[8px] sm:text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-2 sm:mb-3">Active Production Stream</span>
-                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight leading-none mb-2">
-                  {activeBatch?.productName || 'SYSTEM_IDLE'}
-                </h2>
-                <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-slate-400 uppercase tracking-widest">
-                  Batch: <span className="text-slate-900">{activeBatch?.batchCode || '---'}</span>
-                </p>
-              </div>
-              <div className="px-4 py-1.5 sm:px-6 sm:py-2.5 bg-emerald-50 border border-emerald-100 rounded-full text-[9px] sm:text-xs font-black text-emerald-600 uppercase tracking-widest">
-                {activeBatch?.status || 'STANDBY'}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 md:gap-8 relative z-10">
-              <div className="p-6 sm:p-8 md:p-10 bg-slate-50 border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] flex flex-col justify-between h-[200px] sm:h-[240px] md:h-[280px]">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
-                    <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+        {isLoadingLines ? (
+          <div className="flex justify-center p-20">
+            <Activity className="w-12 h-12 text-indigo-600 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {!selectedLineId ? (
+              allLines?.map((line: any) => (
+                <button
+                  key={line.id}
+                  onClick={() => setSelectedLineId(line.id)}
+                  className="bg-white border border-slate-200 p-8 rounded-[2rem] shadow-sm hover:shadow-md hover:border-indigo-200 transition-all text-left flex flex-col justify-between min-h-[200px] group"
+                >
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{line.name}</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">
+                      Batch: <span className="text-slate-700">{line.batch?.batchCode || 'NONE'}</span>
+                    </p>
                   </div>
-                  <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Target Yield</span>
-                </div>
-                <p className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tighter italic">{(activeBatch?.target || 0).toLocaleString()}</p>
-                <div className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Units</div>
-              </div>
-
-              <div className="p-6 sm:p-8 md:p-10 bg-indigo-50 border border-indigo-100 rounded-[2rem] sm:rounded-[2.5rem] flex flex-col justify-between h-[200px] sm:h-[240px] md:h-[280px]">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-white rounded-lg border border-indigo-100 shadow-sm">
-                    <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
+                  <div className={cn(
+                    "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2 self-start border",
+                    line.status === 'RUNNING' ? "bg-emerald-50 border-emerald-100 text-emerald-600" : "bg-slate-50 border-slate-200 text-slate-500"
+                  )}>
+                    {line.status === 'RUNNING' && <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />}
+                    {line.status}
                   </div>
-                  <span className="text-[8px] sm:text-[9px] font-black text-indigo-600 uppercase tracking-widest">Achieved</span>
-                </div>
-                <p className="text-4xl sm:text-5xl md:text-6xl font-black text-indigo-600 tracking-tighter italic">{(activeBatch?.actual || 0).toLocaleString()}</p>
-                <div className="text-[8px] sm:text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em]">{((activeBatch?.actual / activeBatch?.target) * 100).toFixed(1)}% Efficiency</div>
-              </div>
-
-              <div className="p-6 sm:p-8 md:p-10 bg-white border border-slate-100 rounded-[2rem] sm:rounded-[2.5rem] flex flex-col justify-between h-[200px] sm:h-[240px] md:h-[280px] shadow-sm">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="p-1.5 sm:p-2 bg-slate-50 rounded-lg border border-slate-100">
-                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400" />
+                </button>
+              ))
+            ) : (
+              stations.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setSelectedStation(s.id)}
+                  className={cn(
+                    "bg-white border p-8 rounded-[2rem] shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between min-h-[200px] group",
+                    s.border, "hover:border-opacity-100"
+                  )}
+                >
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", s.bg)}>
+                    <s.icon className={cn("w-6 h-6", s.color)} />
                   </div>
-                  <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Balance</span>
-                </div>
-                <p className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tighter italic">{(activeBatch?.target - activeBatch?.actual || 0).toLocaleString()}</p>
-                <div className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Remaining Balance</div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 md:gap-10">
-          <section className="bg-white border border-slate-200 rounded-[2.5rem] sm:rounded-[3rem] p-6 sm:p-8 md:p-10 flex-1 shadow-sm flex flex-col overflow-hidden">
-            <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-10">
-              <div className="p-2 bg-slate-50 border border-slate-100 rounded-xl">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
-              </div>
-              <div>
-                <h3 className="text-xs sm:text-sm font-black uppercase tracking-tight">Timeline Feed</h3>
-                <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Real-time Data Ingress</p>
-              </div>
-            </div>
-
-            <div className="flex-1 flex flex-col items-center justify-center opacity-20 py-10 sm:py-20">
-              <History className="w-12 h-12 sm:w-16 sm:h-16 text-slate-200 mb-4 sm:mb-6" />
-              <p className="text-[8px] sm:text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Waiting for Stream...</p>
-            </div>
-          </section>
-
-          <div className="bg-indigo-600 border border-indigo-700 rounded-[2rem] sm:rounded-[2.5rem] p-6 sm:p-8 lg:p-10 flex items-center justify-between shadow-xl shadow-indigo-100 group">
-            <div>
-              <p className="text-[8px] sm:text-[10px] font-black text-indigo-100 uppercase tracking-[0.3em] mb-1 sm:mb-2">Remote Node Monitor</p>
-              <p className="text-[10px] sm:text-xs font-bold text-white">System v4.2.1 • Operational</p>
-            </div>
-            <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-white/50 group-hover:scale-110 transition-transform" />
+                  <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{s.title}</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">Connect Station</p>
+                </button>
+              ))
+            )}
           </div>
-        </div>
-      </main>
-
-      <footer className="px-6 py-6 sm:px-10 sm:py-8 bg-white border-t border-slate-200 flex justify-between items-center relative z-50">
-        <div className="flex items-center gap-6 sm:gap-10">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-            <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Uplink Confirmed</span>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-300" />
-            <span className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-widest">Secure Industrial Stream</span>
-          </div>
-        </div>
-        <p className="text-[8px] sm:text-[10px] font-black text-slate-300 uppercase tracking-[0.4em] sm:tracking-[0.5em]">ERNAD_CORE_MFG</p>
-      </footer>
+        )}
+      </div>
     </div>
   );
 }

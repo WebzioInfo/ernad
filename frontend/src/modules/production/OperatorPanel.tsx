@@ -37,8 +37,10 @@ const bottleConfigs = [
 
 import ConfirmationModal from '../../components/common/ConfirmationModal';
 
-export default function OperatorPanel() {
-  const { id: lineId, station: urlStation } = useParams<{ id: string, station: string }>();
+export default function OperatorPanel({ lineId: propLineId, station: propStation, isAdminTerminal }: { lineId?: string; station?: string; isAdminTerminal?: boolean }) {
+  const params = useParams<{ id: string, station: string }>();
+  const lineId = propLineId || params.id;
+  const urlStation = propStation || params.station;
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -454,10 +456,10 @@ export default function OperatorPanel() {
   });
 
   useEffect(() => {
-    if (location.pathname.startsWith('/operator/workspace') && user && !activeOperator) {
+    if ((isAdminTerminal || location.pathname.startsWith('/operator/workspace')) && user && !activeOperator) {
       setActiveOperator(user);
     }
-  }, [location, user, activeOperator]);
+  }, [isAdminTerminal, location, user, activeOperator]);
 
   useEffect(() => {
     if (!isLoadingBatch) {
@@ -656,7 +658,7 @@ export default function OperatorPanel() {
     } finally { setIsSubmitting(false); }
   };
 
-  if (!activeOperator) {
+  if (!activeOperator && !isAdminTerminal) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center p-6">
         <div className="max-w-xl w-full">
@@ -684,7 +686,7 @@ export default function OperatorPanel() {
   const machineStatus = (activeEvents?.length > 0) ? 'ERROR' : (activeBatch?.batch?.status === 'RUNNING' ? 'RUNNING' : 'IDLE');
 
   return (
-    <div className="operator-page h-screen bg-white flex flex-col overflow-hidden">
+    <div className="operator-page h-full min-h-[calc(100vh-4rem)] bg-white flex flex-col overflow-hidden">
       {isLoggingOut && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-all duration-500 animate-in fade-in">
           <Loader2 className="w-16 h-16 text-[#1A9A91] animate-spin mb-6" />
