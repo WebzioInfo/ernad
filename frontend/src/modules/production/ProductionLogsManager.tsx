@@ -59,12 +59,12 @@ export default function ProductionLogsManager() {
   const [filters, setFilters] = useState<any>({
     lineId: '',
     station: '',
-    batchId: '',
-    startDate: '',
-    endDate: '',
+    batchCode: '',
+    date: '',
     isDeleted: false
   });
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [editingLog, setEditingLog] = useState<any>(null);
   const [originalLog, setOriginalLog] = useState<any>(null);
   const [verifyingLog, setVerifyingLog] = useState<any>(null);
@@ -80,8 +80,15 @@ export default function ProductionLogsManager() {
   const [pageSize, setPageSize] = useState(15);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     setCurrentPage(1);
-  }, [filters, search, pageSize]);
+  }, [filters, debouncedSearch, pageSize]);
 
   const { data: rawMaterials } = useQuery({
     queryKey: ['raw-materials-packing'],
@@ -152,15 +159,23 @@ export default function ProductionLogsManager() {
 
   // --- DATA FETCHING ---
   const { data: logsData, isLoading: loadingLogs, refetch } = useQuery({
-    queryKey: ['production-logs-all', filters, currentPage, pageSize, search],
+    queryKey: ['production-logs-all', filters, currentPage, pageSize, debouncedSearch],
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, val]) => {
+        if (key === 'date') return;
         if (val) params.append(key, String(val));
       });
+      if (filters.date) {
+        const [y, m, d] = filters.date.split('-');
+        const start = new Date(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0);
+        const end = new Date(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999);
+        params.append('startDate', start.toISOString());
+        params.append('endDate', end.toISOString());
+      }
       params.append('page', String(currentPage));
       params.append('limit', String(pageSize));
-      if (search) params.append('search', search);
+      if (debouncedSearch) params.append('search', debouncedSearch);
       return (await api.get(`${ENDPOINTS.TELEMETRY.LOGS}?${params.toString()}`)).data;
     },
     staleTime: 10000,
@@ -170,6 +185,11 @@ export default function ProductionLogsManager() {
     queryKey: ['production-batches-all'],
     queryFn: async () => (await api.get(ENDPOINTS.PRODUCTION.BATCHES)).data
   });
+
+  const uniqueBatches = useMemo(() => {
+    if (!batches) return [];
+    return Array.from(new Map(batches.map((b: any) => [b.batchCode, b])).values());
+  }, [batches]);
 
   const { data: lines } = useQuery({
     queryKey: ['master-data-lines'],
@@ -294,12 +314,12 @@ export default function ProductionLogsManager() {
           <div className="space-y-2">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Batch Context</label>
             <select
-              value={filters.batchId}
-              onChange={(e) => setFilters({ ...filters, batchId: e.target.value })}
+              value={filters.batchCode}
+              onChange={(e) => setFilters({ ...filters, batchCode: e.target.value })}
               className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             >
               <option value="">All Batches</option>
-              {batches?.map((b: any) => <option key={b.id} value={b.id}>{b.batchCode}</option>)}
+              {uniqueBatches.map((b: any) => <option key={b.batchCode} value={b.batchCode}>{b.batchCode}</option>)}
             </select>
           </div>
 
@@ -307,8 +327,8 @@ export default function ProductionLogsManager() {
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Date Range</label>
             <input
               type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+              value={filters.date || ''}
+              onChange={(e) => setFilters({ ...filters, date: e.target.value })}
               className="w-full h-12 bg-slate-50 border border-slate-200 rounded-2xl px-6 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none focus:border-indigo-500/50 transition-all"
             />
           </div>
@@ -589,6 +609,7 @@ export default function ProductionLogsManager() {
                   payload.rollsUsed = Number(editingLog.rollsUsed || 0);
                   payload.labelsUsed = Number(editingLog.bopRollUsage || 0);
                   payload.damagedLabelWeight = totalWastage;
+                  payload.makeupChanged = editingLog.makeupChanged;
                 }
                 if (editingLog.station === 'BLOWING') {
                   payload.bagsUsed = editingLog.bagsUsed ? Number(editingLog.bagsUsed) : undefined;
@@ -785,6 +806,23 @@ export default function ProductionLogsManager() {
                         </div>
                       )}
                     </div>
+                    
+                    <div className="col-span-2 pt-4 border-t border-slate-100 flex items-center justify-between">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Makeup Replacement</label>
+                        <p className="text-xs font-bold text-slate-500 mt-0.5">Toggle if makeup was changed during this log.</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={editingLog.makeupChanged || false}
+                          onChange={(e) => setEditingLog({ ...editingLog, makeupChanged: e.target.checked })}
+                        />
+                        <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                      </label>
+                    </div>
+
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-8">
@@ -1033,6 +1071,24 @@ export default function ProductionLogsManager() {
                     </div>
                   )}
                 </div>
+
+                {viewingLog.station === 'LABELING' && (
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Consumables</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Makeup Replacement</p>
+                        <div className="mt-1">
+                          <Badge variant={viewingLog.makeupChanged ? 'success' : 'slate'}>{viewingLog.makeupChanged ? 'YES' : 'NO'}</Badge>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Makeup Usage</p>
+                        <p className="text-sm font-black text-indigo-600 font-mono">{viewingLog.makeupUsageQty || 0} PCS</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-4">Remarks</h3>

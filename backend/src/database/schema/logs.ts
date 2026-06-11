@@ -74,7 +74,7 @@ export const productionLogs = pgTable('production_logs', {
   inkChanged: boolean('ink_changed').default(false),
   inkUsageMl: decimal('ink_usage_ml', { precision: 8, scale: 2 }),
   makeupChanged: boolean('makeup_changed').default(false),
-  makeupUsageMl: decimal('makeup_usage_ml', { precision: 8, scale: 2 }),
+  makeupUsageQty: integer('makeup_usage_qty').default(0),
   glueUsageKg: decimal('glue_usage_kg', { precision: 10, scale: 3 }),
   rollsUsed: integer('rolls_used').default(0),
 

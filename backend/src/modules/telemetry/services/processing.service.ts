@@ -204,6 +204,7 @@ export class ProcessingService {
         damagedLabelWeight: dto.damagedLabelWeight ? String(dto.damagedLabelWeight) : null,
         inkChanged: dto.inkChanged || false,
         makeupChanged: dto.makeupChanged || false,
+        makeupUsageQty: dto.makeupChanged ? 1 : 0,
         glueUsageKg: dto.glueUsedKg ? String(dto.glueUsedKg) : null,
         rollsUsed: dto.rollsUsed || 0,
 
@@ -1132,6 +1133,7 @@ export class ProcessingService {
     station?: string;
     userId?: string;
     batchId?: string;
+    batchCode?: string;
     shiftId?: string;
     startDate?: string;
     endDate?: string;
@@ -1151,6 +1153,7 @@ export class ProcessingService {
     if (filters.station) conditions.push(eq(productionLogs.station, filters.station as any));
     if (filters.userId) conditions.push(eq(productionLogs.userId, filters.userId));
     if (filters.batchId) conditions.push(eq(productionLogs.batchId, filters.batchId));
+    if (filters.batchCode) conditions.push(eq(productionBatches.batchCode, filters.batchCode));
     if (filters.shiftId) conditions.push(eq(productionLogs.shiftId, filters.shiftId));
     if (filters.startDate) conditions.push(gte(productionLogs.loggedAt, new Date(filters.startDate)));
     if (filters.endDate) conditions.push(lte(productionLogs.loggedAt, new Date(filters.endDate)));
@@ -1173,6 +1176,7 @@ export class ProcessingService {
     const [countResult] = await db.select({ count: sql<number>`count(*)` })
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
+      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     const totalCount = Number(countResult?.count || 0);
@@ -1196,7 +1200,7 @@ export class ProcessingService {
       inkChanged: productionLogs.inkChanged,
       inkUsageMl: productionLogs.inkUsageMl,
       makeupChanged: productionLogs.makeupChanged,
-      makeupUsageMl: productionLogs.makeupUsageMl,
+      makeupUsageQty: productionLogs.makeupUsageQty,
       glueUsageKg: productionLogs.glueUsageKg,
       shrinkWasteWeight: productionLogs.shrinkWasteWeight,
       sourceBatchNumber: productionLogs.sourceBatchNumber,

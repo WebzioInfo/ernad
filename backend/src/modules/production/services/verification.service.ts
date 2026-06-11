@@ -209,6 +209,54 @@ export class VerificationService {
         shrinkWeightDelta = newSum - oldSum;
       }
 
+      // Reconcile Makeup changes for LABELING station
+      if (oldLog.station === 'LABELING' && newData.makeupChanged !== undefined && oldLog.makeupChanged !== newData.makeupChanged) {
+        const makeupMat = await tx.select().from(rawMaterials).where(eq(rawMaterials.name, 'Makeup')).limit(1);
+        if (makeupMat.length > 0) {
+          const matId = makeupMat[0].id;
+          const [matRecord] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, matId)).for('update');
+          const currentStock = Number(matRecord.currentStock || 0);
+
+          if (oldLog.makeupChanged === true && newData.makeupChanged === false) {
+            // Reversal: Add 1 back to stock
+            const newStock = currentStock + 1;
+            await tx.update(rawMaterials).set({ currentStock: String(newStock), updatedAt: new Date() }).where(eq(rawMaterials.id, matId));
+            
+            const [balanceRes] = await tx.select({ sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')` }).from(rawMaterialTransactions).where(eq(rawMaterialTransactions.materialId, matId));
+            const balanceAfter = Number(balanceRes.sum || 0) + 1;
+
+            await tx.insert(rawMaterialTransactions).values({
+              materialId: matId,
+              type: 'REVERSAL',
+              quantityChange: '1',
+              balanceAfter: String(balanceAfter),
+              remarks: `Correction reversal for Log #${logId} (Makeup removed): ${reason}`,
+              performedBy: verifierId,
+              createdAt: new Date()
+            });
+            newData.makeupUsageQty = 0;
+          } else if (oldLog.makeupChanged === false && newData.makeupChanged === true) {
+            // Consumption: Deduct 1 from stock
+            const newStock = currentStock - 1;
+            await tx.update(rawMaterials).set({ currentStock: String(newStock), updatedAt: new Date() }).where(eq(rawMaterials.id, matId));
+            
+            const [balanceRes] = await tx.select({ sum: sql<string>`coalesce(sum(${rawMaterialTransactions.quantityChange}), '0')` }).from(rawMaterialTransactions).where(eq(rawMaterialTransactions.materialId, matId));
+            const balanceAfter = Number(balanceRes.sum || 0) - 1;
+
+            await tx.insert(rawMaterialTransactions).values({
+              materialId: matId,
+              type: 'CONSUMPTION',
+              quantityChange: '-1',
+              balanceAfter: String(balanceAfter),
+              remarks: `Correction usage for Log #${logId} (Makeup added): ${reason}`,
+              performedBy: verifierId,
+              createdAt: new Date()
+            });
+            newData.makeupUsageQty = 1;
+          }
+        }
+      }
+
       const [updated] = await tx.update(productionLogs)
         .set({
           ...newData,
