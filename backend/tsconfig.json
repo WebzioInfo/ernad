@@ -22,6 +22,11 @@
   "exclude": [
     "node_modules",
     "dist",
-    "scratch"
+    "scratch",
+    "scratch/**",
+    "*.repair.ts",
+    "*.migration-draft.ts",
+    "**/*.repair.ts",
+    "**/*.migration-draft.ts"
   ]
 }

@@ -470,7 +470,9 @@ export class UsersService {
           }
         }
 
-        await tx.update(users).set(updateData).where(eq(users.id, id));
+        if (Object.keys(updateData).length > 0) {
+          await tx.update(users).set(updateData).where(eq(users.id, id));
+        }
 
         if (dto.roles && Array.isArray(dto.roles)) {
           this.logger.log(`[TX] Updating roles for user ${id}. New roles: ${JSON.stringify(dto.roles)}`);

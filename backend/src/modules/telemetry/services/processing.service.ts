@@ -591,9 +591,24 @@ export class ProcessingService {
     } else if (log.station === 'FILLING' && log.rawMaterialId) {
       const qty = Number(log.capBoxUsage || 0);
       if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
-    } else if (log.station === 'PACKING' && log.rawMaterialId) {
-      const qty = Number(log.shrinkWeightUsed || 0) + Number(log.shrinkWastageKg || 0);
-      if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
+    } else if (log.station === 'PACKING') {
+      if (log.rawMaterialId) {
+        const qty = Number(log.shrinkWeightUsed || 0) + Number(log.shrinkWastageKg || 0);
+        if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
+      }
+      if (log.selectedShrinks && log.selectedShrinks.length > 0) {
+        for (const shrink of log.selectedShrinks) {
+          const qty = Number(shrink.mmUsed || 0) + Number(shrink.wastageKg || 0);
+          if (qty > 0) {
+            const existing = usages.find(u => u.materialId === shrink.shrinkId);
+            if (existing) {
+              existing.qty += qty;
+            } else {
+              usages.push({ materialId: shrink.shrinkId, qty });
+            }
+          }
+        }
+      }
     } else if (log.station === 'LABELING') {
       if (log.rawMaterialId) {
         const qty = Number(log.bopRollUsage || 0) + Number(log.damagedLabelWeight || log.wastageCount || 0);
@@ -648,35 +663,6 @@ export class ProcessingService {
   }
 
   private async reverseRawMaterialUsage(tx: any, log: any, userId: string, remarks: string) {
-    if (log.station === 'PACKING' && log.selectedShrinks && log.selectedShrinks.length > 0) {
-      for (const shrink of log.selectedShrinks) {
-        const usage = shrink.mmUsed || 0;
-        const wastage = shrink.wastageKg || 0;
-        const totalRestored = usage + wastage;
-        if (totalRestored > 0) {
-          const [mat] = await tx.select().from(rawMaterials).where(eq(rawMaterials.id, shrink.shrinkId)).for('update');
-          const currentQty = mat ? Number(mat.currentStock || 0) : 0;
-          const restoredQty = currentQty + totalRestored;
-
-          if (mat) {
-            await tx.update(rawMaterials)
-              .set({ currentStock: String(restoredQty), updatedAt: new Date() })
-              .where(eq(rawMaterials.id, shrink.shrinkId));
-          }
-
-          await this.insertRawMaterialTransaction(
-            tx,
-            shrink.shrinkId,
-            totalRestored,
-            'REVERSAL',
-            `${remarks} - restore shrink ${shrink.shrinkName} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
-            userId,
-          );
-        }
-      }
-      return;
-    }
-
     const usages = await this.getRawMaterialUsagesFromLog(tx, log);
     for (const usage of usages) {
       await this.insertRawMaterialTransaction(
@@ -1218,7 +1204,15 @@ export class ProcessingService {
       userName: users.name,
       updatedAt: productionLogs.updatedAt,
       deletedAt: productionLogs.deletedAt,
-      status: productionLogs.status
+      status: productionLogs.status,
+      bagsUsed: productionLogs.bagsUsed,
+      capBoxUsage: productionLogs.capBoxUsage,
+      bopRollUsage: productionLogs.bopRollUsage,
+      rollsUsed: productionLogs.rollsUsed,
+      selectedShrinks: productionLogs.selectedShrinks,
+      rawMaterialId: productionLogs.rawMaterialId,
+      shrinkWastageKg: productionLogs.shrinkWastageKg,
+      shrinkWeightUsed: productionLogs.shrinkWeightUsed
     })
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
