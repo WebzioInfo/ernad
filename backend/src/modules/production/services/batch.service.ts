@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { db } from '../../../database/db';
 import {
   productionBatches, batchTotals, productionLines,
-  productBrands, products, operatorSessions, billOfMaterials, inventoryStock, shifts
+  productBrands, products, operatorSessions, billOfMaterials, inventoryStock, shifts, productionLogs
 } from '../../../database/schema';
 import { eq, and, sql, desc, inArray, or } from 'drizzle-orm';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -161,6 +161,68 @@ export class BatchService {
     }
   }
 
+  async calculateBatchDuration(batch: any): Promise<{ startedAt: Date | null, endedAt: Date | null, durationMinutes: number, durationHours: number, formattedDuration: string }> {
+    let startedAt = batch.adjustedStartTime || batch.startTime;
+    let endedAt = batch.endTime;
+
+    // Fallback logic
+    if (!startedAt || (!endedAt && ['COMPLETED', 'CLOSED'].includes(batch.status))) {
+      const logs = await db.select({
+        minTime: sql<Date>`MIN(${productionLogs.loggedAt})`,
+        maxTime: sql<Date>`MAX(${productionLogs.loggedAt})`
+      })
+      .from(productionLogs)
+      .where(eq(productionLogs.batchId, batch.id));
+
+      if (logs.length > 0) {
+        if (!startedAt && logs[0].minTime) {
+          startedAt = logs[0].minTime;
+          this.logger.warn(`Fallback triggered: Used MIN(loggedAt) for batch ${batch.id} start time.`);
+        }
+        if (!endedAt && ['COMPLETED', 'CLOSED'].includes(batch.status) && logs[0].maxTime) {
+          endedAt = logs[0].maxTime;
+          this.logger.warn(`Fallback triggered: Used MAX(loggedAt) for batch ${batch.id} end time.`);
+        }
+      }
+    }
+
+    let durationMinutes = 0;
+    if (startedAt) {
+      const endToUse = endedAt || new Date();
+      durationMinutes = Math.max(0, Math.round((endToUse.getTime() - startedAt.getTime()) / 60000));
+    }
+
+    const durationHours = Math.floor(durationMinutes / 60);
+    const days = Math.floor(durationHours / 24);
+    const remainingHours = durationHours % 24;
+    const remainingMins = durationMinutes % 60;
+
+    let formattedDuration = `${durationMinutes} mins`;
+    if (days > 0) {
+      formattedDuration = `${days}d ${remainingHours}h ${remainingMins}m`;
+    } else if (durationHours > 0) {
+      formattedDuration = `${durationHours}h ${remainingMins}m`;
+    }
+
+    const resultObj = {
+      startedAt,
+      endedAt,
+      durationMinutes,
+      durationHours,
+      formattedDuration
+    };
+
+    this.logger.debug(`
+      [BATCH DURATION VALIDATION]
+      Batch ID: ${batch.id} / ${batch.batchCode}
+      Start Time Source: ${startedAt ? startedAt.toISOString() : 'N/A'} (From ${batch.adjustedStartTime ? 'adjustedStartTime' : 'startTime'}${!batch.adjustedStartTime && !batch.startTime ? ' fallback logs' : ''})
+      End Time Source: ${endedAt ? endedAt.toISOString() : 'N/A'} (From ${batch.endTime ? 'endTime' : 'fallback logs'})
+      Calculated Duration: ${formattedDuration} (${durationMinutes} mins)
+    `);
+
+    return resultObj;
+  }
+
   async getBatches(limit = 50) {
     const results = await db.select({
       batch: productionBatches,
@@ -177,13 +239,19 @@ export class BatchService {
       .orderBy(desc(productionBatches.startTime))
       .limit(limit);
 
-    return results.map(row => ({
-      ...row.batch,
-      line: row.line,
-      product: row.product || { name: 'Unknown Product', id: null, targetBPM: 120 },
-      brand: row.brand || { name: 'Unknown Brand', id: null },
-      shift: row.shift || { name: 'Unknown Shift', startTime: '', endTime: '' }
+    const batchesWithDuration = await Promise.all(results.map(async row => {
+      const durationStats = await this.calculateBatchDuration(row.batch);
+      return {
+        ...row.batch,
+        ...durationStats,
+        line: row.line,
+        product: row.product || { name: 'Unknown Product', id: null, targetBPM: 120 },
+        brand: row.brand || { name: 'Unknown Brand', id: null },
+        shift: row.shift || { name: 'Unknown Shift', startTime: '', endTime: '' }
+      };
     }));
+
+    return batchesWithDuration;
   }
 
   async getActiveBatch(lineId: string) {
@@ -230,6 +298,8 @@ export class BatchService {
 
       const { batch, brand, product, totals } = results[0];
 
+      const durationStats = await this.calculateBatchDuration(batch);
+
       return {
         lineId,
         status: lineData?.status || batch.status,
@@ -240,7 +310,10 @@ export class BatchService {
           id: batch.id,
           batchCode: batch.batchCode,
           status: batch.status,
-          startTime: batch.startTime,
+          startTime: durationStats.startedAt || batch.startTime,
+          endTime: durationStats.endedAt,
+          formattedDuration: durationStats.formattedDuration,
+          durationMinutes: durationStats.durationMinutes,
           productId: batch.productId,
           brandId: batch.brandId,
           shiftId: batch.shiftId,

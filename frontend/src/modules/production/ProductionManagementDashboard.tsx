@@ -36,6 +36,9 @@ interface ProductionBatchRow {
   product?: { id?: string | null; name?: string | null } | null;
   brand?: { id?: string | null; name?: string | null } | null;
   shift?: { name?: string | null } | null;
+  durationMinutes?: number;
+  durationHours?: number;
+  formattedDuration?: string;
 }
 
 const statusClass = (status: BatchStatus) => {
@@ -154,10 +157,12 @@ export default function ProductionManagementDashboard() {
 
     const startTimes = filteredBatches.map(b => b.startTime ? new Date(b.startTime).getTime() : null).filter(Boolean) as number[];
     const earliestTime = startTimes.length > 0 ? Math.min(...startTimes) : null;
+    const endTimes = filteredBatches.map(b => b.endTime ? new Date(b.endTime).getTime() : null).filter(Boolean) as number[];
+    const latestEndTime = endTimes.length > 0 ? Math.max(...endTimes) : null;
 
-    const runningDurationMinutes = earliestTime
-      ? Math.max(0, Math.round((new Date().getTime() - earliestTime) / 60000))
-      : 0;
+    const runningDurationMinutes = firstBatch.durationMinutes || 0;
+    const formattedDuration = firstBatch.formattedDuration || '0 mins';
+    const durationHours = firstBatch.durationHours || 0;
 
     return {
       batchCode: firstBatch.batchCode,
@@ -168,6 +173,8 @@ export default function ProductionManagementDashboard() {
       products,
       totalTarget,
       runningDurationMinutes,
+      formattedDuration,
+      durationHours,
       lines: filteredBatches,
       lineName: linesRunning > 1 ? 'Multiple Lines' : firstBatch.line?.name || 'Unassigned',
       productionConfig: products.join(', ') || 'Unknown'
@@ -383,9 +390,19 @@ const SingleBatchView = ({ summary, selectedLineId, selectedStation, onBack }: a
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Started</p>
               <p className="text-sm font-bold text-slate-900">{formatDate(summary.startTime)}</p>
             </div>
+            {['COMPLETED', 'CLOSED'].includes(summary.status) && summary.lines[0]?.endTime && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ended</p>
+                <p className="text-sm font-bold text-slate-900">{formatDate(summary.lines[0].endTime)}</p>
+              </div>
+            )}
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Duration</p>
-              <p className="text-sm font-bold text-slate-900">{summary.runningDurationMinutes} Mins</p>
+              <p className="text-sm font-bold text-slate-900">{summary.formattedDuration}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Runtime Hours</p>
+              <p className="text-sm font-bold text-slate-900">{summary.durationHours}</p>
             </div>
           </div>
         </div>
