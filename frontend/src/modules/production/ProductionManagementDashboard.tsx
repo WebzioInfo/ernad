@@ -155,10 +155,7 @@ export default function ProductionManagementDashboard() {
     const products = Array.from(new Set(filteredBatches.map(b => b.product?.name).filter(Boolean)));
     const linesRunning = filteredBatches.length;
 
-    const startTimes = filteredBatches.map(b => b.startTime ? new Date(b.startTime).getTime() : null).filter(Boolean) as number[];
-    const earliestTime = startTimes.length > 0 ? Math.min(...startTimes) : null;
-    const endTimes = filteredBatches.map(b => b.endTime ? new Date(b.endTime).getTime() : null).filter(Boolean) as number[];
-    const latestEndTime = endTimes.length > 0 ? Math.max(...endTimes) : null;
+
 
     const runningDurationMinutes = firstBatch.durationMinutes || 0;
     const formattedDuration = firstBatch.formattedDuration || '0 mins';
