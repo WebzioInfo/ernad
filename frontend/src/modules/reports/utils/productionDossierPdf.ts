@@ -195,13 +195,14 @@ export async function generateProductionDossierPdf(data: any, params: any) {
 
   autoTable(doc, {
     startY,
-    head: [['Date', 'Time', 'Station', 'Operator', 'Output', 'Waste']],
+    head: [['Date', 'Time', 'Station', 'Operator', 'Output', 'Unit Type', 'Waste']],
     body: (data?.logs || []).map((l: any) => [
       format(new Date(l.loggedAt), 'dd-MMM-yyyy'),
       format(new Date(l.loggedAt), 'hh:mm a'),
       l.station,
       'System / Operator', // Operator name not explicitly in details logs currently
-      formatNum(l.primaryCount),
+      formatNum(l.output !== undefined ? l.output : l.primaryCount),
+      l.unitType || 'Units',
       formatDec(l.wastageCount)
     ]),
     theme: 'grid',
@@ -209,7 +210,8 @@ export async function generateProductionDossierPdf(data: any, params: any) {
     bodyStyles: { fontSize: 8 },
     columnStyles: {
       4: { halign: 'right' },
-      5: { halign: 'right', textColor: [225, 29, 72] }
+      5: { halign: 'center' },
+      6: { halign: 'right', textColor: [225, 29, 72] }
     },
     margin: { left: 15, right: 15 }
   });

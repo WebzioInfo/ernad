@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import {
   X, Clock, Download, FileText,
-  Printer, Activity, Target, Factory, Hexagon, Package, BarChart, TrendingUp
+  Printer, Activity, Target, Factory, Hexagon, Package, BarChart
 } from 'lucide-react';
 import { api } from '../../../services/api-client';
 import { ENDPOINTS } from '../../../constants/endpoints';
@@ -204,40 +204,7 @@ export function ProductionDetailModal({ isOpen, onClose, reportParams }: Product
                   </section>
                 </div>
 
-                {/* --- ROW 2: VARIANCE --- */}
-                <div className="grid grid-cols-1 gap-10">
-                  <section>
-                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-rose-500" /> Material Variance Analysis
-                    </h3>
-                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-                      <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 border-b border-slate-100">
-                          <tr>
-                            <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Material Name</th>
-                            <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Expected</th>
-                            <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Actual</th>
-                            <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                          {data?.materialVariance?.map((mv: any, idx: number) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-6 py-4 font-bold text-slate-700">{mv.materialName} <span className="ml-1 text-[10px] font-black text-slate-400">{mv.unit}</span></td>
-                              <td className="px-6 py-4 text-right font-black tabular-nums text-slate-500">{formatDec(mv.expected)}</td>
-                              <td className="px-6 py-4 text-right font-black tabular-nums text-indigo-600">{formatDec(mv.actual)}</td>
-                              <td className="px-6 py-4 text-right">
-                                <span className={`px-2 py-1 rounded-md text-[10px] font-black ${mv.variance <= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                  {mv.variance > 0 ? '+' : ''}{formatDec(mv.variance)}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                </div>
+
 
                 {/* --- ROW 3: CONSUMPTION & TELEMETRY LOGS --- */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
@@ -283,6 +250,7 @@ export function ProductionDetailModal({ isOpen, onClose, reportParams }: Product
                               <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Batch</th>
                               <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest">Station</th>
                               <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Output</th>
+                              <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Unit Type</th>
                               <th className="px-6 py-4 font-black text-[10px] text-slate-400 uppercase tracking-widest text-right">Waste</th>
                             </tr>
                           </thead>
@@ -295,7 +263,8 @@ export function ProductionDetailModal({ isOpen, onClose, reportParams }: Product
                                 </td>
                                 <td className="px-6 py-4 font-black text-xs tracking-tight text-indigo-600">{log.batchCode || 'N/A'}</td>
                                 <td className="px-6 py-4 font-black text-[9px] uppercase tracking-widest text-slate-500">{log.station}</td>
-                                <td className="px-6 py-4 text-right font-black tabular-nums">{formatNum(log.primaryCount)}</td>
+                                <td className="px-6 py-4 text-right font-black tabular-nums">{formatNum(log.output !== undefined ? log.output : log.primaryCount)}</td>
+                                <td className="px-6 py-4 text-right text-xs font-bold text-slate-500">{log.unitType || 'Units'}</td>
                                 <td className="px-6 py-4 text-right font-black tabular-nums text-rose-500">{formatDec(log.wastageCount)}</td>
                               </tr>
                             ))}

@@ -10,7 +10,7 @@ import {
   rawMaterialTransactions, rawMaterials, inventoryLedger, inventoryStock,
   billOfMaterials
 } from '../../database/schema';
-import { eq, and, sql, gte, lte, desc, between, inArray, notInArray } from 'drizzle-orm';
+import { eq, and, sql, gte, lte, desc, between, inArray, notInArray, isNull } from 'drizzle-orm';
 import { getProducedQuantitySql, getWastageQuantitySql } from '../../common/utils/production-metrics.helper';
 
 @Injectable()
@@ -59,30 +59,32 @@ export class ReportsService {
     productId?: string;
   }) {
     try {
-      const conditions = [between(productionLogs.loggedAt, filters.startDate, filters.endDate)];
+      const conditions = [
+        between(productionBatches.endTime, filters.startDate, filters.endDate),
+        inArray(productionBatches.status, ['COMPLETED', 'CLOSED']),
+        sql`${productionBatches.deletedAt} IS NULL`
+      ];
       
-      if (filters.lineId && filters.lineId !== 'all') conditions.push(eq(productionLogs.lineId, filters.lineId));
-      if (filters.brandId && filters.brandId !== 'all') conditions.push(eq(productionLogs.brandId, filters.brandId));
-      if (filters.productId && filters.productId !== 'all') conditions.push(eq(productionLogs.productId, filters.productId));
+      if (filters.lineId && filters.lineId !== 'all') conditions.push(eq(productionBatches.lineId, filters.lineId));
+      if (filters.brandId && filters.brandId !== 'all') conditions.push(eq(productionBatches.brandId, filters.brandId));
+      if (filters.productId && filters.productId !== 'all') conditions.push(eq(productionBatches.productId, filters.productId));
 
       const results = await db.select({
         lineId: productionLines.id,
         lineName: productionLines.name,
-        brandId: productBrands.id,
-        brandName: productBrands.name,
-        productId: products.id,
-        productName: products.name,
-        totalCases: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
-        totalOutput: getProducedQuantitySql(),
-        totalWastage: getWastageQuantitySql(),
-        rejectionRate: sql<string>`CASE WHEN (${getProducedQuantitySql()}::numeric + ${getWastageQuantitySql()}::numeric) > 0 THEN (${getWastageQuantitySql()}::numeric / (${getProducedQuantitySql()}::numeric + ${getWastageQuantitySql()}::numeric)) * 100 ELSE 0 END`,
+        brandName: sql<string>`STRING_AGG(DISTINCT ${productBrands.name}, ', ')`,
+        productName: sql<string>`STRING_AGG(DISTINCT ${products.name}, ', ')`,
+        totalCases: sql<number>`COALESCE(SUM(${batchTotals.casesTotal}), 0)`,
+        totalOutput: sql<number>`COALESCE(SUM(${batchTotals.packingTotal}), 0)`,
+        totalWastage: sql<number>`COALESCE(SUM(${batchTotals.scrapTotal}), 0)`,
       })
-      .from(productionLogs)
-      .leftJoin(productionLines, eq(productionLogs.lineId, productionLines.id))
-      .leftJoin(productBrands, eq(productionLogs.brandId, productBrands.id))
-      .leftJoin(products, eq(productionLogs.productId, products.id))
+      .from(productionBatches)
+      .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
+      .leftJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+      .leftJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
+      .leftJoin(products, eq(productionBatches.productId, products.id))
       .where(and(...conditions))
-      .groupBy(productionLines.id, productionLines.name, productBrands.id, productBrands.name, products.id, products.name);
+      .groupBy(productionLines.id, productionLines.name);
 
       const incidentCounts = await db.select({
         lineId: incidents.lineId,
@@ -95,14 +97,22 @@ export class ReportsService {
 
       return results.map(r => {
         const lineIncidents = incidentCounts.find(i => i.lineId === r.lineId);
+        
+        const sumCases = Number(r.totalCases);
+        const out = Number(r.totalOutput);
+        const waste = Number(r.totalWastage);
+        const rejectionRate = (out + waste) > 0 ? (waste / (out + waste)) * 100 : 0;
+
         return {
           ...r,
-          totalCases: Number(r.totalCases),
-          totalOutput: Number(r.totalOutput),
-          totalWastage: Number(r.totalWastage),
-          rejectionRate: Number(r.rejectionRate),
+          totalCases: sumCases,
+          totalOutput: out,
+          totalWastage: waste,
+          rejectionRate: Number(rejectionRate.toFixed(2)),
           totalIncidents: Number(lineIncidents?.totalIncidents || 0),
-          criticalIncidents: Number(lineIncidents?.criticalIncidents || 0)
+          criticalIncidents: Number(lineIncidents?.criticalIncidents || 0),
+          brandName: r.brandName || 'Multiple',
+          productName: r.productName || 'Multiple'
         };
       });
     } catch (error: any) {
@@ -111,62 +121,112 @@ export class ReportsService {
     }
   }
 
-  async getProductionReportDetails(filters: { startDate: Date; endDate: Date; lineId: string; productId: string; }) {
+  async getProductionReportDetails(filters: { startDate: Date; endDate: Date; lineId: string; productId?: string; }) {
     try {
       const { startDate, endDate, lineId, productId } = filters;
       
-      const logConditions = [
-        between(productionLogs.loggedAt, startDate, endDate),
-        eq(productionLogs.lineId, lineId),
-        eq(productionLogs.productId, productId)
+      const batchConditions = [
+        between(productionBatches.endTime, startDate, endDate),
+        inArray(productionBatches.status, ['COMPLETED', 'CLOSED']),
+        sql`${productionBatches.deletedAt} IS NULL`,
+        eq(productionBatches.lineId, lineId)
       ];
+      
+      if (productId) {
+        batchConditions.push(eq(productionBatches.productId, productId));
+      }
 
-      // 1. Logs & Aggregations
-      const logs = await db.select({
-        id: productionLogs.id,
-        loggedAt: productionLogs.loggedAt,
-        station: productionLogs.station,
-        primaryCount: productionLogs.primaryCount,
-        wastageCount: productionLogs.wastageCount,
-        remarks: productionLogs.remarks,
-        operator: users.name,
+      // 1. Fetch Completed Batches
+      const batches = await db.select({
+        id: productionBatches.id,
         batchCode: productionBatches.batchCode,
-        batchId: productionBatches.id
+        productId: productionBatches.productId,
+        blowingTotal: batchTotals.blowingTotal,
+        fillingTotal: batchTotals.fillingTotal,
+        labelingTotal: batchTotals.labelingTotal,
+        packingTotal: batchTotals.packingTotal,
+        scrapTotal: batchTotals.scrapTotal,
+        casesTotal: batchTotals.casesTotal,
+        unitsPerCase: products.unitsPerCase
       })
-      .from(productionLogs)
-      .leftJoin(users, eq(productionLogs.userId, users.id))
-      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
-      .where(and(...logConditions))
-      .orderBy(desc(productionLogs.loggedAt));
+      .from(productionBatches)
+      .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
+      .leftJoin(products, eq(productionBatches.productId, products.id))
+      .where(and(...batchConditions))
+      .orderBy(desc(productionBatches.endTime));
 
-      // 2. Distinct batches for this period & parameters
-      const batchIds = [...new Set(logs.map(l => l.batchId).filter(Boolean))] as string[];
+      const batchIds = batches.map(b => b.id);
 
-      // 3. Overall Summary
-      const summaryResults = await db.select({
-        unitsPerCase: products.unitsPerCase,
-        totalOutput: getProducedQuantitySql(),
-        totalWastage: getWastageQuantitySql()
-      })
-      .from(productionLogs)
-      .leftJoin(products, eq(productionLogs.productId, products.id))
-      .where(and(...logConditions))
-      .groupBy(products.unitsPerCase);
+      if (batchIds.length === 0) {
+        this.logger.log(`[DOSSIER_RECONCILIATION] Line: ${lineId} | Range: ${startDate.toISOString()} to ${endDate.toISOString()} | No Batches Found`);
+        return {
+          summary: {
+            producedCases: 0,
+            producedUnits: 0,
+            rejectedUnits: 0,
+            qualityYield: 100,
+            dispatchQty: 0
+          },
+          logs: [],
+          materialConsumption: [],
+          stationAnalysis: [
+            { station: 'Blowing Output (Units)', output: 0, waste: 0, yieldPct: 100 },
+            { station: 'Filling Output (Units)', output: 0, waste: 0, yieldPct: 100 },
+            { station: 'Labeling Output (Units)', output: 0, waste: 0, yieldPct: 100 },
+            { station: 'Packing Cases', output: 0, waste: 0, yieldPct: 100 }
+          ],
+          skuRecipe: [],
+          materialVariance: [],
+          costSummary: {
+            materialCost: 0,
+            wastageCost: 0,
+            productionCost: 0,
+            estimatedRevenue: 0,
+            margin: 0
+          },
+          batches: [],
+          reconciliation: {
+            selectedBatchIds: [],
+            summaryCases: 0,
+            summaryWaste: 0,
+            telemetryCount: 0,
+            materialTransactionsCount: 0
+          }
+        };
+      }
 
-      const summary = summaryResults[0] || { unitsPerCase: 1, totalOutput: '0', totalWastage: '0' };
-      const outputNum = Number(summary.totalOutput);
-      const wastageNum = Number(summary.totalWastage);
+      // 2. Calculate Aggregations
+      let outputNum = 0;
+      let wastageNum = 0;
+      let producedCases = 0;
+
+      batches.forEach(b => {
+        producedCases += Number(b.casesTotal || 0);
+        outputNum += Number(b.packingTotal || 0);
+        wastageNum += Number(b.scrapTotal || 0);
+      });
+
       const qualityYield = (outputNum + wastageNum) > 0 ? (outputNum / (outputNum + wastageNum)) * 100 : 100;
-      const producedCases = Math.floor(outputNum / (summary.unitsPerCase || 1));
 
-      // 4. Material Consumption (from Raw Material Ledger via Log # linkage)
+      // 3. Material Consumption via Log Linkage
       let materialConsumption = [];
-      const logIds = logs.map(l => l.id);
+      let logIds: any[] = [];
+      let matchedTxsCount = 0;
+
+      if (batchIds.length > 0) {
+        const logsForBatches = await db.select({ id: productionLogs.id })
+          .from(productionLogs)
+          .where(and(
+            inArray(productionLogs.batchId, batchIds),
+            isNull(productionLogs.deletedAt)
+          ));
+        logIds = logsForBatches.map(l => l.id);
+      }
       
       if (logIds.length > 0) {
-        // Broad time window query to catch transactions created slightly before/after logs
-        const windowStart = new Date(startDate.getTime() - 86400000);
-        const windowEnd = new Date(endDate.getTime() + 86400000);
+        // Broad time window query to catch transactions created slightly before/after
+        const windowStart = new Date(startDate.getTime() - 86400000 * 2);
+        const windowEnd = new Date(endDate.getTime() + 86400000 * 2);
         
         const allTxs = await db.select({
           materialId: rawMaterials.id,
@@ -189,6 +249,7 @@ export class ReportsService {
         const matchedTxs = allTxs.filter(tx => 
           tx.remarks && logIds.some(id => tx.remarks?.includes(`(Log #${id})`))
         );
+        matchedTxsCount = matchedTxs.length;
 
         const consumptionMap = matchedTxs.reduce((acc, tx) => {
           if (!acc[tx.materialId]) {
@@ -199,19 +260,14 @@ export class ReportsService {
               currentStock: Number(tx.currentStock || 0)
             };
           }
-          // transactions are negative for consumption, we want positive consumed sum
           acc[tx.materialId].consumed += Math.abs(Number(tx.consumed || 0));
           return acc;
         }, {} as Record<string, { materialName: string, unit: string, consumed: number, currentStock: number }>);
 
         materialConsumption = Object.values(consumptionMap);
-
-        if (materialConsumption.length === 0 && outputNum > 0) {
-          this.logger.warn(`[DATA INTEGRITY] No material consumption found for report ${lineId} / ${productId} despite output > 0. Checked ${allTxs.length} txs for ${logIds.length} logs.`);
-        }
       }
 
-      // 5. Dispatch Qty
+      // 4. Dispatch Qty
       let dispatchQty = 0;
       if (batchIds.length > 0) {
         const dispatchResults = await db.select({
@@ -227,56 +283,104 @@ export class ReportsService {
         dispatchQty = Number((dispatchResults[0] as any)?.totalDispatch || 0);
       }
 
-      // 6. Station Analysis
-      const stationAnalysis = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'].map(stationName => {
+      // 5. Station Analysis (Strict Batch-Scope)
+      const logs = await db.select({
+        id: productionLogs.id,
+        loggedAt: productionLogs.loggedAt,
+        batchCode: productionBatches.batchCode,
+        station: productionLogs.station,
+        primaryCount: productionLogs.primaryCount,
+        wastageCount: productionLogs.wastageCount,
+        casesProduced: productionLogs.casesProduced
+      })
+      .from(productionLogs)
+      .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .where(and(
+        inArray(productionLogs.batchId, batchIds),
+        isNull(productionLogs.deletedAt)
+      ))
+      .orderBy(desc(productionLogs.loggedAt));
+
+      const getYield = (out: number, w: number) => (out + w) > 0 ? (out / (out + w)) * 100 : 100;
+      
+      const stationAnalysis = [
+        {
+          station: 'Blowing Output (Units)',
+          output: logs.filter(l => l.station === 'BLOWING').reduce((sum, l) => sum + Number(l.primaryCount || 0), 0),
+          waste: logs.filter(l => l.station === 'BLOWING').reduce((sum, l) => sum + Number(l.wastageCount || 0), 0),
+          yieldPct: 0
+        },
+        {
+          station: 'Filling Output (Units)',
+          output: logs.filter(l => l.station === 'FILLING').reduce((sum, l) => sum + Number(l.primaryCount || 0), 0),
+          waste: logs.filter(l => l.station === 'FILLING').reduce((sum, l) => sum + Number(l.wastageCount || 0), 0),
+          yieldPct: 0
+        },
+        {
+          station: 'Labeling Output (Units)',
+          output: logs.filter(l => l.station === 'LABELING').reduce((sum, l) => sum + Number(l.primaryCount || 0), 0),
+          waste: logs.filter(l => l.station === 'LABELING').reduce((sum, l) => sum + Number(l.wastageCount || 0), 0),
+          yieldPct: 0
+        },
+        {
+          station: 'Packing Cases',
+          output: logs.filter(l => l.station === 'PACKING').reduce((sum, l) => sum + Number(l.casesProduced || 0), 0),
+          waste: logs.filter(l => l.station === 'PACKING').reduce((sum, l) => sum + Number(l.wastageCount || 0), 0),
+          yieldPct: 0
+        }
+      ];
+
+      // Set correct yieldPct for each station using unit-based calculation
+      stationAnalysis.forEach((s, idx) => {
+        const stationName = ['BLOWING', 'FILLING', 'LABELING', 'PACKING'][idx];
         const stationLogs = logs.filter(l => l.station === stationName);
-        const output = stationLogs.reduce((sum, l) => sum + (l.primaryCount || 0), 0);
-        const waste = stationLogs.reduce((sum, l) => sum + Number(l.wastageCount || 0), 0);
-        const yieldPct = (output + waste) > 0 ? (output / (output + waste)) * 100 : 100;
-        return {
-          station: stationName,
-          output,
-          waste,
-          yieldPct: Math.round(yieldPct * 100) / 100
-        };
+        const outUnits = stationLogs.reduce((sum, l) => sum + Number(l.primaryCount || 0), 0);
+        const wasteUnits = stationLogs.reduce((sum, l) => sum + Number(l.wastageCount || 0), 0);
+        s.yieldPct = Math.round(getYield(outUnits, wasteUnits) * 100) / 100;
       });
 
       // 7. SKU Recipe & Material Variance
-      const bomData = await db.select({
-        stockId: billOfMaterials.stockId,
-        itemName: inventoryStock.itemName,
-        unit: inventoryStock.unit,
-        qtyPerUnit: billOfMaterials.quantityPerUnit,
-        valuationRate: inventoryStock.valuationRate
-      })
-      .from(billOfMaterials)
-      .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
-      .where(eq(billOfMaterials.productId, productId));
-      
-      const skuRecipe = bomData.map(item => ({
-        materialName: item.itemName,
-        unit: item.unit,
-        qtyPerUnit: Number(item.qtyPerUnit || 0)
-      }));
+      let bomData: any[] = [];
+      let skuRecipe: any[] = [];
+      let materialVariance: any[] = [];
 
-      // Variance Calculation
-      const packingOutput = stationAnalysis.find(s => s.station === 'PACKING')?.output || 0;
-      const materialVariance: any[] = bomData.map(item => {
-        const expected = Number(item.qtyPerUnit) * packingOutput;
-        const actualMatch = materialConsumption.find(mc => 
-          mc.materialName.toLowerCase() === item.itemName.toLowerCase() || 
-          mc.materialName.includes(item.itemName) || 
-          item.itemName.includes(mc.materialName)
-        );
-        const actual = actualMatch ? actualMatch.consumed : 0;
-        return {
+      if (productId) {
+        bomData = await db.select({
+          stockId: billOfMaterials.stockId,
+          itemName: inventoryStock.itemName,
+          unit: inventoryStock.unit,
+          qtyPerUnit: billOfMaterials.quantityPerUnit,
+          valuationRate: inventoryStock.valuationRate
+        })
+        .from(billOfMaterials)
+        .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
+        .where(eq(billOfMaterials.productId, productId));
+        
+        skuRecipe = bomData.map(item => ({
           materialName: item.itemName,
           unit: item.unit,
-          expected,
-          actual,
-          variance: actual - expected
-        };
-      });
+          qtyPerUnit: Number(item.qtyPerUnit || 0)
+        }));
+
+        // Variance Calculation using Single Source of Truth packing output in units
+        const packingOutput = outputNum;
+        materialVariance = bomData.map(item => {
+          const expected = Number(item.qtyPerUnit) * packingOutput;
+          const actualMatch = materialConsumption.find(mc => 
+            mc.materialName.toLowerCase() === item.itemName.toLowerCase() || 
+            mc.materialName.includes(item.itemName) || 
+            item.itemName.includes(mc.materialName)
+          );
+          const actual = actualMatch ? actualMatch.consumed : 0;
+          return {
+            materialName: item.itemName,
+            unit: item.unit,
+            expected,
+            actual,
+            variance: actual - expected
+          };
+        });
+      }
 
       // Add items consumed that weren't in BOM
       materialConsumption.forEach(mc => {
@@ -316,6 +420,14 @@ export class ReportsService {
         margin: Math.round(margin * 100) / 100
       };
 
+      const mappedLogs = logs.map(l => ({
+        ...l,
+        output: l.station === 'PACKING' ? Number(l.casesProduced || 0) : Number(l.primaryCount || 0),
+        unitType: l.station === 'PACKING' ? 'Cases' : 'Units'
+      }));
+
+      this.logger.log(`[DOSSIER_RECONCILIATION] Line: ${lineId} | Range: ${startDate.toISOString()} to ${endDate.toISOString()} | Batches: [${batchIds.join(', ')}] | Summary Cases: ${producedCases} | Summary Waste: ${wastageNum} | Telemetry Logs: ${logs.length} | Material Txs: ${matchedTxsCount}`);
+
       return {
         summary: {
           producedCases,
@@ -324,13 +436,20 @@ export class ReportsService {
           qualityYield,
           dispatchQty
         },
-        logs,
+        logs: mappedLogs,
         materialConsumption,
         stationAnalysis,
         skuRecipe,
         materialVariance,
         costSummary,
-        batches: [...new Set(logs.map(l => l.batchCode).filter(Boolean))]
+        batches: [...new Set(batches.map(b => b.batchCode).filter(Boolean))],
+        reconciliation: {
+          selectedBatchIds: batchIds,
+          summaryCases: producedCases,
+          summaryWaste: wastageNum,
+          telemetryCount: logs.length,
+          materialTransactionsCount: matchedTxsCount
+        }
       };
 
     } catch (error: any) {
@@ -363,8 +482,11 @@ export class ReportsService {
       .innerJoin(products, eq(productionBatches.productId, products.id))
       .innerJoin(productBrands, eq(productionBatches.brandId, productBrands.id))
       .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
-      .where(between(sql`date(${productionBatches.startTime})`, filters.startDate, filters.endDate))
-      .orderBy(desc(productionBatches.startTime));
+      .where(and(
+        between(sql`date(${productionBatches.endTime})`, filters.startDate, filters.endDate),
+        inArray(productionBatches.status, ['COMPLETED', 'CLOSED'])
+      ))
+      .orderBy(desc(productionBatches.endTime));
     } catch (error: any) {
       this.logger.error(`[GET_PRODUCTION_BATCHES_FAILED] ${error.message}`);
       throw error;
@@ -447,9 +569,101 @@ export class ReportsService {
       .orderBy(desc(getProducedQuantitySql()))
       .limit(10);
 
+      // Material Wastage Analysis - Aggregated by Actual Materials (via BOM)
+      const logsAggregation = await db.select({
+        lineName: productionLines.name,
+        materialName: inventoryStock.itemName,
+        materialCode: inventoryStock.sku,
+        materialType: inventoryStock.materialType,
+        unit: inventoryStock.unit,
+        
+        expectedUsage: sql<number>`SUM(COALESCE(${productionLogs.primaryCount}::numeric, 0) * COALESCE(${billOfMaterials.quantityPerUnit}::numeric, 0))`,
+
+        // Blowing (Preforms/Bottles)
+        preformUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' AND ${inventoryStock.materialType}::text = 'PREFORM' THEN COALESCE(${productionLogs.bagsUsed}::numeric, 0) + COALESCE(${productionLogs.preformUsage}::numeric, 0) ELSE 0 END)`,
+        bottleLeakage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' AND ${inventoryStock.materialType}::text = 'PREFORM' THEN COALESCE(${productionLogs.bottleLeakage}::numeric, 0) ELSE 0 END)`,
+        
+        // Filling (Caps)
+        capUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' AND ${inventoryStock.materialType}::text = 'CAP' THEN COALESCE(${productionLogs.capBoxUsage}::numeric, 0) + COALESCE(${productionLogs.capUsage}::numeric, 0) ELSE 0 END)`,
+        capWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' AND ${inventoryStock.materialType}::text = 'CAP' THEN COALESCE(${productionLogs.capWastage}::numeric, 0) ELSE 0 END)`,
+        
+        // Labeling (Labels)
+        labelUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' AND ${inventoryStock.materialType}::text = 'LABEL' THEN COALESCE(${productionLogs.bopRollUsage}::numeric, 0) + COALESCE(${productionLogs.labelUsage}::numeric, 0) ELSE 0 END)`,
+        labelWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' AND ${inventoryStock.materialType}::text = 'LABEL' THEN COALESCE(${productionLogs.damagedLabelWeight}::numeric, 0) + COALESCE(${productionLogs.wastageCount}::numeric, 0) ELSE 0 END)`,
+        
+        // Packing (Shrink Roll)
+        shrinkUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' AND ${inventoryStock.materialType}::text = 'SHRINK' THEN COALESCE(${productionLogs.shrinkWeightUsed}::numeric, 0) ELSE 0 END)`,
+        shrinkWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' AND ${inventoryStock.materialType}::text = 'SHRINK' THEN COALESCE(${productionLogs.shrinkWastageKg}::numeric, 0) ELSE 0 END)`
+      })
+      .from(productionLogs)
+      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+      .innerJoin(billOfMaterials, eq(productionLogs.productId, billOfMaterials.productId))
+      .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
+      .where(and(
+        between(productionLogs.loggedAt, startDate, endDate),
+        inArray(productionBatches.status, ['COMPLETED', 'CLOSED']),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ))
+      .groupBy(productionLines.name, inventoryStock.itemName, inventoryStock.sku, inventoryStock.materialType, inventoryStock.unit);
+
+      const lineMaterialWastage: any[] = [];
+      logsAggregation.forEach(row => {
+        if (!row.materialName) return;
+
+        let consumed = 0;
+        let wastage = 0;
+
+        switch (row.materialType) {
+          case 'PREFORM':
+            consumed = Number(row.preformUsage);
+            wastage = Number(row.bottleLeakage);
+            break;
+          case 'CAP':
+            consumed = Number(row.capUsage);
+            wastage = Number(row.capWastage);
+            break;
+          case 'LABEL':
+            consumed = Number(row.labelUsage);
+            wastage = Number(row.labelWastage);
+            break;
+          case 'SHRINK':
+            consumed = Number(row.shrinkUsage);
+            wastage = Number(row.shrinkWastage);
+            break;
+        }
+
+        if (consumed > 0 || wastage > 0) {
+          const expected = Number(row.expectedUsage);
+          const variance = expected > 0 ? ((consumed - expected) / expected) * 100 : 0;
+          
+          lineMaterialWastage.push({ 
+            lineName: row.lineName, 
+            materialName: row.materialName,
+            materialCode: row.materialCode || 'N/A',
+            unit: row.unit || 'N/A', 
+            totalConsumed: consumed, 
+            totalWastage: wastage,
+            variance: Math.round(variance * 100) / 100
+          });
+        }
+      });
+
       return {
         reportData,
         batchesData,
+        lineMaterialWastage: lineMaterialWastage.map(m => {
+          const consumed = Number(m.totalConsumed || 0);
+          const waste = Number(m.totalWastage || 0);
+          const variance = consumed > 0 ? (waste / consumed) * 100 : 0;
+          return {
+            ...m,
+            totalConsumed: consumed,
+            totalWastage: waste,
+            variance: Number(variance.toFixed(2))
+          };
+        }),
         materialConsumption: materialConsumption.map(m => ({
           ...m,
           consumed: Number(m.consumed || 0),

@@ -55,9 +55,9 @@ export class ReportsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('lineId') lineId: string,
-    @Query('productId') productId: string
+    @Query('productId') productId?: string
   ) {
-    if (!lineId || !productId) throw new BadRequestException('lineId and productId are required');
+    if (!lineId) throw new BadRequestException('lineId is required');
     const dates = this.validateDates(startDate, endDate);
     return this.reportsService.getProductionReportDetails({
       ...dates,
