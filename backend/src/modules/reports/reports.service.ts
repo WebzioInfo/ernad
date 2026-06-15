@@ -507,6 +507,8 @@ export class ReportsService {
         endDate: endDate.toISOString().split('T')[0] 
       });
 
+      const batchIds = batchesData.map(b => b.id);
+
       // Raw Material Consumption
       const materialConsumption = await db.select({
         materialId: rawMaterials.id,
@@ -569,86 +571,119 @@ export class ReportsService {
       .orderBy(desc(getProducedQuantitySql()))
       .limit(10);
 
-      // Material Wastage Analysis - Aggregated by Actual Materials (via BOM)
-      const logsAggregation = await db.select({
-        lineName: productionLines.name,
-        materialName: inventoryStock.itemName,
-        materialCode: inventoryStock.sku,
-        materialType: inventoryStock.materialType,
-        unit: inventoryStock.unit,
-        
-        expectedUsage: sql<number>`SUM(COALESCE(${productionLogs.primaryCount}::numeric, 0) * COALESCE(${billOfMaterials.quantityPerUnit}::numeric, 0))`,
-
-        // Blowing (Preforms/Bottles)
-        preformUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' AND ${inventoryStock.materialType}::text = 'PREFORM' THEN COALESCE(${productionLogs.bagsUsed}::numeric, 0) + COALESCE(${productionLogs.preformUsage}::numeric, 0) ELSE 0 END)`,
-        bottleLeakage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'BLOWING' AND ${inventoryStock.materialType}::text = 'PREFORM' THEN COALESCE(${productionLogs.bottleLeakage}::numeric, 0) ELSE 0 END)`,
-        
-        // Filling (Caps)
-        capUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' AND ${inventoryStock.materialType}::text = 'CAP' THEN COALESCE(${productionLogs.capBoxUsage}::numeric, 0) + COALESCE(${productionLogs.capUsage}::numeric, 0) ELSE 0 END)`,
-        capWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'FILLING' AND ${inventoryStock.materialType}::text = 'CAP' THEN COALESCE(${productionLogs.capWastage}::numeric, 0) ELSE 0 END)`,
-        
-        // Labeling (Labels)
-        labelUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' AND ${inventoryStock.materialType}::text = 'LABEL' THEN COALESCE(${productionLogs.bopRollUsage}::numeric, 0) + COALESCE(${productionLogs.labelUsage}::numeric, 0) ELSE 0 END)`,
-        labelWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'LABELING' AND ${inventoryStock.materialType}::text = 'LABEL' THEN COALESCE(${productionLogs.damagedLabelWeight}::numeric, 0) + COALESCE(${productionLogs.wastageCount}::numeric, 0) ELSE 0 END)`,
-        
-        // Packing (Shrink Roll)
-        shrinkUsage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' AND ${inventoryStock.materialType}::text = 'SHRINK' THEN COALESCE(${productionLogs.shrinkWeightUsed}::numeric, 0) ELSE 0 END)`,
-        shrinkWastage: sql<number>`SUM(CASE WHEN ${productionLogs.station}::text = 'PACKING' AND ${inventoryStock.materialType}::text = 'SHRINK' THEN COALESCE(${productionLogs.shrinkWastageKg}::numeric, 0) ELSE 0 END)`
-      })
-      .from(productionLogs)
-      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
-      .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
-      .innerJoin(billOfMaterials, eq(productionLogs.productId, billOfMaterials.productId))
-      .innerJoin(inventoryStock, eq(billOfMaterials.stockId, inventoryStock.id))
-      .where(and(
-        between(productionLogs.loggedAt, startDate, endDate),
-        inArray(productionBatches.status, ['COMPLETED', 'CLOSED']),
-        isNull(productionLogs.deletedAt),
-        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
-      ))
-      .groupBy(productionLines.name, inventoryStock.itemName, inventoryStock.sku, inventoryStock.materialType, inventoryStock.unit);
-
+      // Material Wastage Analysis - Aggregated by Actual Materials (scoped to canonical batch list)
       const lineMaterialWastage: any[] = [];
-      logsAggregation.forEach(row => {
-        if (!row.materialName) return;
 
-        let consumed = 0;
-        let wastage = 0;
+      if (batchIds.length > 0) {
+        const windowStart = new Date(startDate.getTime() - 86400000 * 5);
+        const windowEnd = new Date(endDate.getTime() + 86400000 * 5);
 
-        switch (row.materialType) {
-          case 'PREFORM':
-            consumed = Number(row.preformUsage);
-            wastage = Number(row.bottleLeakage);
-            break;
-          case 'CAP':
-            consumed = Number(row.capUsage);
-            wastage = Number(row.capWastage);
-            break;
-          case 'LABEL':
-            consumed = Number(row.labelUsage);
-            wastage = Number(row.labelWastage);
-            break;
-          case 'SHRINK':
-            consumed = Number(row.shrinkUsage);
-            wastage = Number(row.shrinkWastage);
-            break;
+        const logs = await db.select({
+          id: productionLogs.id,
+          batchId: productionLogs.batchId,
+          station: productionLogs.station,
+          primaryCount: productionLogs.primaryCount,
+          wastageCount: productionLogs.wastageCount,
+          capWastage: productionLogs.capWastage,
+          bottleLeakage: productionLogs.bottleLeakage,
+          damagedLabelWeight: productionLogs.damagedLabelWeight,
+          shrinkWastageKg: productionLogs.shrinkWastageKg,
+          lineName: productionLines.name
+        })
+        .from(productionLogs)
+        .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+        .innerJoin(productionLines, eq(productionBatches.lineId, productionLines.id))
+        .where(and(
+          inArray(productionLogs.batchId, batchIds),
+          isNull(productionLogs.deletedAt),
+          notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+        ));
+
+        const logIds = logs.map(l => l.id);
+
+        const allTxs = await db.select({
+          materialId: rawMaterials.id,
+          materialName: rawMaterials.name,
+          materialType: rawMaterials.materialType,
+          unit: rawMaterials.unit,
+          quantityChange: rawMaterialTransactions.quantityChange,
+          remarks: rawMaterialTransactions.remarks
+        })
+        .from(rawMaterialTransactions)
+        .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
+        .where(and(
+          eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+          between(rawMaterialTransactions.createdAt, windowStart, windowEnd)
+        ));
+
+        const matchedTxs = allTxs.filter(tx => 
+          tx.remarks && logIds.some(id => tx.remarks?.includes(`(Log #${id})`))
+        );
+
+        this.logger.log(`[WASTAGE_AUDIT] Batches: ${batchIds.length} | Logs: ${logs.length} | Transactions Found: ${allTxs.length} | Matched Transactions: ${matchedTxs.length}`);
+
+        const aggregationMap = new Map<string, {
+          lineName: string;
+          materialName: string;
+          materialCode: string;
+          unit: string;
+          totalConsumed: number;
+          totalWastage: number;
+        }>();
+
+        matchedTxs.forEach(tx => {
+          const logIdMatch = tx.remarks?.match(/\(Log #(\d+)\)/);
+          const logId = logIdMatch ? Number(logIdMatch[1]) : null;
+          const log = logs.find(l => l.id === logId);
+
+          let wastage = 0;
+          if (log) {
+            if (tx.materialType === 'PREFORM') {
+              wastage = Number(log.bottleLeakage || 0);
+              if (wastage === 0) wastage = Number(log.wastageCount || 0);
+            } else if (tx.materialType === 'CAP') {
+              wastage = Number(log.capWastage || 0);
+            } else if (tx.materialType === 'LABEL') {
+              wastage = Number(log.damagedLabelWeight || 0);
+              if (wastage === 0) wastage = Number(log.wastageCount || 0);
+            } else if (tx.materialType === 'SHRINK') {
+              wastage = Number(log.shrinkWastageKg || 0);
+            } else {
+              wastage = Number(log.wastageCount || 0);
+            }
+          }
+
+          const key = `${log ? log.lineName : 'Unknown'}::${tx.materialId}`;
+          const consumed = Math.abs(Number(tx.quantityChange || 0));
+
+          if (!aggregationMap.has(key)) {
+            aggregationMap.set(key, {
+              lineName: log ? log.lineName : 'Unknown',
+              materialName: tx.materialName,
+              materialCode: tx.materialId.slice(0, 8),
+              unit: tx.unit,
+              totalConsumed: 0,
+              totalWastage: 0
+            });
+          }
+
+          const entry = aggregationMap.get(key)!;
+          entry.totalConsumed += consumed;
+          entry.totalWastage += wastage;
+        });
+
+        aggregationMap.forEach(item => {
+          if (item.totalConsumed > 0 || item.totalWastage > 0) {
+            lineMaterialWastage.push(item);
+          }
+        });
+
+        this.logger.log(`[WASTAGE_AUDIT] Generated ${lineMaterialWastage.length} wastage rows.`);
+
+        if (batchIds.length > 0 && lineMaterialWastage.length === 0) {
+          this.logger.warn(`[WASTAGE_AUDIT_ZERO_ROWS] Details contained ${batchIds.length} batches but Material Wastage returned 0 rows. Checked logs count: ${logs.length}, matched transactions: ${matchedTxs.length}.`);
         }
-
-        if (consumed > 0 || wastage > 0) {
-          const expected = Number(row.expectedUsage);
-          const variance = expected > 0 ? ((consumed - expected) / expected) * 100 : 0;
-          
-          lineMaterialWastage.push({ 
-            lineName: row.lineName, 
-            materialName: row.materialName,
-            materialCode: row.materialCode || 'N/A',
-            unit: row.unit || 'N/A', 
-            totalConsumed: consumed, 
-            totalWastage: wastage,
-            variance: Math.round(variance * 100) / 100
-          });
-        }
-      });
+      }
 
       return {
         reportData,

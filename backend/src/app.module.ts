@@ -11,6 +11,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { TelemetryModule } from './modules/telemetry/telemetry.module';
 import { ProductionModule } from './modules/production/production.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { WastageModule } from './modules/wastage/wastage.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { MasterDataModule } from './modules/master-data/master-data.module';
@@ -61,6 +62,7 @@ import { AppController } from './app.controller';
     DashboardModule,
 
     ReportsModule,
+    WastageModule,
     SalesModule,
     ProcurementModule,
     WarehousingModule,

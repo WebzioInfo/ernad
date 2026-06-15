@@ -7,10 +7,11 @@ import { notesConfig } from '../../modules/notes/module.config';
 import { settingsConfig } from '../../modules/settings/module.config';
 import { reportsConfig } from '../../modules/reports/module.config';
 import { incidentsConfig } from '../../modules/incidents/module.config';
+import { wastageConfig } from '../../modules/wastage/module.config';
 
 export const registerModules = () => {
   moduleRegistry.register(analyticsConfig);
-  
+  moduleRegistry.register(wastageConfig);
   moduleRegistry.register(personnelConfig);
   moduleRegistry.register(productionConfig);
   moduleRegistry.register(incidentsConfig);
