@@ -10,10 +10,11 @@ async function bootstrap() {
   const startDate = new Date('2026-06-08T00:00:00.000Z');
   const endDate = new Date('2026-06-15T23:59:59.000Z');
 
-  console.log('--- CALLING getWastageDashboardData ---');
+  console.log('--- CALLING getWastageDashboardData for batchCode EB26164 ---');
   const result = await wastageService.getWastageDashboardData({
     startDate,
-    endDate
+    endDate,
+    batchCode: 'EB26164'
   });
 
   console.log('\n=== KPIS ===');

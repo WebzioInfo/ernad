@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api-client';
-import { 
-  Calendar, ArrowUpRight, ArrowDownRight, TrendingDown, Tag, 
-  Activity, Search, Award, ShieldAlert, AlertCircle, RefreshCw, 
+import {
+  Calendar, ArrowUpRight, ArrowDownRight, TrendingDown, Tag,
+  Activity, Search, Award, ShieldAlert, AlertCircle, RefreshCw,
   BarChart2, ShieldCheck, MapPin, Loader2
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, 
-  ResponsiveContainer, BarChart, Bar, Cell 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip,
+  ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
 import WastageBatchDrawer from '../components/WastageBatchDrawer';
 
@@ -23,7 +23,7 @@ export default function WastageDashboard() {
   const [selectedFilters, setSelectedFilters] = useState({
     lineId: 'all',
     productId: 'all',
-    batchId: 'all'
+    batchCode: 'all'
   });
 
   const [searchText, setSearchText] = useState('');
@@ -62,7 +62,7 @@ export default function WastageDashboard() {
           endDate: dateRange.end,
           lineId: selectedFilters.lineId,
           productId: selectedFilters.productId,
-          batchId: selectedFilters.batchId
+          batchCode: selectedFilters.batchCode
         }
       });
       return res.data;
@@ -79,7 +79,7 @@ export default function WastageDashboard() {
 
     if (searchText.trim()) {
       const query = searchText.toLowerCase();
-      items = items.filter((b: any) => 
+      items = items.filter((b: any) =>
         b.batchCode.toLowerCase().includes(query) ||
         b.lineName.toLowerCase().includes(query) ||
         b.skuName.toLowerCase().includes(query)
@@ -87,6 +87,11 @@ export default function WastageDashboard() {
     }
     return items;
   }, [wastageData, searchText]);
+
+  const uniqueBatchCodes = useMemo(() => {
+    if (!filterBatches) return [];
+    return [...new Set(filterBatches.map((b: any) => b.batchCode).filter(Boolean))].sort();
+  }, [filterBatches]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBatchesTable.length / itemsPerPage));
   const paginatedBatches = useMemo(() => {
@@ -118,7 +123,7 @@ export default function WastageDashboard() {
               <p className="text-slate-400 font-bold mt-1 text-sm">Enterprise loss diagnostics, yields ranking, and material leak analytics.</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => refetch()}
             className="px-5 py-3 bg-white/5 hover:bg-white/10 text-white rounded-2xl border border-white/10 flex items-center gap-2 transition-all font-semibold text-xs active:scale-95 disabled:opacity-50"
           >
@@ -219,12 +224,12 @@ export default function WastageDashboard() {
             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Batch Number</span>
             <select
               className="bg-transparent border-none outline-none font-bold text-slate-700 text-xs mt-0.5 w-full"
-              value={selectedFilters.batchId}
-              onChange={(e) => setSelectedFilters(prev => ({ ...prev, batchId: e.target.value }))}
+              value={selectedFilters.batchCode}
+              onChange={(e) => setSelectedFilters(prev => ({ ...prev, batchCode: e.target.value }))}
             >
               <option value="all">All Batches</option>
-              {filterBatches?.map((b: any) => (
-                <option key={b.id} value={b.id}>{b.batchCode}</option>
+              {uniqueBatchCodes.map((code: any) => (
+                <option key={code} value={code}>{code}</option>
               ))}
             </select>
           </div>
@@ -334,29 +339,29 @@ export default function WastageDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={wastageData.trendData} onClick={handleTrendPointClick}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                         dy={10}
                       />
-                      <YAxis 
+                      <YAxis
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                         dx={-10}
                       />
-                      <ChartTooltip 
+                      <ChartTooltip
                         contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                         formatter={(value: any) => [`${value} Units`, 'Wastage']}
                         labelFormatter={(val) => `Date: ${val}`}
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="waste" 
-                        stroke="#f43f5e" 
-                        strokeWidth={3} 
+                      <Line
+                        type="monotone"
+                        dataKey="waste"
+                        stroke="#f43f5e"
+                        strokeWidth={3}
                         dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
                         activeDot={{ r: 7, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }}
                       />
@@ -400,7 +405,7 @@ export default function WastageDashboard() {
               </h3>
               <div className="flex-1 overflow-y-auto space-y-4">
                 {wastageData?.linePerformance?.map((line: any) => (
-                  <div 
+                  <div
                     key={line.lineName}
                     className={`p-5 rounded-3xl border flex items-center justify-between ${line.rank === 1 ? 'bg-indigo-50/20 border-indigo-100' : 'bg-slate-50/40 border-slate-100'}`}
                   >
@@ -433,22 +438,25 @@ export default function WastageDashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={wastageData.materialWastage.slice(0, 10)}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="materialName" 
+                      <XAxis
+                        dataKey="materialName"
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 9, fontWeight: 600 }}
                         dy={10}
                       />
-                      <YAxis 
+                      <YAxis
                         axisLine={false}
                         tickLine={false}
                         tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 600 }}
                         dx={-10}
                       />
-                      <ChartTooltip 
+                      <ChartTooltip
                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                        formatter={(value: any) => [`${value} Units`, 'Wastage']}
+                        formatter={(value: any, _: any, props: any) => [
+                          `${value.toLocaleString()} ${props?.payload?.unit || 'Units'}`, 
+                          'Wastage'
+                        ]}
                       />
                       <Bar dataKey="wasted" radius={[6, 6, 0, 0]}>
                         {wastageData.materialWastage.slice(0, 10).map((_: any, index: number) => (
@@ -553,8 +561,8 @@ export default function WastageDashboard() {
                       <span className="font-black text-slate-950">{cause.count} instances</span>
                     </div>
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-indigo-500 rounded-full" 
+                      <div
+                        className="h-full bg-indigo-500 rounded-full"
                         style={{ width: `${Math.min(100, (cause.count / (wastageData.trendData.length || 1)) * 100)}%` }}
                       />
                     </div>
@@ -607,8 +615,8 @@ export default function WastageDashboard() {
                     </tr>
                   ) : (
                     paginatedBatches.map((b: any) => (
-                      <tr 
-                        key={b.id} 
+                      <tr
+                        key={b.id}
                         onClick={() => setSelectedBatchId(b.id)}
                         className="hover:bg-slate-50/40 transition-all cursor-pointer group"
                       >
@@ -679,9 +687,9 @@ export default function WastageDashboard() {
               onClick={() => setSelectedBatchId(null)}
               className="fixed inset-0 bg-black z-40 backdrop-blur-sm"
             />
-            <WastageBatchDrawer 
-              batchId={selectedBatchId} 
-              onClose={() => setSelectedBatchId(null)} 
+            <WastageBatchDrawer
+              batchId={selectedBatchId}
+              onClose={() => setSelectedBatchId(null)}
             />
           </>
         )}

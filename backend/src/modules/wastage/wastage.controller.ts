@@ -36,15 +36,15 @@ export class WastageController {
     @Query('endDate') endDate: string,
     @Query('lineId') lineId?: string,
     @Query('productId') productId?: string,
-    @Query('batchId') batchId?: string
+    @Query('batchCode') batchCode?: string
   ) {
-    this.logger.log(`[WASTAGE_CONTROLLER] Dashboard fetch request. Line: ${lineId || 'all'}, Product: ${productId || 'all'}, Batch: ${batchId || 'all'}`);
+    this.logger.log(`[WASTAGE_CONTROLLER] Dashboard fetch request. Line: ${lineId || 'all'}, Product: ${productId || 'all'}, BatchCode: ${batchCode || 'all'}`);
     const dates = this.validateDates(startDate, endDate);
     return this.wastageService.getWastageDashboardData({
       ...dates,
       lineId,
       productId,
-      batchId
+      batchCode
     });
   }
 

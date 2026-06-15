@@ -21,7 +21,7 @@ export class WastageService {
     endDate: Date;
     lineId?: string;
     productId?: string;
-    batchId?: string;
+    batchCode?: string;
   }) {
     const conditions = [
       between(productionBatches.endTime, filters.startDate, filters.endDate),
@@ -35,8 +35,8 @@ export class WastageService {
     if (filters.productId && filters.productId !== 'all') {
       conditions.push(eq(productionBatches.productId, filters.productId));
     }
-    if (filters.batchId && filters.batchId !== 'all') {
-      conditions.push(eq(productionBatches.id, filters.batchId));
+    if (filters.batchCode && filters.batchCode !== 'all') {
+      conditions.push(eq(productionBatches.batchCode, filters.batchCode));
     }
 
     const batches = await db.select({ id: productionBatches.id })
@@ -52,14 +52,14 @@ export class WastageService {
   private async getWastageForRange(startDate: Date, endDate: Date, filters: {
     lineId?: string;
     productId?: string;
-    batchId?: string;
+    batchCode?: string;
   }): Promise<number> {
     const batchIds = await this.getCanonicalBatchIds({
       startDate,
       endDate,
       lineId: filters.lineId,
       productId: filters.productId,
-      batchId: filters.batchId
+      batchCode: filters.batchCode
     });
 
     if (batchIds.length === 0) return 0;
@@ -85,7 +85,7 @@ export class WastageService {
     endDate: Date;
     lineId?: string;
     productId?: string;
-    batchId?: string;
+    batchCode?: string;
   }) {
     try {
       const { startDate, endDate } = filters;
