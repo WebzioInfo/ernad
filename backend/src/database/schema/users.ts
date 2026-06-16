@@ -70,4 +70,16 @@ export const userLines = pgTable('user_lines', {
   ];
 });
 
-
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  usedAt: timestamp('used_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+  return [
+    index('idx_pwd_reset_token_hash').on(table.tokenHash),
+    index('idx_pwd_reset_user_id').on(table.userId),
+  ];
+});

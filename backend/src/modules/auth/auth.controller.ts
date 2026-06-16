@@ -7,6 +7,7 @@ import {
   UseGuards,
   Request,
   UnauthorizedException,
+  BadRequestException,
   HttpCode,
   Res,
   HttpStatus,
@@ -130,5 +131,27 @@ export class AuthController {
     @Body() body: { userId: string; newCredential: string; type: 'PASSWORD' | 'PIN' },
   ) {
     return this.authService.resetCredentialById(req.user.roles, body.userId, body.newCredential, body.type);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset email' })
+  async forgotPassword(@Body() body: { email: string }) {
+    if (!body.email) {
+      throw new BadRequestException('Email is required');
+    }
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using token' })
+  async resetPassword(@Body() body: { token: string; newPassword: string }) {
+    if (!body.token || !body.newPassword) {
+      throw new BadRequestException('Token and new password are required');
+    }
+    return this.authService.resetPassword(body.token, body.newPassword);
   }
 }

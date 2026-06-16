@@ -1,10 +1,12 @@
 import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { db } from '../../database/db';
-import { users, operatorSessions, roles, permissions, rolePermissions, userRoles } from '../../database/schema';
-import { eq, ilike, and, isNull, sql, or } from 'drizzle-orm';
+import { users, operatorSessions, roles, permissions, rolePermissions, userRoles, passwordResetTokens, auditLogs } from '../../database/schema';
+import { eq, ilike, and, isNull, sql, or, gt } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { OperatorSessionsService } from '../operator-sessions/operator-sessions.service';
+import { MailService } from '../../providers/mail/mail.service';
 
 const ROLE_PRECEDENCE = [
   'ADMIN',
@@ -39,7 +41,8 @@ export class AuthService {
 
   constructor(
     private jwtService: JwtService,
-    private sessionService: OperatorSessionsService
+    private sessionService: OperatorSessionsService,
+    private mailService: MailService
   ) {}
 
   async login(identity: string, credential: string, type?: 'PASSWORD' | 'PIN') {
@@ -360,5 +363,123 @@ export class AuthService {
       throw err;
     }
   }
-}
 
+  async forgotPassword(email: string) {
+    this.logger.log(`[AUTH] Forgot password request for: ${email}`);
+
+    // Generic success message to prevent email enumeration
+    const genericMessage = 'If an account exists with this email, a password reset link has been sent.';
+
+    // 1. Find user
+    const [user] = await db.select().from(users).where(ilike(users.email, email.trim())).limit(1);
+
+    if (!user) {
+      this.logger.warn(`[AUTH] Forgot password request for non-existent email: ${email}`);
+      return { message: genericMessage };
+    }
+
+    // 2. Rate limiting check (e.g., max 3 requests in the last hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentRequests = await db.select({ id: passwordResetTokens.id })
+      .from(passwordResetTokens)
+      .where(
+        and(
+          eq(passwordResetTokens.userId, user.id),
+          gt(passwordResetTokens.createdAt, oneHourAgo)
+        )
+      );
+
+    if (recentRequests.length >= 3) {
+      this.logger.warn(`[AUTH] Rate limit exceeded for password reset: ${email}`);
+      return { message: genericMessage };
+    }
+
+    // 3. Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(token, 10);
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    // 4. Save token
+    await db.insert(passwordResetTokens).values({
+      userId: user.id,
+      tokenHash,
+      expiresAt,
+    });
+
+    // 5. Send email
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+
+    await this.mailService.sendPasswordResetEmail(user.email, user.name, resetLink);
+
+    // 6. Audit logging
+    await db.insert(auditLogs).values({
+      actorId: user.id,
+      action: 'PASSWORD_RESET_REQUESTED',
+      entityType: 'USER',
+      entityId: user.id,
+      category: 'SECURITY',
+      occurredAt: new Date(),
+    });
+
+    return { message: genericMessage };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    if (newPassword.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters long');
+    }
+
+    // 1. Find the active token
+    const validTokens = await db.select()
+      .from(passwordResetTokens)
+      .where(
+        and(
+          gt(passwordResetTokens.expiresAt, new Date()),
+          isNull(passwordResetTokens.usedAt)
+        )
+      );
+
+    let validTokenRecord = null;
+    for (const record of validTokens) {
+      const isMatch = await bcrypt.compare(token, record.tokenHash);
+      if (isMatch) {
+        validTokenRecord = record;
+        break;
+      }
+    }
+
+    if (!validTokenRecord) {
+      // Find user if possible for audit log, but since we can't reliably map token to user without a match,
+      // we log a generic invalid attempt if we want, but it's hard without userId.
+      this.logger.warn('[AUTH] Invalid or expired password reset token attempt');
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    const userId = validTokenRecord.userId;
+
+    // 2. Hash new password and update user
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await db.update(users)
+      .set({ passwordHash: newPasswordHash })
+      .where(eq(users.id, userId));
+
+    // 3. Mark token as used
+    await db.update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokens.id, validTokenRecord.id));
+
+    // 4. Audit logging
+    await db.insert(auditLogs).values({
+      actorId: userId,
+      action: 'PASSWORD_SUCCESSFULLY_CHANGED',
+      entityType: 'USER',
+      entityId: userId,
+      category: 'SECURITY',
+      occurredAt: new Date(),
+    });
+
+    return { message: 'Password has been successfully reset' };
+  }
+}

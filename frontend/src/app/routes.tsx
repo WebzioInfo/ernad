@@ -3,6 +3,8 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 import DashboardLayout from '../layouts/DashboardLayout';
 import Login from '../modules/auth/Login';
+import ForgotPassword from '../modules/auth/ForgotPassword';
+import ResetPassword from '../modules/auth/ResetPassword';
 import RequireAuth from '../modules/auth/RequireAuth';
 import SmartRedirect from './SmartRedirect';
 // TEMP DISABLED - Future Admin Feature
@@ -51,6 +53,8 @@ export function AppRoutes() {
         {/* Public & Core */}
         <Route path="/" element={<SmartRedirect />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* 1. ADMINISTRATION (Admin) */}
         <Route

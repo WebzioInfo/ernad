@@ -5,7 +5,7 @@ import { TerminalsController } from './terminals.controller';
 import { AuthService } from './auth.service';
 import { OperatorSessionsModule } from '../operator-sessions/operator-sessions.module';
 import { UsersModule } from '../users/users.module';
-
+import { MailModule } from '../../providers/mail/mail.module';
 @Module({
   imports: [
     JwtModule.register({
@@ -15,6 +15,7 @@ import { UsersModule } from '../users/users.module';
     }),
     OperatorSessionsModule,
     UsersModule,
+    MailModule,
   ],
   controllers: [AuthController, TerminalsController],
   providers: [AuthService],
