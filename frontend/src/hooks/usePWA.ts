@@ -3,8 +3,38 @@ import { useState, useEffect } from 'react';
 export function usePWA() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [isPromptOpen, setIsPromptOpen] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
+    // Detect iOS (iPhone, iPad, iPod, and desktop-class iPadOS)
+    const checkIsIOS = () => {
+      const userAgent = window.navigator.userAgent || '';
+      const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) || 
+        (userAgent.includes('Mac') && 'ontouchend' in document);
+      setIsIOS(isIOSDevice);
+    };
+
+    // Check if the app is already installed/running in standalone mode
+    const checkStandalone = () => {
+      const isStandaloneMode = 
+        (window.navigator as any).standalone === true || 
+        window.matchMedia('(display-mode: standalone)').matches;
+      
+      setIsInstalled(isStandaloneMode);
+    };
+
+    // Check localStorage for dismissal state
+    const checkDismissal = () => {
+      const dismissed = localStorage.getItem('eranad-pwa-ios-dismissed') === 'true';
+      setIsDismissed(dismissed);
+    };
+
+    checkIsIOS();
+    checkStandalone();
+    checkDismissal();
+
     const handleBeforeInstallPrompt = (e: any) => {
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
@@ -20,11 +50,6 @@ export function usePWA() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
-
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -46,5 +71,32 @@ export function usePWA() {
     setInstallPrompt(null);
   };
 
-  return { installPrompt, isInstalled, installApp };
+  const dismissIOSPrompt = () => {
+    localStorage.setItem('eranad-pwa-ios-dismissed', 'true');
+    setIsDismissed(true);
+    setIsPromptOpen(false);
+  };
+
+  const triggerIOSPrompt = () => {
+    setIsPromptOpen(true);
+  };
+
+  const closeIOSPrompt = () => {
+    setIsPromptOpen(false);
+  };
+
+  // The automatic banner should show if the user is on iOS, the app is not installed, 
+  // and the user has not dismissed it. Or if they manually triggered it (isPromptOpen).
+  const showIOSPrompt = (isIOS && !isInstalled && !isDismissed) || isPromptOpen;
+
+  return { 
+    installPrompt, 
+    isInstalled, 
+    installApp,
+    isIOS,
+    showIOSPrompt,
+    dismissIOSPrompt,
+    triggerIOSPrompt,
+    closeIOSPrompt
+  };
 }

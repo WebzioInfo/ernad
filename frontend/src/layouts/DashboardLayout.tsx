@@ -10,12 +10,21 @@ import CommandPalette from '../components/common/CommandPalette';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { usePWA } from '../hooks/usePWA';
+import { IOSInstallPrompt } from '../components/common/IOSInstallPrompt';
 import { cn } from '@/lib/utils';
 import QuickNotes from '../components/QuickNotes';
 
 export default function DashboardLayout() {
   const { user, logout } = useAuthStore();
-  const { installPrompt, installApp } = usePWA();
+  const { 
+    installPrompt, 
+    installApp, 
+    isIOS, 
+    isInstalled, 
+    showIOSPrompt, 
+    dismissIOSPrompt, 
+    triggerIOSPrompt 
+  } = usePWA();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -126,6 +135,7 @@ export default function DashboardLayout() {
   return (
     <div className="flex h-screen bg-[#FDFDFD]">
       <CommandPalette />
+      <IOSInstallPrompt isOpen={showIOSPrompt} onClose={dismissIOSPrompt} />
 
       {/* Mobile Sidebar Backdrop Overlay */}
       {isSidebarOpen && (
@@ -228,9 +238,21 @@ export default function DashboardLayout() {
         </nav>
 
         <div className="p-4 bg-slate-950/30 space-y-2">
-          {installPrompt && (
+          {/* Install prompt button for non-iOS browsers supporting beforeinstallprompt */}
+          {!isIOS && installPrompt && (
             <button
               onClick={installApp}
+              className={`w-full flex items-center py-3 rounded-2xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors border border-indigo-500/20 ${isSidebarOpen ? 'px-4' : 'justify-center'}`}
+            >
+              <Command className="w-5 h-5 flex-shrink-0" />
+              {isSidebarOpen && <span className="ml-4 font-bold text-sm truncate animate-in fade-in slide-in-from-left-2">Install System</span>}
+            </button>
+          )}
+
+          {/* Install guidance button for iOS devices */}
+          {isIOS && !isInstalled && (
+            <button
+              onClick={triggerIOSPrompt}
               className={`w-full flex items-center py-3 rounded-2xl bg-indigo-600/10 text-indigo-400 hover:bg-indigo-600/20 transition-colors border border-indigo-500/20 ${isSidebarOpen ? 'px-4' : 'justify-center'}`}
             >
               <Command className="w-5 h-5 flex-shrink-0" />
