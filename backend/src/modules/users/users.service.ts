@@ -360,6 +360,7 @@ export class UsersService {
           department: dto.department || null,
           jobTitle: dto.jobTitle || null,
           pinCode: hashedPin,
+          passwordHash: hashedPin,
           operatorType: dto.operatorType || null,
           isActive: true,
         })
@@ -452,7 +453,9 @@ export class UsersService {
           if (String(dto.pin).length !== 4) {
             throw new BadRequestException('Operator PIN must be exactly 4 digits');
           }
-          updateData.pinCode = await bcrypt.hash(dto.pin, 10);
+          const hashedPin = await bcrypt.hash(dto.pin, 10);
+          updateData.pinCode = hashedPin;
+          updateData.passwordHash = hashedPin;
         }
 
         // Hierarchy validation for role updates
