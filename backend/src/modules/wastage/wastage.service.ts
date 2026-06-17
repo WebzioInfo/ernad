@@ -159,7 +159,7 @@ export class WastageService {
       .from(rawMaterialTransactions)
       .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
       .where(and(
-        eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+          inArray(rawMaterialTransactions.type, ['CONSUMPTION', 'REVERSAL']),
         between(rawMaterialTransactions.createdAt, windowStart, windowEnd)
       ));
 
@@ -236,7 +236,7 @@ export class WastageService {
           }
         }
 
-        const consumed = Math.abs(Number(tx.quantityChange || 0));
+        const consumed = -Number(tx.quantityChange || 0);
         const rate = getValuationRate(tx.materialName);
         const costImpact = wasted * rate;
 
@@ -623,7 +623,7 @@ export class WastageService {
       })
       .from(rawMaterialTransactions)
       .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
-      .where(eq(rawMaterialTransactions.type, 'CONSUMPTION'));
+      .where(inArray(rawMaterialTransactions.type, ['CONSUMPTION', 'REVERSAL']));
 
       const matchedTxs = rawTransactions.filter(tx =>
         tx.remarks && logIds.some(id => tx.remarks?.includes(`(Log #${id})`))
@@ -664,7 +664,6 @@ export class WastageService {
           yield: Number(yieldPct.toFixed(2)),
           status: batch.status
         },
-        stations,
         logs: logs.map(l => ({
           ...l,
           output: l.station === 'PACKING' ? Math.round(l.primaryCount / (product?.unitsPerCase || 24)) : l.primaryCount,
@@ -672,7 +671,7 @@ export class WastageService {
         })),
         transactions: matchedTxs.map(tx => ({
           materialName: tx.materialName,
-          consumed: Math.abs(Number(tx.quantityChange)),
+          consumed: -Number(tx.quantityChange),
           unit: tx.unit,
           remarks: tx.remarks,
           loggedAt: tx.createdAt

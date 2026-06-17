@@ -240,7 +240,7 @@ export class ReportsService {
         .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
         .where(
           and(
-            eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+            inArray(rawMaterialTransactions.type, ['CONSUMPTION', 'REVERSAL']),
             between(rawMaterialTransactions.createdAt, windowStart, windowEnd)
           )
         );
@@ -260,7 +260,7 @@ export class ReportsService {
               currentStock: Number(tx.currentStock || 0)
             };
           }
-          acc[tx.materialId].consumed += Math.abs(Number(tx.consumed || 0));
+          acc[tx.materialId].consumed -= Number(tx.consumed || 0);
           return acc;
         }, {} as Record<string, { materialName: string, unit: string, consumed: number, currentStock: number }>);
 
@@ -520,7 +520,7 @@ export class ReportsService {
       .from(rawMaterialTransactions)
       .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
       .where(and(
-        eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+        inArray(rawMaterialTransactions.type, ['CONSUMPTION', 'REVERSAL']),
         between(rawMaterialTransactions.createdAt, startDate, endDate)
       ))
       .groupBy(rawMaterials.id, rawMaterials.name, rawMaterials.unit, rawMaterials.currentStock);
@@ -612,7 +612,7 @@ export class ReportsService {
         .from(rawMaterialTransactions)
         .innerJoin(rawMaterials, eq(rawMaterialTransactions.materialId, rawMaterials.id))
         .where(and(
-          eq(rawMaterialTransactions.type, 'CONSUMPTION'),
+          inArray(rawMaterialTransactions.type, ['CONSUMPTION', 'REVERSAL']),
           between(rawMaterialTransactions.createdAt, windowStart, windowEnd)
         ));
 
@@ -654,7 +654,7 @@ export class ReportsService {
           }
 
           const key = `${log ? log.lineName : 'Unknown'}::${tx.materialId}`;
-          const consumed = Math.abs(Number(tx.quantityChange || 0));
+          const consumed = -Number(tx.quantityChange || 0);
 
           if (!aggregationMap.has(key)) {
             aggregationMap.set(key, {

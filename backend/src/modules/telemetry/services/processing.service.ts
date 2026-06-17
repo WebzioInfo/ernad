@@ -1232,26 +1232,38 @@ export class ProcessingService {
     const logIds = logs.map(l => l.id);
     const idsString = logIds.join('|');
     const rmts = await db.execute(sql`
-      SELECT rmt.remarks, rmt.quantity_change, rm.name, rm.unit 
+      SELECT rmt.remarks, rmt.quantity_change, rmt.type, rm.name, rm.unit 
       FROM raw_material_transactions rmt
       JOIN raw_materials rm ON rm.id = rmt.material_id
       WHERE rmt.remarks ~ ${'\\(Log #(' + idsString + ')\\)'}
+        AND rmt.type IN ('CONSUMPTION', 'REVERSAL')
     `);
 
     const data = logs.map(log => {
-      const consumption: any[] = [];
+      const consumptionMap: Record<string, { name: string, quantity: number, unit: string }> = {};
       const pattern = new RegExp(`\\(Log #${log.id}\\)`);
       
       rmts.forEach((rmt: any) => {
         if (pattern.test(rmt.remarks)) {
-          const qty = Math.abs(Number(rmt.quantity_change));
-          consumption.push({
-            name: rmt.name,
-            quantity: qty,
-            unit: rmt.unit
-          });
+          const matName = rmt.name;
+          if (!consumptionMap[matName]) {
+            consumptionMap[matName] = {
+              name: matName,
+              quantity: 0,
+              unit: rmt.unit
+            };
+          }
+          consumptionMap[matName].quantity += -Number(rmt.quantity_change);
         }
       });
+
+      // Filter out any materials that net to 0 (or close to 0 due to precision)
+      const consumption = Object.values(consumptionMap)
+        .filter(c => c.quantity > 0.001)
+        .map(c => ({
+          ...c,
+          quantity: Math.round(c.quantity * 100) / 100 // Round to 2 decimals for clean UI
+        }));
 
       return {
         ...log,

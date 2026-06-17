@@ -159,7 +159,7 @@ export class VerificationService {
                 type: 'REVERSAL',
                 quantityChange: String(totalRestored),
                 balanceAfter: String(balanceAfter),
-                remarks: `Correction reversal for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
+                remarks: `Correction reversal for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG) (Log #${logId})`,
                 performedBy: verifierId,
                 createdAt: new Date()
               });
@@ -197,7 +197,7 @@ export class VerificationService {
               type: 'CONSUMPTION',
               quantityChange: String(-totalDeduction),
               balanceAfter: String(balanceAfter),
-              remarks: `Correction usage for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG)`,
+              remarks: `Correction usage for Log #${logId}: ${reason} (Usage: ${usage} KG, Wastage: ${wastage} KG) (Log #${logId})`,
               performedBy: verifierId,
               createdAt: new Date()
             });
@@ -230,7 +230,7 @@ export class VerificationService {
               type: 'REVERSAL',
               quantityChange: '1',
               balanceAfter: String(balanceAfter),
-              remarks: `Correction reversal for Log #${logId} (Makeup removed): ${reason}`,
+              remarks: `Correction reversal for Log #${logId} (Makeup removed): ${reason} (Log #${logId})`,
               performedBy: verifierId,
               createdAt: new Date()
             });
@@ -248,7 +248,7 @@ export class VerificationService {
               type: 'CONSUMPTION',
               quantityChange: '-1',
               balanceAfter: String(balanceAfter),
-              remarks: `Correction usage for Log #${logId} (Makeup added): ${reason}`,
+              remarks: `Correction usage for Log #${logId} (Makeup added): ${reason} (Log #${logId})`,
               performedBy: verifierId,
               createdAt: new Date()
             });
