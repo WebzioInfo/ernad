@@ -5,6 +5,7 @@ import { LoadingScreen } from './components/common/LoadingScreen';
 import useAuthStore from './modules/auth/auth.store';
 import { usePushNotifications } from './hooks/usePushNotifications';
 import { useWebSocket } from './hooks/useWebSocket';
+import { UpdatePrompt } from './components/common/UpdatePrompt';
 
 function AppInner() {
   usePushNotifications();
@@ -27,6 +28,7 @@ function App() {
           <AppRoutes />
         </div>
       </Router>
+      <UpdatePrompt />
     </Providers>
   );
 }
