@@ -392,7 +392,7 @@ export class ProcessingService {
       if (resolvedMaterialId) {
         const usage = dto.labelsUsed || 0;
         const wastage = dto.damagedLabelWeight || dto.wastageCount || 0;
-        const totalDeduction = usage + wastage;
+        const totalDeduction = usage; // Wastage is already included in total stickers used
         directDeductions.push({ materialId: resolvedMaterialId, qty: totalDeduction, remarks: `Labels used in Labeling Station (Usage: ${usage}, Wastage: ${wastage}) (Log #${logId})` });
       } else {
         this.logger.warn(`[LABELING RESOLUTION] Could not resolve label material for payload. Ignoring deduction.`);
@@ -612,7 +612,7 @@ export class ProcessingService {
       }
     } else if (log.station === 'LABELING') {
       if (log.rawMaterialId) {
-        const qty = Number(log.bopRollUsage || 0) + Number(log.damagedLabelWeight || log.wastageCount || 0);
+        const qty = Number(log.bopRollUsage || 0); // Wastage is already included in total bopRollUsage
         if (qty > 0) usages.push({ materialId: log.rawMaterialId, qty });
       }
       if (log.inkChanged) {
@@ -1236,7 +1236,7 @@ export class ProcessingService {
       FROM raw_material_transactions rmt
       JOIN raw_materials rm ON rm.id = rmt.material_id
       WHERE rmt.remarks ~ ${'\\(Log #(' + idsString + ')\\)'}
-        AND rmt.type IN ('CONSUMPTION', 'REVERSAL')
+        AND rmt.type IN ('CONSUMPTION', 'REVERSAL', 'CORRECTION')
     `);
 
     const data = logs.map(log => {
@@ -1258,12 +1258,26 @@ export class ProcessingService {
       });
 
       // Filter out any materials that net to 0 (or close to 0 due to precision)
-      const consumption = Object.values(consumptionMap)
+      let consumption = Object.values(consumptionMap)
         .filter(c => c.quantity > 0.001)
         .map(c => ({
           ...c,
           quantity: Math.round(c.quantity * 100) / 100 // Round to 2 decimals for clean UI
         }));
+
+      // Override for LABELING sticker consumption if user wants exactly bopRollUsage to show
+      if (log.station === 'LABELING' && log.bopRollUsage) {
+        const bopVal = Number(log.bopRollUsage);
+        if (bopVal > 0) {
+           const stickerMaterial = consumption.find(c => c.name.toLowerCase().includes('sticker') || c.name.toLowerCase().includes('label'));
+           if (stickerMaterial) {
+              stickerMaterial.quantity = bopVal;
+           } else if (log.rawMaterialId) {
+              // If not found in transactions but bopRollUsage exists, we can still try to show it if needed,
+              // but since they already have it in db, we just overwrite the quantity
+           }
+        }
+      }
 
       return {
         ...log,
