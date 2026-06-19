@@ -206,6 +206,11 @@ export default function ProductionLogsManager() {
       setVerifyingLog(null);
       setVerificationRemarks('');
       queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossier'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-forensics'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-logs'] });
     }
   });
 
@@ -218,6 +223,11 @@ export default function ProductionLogsManager() {
       setRejectingLog(null);
       setRejectionReason('');
       queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossier'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-forensics'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-logs'] });
     }
   });
 
@@ -229,6 +239,11 @@ export default function ProductionLogsManager() {
       toast.success('Log Corrected');
       setEditingLog(null);
       queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossier'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-forensics'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-logs'] });
     }
   });
 

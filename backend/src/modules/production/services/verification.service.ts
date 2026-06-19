@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { db } from '../../../database/db';
-import { productionLogs, users, batchTotals, rawMaterials, rawMaterialTransactions } from '../../../database/schema';
+import { productionLogs, users, batchTotals, rawMaterials, rawMaterialTransactions, products } from '../../../database/schema';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { AuditService } from '../../audit/audit.service';
 import { InventoryService } from '../../inventory/inventory.service';
@@ -76,6 +76,10 @@ export class VerificationService {
       if (updateField && updateField !== 'scrapTotal') {
         setClause[updateField] = sql`${batchTotals[updateField]} - ${log.primaryCount}`;
       }
+      if (log.station === 'PACKING') {
+        setClause.casesTotal = sql`${batchTotals.casesTotal} - ${log.casesProduced || 0}`;
+        setClause.finishedGoodsTotal = sql`${batchTotals.finishedGoodsTotal} - ${log.finishedGoodsProduced || 0}`;
+      }
       await tx.update(batchTotals)
         .set(setClause)
         .where(eq(batchTotals.batchId, log.batchId));
@@ -113,6 +117,25 @@ export class VerificationService {
           newData.wastageCount = String(totalWastage);
         } else if (newData.shrinkWastageKg !== undefined) {
           newData.wastageCount = String(newData.shrinkWastageKg);
+        }
+      }
+
+      let casesDelta = 0;
+      let finishedGoodsDelta = 0;
+
+      if (oldLog.station === 'PACKING') {
+        if (newData.primaryCount !== undefined) {
+          const [prod] = await tx.select().from(products).where(eq(products.id, oldLog.productId)).limit(1);
+          const unitsPerCase = prod?.unitsPerCase ?? 24;
+          const newPrimary = newData.primaryCount;
+          const casesProduced = Math.round(newPrimary / unitsPerCase);
+          const finishedGoodsProduced = newPrimary;
+
+          newData.casesProduced = casesProduced;
+          newData.finishedGoodsProduced = finishedGoodsProduced;
+
+          casesDelta = casesProduced - (oldLog.casesProduced || 0);
+          finishedGoodsDelta = finishedGoodsProduced - (oldLog.finishedGoodsProduced || 0);
         }
       }
 
@@ -272,7 +295,7 @@ export class VerificationService {
       const primaryDelta = (newData.primaryCount !== undefined ? newData.primaryCount : oldLog.primaryCount) - oldLog.primaryCount;
       const wastageDelta = Number(newData.wastageCount !== undefined ? newData.wastageCount : oldLog.wastageCount) - Number(oldLog.wastageCount);
 
-      if (primaryDelta !== 0 || wastageDelta !== 0 || shrinkWeightDelta !== 0) {
+      if (primaryDelta !== 0 || wastageDelta !== 0 || shrinkWeightDelta !== 0 || casesDelta !== 0 || finishedGoodsDelta !== 0) {
         const updateField = this.getFieldName(oldLog.station);
         const setClause: any = {
           scrapTotal: sql`${batchTotals.scrapTotal} + ${wastageDelta}`,
@@ -283,6 +306,10 @@ export class VerificationService {
         }
         if (shrinkWeightDelta !== 0) {
           setClause.shrinkWeightTotal = sql`${batchTotals.shrinkWeightTotal} + ${shrinkWeightDelta}`;
+        }
+        if (oldLog.station === 'PACKING') {
+          setClause.casesTotal = sql`${batchTotals.casesTotal} + ${casesDelta}`;
+          setClause.finishedGoodsTotal = sql`${batchTotals.finishedGoodsTotal} + ${finishedGoodsDelta}`;
         }
         await tx.update(batchTotals)
           .set(setClause)

@@ -55,6 +55,10 @@ export default function BatchForensicsPage() {
       setEditingLogId(null);
       queryClient.invalidateQueries({ queryKey: ['batch-logs', batchId] });
       queryClient.invalidateQueries({ queryKey: ['batch-dossier', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-forensics'] });
+      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
     },
     onError: () => toast.error('Failed to update log entry')
   });

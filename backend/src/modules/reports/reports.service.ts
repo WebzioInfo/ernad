@@ -136,23 +136,29 @@ export class ReportsService {
         batchConditions.push(eq(productionBatches.productId, productId));
       }
 
-      // 1. Fetch Completed Batches
+      // 1. Fetch Completed Batches with dynamic calculations
       const batches = await db.select({
         id: productionBatches.id,
         batchCode: productionBatches.batchCode,
         productId: productionBatches.productId,
-        blowingTotal: batchTotals.blowingTotal,
-        fillingTotal: batchTotals.fillingTotal,
-        labelingTotal: batchTotals.labelingTotal,
-        packingTotal: batchTotals.packingTotal,
-        scrapTotal: batchTotals.scrapTotal,
-        casesTotal: batchTotals.casesTotal,
+        blowingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        fillingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        labelingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'LABELING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        packingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        scrapTotal: sql<string>`COALESCE(SUM(${productionLogs.wastageCount}), '0')`,
+        casesTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
         unitsPerCase: products.unitsPerCase
       })
       .from(productionBatches)
-      .leftJoin(batchTotals, eq(productionBatches.id, batchTotals.batchId))
       .leftJoin(products, eq(productionBatches.productId, products.id))
+      .leftJoin(productionLogs, and(
+        eq(productionLogs.batchId, productionBatches.id),
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ))
       .where(and(...batchConditions))
+      .groupBy(productionBatches.id, productionBatches.batchCode, productionBatches.productId, products.unitsPerCase)
       .orderBy(desc(productionBatches.endTime));
 
       const batchIds = batches.map(b => b.id);
@@ -218,7 +224,9 @@ export class ReportsService {
           .from(productionLogs)
           .where(and(
             inArray(productionLogs.batchId, batchIds),
-            isNull(productionLogs.deletedAt)
+            eq(productionLogs.lineId, lineId),
+            isNull(productionLogs.deletedAt),
+            notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
           ));
         logIds = logsForBatches.map(l => l.id);
       }
@@ -297,7 +305,9 @@ export class ReportsService {
       .leftJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
       .where(and(
         inArray(productionLogs.batchId, batchIds),
-        isNull(productionLogs.deletedAt)
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
       ))
       .orderBy(desc(productionLogs.loggedAt));
 
@@ -748,12 +758,8 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
 
       if (!batchData) return null;
 
-      const [extraTotals] = await db.select({
-        boxCountTotal: sql<string>`COALESCE(SUM(${productionLogs.boxCount}), '0')`,
-        labelUsageTotal: sql<string>`COALESCE(SUM(${productionLogs.labelUsage}), '0')`
-      })
-      .from(productionLogs)
-      .where(eq(productionLogs.batchId, batchId));
+      const batchCode = batchData.batch.batchCode;
+      const lineId = batchData.batch.lineId;
 
       // Filter privileged names post-query for safety
       const excludedIds = await this.getExcludedUserIds();
@@ -763,20 +769,49 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
         }
       }
 
-      const [totals] = await db.select().from(batchTotals).where(eq(batchTotals.batchId, batchId));
-      
+      // Compute totals dynamically from production logs matching batchCode and lineId
+      const [dynamicTotals] = await db.select({
+        blowingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'BLOWING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        fillingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'FILLING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        labelingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'LABELING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        packingTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.primaryCount} ELSE 0 END), 0)`,
+        scrapTotal: sql<string>`COALESCE(SUM(${productionLogs.wastageCount}), '0')`,
+        capTotal: sql<number>`COALESCE(SUM(${productionLogs.capUsage}), 0)`,
+        preformTotal: sql<number>`COALESCE(SUM(${productionLogs.preformUsage}), 0)`,
+        bagsTotal: sql<string>`COALESCE(SUM(${productionLogs.bagsUsed}), '0')`,
+        bopRollTotal: sql<string>`COALESCE(SUM(${productionLogs.bopRollUsage}::numeric), '0')`,
+        shrinkWeightTotal: sql<string>`COALESCE(SUM(${productionLogs.shrinkWeightUsed}::numeric), '0')`,
+        finishedGoodsTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.finishedGoodsProduced} ELSE 0 END), 0)`,
+        casesTotal: sql<number>`COALESCE(SUM(CASE WHEN ${productionLogs.station} = 'PACKING' THEN ${productionLogs.casesProduced} ELSE 0 END), 0)`,
+        boxCountTotal: sql<string>`COALESCE(SUM(${productionLogs.boxCount}), '0')`,
+        labelUsageTotal: sql<string>`COALESCE(SUM(${productionLogs.labelUsage}), '0')`
+      })
+      .from(productionLogs)
+      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .where(and(
+        eq(productionBatches.batchCode, batchCode),
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ));
+
       const performance = await db.select({
         time: sql`date_trunc('hour', ${productionLogs.loggedAt})`,
         count: sql<string>`COALESCE(SUM(${productionLogs.primaryCount}), '0')`,
         waste: sql<string>`COALESCE(SUM(${productionLogs.wastageCount}), '0')`
       })
       .from(productionLogs)
-      .where(eq(productionLogs.batchId, batchId))
+      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+      .where(and(
+        eq(productionBatches.batchCode, batchCode),
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ))
       .groupBy(sql`date_trunc('hour', ${productionLogs.loggedAt})`)
       .orderBy(sql`date_trunc('hour', ${productionLogs.loggedAt})`);
 
       // ENHANCED BATCH DOSSIER DATA
-      
       const stationLogsRaw = await db.select({
         station: productionLogs.station,
         count: sql<string>`COALESCE(SUM(${productionLogs.primaryCount}), '0')`,
@@ -785,8 +820,14 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
         operatorName: users.name,
       })
       .from(productionLogs)
+      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
       .leftJoin(users, eq(productionLogs.userId, users.id))
-      .where(eq(productionLogs.batchId, batchId))
+      .where(and(
+        eq(productionBatches.batchCode, batchCode),
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ))
       .groupBy(productionLogs.station, users.name);
 
       const timelineRaw = await db.select({
@@ -797,8 +838,14 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
         user: users.name,
       })
       .from(productionLogs)
+      .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
       .leftJoin(users, eq(productionLogs.userId, users.id))
-      .where(eq(productionLogs.batchId, batchId))
+      .where(and(
+        eq(productionBatches.batchCode, batchCode),
+        eq(productionLogs.lineId, lineId),
+        isNull(productionLogs.deletedAt),
+        notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+      ))
       .orderBy(productionLogs.loggedAt);
 
       const dispatchInfo = await this.hasTable('dispatch_logs') ? await db.select({
@@ -813,10 +860,16 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
       
       const damagesTotal = [{ quantity: '0' }];
 
-      // Fetch all log IDs for this batch first
+      // Fetch all log IDs for this batch/line first
       const logs = await db.select({ id: productionLogs.id })
         .from(productionLogs)
-        .where(eq(productionLogs.batchId, batchId));
+        .innerJoin(productionBatches, eq(productionLogs.batchId, productionBatches.id))
+        .where(and(
+          eq(productionBatches.batchCode, batchCode),
+          eq(productionLogs.lineId, lineId),
+          isNull(productionLogs.deletedAt),
+          notInArray(productionLogs.status, ['DRAFT', 'REJECTED'])
+        ));
       
       let materialConsumption: any[] = [];
       if (logs.length > 0) {
@@ -890,9 +943,20 @@ async getBatchDossier(batchId: string, callerRoles: string[] = []) {
           quantity: Number(m.quantity)
         })),
         totals: {
-          ...(totals || {}),
-          boxCountTotal: Number(extraTotals?.boxCountTotal || 0),
-          labelUsageTotal: Number(extraTotals?.labelUsageTotal || 0)
+          blowingTotal: Number(dynamicTotals?.blowingTotal || 0),
+          fillingTotal: Number(dynamicTotals?.fillingTotal || 0),
+          labelingTotal: Number(dynamicTotals?.labelingTotal || 0),
+          packingTotal: Number(dynamicTotals?.packingTotal || 0),
+          scrapTotal: String(dynamicTotals?.scrapTotal || '0'),
+          capTotal: Number(dynamicTotals?.capTotal || 0),
+          preformTotal: Number(dynamicTotals?.preformTotal || 0),
+          bagsTotal: String(dynamicTotals?.bagsTotal || '0'),
+          bopRollTotal: String(dynamicTotals?.bopRollTotal || '0'),
+          shrinkWeightTotal: String(dynamicTotals?.shrinkWeightTotal || '0'),
+          finishedGoodsTotal: Number(dynamicTotals?.finishedGoodsTotal || 0),
+          casesTotal: Number(dynamicTotals?.casesTotal || 0),
+          boxCountTotal: Number(dynamicTotals?.boxCountTotal || 0),
+          labelUsageTotal: Number(dynamicTotals?.labelUsageTotal || 0)
         },
         hourlyTrend: performance.map(p => ({
           ...p,

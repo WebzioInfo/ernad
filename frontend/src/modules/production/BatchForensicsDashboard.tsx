@@ -44,6 +44,11 @@ export default function BatchForensicsDashboard() {
     mutationFn: async (payload: any) => (await api.patch(`forensics/log/${selectedEntry.id}`, payload)).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch-forensics', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossier'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
       setSelectedEntry(null);
       setCorrectionReason('');
     }
@@ -53,6 +58,11 @@ export default function BatchForensicsDashboard() {
     mutationFn: async (reason: string) => (await api.delete(`forensics/log/${selectedEntry.id}`, { data: { reason } })).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['batch-forensics', batchId] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossier'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-dossiers'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['production-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['production-batches-all'] });
       setSelectedEntry(null);
       setCorrectionReason('');
     }
