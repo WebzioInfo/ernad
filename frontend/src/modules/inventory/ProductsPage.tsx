@@ -18,7 +18,7 @@ import { useMemo } from 'react';
 export default function ProductsPage() {
   const { user } = useAuthStore();
   const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
-  const isAdmin = userRoles.includes('ADMIN');
+  const isAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPER_ADMIN');
   const canManageProducts = isAdmin || userRoles.includes('MANAGER');
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,6 +40,10 @@ export default function ProductsPage() {
   const currentProduct = selectedProduct || productionStock?.[0];
 
   const { data: ledger, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
+
+  const editingProductStock = useMemo(() => {
+    return productionStock?.find((s: any) => s.productId === editingProduct?.id);
+  }, [productionStock, editingProduct]);
 
   const addStockMutation = useMutation({
     mutationFn: (data: any) => {
@@ -536,6 +540,8 @@ export default function ProductsPage() {
       {isProductModalOpen && (
         <ProductFormModal
           product={editingProduct}
+          stock={editingProductStock}
+          isAdmin={isAdmin}
           brands={brands}
           isPending={saveProductMutation.isPending}
           onClose={() => {
@@ -563,12 +569,16 @@ export default function ProductsPage() {
 
 function ProductFormModal({
   product,
+  stock,
+  isAdmin,
   brands,
   isPending,
   onClose,
   onSubmit,
 }: {
   product?: any;
+  stock?: any;
+  isAdmin: boolean;
   brands: any[];
   isPending: boolean;
   onClose: () => void;
@@ -581,20 +591,74 @@ function ProductFormModal({
     brandId: product?.brandId || brands?.[0]?.id || '',
     category: product?.category || 'Water',
     targetBPM: product?.targetBPM || 120,
+    currentStock: stock?.currentStock || 0,
+    totalProduced: stock?.totalProduced || 0,
+    totalDispatched: stock?.totalDispatched || 0,
   });
 
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    onSubmit({
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const isInventoryModified = () => {
+    return (
+      Number(formData.currentStock) !== Number(stock?.currentStock || 0) ||
+      Number(formData.totalProduced) !== Number(stock?.totalProduced || 0) ||
+      Number(formData.totalDispatched) !== Number(stock?.totalDispatched || 0)
+    );
+  };
+
+  const handleSubmit = (event?: FormEvent) => {
+    if (event) event.preventDefault();
+
+    const currentStock = Number(formData.currentStock) || 0;
+    const totalProduced = Number(formData.totalProduced) || 0;
+    const totalDispatched = Number(formData.totalDispatched) || 0;
+
+    if (currentStock < 0 || totalProduced < 0 || totalDispatched < 0) {
+      toast.error('Inventory values cannot be negative');
+      return;
+    }
+
+    if (isAdmin && isInventoryModified() && !showConfirm) {
+      setShowConfirm(true);
+      return;
+    }
+
+    const payload: any = {
       ...formData,
       targetBPM: Number(formData.targetBPM) || 0,
-    });
+    };
+
+    if (isAdmin) {
+      payload.currentStock = currentStock;
+      payload.totalProduced = totalProduced;
+      payload.totalDispatched = totalDispatched;
+    } else {
+      delete payload.currentStock;
+      delete payload.totalProduced;
+      delete payload.totalDispatched;
+    }
+
+    onSubmit(payload);
   };
+
+  if (showConfirm) {
+    return (
+      <ConfirmationModal
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={() => handleSubmit()}
+        title="Manual Inventory Update"
+        message="You are about to manually modify inventory values. This action will affect stock calculations and reports. Do you want to continue?"
+        variant="danger"
+        confirmText="Confirm & Update"
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 sticky top-0 z-10">
           <div>
             <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{product ? 'Edit Product' : 'Add Product'}</h3>
             <p className="text-xs text-slate-500 mt-0.5">Manage finished goods master data.</p>
@@ -604,40 +668,67 @@ function ProductFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Product Name</span>
-              <input required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">SKU</span>
-              <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="space-y-4">
+            <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Product Information</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-600">Product Name</span>
+                <input required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-600">SKU</span>
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-600">Brand</span>
+                <select required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.brandId} onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}>
+                  <option value="" disabled>Select brand</option>
+                  {brands.map((brand: any) => (
+                    <option key={brand.id} value={brand.id}>{brand.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-xs font-semibold text-slate-600">Category</span>
+                <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} />
+              </label>
+            </div>
+
+            <label className="space-y-1 block">
+              <span className="text-xs font-semibold text-slate-600">Target BPM</span>
+              <input type="number" min={0} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.targetBPM} onChange={(e) => setFormData({ ...formData, targetBPM: Number(e.target.value) })} />
             </label>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Brand</span>
-              <select required className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.brandId} onChange={(e) => setFormData({ ...formData, brandId: e.target.value })}>
-                <option value="" disabled>Select brand</option>
-                {brands.map((brand: any) => (
-                  <option key={brand.id} value={brand.id}>{brand.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs font-semibold text-slate-600">Category</span>
-              <input className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} />
-            </label>
-          </div>
+          {product && (
+            <div className="space-y-4 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Inventory Information</h4>
+                {!isAdmin && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-wider">Read Only</span>}
+                {isAdmin && <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded uppercase tracking-wider">Manual Adjustment (Admin Only)</span>}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <label className="space-y-1 block">
+                  <span className="text-xs font-semibold text-slate-600">Current Stock</span>
+                  <input type="number" min={0} readOnly={!isAdmin} className={`w-full border rounded-lg px-3 py-2 text-sm font-medium outline-none ${!isAdmin ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]'} ${Number(formData.currentStock) !== Number(stock?.currentStock || 0) ? 'border-amber-400 bg-amber-50' : ''}`} value={formData.currentStock} onChange={(e) => setFormData({ ...formData, currentStock: Number(e.target.value) })} />
+                </label>
+                <label className="space-y-1 block">
+                  <span className="text-xs font-semibold text-slate-600">Total Produced</span>
+                  <input type="number" min={0} readOnly={!isAdmin} className={`w-full border rounded-lg px-3 py-2 text-sm font-medium outline-none ${!isAdmin ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]'} ${Number(formData.totalProduced) !== Number(stock?.totalProduced || 0) ? 'border-amber-400 bg-amber-50' : ''}`} value={formData.totalProduced} onChange={(e) => setFormData({ ...formData, totalProduced: Number(e.target.value) })} />
+                </label>
+                <label className="space-y-1 block">
+                  <span className="text-xs font-semibold text-slate-600">Total Dispatched</span>
+                  <input type="number" min={0} readOnly={!isAdmin} className={`w-full border rounded-lg px-3 py-2 text-sm font-medium outline-none ${!isAdmin ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]'} ${Number(formData.totalDispatched) !== Number(stock?.totalDispatched || 0) ? 'border-amber-400 bg-amber-50' : ''}`} value={formData.totalDispatched} onChange={(e) => setFormData({ ...formData, totalDispatched: Number(e.target.value) })} />
+                </label>
+              </div>
+            </div>
+          )}
 
-          <label className="space-y-1 block">
-            <span className="text-xs font-semibold text-slate-600">Target BPM</span>
-            <input type="number" min={0} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91]" value={formData.targetBPM} onChange={(e) => setFormData({ ...formData, targetBPM: Number(e.target.value) })} />
-          </label>
-
-          <div className="pt-3 border-t border-slate-200 flex justify-end gap-3">
+          <div className="pt-4 border-t border-slate-200 flex justify-end gap-3 sticky bottom-0 bg-white pb-2">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold uppercase tracking-wider">Cancel</button>
             <button type="submit" disabled={isPending} className="px-5 py-2 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-lg text-xs font-bold uppercase tracking-wider disabled:opacity-50 flex items-center gap-2">
               {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

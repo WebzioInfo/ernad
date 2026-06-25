@@ -456,6 +456,11 @@ export class InventoryService {
           AND pl.station = 'PACKING'
           AND pl.deleted_at IS NULL
           AND pb.deleted_at IS NULL
+      ), 0) + COALESCE((
+        SELECT SUM(pst.quantity_change)
+        FROM product_stock_transactions pst
+        WHERE pst.product_id = ps.product_id
+          AND pst.type = 'MANUAL_PRODUCED_ADJUST'
       ), 0),
       updated_at = NOW()
     `);
@@ -474,6 +479,11 @@ export class InventoryService {
         FROM sales_transactions st
         WHERE st.product_id = ps.product_id
           AND st.type = 'SALES_DISPATCH'
+      ), 0) + COALESCE((
+        SELECT SUM(pst.quantity_change)
+        FROM product_stock_transactions pst
+        WHERE pst.product_id = ps.product_id
+          AND pst.type = 'MANUAL_DISPATCH_ADJUST'
       ), 0),
       updated_at = NOW()
     `);
@@ -486,6 +496,7 @@ export class InventoryService {
               SELECT SUM(pst.quantity_change)
               FROM product_stock_transactions pst
               WHERE pst.product_id = ps.product_id
+                AND pst.type NOT IN ('MANUAL_PRODUCED_ADJUST', 'MANUAL_DISPATCH_ADJUST')
             ), 0)
           - ps.total_dispatched
           + COALESCE((

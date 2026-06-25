@@ -122,6 +122,24 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   targetBPM?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  currentStock?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalProduced?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  totalDispatched?: number;
 }
 
 export class UpdateRawMaterialDto {

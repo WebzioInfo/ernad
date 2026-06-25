@@ -1,16 +1,20 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 import { db } from '../../database/db';
-import { productionLines, products, productBrands, productionBatches, rawMaterials, rawMaterialTransactions } from '../../database/schema';
+import { productionLines, products, productBrands, productionBatches, rawMaterials, rawMaterialTransactions, productStockTransactions, productionStock } from '../../database/schema';
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { sumRawMaterialTransactions } from '../inventory/raw-material-balance.util';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class MasterDataService {
   private linesCache: { data: any; expiresAt: number } | null = null;
 
-  constructor(private readonly eventsService: ProductionEventsService) {}
+  constructor(
+    private readonly eventsService: ProductionEventsService,
+    private readonly auditService: AuditService
+  ) {}
 
   async getLines() {
     const now = Date.now();
@@ -134,13 +138,102 @@ export class MasterDataService {
     return { success: true };
   }
 
-  async updateProduct(id: string, dto: any) {
-    const [product] = await db.update(products)
-      .set({ ...dto })
-      .where(eq(products.id, id))
-      .returning();
+  async updateProduct(user: any, id: string, dto: any) {
+    const { currentStock, totalProduced, totalDispatched, ...productDto } = dto;
+    const hasInventoryUpdate = currentStock !== undefined || totalProduced !== undefined || totalDispatched !== undefined;
+
+    if (hasInventoryUpdate) {
+      if (!user?.roles?.includes('ADMIN') && !user?.roles?.includes('SUPER_ADMIN')) {
+        throw new ForbiddenException("You do not have permission to edit inventory.");
+      }
+    }
+
+    const result = await db.transaction(async (tx) => {
+      let product;
+      if (Object.keys(productDto).length > 0) {
+        [product] = await tx.update(products)
+          .set({ ...productDto })
+          .where(eq(products.id, id))
+          .returning();
+      } else {
+        [product] = await tx.select().from(products).where(eq(products.id, id)).limit(1);
+      }
+
+      if (hasInventoryUpdate) {
+        const [stockRec] = await tx.select().from(productionStock).where(eq(productionStock.productId, id)).limit(1);
+        if (stockRec) {
+          const updatePayload: any = { updatedAt: new Date() };
+
+          if (currentStock !== undefined && Number(stockRec.currentStock) !== currentStock) {
+            updatePayload.currentStock = String(currentStock);
+            const diff = currentStock - Number(stockRec.currentStock);
+            await tx.insert(productStockTransactions).values({
+              productId: id,
+              type: 'MANUAL_STOCK_ADJUST',
+              quantityChange: String(diff),
+              balanceAfter: String(currentStock),
+              remarks: 'Manual Stock Adjustment',
+              performedBy: user.id,
+            });
+          }
+
+          if (totalProduced !== undefined && Number(stockRec.totalProduced) !== totalProduced) {
+            updatePayload.totalProduced = String(totalProduced);
+            const diff = totalProduced - Number(stockRec.totalProduced);
+            await tx.insert(productStockTransactions).values({
+              productId: id,
+              type: 'MANUAL_PRODUCED_ADJUST',
+              quantityChange: String(diff),
+              balanceAfter: String(totalProduced),
+              remarks: 'Manual Total Produced Adjustment',
+              performedBy: user.id,
+            });
+          }
+
+          if (totalDispatched !== undefined && Number(stockRec.totalDispatched) !== totalDispatched) {
+            updatePayload.totalDispatched = String(totalDispatched);
+            const diff = totalDispatched - Number(stockRec.totalDispatched);
+            await tx.insert(productStockTransactions).values({
+              productId: id,
+              type: 'MANUAL_DISPATCH_ADJUST',
+              quantityChange: String(diff),
+              balanceAfter: String(totalDispatched),
+              remarks: 'Manual Total Dispatched Adjustment',
+              performedBy: user.id,
+            });
+          }
+
+          if (Object.keys(updatePayload).length > 1) {
+            await tx.update(productionStock).set(updatePayload).where(eq(productionStock.id, stockRec.id));
+
+            await this.auditService.logAction({
+              userId: user.id,
+              action: `MANUAL_INVENTORY_ADJUST`,
+              entityType: 'production_stock',
+              entityId: stockRec.id,
+              category: 'INVENTORY',
+              payload: {
+                productId: id,
+                productName: product.name,
+                previousCurrentStock: Number(stockRec.currentStock),
+                newCurrentStock: currentStock !== undefined ? currentStock : Number(stockRec.currentStock),
+                previousTotalProduced: Number(stockRec.totalProduced),
+                newTotalProduced: totalProduced !== undefined ? totalProduced : Number(stockRec.totalProduced),
+                previousTotalDispatched: Number(stockRec.totalDispatched),
+                newTotalDispatched: totalDispatched !== undefined ? totalDispatched : Number(stockRec.totalDispatched),
+              }
+            });
+          }
+        }
+      }
+      return product;
+    });
+
     await this.eventsService.emitDataChanged('products', { action: 'updated', id });
-    return product;
+    if (hasInventoryUpdate) {
+      await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_created', itemId: id, itemType: 'PRODUCT' });
+    }
+    return result;
   }
 
   async deleteProduct(id: string) {

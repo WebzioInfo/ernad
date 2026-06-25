@@ -91,8 +91,8 @@ export class MasterDataController {
 
   @Patch('products/:id')
   @Roles('ADMIN', 'MANAGER')
-  async updateProduct(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return await this.masterDataService.updateProduct(id, dto);
+  async updateProduct(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateProductDto) {
+    return await this.masterDataService.updateProduct(req.user, id, dto);
   }
 
   @Delete('products/:id')
