@@ -435,60 +435,114 @@ export default function ProductsPage() {
             </div>
           ) : (
             ledger.map((tx: any) => {
-              const isAddition = tx.type === 'ADD' || tx.type === 'PRODUCTION';
-              const isReduction = tx.type === 'DISPATCH' || tx.type === 'LEAKAGE' || tx.type === 'REJECTION';
-              const isManual = tx.type === 'ADD' || tx.type === 'EDIT' || tx.type === 'DELETE';
+              const isAddition = tx.transactionType === 'ADD' || tx.transactionType === 'PRODUCTION' || tx.quantity > 0;
+              const isReduction = tx.transactionType === 'DISPATCH' || tx.transactionType === 'LEAKAGE' || tx.transactionType === 'REJECTION' || tx.quantity < 0;
+              const isManual = tx.transactionType === 'ADD' || tx.transactionType === 'EDIT' || tx.transactionType === 'DELETE' || tx.transactionType === 'MANUAL_PRODUCED_ADJUST' || tx.transactionType === 'MANUAL_DISPATCH_ADJUST';
 
               return (
-                <div key={tx.id} className="bg-slate-50/40 rounded-2xl p-5 border border-slate-150 flex items-center justify-between group hover:bg-white hover:shadow-md hover:border-slate-250 transition-all duration-300">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
-                      isAddition ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                      isReduction ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
-                    }`}>
-                      {isAddition ? <ArrowDownLeft className="w-5 h-5" /> :
-                       isReduction ? <ArrowUpRight className="w-5 h-5" /> : <RefreshCw className="w-4 h-4" />}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-black uppercase tracking-wider ${
-                          isAddition ? 'text-emerald-700' : isReduction ? 'text-rose-700' : 'text-blue-700'
-                        }`}>{tx.type}</span>
-                        <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
+                <div key={tx.id} className="bg-slate-50/40 rounded-2xl p-6 border border-slate-150 group hover:bg-white hover:shadow-md hover:border-slate-250 transition-all duration-300">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                        isAddition ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                        isReduction ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                      }`}>
+                        {isAddition ? <ArrowDownLeft className="w-5 h-5" /> :
+                         isReduction ? <ArrowUpRight className="w-5 h-5" /> : <RefreshCw className="w-4 h-4" />}
                       </div>
-                      <p className="text-xs text-slate-600 font-bold mt-1">{tx.remarks}</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Performed by: {tx.userName}</p>
+                      <div className="pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[11px] font-black uppercase tracking-wider ${
+                            isAddition ? 'text-emerald-700' : isReduction ? 'text-rose-700' : 'text-blue-700'
+                          }`}>{tx.transactionType?.replace(/_/g, ' ')}</span>
+                          <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 font-bold mt-1">{tx.remarks}</p>
+                        <p className="text-[10px] text-slate-400 font-semibold mt-1">Performed by {tx.performedBy}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <p className={`text-xl font-black tabular-nums tracking-tight ${
+                        isAddition ? 'text-emerald-600' : isReduction ? 'text-rose-600' : 'text-blue-600'
+                      }`}>
+                        {tx.quantity > 0 ? '+' : ''}{tx.quantity.toLocaleString()} Units
+                      </p>
+                      
+                      {canManageProducts && isManual && (
+                        <div className="flex items-center justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => setEditingTransaction(tx)}
+                            className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg text-slate-400 transition-colors"
+                            title="Edit Record"
+                          >
+                            <PenLine className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setTransactionToDelete(tx.id)}
+                            className="p-1.5 hover:bg-slate-100 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className={`text-lg font-black tabular-nums tracking-tight ${
-                        isAddition ? 'text-emerald-600' : isReduction ? 'text-rose-600' : 'text-blue-600'
-                      }`}>
-                        {tx.quantityChange > 0 ? '+' : ''}{tx.quantityChange.toLocaleString()}
-                      </p>
-                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Balance: {tx.balanceAfter.toLocaleString()}</p>
-                    </div>
-
-                    {canManageProducts && isManual && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setEditingTransaction(tx)}
-                          className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg text-slate-400 transition-colors"
-                          title="Edit Record"
-                        >
-                          <PenLine className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setTransactionToDelete(tx.id)}
-                          className="p-1.5 hover:bg-slate-100 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
-                          title="Delete Record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                  <div className="mt-4 pt-3 border-t border-slate-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Inventory After Transaction
+                    </h5>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2">
+                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.stock !== 0 ? 'bg-indigo-50/50 border-indigo-100' : 'bg-white border-slate-100'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.stock !== 0 ? 'text-indigo-600' : 'text-slate-500'}`}>
+                          Stock
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <p className={`text-xs font-black tabular-nums ${tx.impact?.stock !== 0 ? 'text-indigo-900' : 'text-slate-700'}`}>
+                            {Number(tx.stockBalanceAfter || 0).toLocaleString()}
+                          </p>
+                          {tx.impact?.stock !== 0 && (
+                            <span className="text-[9px] font-bold text-indigo-500 bg-indigo-100/50 px-1 rounded">
+                              {tx.impact.stock > 0 ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    )}
+                      
+                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.produced !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.produced !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                          Produced
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <p className={`text-xs font-black tabular-nums ${tx.impact?.produced !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
+                            {Number(tx.producedBalanceAfter || 0).toLocaleString()}
+                          </p>
+                          {tx.impact?.produced !== 0 && (
+                            <span className="text-[9px] font-bold text-emerald-500 bg-emerald-100/50 px-1 rounded">
+                              {tx.impact.produced > 0 ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.dispatched !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.dispatched !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                          Dispatched
+                        </p>
+                        <div className="flex items-center gap-1">
+                          <p className={`text-xs font-black tabular-nums ${tx.impact?.dispatched !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
+                            {Number(tx.dispatchedBalanceAfter || 0).toLocaleString()}
+                          </p>
+                          {tx.impact?.dispatched !== 0 && (
+                            <span className="text-[9px] font-bold text-amber-500 bg-amber-100/50 px-1 rounded">
+                              {tx.impact.dispatched > 0 ? '↑' : '↓'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );

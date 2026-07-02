@@ -1,0 +1,1 @@
+import { db } from '../src/database/db'; import { sql } from 'drizzle-orm'; async function run() { try { const res = await db.execute(sql\SELECT column_name FROM information_schema.columns WHERE table_name = 'product_stock_transactions'\); console.log('Columns:', res.map((r) => r.column_name).join(', ')); } catch (e) { console.error(e); } finally { process.exit(0); } } run();

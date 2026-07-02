@@ -317,22 +317,20 @@ export class InventoryService {
     const result = await db.transaction(async (tx) => {
       if (dto.itemType === 'PRODUCT') {
         const qty = Number(dto.quantity);
-        // Insert log
-        await tx.insert(productStockTransactions).values({
-          productId: dto.itemId,
-          type: qty > 0 ? 'ADD' : 'DEDUCT',
-          quantityChange: String(qty),
-          balanceAfter: '0',
-          remarks: dto.remarks,
-          performedBy: dto.performedBy,
-          createdAt: new Date()
-        });
-
-        // Atomic update stock
+        
         const existing = await tx.select().from(productionStock).where(eq(productionStock.productId, dto.itemId)).limit(1);
+        
+        let newStock = qty;
+        let newProduced = 0;
+        let newDispatched = 0;
+        
         if (existing.length > 0) {
+          newStock = Number(existing[0].currentStock) + qty;
+          newProduced = Number(existing[0].totalProduced);
+          newDispatched = Number(existing[0].totalDispatched);
+
           await tx.update(productionStock)
-            .set({ currentStock: sql`${productionStock.currentStock} + ${qty}`, updatedAt: new Date() })
+            .set({ currentStock: String(newStock), updatedAt: new Date() })
             .where(eq(productionStock.productId, dto.itemId));
         } else {
           await tx.insert(productionStock).values({
@@ -340,6 +338,20 @@ export class InventoryService {
             createdAt: new Date(), updatedAt: new Date()
           });
         }
+
+        // Insert log with snapshots
+        await tx.insert(productStockTransactions).values({
+          productId: dto.itemId,
+          type: qty > 0 ? 'ADD' : 'DEDUCT',
+          quantityChange: String(qty),
+          balanceAfter: String(newStock),
+          stockBalanceAfter: String(newStock),
+          producedBalanceAfter: String(newProduced),
+          dispatchedBalanceAfter: String(newDispatched),
+          remarks: dto.remarks,
+          performedBy: dto.performedBy,
+          createdAt: new Date()
+        });
       } else {
         const qty = Number(dto.quantity);
         await tx.insert(rawMaterialTransactions).values({
@@ -522,7 +534,7 @@ export class InventoryService {
       .limit(1);
     const totalCurrentStock = Number(stock?.currentStock || 0);
 
-    // Fetch in parallel with 100 limit each to prevent event loop blocking
+    // Fetch all history without limits to calculate accurate snapshots
     const [manualTxs, packingLogs, dispatches, salesTxs] = await Promise.all([
       db.select({
         id: productStockTransactions.id,
@@ -530,20 +542,24 @@ export class InventoryService {
         quantityChange: productStockTransactions.quantityChange,
         remarks: productStockTransactions.remarks,
         createdAt: productStockTransactions.createdAt,
-        userName: users.name
+        userName: users.name,
+        stockBalanceAfter: productStockTransactions.stockBalanceAfter,
+        producedBalanceAfter: productStockTransactions.producedBalanceAfter,
+        dispatchedBalanceAfter: productStockTransactions.dispatchedBalanceAfter,
       })
       .from(productStockTransactions)
       .leftJoin(users, eq(productStockTransactions.performedBy, users.id))
-      .where(eq(productStockTransactions.productId, productId))
-      .orderBy(desc(productStockTransactions.createdAt))
-      .limit(100),
+      .where(eq(productStockTransactions.productId, productId)),
 
       db.select({
         id: productionLogs.id,
         casesProduced: productionLogs.casesProduced,
         createdAt: productionLogs.loggedAt,
         userName: users.name,
-        batchCode: productionBatches.batchCode
+        batchCode: productionBatches.batchCode,
+        stockBalanceAfter: productionLogs.stockBalanceAfter,
+        producedBalanceAfter: productionLogs.producedBalanceAfter,
+        dispatchedBalanceAfter: productionLogs.dispatchedBalanceAfter,
       })
       .from(productionLogs)
       .leftJoin(users, eq(productionLogs.userId, users.id))
@@ -552,16 +568,17 @@ export class InventoryService {
         eq(productionLogs.productId, productId),
         eq(productionLogs.station, 'PACKING'),
         isNull(productionLogs.deletedAt)
-      ))
-      .orderBy(desc(productionLogs.loggedAt))
-      .limit(100),
+      )),
 
       db.select({
         id: dispatchLogs.id,
         quantity: dispatchLogs.quantity,
         createdAt: dispatchLogs.dispatchedAt,
         userName: users.name,
-        batchCode: productionBatches.batchCode
+        batchCode: productionBatches.batchCode,
+        stockBalanceAfter: dispatchLogs.stockBalanceAfter,
+        producedBalanceAfter: dispatchLogs.producedBalanceAfter,
+        dispatchedBalanceAfter: dispatchLogs.dispatchedBalanceAfter,
       })
       .from(dispatchLogs)
       .innerJoin(productionBatches, eq(dispatchLogs.batchId, productionBatches.id))
@@ -569,9 +586,7 @@ export class InventoryService {
       .where(and(
         eq(productionBatches.productId, productId),
         isNull(productionBatches.deletedAt)
-      ))
-      .orderBy(desc(dispatchLogs.dispatchedAt))
-      .limit(100),
+      )),
 
       db.select({
         id: salesTransactions.id,
@@ -579,13 +594,14 @@ export class InventoryService {
         quantity: salesTransactions.quantity,
         salesDate: salesTransactions.salesDate,
         createdAt: salesTransactions.createdAt,
-        userName: users.name
+        userName: users.name,
+        stockBalanceAfter: salesTransactions.stockBalanceAfter,
+        producedBalanceAfter: salesTransactions.producedBalanceAfter,
+        dispatchedBalanceAfter: salesTransactions.dispatchedBalanceAfter,
       })
       .from(salesTransactions)
       .leftJoin(users, eq(salesTransactions.performedBy, users.id))
       .where(eq(salesTransactions.productId, productId))
-      .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt))
-      .limit(100)
     ]);
 
     const ledgerEntries: any[] = [];
@@ -594,39 +610,62 @@ export class InventoryService {
       let typeLabel = '';
       let quantityChange = 0;
       let remarks = '';
+      let impact = { stock: 0, produced: 0, dispatched: 0 };
       
       if (t.type === 'RETURN') {
         typeLabel = 'RETURN';
         quantityChange = t.quantity;
         remarks = 'Returned Product';
+        impact = { stock: t.quantity, produced: 0, dispatched: 0 };
       } else if (t.type === 'SALES_DISPATCH') {
         typeLabel = 'SALES_DISPATCH';
         quantityChange = -t.quantity;
         remarks = 'Sales Dispatch';
+        impact = { stock: -t.quantity, produced: 0, dispatched: t.quantity };
       } else if (t.type === 'DAMAGE') {
         typeLabel = 'DAMAGE';
         quantityChange = -t.quantity;
         remarks = 'Damaged Product';
+        impact = { stock: -t.quantity, produced: 0, dispatched: 0 };
       }
 
       ledgerEntries.push({
         id: `sales_${t.id}`,
-        type: typeLabel,
-        quantityChange,
+        transactionType: typeLabel,
+        quantity: quantityChange,
         remarks,
         createdAt: t.salesDate,
-        userName: t.userName || 'Manager'
+        performedBy: t.userName || 'Manager',
+        impact,
+        stockBalanceAfter: t.stockBalanceAfter,
+        producedBalanceAfter: t.producedBalanceAfter,
+        dispatchedBalanceAfter: t.dispatchedBalanceAfter,
       });
     });
 
     manualTxs.forEach(t => {
+      let impact = { stock: 0, produced: 0, dispatched: 0 };
+      const qty = Number(t.quantityChange);
+      
+      if (t.type === 'MANUAL_PRODUCED_ADJUST') {
+        impact = { stock: 0, produced: qty, dispatched: 0 };
+      } else if (t.type === 'MANUAL_DISPATCH_ADJUST') {
+        impact = { stock: 0, produced: 0, dispatched: qty };
+      } else {
+        impact = { stock: qty, produced: 0, dispatched: 0 };
+      }
+
       ledgerEntries.push({
         id: t.id,
-        type: t.type,
-        quantityChange: Number(t.quantityChange),
+        transactionType: t.type,
+        quantity: qty,
         remarks: t.remarks || 'Stock Adjustment',
         createdAt: t.createdAt,
-        userName: t.userName || 'Admin'
+        performedBy: t.userName || 'Admin',
+        impact,
+        stockBalanceAfter: t.stockBalanceAfter,
+        producedBalanceAfter: t.producedBalanceAfter,
+        dispatchedBalanceAfter: t.dispatchedBalanceAfter,
       });
     });
 
@@ -635,39 +674,58 @@ export class InventoryService {
       if (casesProduced <= 0) return;
       ledgerEntries.push({
         id: `packing_${l.id}`,
-        type: 'PRODUCTION',
-        quantityChange: casesProduced,
+        transactionType: 'PRODUCTION',
+        quantity: casesProduced,
         remarks: `Production Output (Batch #${l.batchCode})`,
         createdAt: l.createdAt,
-        userName: l.userName || 'Operator'
+        performedBy: l.userName || 'Operator',
+        impact: { stock: casesProduced, produced: casesProduced, dispatched: 0 },
+        stockBalanceAfter: l.stockBalanceAfter,
+        producedBalanceAfter: l.producedBalanceAfter,
+        dispatchedBalanceAfter: l.dispatchedBalanceAfter,
       });
     });
 
     dispatches.forEach(d => {
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
-        type: 'DISPATCH',
-        quantityChange: -d.quantity,
+        transactionType: 'DISPATCH',
+        quantity: -d.quantity,
         remarks: `Dispatched Stock (Batch #${d.batchCode})`,
         createdAt: d.createdAt,
-        userName: d.userName || 'Logistics'
+        performedBy: d.userName || 'Logistics',
+        impact: { stock: -d.quantity, produced: 0, dispatched: d.quantity },
+        stockBalanceAfter: d.stockBalanceAfter,
+        producedBalanceAfter: d.producedBalanceAfter,
+        dispatchedBalanceAfter: d.dispatchedBalanceAfter,
       });
     });
 
-    // Sort descending by date
-    ledgerEntries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const limitedEntries = ledgerEntries.slice(0, 100);
+    // Sort ascending by date to chronologically replay
+    ledgerEntries.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-    // Compute running balance backwards starting from current live stock balance
-    let balance = totalCurrentStock;
-    const sortedLedger = [];
-    for (const entry of limitedEntries) {
-      entry.balanceAfter = balance;
-      balance -= entry.quantityChange;
-      sortedLedger.push(entry);
+    let runningStock = 0;
+    let runningProduced = 0;
+    let runningDispatched = 0;
+
+    for (const entry of ledgerEntries) {
+      entry.previousStock = runningStock;
+      entry.previousProduced = runningProduced;
+      entry.previousDispatched = runningDispatched;
+
+      runningStock += entry.impact.stock;
+      runningProduced += entry.impact.produced;
+      runningDispatched += entry.impact.dispatched;
+
+      // Use stored snapshots if available (future proof), otherwise dynamically calculate
+      entry.stockBalanceAfter = entry.stockBalanceAfter ?? runningStock;
+      entry.producedBalanceAfter = entry.producedBalanceAfter ?? runningProduced;
+      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter ?? runningDispatched;
     }
 
-    return sortedLedger;
+    // Reverse for descending display and take top 100
+    ledgerEntries.reverse();
+    return ledgerEntries.slice(0, 100);
   }
 
   async getStationConsumption() {

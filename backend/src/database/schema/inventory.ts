@@ -150,6 +150,12 @@ export const productStockTransactions = pgTable('product_stock_transactions', {
   type: varchar('type', { length: 50 }).notNull(), // ADD, EDIT, DELETE
   quantityChange: decimal('quantity_change', { precision: 12, scale: 2 }).notNull(),
   balanceAfter: decimal('balance_after', { precision: 12, scale: 2 }).notNull(),
+
+  // Historical Snapshot Columns (Enterprise Ledger)
+  stockBalanceAfter: decimal('stock_balance_after', { precision: 12, scale: 2 }),
+  producedBalanceAfter: decimal('produced_balance_after', { precision: 12, scale: 2 }),
+  dispatchedBalanceAfter: decimal('dispatched_balance_after', { precision: 12, scale: 2 }),
+
   remarks: text('remarks'),
   performedBy: uuid('performed_by').references(() => users.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),

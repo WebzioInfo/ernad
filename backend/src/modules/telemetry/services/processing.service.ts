@@ -17,7 +17,8 @@ import {
   operatorSessions,
   rawMaterials,
   rawMaterialTransactions,
-  products
+  products,
+  productionStock
 } from '../../../database/schema';
 import { billOfMaterials } from '../../../database/schema';
 import { TelemetryDto } from '../dto/telemetry.dto';
@@ -166,6 +167,23 @@ export class ProcessingService {
         }
       }
 
+      let runningStock = 0;
+      let runningProduced = 0;
+      let runningDispatched = 0;
+
+      if (dto.station === 'PACKING' && dto.casesProduced) {
+        const existingStock = await tx.select().from(productionStock).where(eq(productionStock.productId, dto.productId)).limit(1);
+        if (existingStock.length > 0) {
+          runningStock = Number(existingStock[0].currentStock) + dto.casesProduced;
+          runningProduced = Number(existingStock[0].totalProduced) + dto.casesProduced;
+          runningDispatched = Number(existingStock[0].totalDispatched);
+        } else {
+          runningStock = dto.casesProduced;
+          runningProduced = dto.casesProduced;
+        }
+      }
+
+
       const [log] = await tx.insert(productionLogs).values({
         requestId: dto.requestId,
         batchId: dto.batchId,
@@ -217,6 +235,11 @@ export class ProcessingService {
         // Blowing / Material Consumption Fields
         rawMaterialId: dto.rawMaterialId || null,
         bagsUsed: dto.bagsUsed ? String(dto.bagsUsed) : null,
+
+        // Snapshot Columns
+        stockBalanceAfter: dto.station === 'PACKING' && dto.casesProduced ? String(runningStock) : null,
+        producedBalanceAfter: dto.station === 'PACKING' && dto.casesProduced ? String(runningProduced) : null,
+        dispatchedBalanceAfter: dto.station === 'PACKING' && dto.casesProduced ? String(runningDispatched) : null,
 
         loggedAt: dto.loggedAt ? new Date(dto.loggedAt) : new Date(),
       }).returning();

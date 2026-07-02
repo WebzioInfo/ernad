@@ -85,6 +85,11 @@ export const productionLogs = pgTable('production_logs', {
   updatedBy: uuid('updated_by').references(() => users.id),
   updatedAt: timestamp('updated_at'),
   
+  // Historical Snapshot Columns (Enterprise Ledger)
+  stockBalanceAfter: decimal('stock_balance_after', { precision: 12, scale: 2 }),
+  producedBalanceAfter: decimal('produced_balance_after', { precision: 12, scale: 2 }),
+  dispatchedBalanceAfter: decimal('dispatched_balance_after', { precision: 12, scale: 2 }),
+
   // Forensic Auditability (Phase 8 Hardening)
   deletedAt: timestamp('deleted_at'),
   deletedBy: uuid('deleted_by').references(() => users.id),
@@ -201,6 +206,12 @@ export const dispatchLogs = pgTable('dispatch_logs', {
   quantity: integer('quantity').notNull(),
   vehicleNumber: varchar('vehicle_number', { length: 50 }),
   remarks: varchar('remarks', { length: 500 }),
+
+  // Historical Snapshot Columns (Enterprise Ledger)
+  stockBalanceAfter: decimal('stock_balance_after', { precision: 12, scale: 2 }),
+  producedBalanceAfter: decimal('produced_balance_after', { precision: 12, scale: 2 }),
+  dispatchedBalanceAfter: decimal('dispatched_balance_after', { precision: 12, scale: 2 }),
+
   dispatchedAt: timestamp('dispatched_at').defaultNow().notNull(),
 }, (table) => {
   return [

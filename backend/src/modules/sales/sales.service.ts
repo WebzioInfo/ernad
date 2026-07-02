@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { db } from '../../database/db';
-import { customers, salesOrders, salesOrderItems, salesTransactions, products, productBrands, users } from '../../database/schema';
+import { customers, salesOrders, salesOrderItems, salesTransactions, products, productBrands, users, productionStock } from '../../database/schema';
 import { eq, desc } from 'drizzle-orm';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../audit/audit.service';
@@ -94,6 +94,23 @@ export class SalesService {
     }
 
     return await db.transaction(async (tx) => {
+      let runningStock = 0;
+      let runningProduced = 0;
+      let runningDispatched = 0;
+
+      const existingStock = await tx.select().from(productionStock).where(eq(productionStock.productId, productId)).limit(1);
+      if (existingStock.length > 0) {
+        runningStock = Number(existingStock[0].currentStock);
+        runningProduced = Number(existingStock[0].totalProduced);
+        runningDispatched = Number(existingStock[0].totalDispatched);
+        if (type === 'RETURN') runningStock += quantity;
+        else if (type === 'SALES_DISPATCH') {
+           runningStock -= quantity;
+           runningDispatched += quantity;
+        }
+        else if (type === 'DAMAGE') runningStock -= quantity;
+      }
+
       // 1. Insert transaction record
       const [transaction] = await tx.insert(salesTransactions).values({
         brandId,
@@ -105,6 +122,9 @@ export class SalesService {
         customerId: customerId || null,
         unitPrice: unitPrice !== undefined ? String(unitPrice) : '0.00',
         remarks: remarks || null,
+        stockBalanceAfter: String(runningStock),
+        producedBalanceAfter: String(runningProduced),
+        dispatchedBalanceAfter: String(runningDispatched),
         createdAt: new Date(),
         updatedAt: new Date(),
       }).returning();

@@ -75,6 +75,12 @@ export const salesTransactions = pgTable('sales_transactions', {
   unitPrice: decimal('unit_price', { precision: 12, scale: 2 }).default('0.00'),
   remarks: text('remarks'),
   updatedBy: uuid('updated_by').references(() => users.id),
+
+  // Historical Snapshot Columns (Enterprise Ledger)
+  stockBalanceAfter: decimal('stock_balance_after', { precision: 12, scale: 2 }),
+  producedBalanceAfter: decimal('produced_balance_after', { precision: 12, scale: 2 }),
+  dispatchedBalanceAfter: decimal('dispatched_balance_after', { precision: 12, scale: 2 }),
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => {

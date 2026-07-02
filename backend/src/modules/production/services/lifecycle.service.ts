@@ -3,7 +3,7 @@ import { db } from '../../../database/db';
 import { 
   productionBatches, batchTotals, productionLines,
   packagingLogs, dispatchLogs, userRoles, roles, operatorSessions,
-  finishedGoodsInventory, inventoryStock, warehouseLocations, inventoryTransactions
+  finishedGoodsInventory, inventoryStock, warehouseLocations, inventoryTransactions, productionStock
 } from '../../../database/schema';
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { ProductionEventsService } from '../../../realtime/production.gateway';
@@ -195,6 +195,17 @@ export class LifecycleService {
          throw new BadRequestException('Batch must be at least QC_PENDING or COMPLETED to dispatch.');
       }
 
+      let runningStock = -quantity;
+      let runningProduced = 0;
+      let runningDispatched = quantity;
+
+      const existingStock = await tx.select().from(productionStock).where(eq(productionStock.productId, batch.productId)).limit(1);
+      if (existingStock.length > 0) {
+        runningStock = Number(existingStock[0].currentStock) - quantity;
+        runningProduced = Number(existingStock[0].totalProduced);
+        runningDispatched = Number(existingStock[0].totalDispatched) + quantity;
+      }
+
       const res = await tx.insert(dispatchLogs).values({
         batchId,
         dispatchManagerId: managerId,
@@ -202,6 +213,9 @@ export class LifecycleService {
         quantity,
         vehicleNumber: vehicle,
         remarks: remarks,
+        stockBalanceAfter: String(runningStock),
+        producedBalanceAfter: String(runningProduced),
+        dispatchedBalanceAfter: String(runningDispatched),
         dispatchedAt: new Date(),
       }).returning();
       
