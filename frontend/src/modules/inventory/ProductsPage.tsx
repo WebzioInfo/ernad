@@ -498,41 +498,41 @@ export default function ProductsPage() {
                           <p className={`text-xs font-black tabular-nums ${tx.impact?.stock !== 0 ? 'text-indigo-900' : 'text-slate-700'}`}>
                             {Number(tx.stockBalanceAfter || 0).toLocaleString()}
                           </p>
-                          {tx.impact?.stock !== 0 && (
+                          {Number(tx.impact?.stock ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-indigo-500 bg-indigo-100/50 px-1 rounded">
-                              {tx.impact.stock > 0 ? '↑' : '↓'}
+                              {Number(tx.impact?.stock ?? 0) > 0 ? '↑' : '↓'}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.produced !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.produced !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.produced ?? 0) !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
                           Produced
                         </p>
                         <div className="flex items-center gap-1">
-                          <p className={`text-xs font-black tabular-nums ${tx.impact?.produced !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
+                          <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
                             {Number(tx.producedBalanceAfter || 0).toLocaleString()}
                           </p>
-                          {tx.impact?.produced !== 0 && (
+                          {Number(tx.impact?.produced ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-emerald-500 bg-emerald-100/50 px-1 rounded">
-                              {tx.impact.produced > 0 ? '↑' : '↓'}
+                              {Number(tx.impact?.produced ?? 0) > 0 ? '↑' : '↓'}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.dispatched !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.dispatched !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
+                        <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
                           Dispatched
                         </p>
                         <div className="flex items-center gap-1">
-                          <p className={`text-xs font-black tabular-nums ${tx.impact?.dispatched !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
+                          <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
                             {Number(tx.dispatchedBalanceAfter || 0).toLocaleString()}
                           </p>
-                          {tx.impact?.dispatched !== 0 && (
+                          {Number(tx.impact?.dispatched ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-amber-500 bg-amber-100/50 px-1 rounded">
-                              {tx.impact.dispatched > 0 ? '↑' : '↓'}
+                              {Number(tx.impact?.dispatched ?? 0) > 0 ? '↑' : '↓'}
                             </span>
                           )}
                         </div>
