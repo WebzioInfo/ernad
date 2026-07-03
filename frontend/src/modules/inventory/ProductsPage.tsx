@@ -4,8 +4,8 @@ import { ENDPOINTS } from '../../constants/endpoints';
 import { api } from '../../services/api-client';
 import {
   Package, Search, RefreshCw, Loader2,
-  TrendingUp, CheckCircle, Truck, History,
-  ArrowDownLeft, ArrowUpRight, Plus, PenLine, Trash2, X
+  TrendingUp, CheckCircle, Truck,
+  Plus, PenLine, Trash2, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import useAuthStore from '../auth/auth.store';
@@ -14,6 +14,8 @@ import { StockTransactionModal } from './RawMaterialsPage';
 import { useProductionStock, useProducts, useBrands, useProductLedger, QK } from '../../hooks/useApi';
 import { useTransactionOverlay } from '../../components/TransactionOverlay';
 import { useMemo } from 'react';
+import { LedgerHistory } from './ledger/LedgerHistory';
+import { ProductLedgerItem, normalizeLedgerItem } from './ledger/ledger-types';
 
 export default function ProductsPage() {
   const { user } = useAuthStore();
@@ -39,7 +41,12 @@ export default function ProductsPage() {
 
   const currentProduct = selectedProduct || productionStock?.[0];
 
-  const { data: ledger, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
+  const { data: ledgerRaw, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
+
+  const normalizedLedger = useMemo<ProductLedgerItem[]>(() => {
+    if (!Array.isArray(ledgerRaw)) return [];
+    return ledgerRaw.map(normalizeLedgerItem);
+  }, [ledgerRaw]);
 
   const editingProductStock = useMemo(() => {
     return productionStock?.find((s: any) => s.productId === editingProduct?.id);
@@ -405,154 +412,14 @@ export default function ProductsPage() {
       </div>
 
       {/* Detailed Ledger History for Selected Product */}
-      <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm flex flex-col min-h-[450px]">
-        <div className="p-6 bg-slate-50/50 border-b border-slate-200 flex justify-between items-center">
-          <div>
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <History className="w-4 h-4 text-[#1A9A91]" />
-              {currentProduct ? `${currentProduct.productName} Ledger History` : 'Transaction History'}
-            </h3>
-            <p className="text-slate-400 font-bold text-[10px] mt-1 uppercase tracking-wide">
-              Chronological stock movements
-            </p>
-          </div>
-          {currentProduct && (
-            <span className="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider">
-              {Number(currentProduct?.currentStock ?? 0).toLocaleString()} units left
-            </span>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-6 max-h-[500px] space-y-4">
-          {isLedgerLoading ? (
-            <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-200" /></div>
-          ) : !ledger || ledger.length === 0 ? (
-            <div className="py-20 text-center flex flex-col items-center gap-3 opacity-30">
-              <History className="w-12 h-12" />
-              <p className="font-black uppercase tracking-widest text-[10px]">No movements recorded</p>
-            </div>
-          ) : (
-            ledger.map((tx: any) => {
-              const isAddition = tx.transactionType === 'ADD' || tx.transactionType === 'PRODUCTION' || tx.quantity > 0;
-              const isReduction = tx.transactionType === 'DISPATCH' || tx.transactionType === 'LEAKAGE' || tx.transactionType === 'REJECTION' || tx.quantity < 0;
-              const isManual = tx.transactionType === 'ADD' || tx.transactionType === 'EDIT' || tx.transactionType === 'DELETE' || tx.transactionType === 'MANUAL_PRODUCED_ADJUST' || tx.transactionType === 'MANUAL_DISPATCH_ADJUST';
-
-              return (
-                <div key={tx.id} className="bg-slate-50/40 rounded-2xl p-6 border border-slate-150 group hover:bg-white hover:shadow-md hover:border-slate-250 transition-all duration-300">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isAddition ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                        isReduction ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
-                        }`}>
-                        {isAddition ? <ArrowDownLeft className="w-5 h-5" /> :
-                          isReduction ? <ArrowUpRight className="w-5 h-5" /> : <RefreshCw className="w-4 h-4" />}
-                      </div>
-                      <div className="pt-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[11px] font-black uppercase tracking-wider ${isAddition ? 'text-emerald-700' : isReduction ? 'text-rose-700' : 'text-blue-700'
-                            }`}>{tx.transactionType?.replace(/_/g, ' ')}</span>
-                          <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
-                        </div>
-                        {tx.batchCode && (
-                          <p className="text-sm text-slate-700 font-bold mt-1">Batch: {tx.batchCode}</p>
-                        )}
-                        {tx.remarks && (
-                          <p className="text-xs text-slate-500 font-semibold mt-1">Remarks: {tx.remarks}</p>
-                        )}
-                        <div className="mt-2">
-                          <p className="text-[10px] text-slate-400 font-semibold">Performed by:</p>
-                          <p className="text-sm text-slate-800 font-bold">{tx.performedByName}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className={`text-xl font-black tabular-nums tracking-tight ${isAddition ? 'text-emerald-600' : isReduction ? 'text-rose-600' : 'text-blue-600'
-                        }`}>
-                        {tx.quantity > 0 ? '+' : ''}{Number(tx.quantity).toLocaleString()} Units
-                      </p>
-
-                      {canManageProducts && isManual && (
-                        <div className="flex items-center justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => setEditingTransaction(tx)}
-                            className="p-1.5 hover:bg-slate-100 hover:text-indigo-600 rounded-lg text-slate-400 transition-colors"
-                            title="Edit Record"
-                          >
-                            <PenLine className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => setTransactionToDelete(tx.id)}
-                            className="p-1.5 hover:bg-slate-100 hover:text-rose-600 rounded-lg text-slate-400 transition-colors"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      Inventory After Transaction
-                    </h5>
-                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2">
-                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.stock !== 0 ? 'bg-indigo-50/50 border-indigo-100' : 'bg-white border-slate-100'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.stock !== 0 ? 'text-indigo-600' : 'text-slate-500'}`}>
-                          Current Stock
-                        </p>
-                        <div className="flex items-center gap-1">
-                          <p className={`text-xs font-black tabular-nums ${tx.impact?.stock !== 0 ? 'text-indigo-900' : 'text-slate-700'}`}>
-                            {Number(tx.stockBalanceAfter).toLocaleString()}
-                          </p>
-                          {Number(tx.impact?.stock ?? 0) !== 0 && (
-                            <span className="text-[9px] font-bold text-indigo-500 bg-indigo-100/50 px-1 rounded">
-                              {Number(tx.impact?.stock ?? 0) > 0 ? '↑' : '↓'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.produced ?? 0) !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
-                          Total Produced
-                        </p>
-                        <div className="flex items-center gap-1">
-                          <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
-                            {Number(tx.producedBalanceAfter).toLocaleString()}
-                          </p>
-                          {Number(tx.impact?.produced ?? 0) !== 0 && (
-                            <span className="text-[9px] font-bold text-emerald-500 bg-emerald-100/50 px-1 rounded">
-                              {Number(tx.impact?.produced ?? 0) > 0 ? '↑' : '↓'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
-                        <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
-                          Total Dispatched
-                        </p>
-                        <div className="flex items-center gap-1">
-                          <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
-                            {Number(tx.dispatchedBalanceAfter).toLocaleString()}
-                          </p>
-                          {Number(tx.impact?.dispatched ?? 0) !== 0 && (
-                            <span className="text-[9px] font-bold text-amber-500 bg-amber-100/50 px-1 rounded">
-                              {Number(tx.impact?.dispatched ?? 0) > 0 ? '↑' : '↓'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+      <LedgerHistory 
+        ledger={normalizedLedger} 
+        currentProduct={currentProduct} 
+        isLedgerLoading={isLedgerLoading} 
+        canManageProducts={canManageProducts} 
+        onEditTransaction={setEditingTransaction} 
+        onDeleteTransaction={setTransactionToDelete} 
+      />
 
       {/* Add Stock Modal */}
       {isAddModalOpen && (
@@ -623,6 +490,8 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+
 
 function ProductFormModal({
   product,
