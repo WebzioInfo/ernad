@@ -94,6 +94,9 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // ── RESPONSE INTERCEPTOR (ERROR MAPPING & RETRY) ──
 api.interceptors.response.use(
   (response) => {
+    if (response.config.url?.includes('inventory/ledger/product')) {
+      console.log("RAW API", response.data);
+    }
     return response;
   },
   async (error: AxiosError) => {

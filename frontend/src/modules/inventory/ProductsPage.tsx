@@ -44,8 +44,23 @@ export default function ProductsPage() {
   const { data: ledgerRaw, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
 
   const normalizedLedger = useMemo<ProductLedgerItem[]>(() => {
+    console.log("REACT QUERY (ledgerRaw):", ledgerRaw);
     if (!Array.isArray(ledgerRaw)) return [];
-    return ledgerRaw.map(normalizeLedgerItem);
+    
+    return ledgerRaw.map((rawTx) => {
+      console.log("RAW API ITEM (rawTx):", rawTx);
+      const mapped = normalizeLedgerItem(rawTx);
+      console.log("MAPPED ITEM:", {
+        raw: rawTx,
+        mapped: mapped,
+        quantity: mapped.quantity,
+        performedByName: mapped.performedByName,
+        stock: mapped.stockBalanceAfter,
+        produced: mapped.producedBalanceAfter,
+        dispatched: mapped.dispatchedBalanceAfter,
+      });
+      return mapped;
+    });
   }, [ledgerRaw]);
 
   const editingProductStock = useMemo(() => {

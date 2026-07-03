@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
 import { 
   inventoryStock, 
@@ -528,12 +528,6 @@ export class InventoryService {
     const [prod] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (!prod) return [];
 
-    const [stock] = await db.select({ currentStock: productionStock.currentStock })
-      .from(productionStock)
-      .where(eq(productionStock.productId, productId))
-      .limit(1);
-    const totalCurrentStock = Number(stock?.currentStock || 0);
-
     // Fetch all history without limits to calculate accurate snapshots
     const [manualTxs, packingLogs, dispatches, salesTxs] = await Promise.all([
       db.select({
@@ -542,6 +536,7 @@ export class InventoryService {
         quantityChange: productStockTransactions.quantityChange,
         remarks: productStockTransactions.remarks,
         createdAt: productStockTransactions.createdAt,
+        performedById: productStockTransactions.performedBy,
         userName: users.name,
         stockBalanceAfter: productStockTransactions.stockBalanceAfter,
         producedBalanceAfter: productStockTransactions.producedBalanceAfter,
@@ -554,7 +549,9 @@ export class InventoryService {
       db.select({
         id: productionLogs.id,
         casesProduced: productionLogs.casesProduced,
+        remarks: productionLogs.remarks,
         createdAt: productionLogs.loggedAt,
+        performedById: productionLogs.userId,
         userName: users.name,
         batchCode: productionBatches.batchCode,
         stockBalanceAfter: productionLogs.stockBalanceAfter,
@@ -573,7 +570,9 @@ export class InventoryService {
       db.select({
         id: dispatchLogs.id,
         quantity: dispatchLogs.quantity,
+        remarks: dispatchLogs.remarks,
         createdAt: dispatchLogs.dispatchedAt,
+        performedById: dispatchLogs.dispatchManagerId,
         userName: users.name,
         batchCode: productionBatches.batchCode,
         stockBalanceAfter: dispatchLogs.stockBalanceAfter,
@@ -594,6 +593,8 @@ export class InventoryService {
         quantity: salesTransactions.quantity,
         salesDate: salesTransactions.salesDate,
         createdAt: salesTransactions.createdAt,
+        remarks: salesTransactions.remarks,
+        performedById: salesTransactions.performedBy,
         userName: users.name,
         stockBalanceAfter: salesTransactions.stockBalanceAfter,
         producedBalanceAfter: salesTransactions.producedBalanceAfter,
@@ -605,48 +606,67 @@ export class InventoryService {
     ]);
 
     const ledgerEntries: any[] = [];
+    const requireNumber = (value: unknown, field: string, id: string): number => {
+      const parsed = typeof value === 'number' ? value : Number(value);
+      if (value === null || value === undefined || !Number.isFinite(parsed)) {
+        throw new InternalServerErrorException(`Ledger integrity error: ${field} is missing or invalid for ${id}`);
+      }
+      return parsed;
+    };
+    const requireUserName = (name: string | null, userId: string | null, id: string): string => {
+      if (!userId || !name?.trim()) {
+        throw new InternalServerErrorException(`Ledger integrity error: user relationship is invalid for ${id}`);
+      }
+      return name;
+    };
 
     salesTxs.forEach(t => {
       let typeLabel = '';
-      let quantityChange = 0;
-      let remarks = '';
+      const sourceQuantity = requireNumber(t.quantity, 'quantity', `sales:${t.id}`);
+      let quantityChange: number;
+      let remarks: string;
       let impact = { stock: 0, produced: 0, dispatched: 0 };
       
       if (t.type === 'RETURN') {
         typeLabel = 'RETURN';
-        quantityChange = t.quantity;
-        remarks = 'Returned Product';
-        impact = { stock: t.quantity, produced: 0, dispatched: 0 };
+        quantityChange = sourceQuantity;
+        remarks = t.remarks || 'Returned Product';
+        impact = { stock: sourceQuantity, produced: 0, dispatched: 0 };
       } else if (t.type === 'SALES_DISPATCH') {
         typeLabel = 'SALES_DISPATCH';
-        quantityChange = -t.quantity;
-        remarks = 'Sales Dispatch';
-        impact = { stock: -t.quantity, produced: 0, dispatched: t.quantity };
+        quantityChange = -sourceQuantity;
+        remarks = t.remarks || 'Sales Dispatch';
+        impact = { stock: -sourceQuantity, produced: 0, dispatched: sourceQuantity };
       } else if (t.type === 'DAMAGE') {
         typeLabel = 'DAMAGE';
-        quantityChange = -t.quantity;
-        remarks = 'Damaged Product';
-        impact = { stock: -t.quantity, produced: 0, dispatched: 0 };
+        quantityChange = -sourceQuantity;
+        remarks = t.remarks || 'Damaged Product';
+        impact = { stock: -sourceQuantity, produced: 0, dispatched: 0 };
+      } else {
+        throw new InternalServerErrorException(`Ledger integrity error: unsupported sales transaction type ${t.type}`);
       }
+
+      const userName = requireUserName(t.userName, t.performedById, `sales:${t.id}`);
 
       ledgerEntries.push({
         id: `sales_${t.id}`,
         transactionType: typeLabel,
-        quantity: parseFloat(quantityChange as any),
+        quantity: quantityChange,
         remarks,
         createdAt: t.salesDate,
-        performedBy: t.userName || 'Unknown User',
-        performedByName: t.userName || 'Unknown User',
+        performedByName: userName,
         impact,
         stockBalanceAfter: t.stockBalanceAfter,
         producedBalanceAfter: t.producedBalanceAfter,
         dispatchedBalanceAfter: t.dispatchedBalanceAfter,
+        snapshotSource: 'sales',
+        sourceId: t.id,
       });
     });
 
     manualTxs.forEach(t => {
       let impact = { stock: 0, produced: 0, dispatched: 0 };
-      const qty = t.quantityChange != null ? parseFloat(t.quantityChange as any) : 0;
+      const qty = requireNumber(t.quantityChange, 'quantityChange', `manual:${t.id}`);
       
       if (t.type === 'MANUAL_PRODUCED_ADJUST') {
         impact = { stock: 0, produced: qty, dispatched: 0 };
@@ -656,58 +676,64 @@ export class InventoryService {
         impact = { stock: qty, produced: 0, dispatched: 0 };
       }
 
+      const userName = requireUserName(t.userName, t.performedById, `manual:${t.id}`);
+
       ledgerEntries.push({
         id: t.id,
         transactionType: t.type,
         quantity: qty,
         quantityChange: qty,
-        remarks: t.remarks || 'Stock Adjustment',
+        remarks: t.remarks,
         createdAt: t.createdAt,
-        performedBy: t.userName || 'Unknown User',
-        performedByName: t.userName || 'Unknown User',
+        performedByName: userName,
         impact,
         stockBalanceAfter: t.stockBalanceAfter,
         producedBalanceAfter: t.producedBalanceAfter,
         dispatchedBalanceAfter: t.dispatchedBalanceAfter,
+        snapshotSource: 'manual',
+        sourceId: t.id,
       });
     });
 
     packingLogs.forEach(l => {
-      const casesProduced = parseFloat(l.casesProduced as any);
-      if (isNaN(casesProduced) || casesProduced <= 0) return;
+      const casesProduced = requireNumber(l.casesProduced, 'casesProduced', `production:${l.id}`);
+      const userName = requireUserName(l.userName, l.performedById, `production:${l.id}`);
       ledgerEntries.push({
         id: `packing_${l.id}`,
         transactionType: 'PRODUCTION',
         quantity: casesProduced,
         quantityChange: casesProduced,
-        remarks: `Production Output (Batch #${l.batchCode})`,
+        remarks: l.remarks || `Production Output (Batch #${l.batchCode})`,
         batchCode: l.batchCode,
         createdAt: l.createdAt,
-        performedBy: l.userName || 'Unknown User',
-        performedByName: l.userName || 'Unknown User',
+        performedByName: userName,
         impact: { stock: casesProduced, produced: casesProduced, dispatched: 0 },
         stockBalanceAfter: l.stockBalanceAfter,
         producedBalanceAfter: l.producedBalanceAfter,
         dispatchedBalanceAfter: l.dispatchedBalanceAfter,
+        snapshotSource: 'production',
+        sourceId: l.id,
       });
     });
 
     dispatches.forEach(d => {
-      const quantity = d.quantity != null ? parseFloat(d.quantity as any) : 0;
+      const quantity = requireNumber(d.quantity, 'quantity', `dispatch:${d.id}`);
+      const userName = requireUserName(d.userName, d.performedById, `dispatch:${d.id}`);
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
         transactionType: 'DISPATCH',
         quantity: -quantity,
         quantityChange: -quantity,
-        remarks: `Dispatched Stock (Batch #${d.batchCode})`,
+        remarks: d.remarks || `Dispatched Stock (Batch #${d.batchCode})`,
         batchCode: d.batchCode,
         createdAt: d.createdAt,
-        performedBy: d.userName || 'Unknown User',
-        performedByName: d.userName || 'Unknown User',
+        performedByName: userName,
         impact: { stock: -quantity, produced: 0, dispatched: quantity },
         stockBalanceAfter: d.stockBalanceAfter,
         producedBalanceAfter: d.producedBalanceAfter,
         dispatchedBalanceAfter: d.dispatchedBalanceAfter,
+        snapshotSource: 'dispatch',
+        sourceId: d.id,
       });
     });
 
@@ -723,17 +749,35 @@ export class InventoryService {
       entry.previousProduced = parseFloat(runningProduced as any);
       entry.previousDispatched = parseFloat(runningDispatched as any);
 
-      runningStock += parseFloat(entry.impact?.stock);
-      runningProduced += parseFloat(entry.impact?.produced);
-      runningDispatched += parseFloat(entry.impact?.dispatched);
+      runningStock += entry.impact.stock;
+      runningProduced += entry.impact.produced;
+      runningDispatched += entry.impact.dispatched;
 
-      // Now that the DB migration is running, the values will be guaranteed to be present in DB
-      // However, if any somehow slips through, we fallback cleanly without falsifying 0
-      entry.stockBalanceAfter = entry.stockBalanceAfter != null ? parseFloat(entry.stockBalanceAfter) : runningStock;
-      entry.producedBalanceAfter = entry.producedBalanceAfter != null ? parseFloat(entry.producedBalanceAfter) : runningProduced;
-      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter != null ? parseFloat(entry.dispatchedBalanceAfter) : runningDispatched;
-      
-      entry.quantity = entry.quantity != null ? parseFloat(entry.quantity) : 0;
+      const snapshotsMissing = entry.stockBalanceAfter == null
+        || entry.producedBalanceAfter == null
+        || entry.dispatchedBalanceAfter == null;
+
+      if (snapshotsMissing) {
+        const snapshots = {
+          stockBalanceAfter: String(runningStock),
+          producedBalanceAfter: String(runningProduced),
+          dispatchedBalanceAfter: String(runningDispatched),
+        };
+        if (entry.snapshotSource === 'sales') await db.update(salesTransactions).set(snapshots).where(eq(salesTransactions.id, entry.sourceId));
+        else if (entry.snapshotSource === 'manual') await db.update(productStockTransactions).set(snapshots).where(eq(productStockTransactions.id, entry.sourceId));
+        else if (entry.snapshotSource === 'production') await db.update(productionLogs).set(snapshots).where(eq(productionLogs.id, entry.sourceId));
+        else if (entry.snapshotSource === 'dispatch') await db.update(dispatchLogs).set(snapshots).where(eq(dispatchLogs.id, entry.sourceId));
+        entry.stockBalanceAfter = runningStock;
+        entry.producedBalanceAfter = runningProduced;
+        entry.dispatchedBalanceAfter = runningDispatched;
+      } else {
+        entry.stockBalanceAfter = requireNumber(entry.stockBalanceAfter, 'stockBalanceAfter', entry.id);
+        entry.producedBalanceAfter = requireNumber(entry.producedBalanceAfter, 'producedBalanceAfter', entry.id);
+        entry.dispatchedBalanceAfter = requireNumber(entry.dispatchedBalanceAfter, 'dispatchedBalanceAfter', entry.id);
+      }
+
+      delete entry.snapshotSource;
+      delete entry.sourceId;
     }
 
     // Reverse for descending display and take top 100

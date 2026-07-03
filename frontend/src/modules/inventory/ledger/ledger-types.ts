@@ -22,11 +22,12 @@ export function normalizeLedgerItem(apiItem: unknown): ProductLedgerItem {
   const item = (apiItem || {}) as Record<string, unknown>;
 
   const safeNumber = (val: unknown, fieldName: string): number => {
-    if (val === null || val === undefined) return 0;
+    if (val === null || val === undefined) {
+      throw new Error(`[Ledger Contract] Missing required numeric field: ${fieldName}`);
+    }
     const num = Number(val);
     if (!Number.isFinite(num)) {
-      console.warn(`[Ledger Normalization] Field ${fieldName} parsed to invalid number:`, val);
-      return 0;
+      throw new Error(`[Ledger Contract] Invalid numeric field ${fieldName}: ${String(val)}`);
     }
     return num;
   };
@@ -45,7 +46,9 @@ export function normalizeLedgerItem(apiItem: unknown): ProductLedgerItem {
     remarks: item.remarks ? String(item.remarks) : undefined,
     batchCode: item.batchCode ? String(item.batchCode) : undefined,
     createdAt: safeString(item.createdAt),
-    performedByName: item.performedByName ? String(item.performedByName) : 'Unknown User',
+    performedByName: item.performedByName
+      ? String(item.performedByName)
+      : (() => { throw new Error('[Ledger Contract] Missing performedByName'); })(),
     impact: {
       stock: safeNumber(impactObj.stock, 'impact.stock'),
       produced: safeNumber(impactObj.produced, 'impact.produced'),
