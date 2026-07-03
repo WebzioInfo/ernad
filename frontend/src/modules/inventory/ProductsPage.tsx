@@ -15,7 +15,7 @@ import { useProductionStock, useProducts, useBrands, useProductLedger, QK } from
 import { useTransactionOverlay } from '../../components/TransactionOverlay';
 import { useMemo } from 'react';
 import { LedgerHistory } from './ledger/LedgerHistory';
-import { ProductLedgerItem, normalizeLedgerItem } from './ledger/ledger-types';
+import { LedgerItem } from './ledger/ledger-types';
 
 export default function ProductsPage() {
   const { user } = useAuthStore();
@@ -43,25 +43,7 @@ export default function ProductsPage() {
 
   const { data: ledgerRaw, isLoading: isLedgerLoading, refetch: refetchLedger } = useProductLedger(currentProduct?.productId);
 
-  const normalizedLedger = useMemo<ProductLedgerItem[]>(() => {
-    console.log("REACT QUERY (ledgerRaw):", ledgerRaw);
-    if (!Array.isArray(ledgerRaw)) return [];
-    
-    return ledgerRaw.map((rawTx) => {
-      console.log("RAW API ITEM (rawTx):", rawTx);
-      const mapped = normalizeLedgerItem(rawTx);
-      console.log("MAPPED ITEM:", {
-        raw: rawTx,
-        mapped: mapped,
-        quantity: mapped.quantity,
-        performedByName: mapped.performedByName,
-        stock: mapped.stockBalanceAfter,
-        produced: mapped.producedBalanceAfter,
-        dispatched: mapped.dispatchedBalanceAfter,
-      });
-      return mapped;
-    });
-  }, [ledgerRaw]);
+  const normalizedLedger = (ledgerRaw || []) as LedgerItem[];
 
   const editingProductStock = useMemo(() => {
     return productionStock?.find((s: any) => s.productId === editingProduct?.id);

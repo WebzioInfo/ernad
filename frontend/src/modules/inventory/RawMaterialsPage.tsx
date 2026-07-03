@@ -352,11 +352,11 @@ export default function RawMaterialsPage() {
                       <div className="flex items-center gap-2">
                         <span className={`text-[10px] font-black uppercase tracking-wider ${
                           isAddition ? 'text-emerald-700' : isConsumption ? 'text-rose-700' : 'text-blue-700'
-                        }`}>{tx.type}</span>
+                        }`}>{tx.transactionType}</span>
                         <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
                       </div>
                       <p className="text-xs text-slate-600 font-bold mt-1">{tx.remarks}</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Performed by: {tx.userName}</p>
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Performed by: {tx.performedByName}</p>
                     </div>
                   </div>
 
@@ -365,9 +365,9 @@ export default function RawMaterialsPage() {
                       <p className={`text-lg font-black tabular-nums tracking-tight ${
                         isAddition ? 'text-emerald-600' : isConsumption ? 'text-rose-600' : 'text-blue-600'
                       }`}>
-                        {tx.quantityChange > 0 ? '+' : ''}{tx.quantityChange.toLocaleString()} <span className="text-xs ml-0.5">{tx.unit || currentMaterial?.unit}</span>
+                        {tx.quantity > 0 ? '+' : ''}{tx.quantity.toLocaleString()} <span className="text-xs ml-0.5">{tx.unit || currentMaterial?.unit}</span>
                       </p>
-                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Balance: {tx.balanceAfter.toLocaleString()} {tx.unit || currentMaterial?.unit}</p>
+                      <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Balance: {(tx.stockBalanceAfter || 0).toLocaleString()} {tx.unit || currentMaterial?.unit}</p>
                     </div>
 
                     {isAdmin && !isConsumption && (
@@ -568,7 +568,7 @@ export function StockTransactionModal({ materials, material, transaction, onClos
   const [itemType, setItemType] = useState<'RAW' | 'PRODUCT'>(
     transaction?.productId ? 'PRODUCT' : defaultType
   );
-  const [quantity, setQuantity] = useState(transaction ? Math.abs(transaction.quantityChange).toString() : '');
+  const [quantity, setQuantity] = useState(transaction ? Math.abs(transaction.quantity).toString() : '');
   const [remarks, setRemarks] = useState(transaction?.remarks || '');
   const [selectedId, setSelectedId] = useState(
     transaction ? (transaction.productId || transaction.materialId) : (material?.id || '')

@@ -18,7 +18,6 @@ import type {
   DispatchLog,
   BatchTotal,
   InventoryStock,
-  InventoryLedger,
   PackagingConfiguration,
   RawMaterial,
   WarehouseLocation,
@@ -35,6 +34,7 @@ import type {
   Note,
   Terminal
 } from '../types/database.types';
+import { normalizeLedgerItem } from '../modules/inventory/ledger/ledger-types';
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -317,7 +317,10 @@ export const InventoryService = {
     api.get<PackagingConfiguration[]>(ENDPOINTS.INVENTORY.PACKAGING(productId)).then(r => r.data),
 
   getLedger: (stockId: string) =>
-    api.get<InventoryLedger[]>(ENDPOINTS.INVENTORY.LEDGER(stockId)).then(r => r.data),
+    api.get<any[]>(ENDPOINTS.INVENTORY.LEDGER(stockId)).then(r => {
+      if (!Array.isArray(r.data)) return [];
+      return r.data.map(normalizeLedgerItem);
+    }),
 
   getRawMaterials: () =>
     api.get<any[]>(ENDPOINTS.INVENTORY.RAW_MATERIALS).then(r => r.data),
@@ -329,10 +332,16 @@ export const InventoryService = {
     api.get<any[]>(ENDPOINTS.INVENTORY.PRODUCTION_STOCK).then(r => r.data),
 
   getRawMaterialLedger: (id: string) =>
-    api.get<any[]>(ENDPOINTS.INVENTORY.RAW_MATERIAL_LEDGER(id)).then(r => r.data),
+    api.get<any[]>(ENDPOINTS.INVENTORY.RAW_MATERIAL_LEDGER(id)).then(r => {
+      if (!Array.isArray(r.data)) return [];
+      return r.data.map(normalizeLedgerItem);
+    }),
 
   getProductLedger: (id: string) =>
-    api.get<any[]>(ENDPOINTS.INVENTORY.PRODUCT_LEDGER(id)).then(r => r.data),
+    api.get<any[]>(ENDPOINTS.INVENTORY.PRODUCT_LEDGER(id)).then(r => {
+      if (!Array.isArray(r.data)) return [];
+      return r.data.map(normalizeLedgerItem);
+    }),
 };
 
 // ─── ANALYTICS ───────────────────────────────────────────────────────────────

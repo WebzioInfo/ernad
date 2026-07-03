@@ -666,15 +666,15 @@ export default function BatchForensicsDashboard() {
                           </div>
                         </div>
                         <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                          {material.type}
+                          {material.transactionType}
                         </span>
                       </div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-black text-slate-900">{material.quantityChange}</span>
+                        <span className="text-2xl font-black text-slate-900">{material.quantity}</span>
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">UNITS</span>
                       </div>
                       <p className="text-[10px] font-bold text-slate-400 mt-4 italic">
-                        Balance after: {material.balanceAfter} — {material.remarks || 'Production deduction'}
+                        Balance after: {material.stockBalanceAfter || 0} — {material.remarks || 'Production deduction'}
                       </p>
                     </div>
                   ))}

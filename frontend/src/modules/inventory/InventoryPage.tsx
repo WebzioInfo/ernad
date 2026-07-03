@@ -354,15 +354,15 @@ function LedgerModal({ material, onClose }: any) {
               <div key={tx.id} className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex items-center justify-between group hover:bg-white hover:shadow-xl transition-all duration-500">
                 <div className="flex items-center gap-6">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-12 ${
-                    tx.type === 'IN' ? 'bg-emerald-50 text-emerald-600' :
-                    tx.type === 'OUT' || tx.type === 'CONSUMPTION' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+                    tx.transactionType === 'IN' ? 'bg-emerald-50 text-emerald-600' :
+                    tx.transactionType === 'OUT' || tx.transactionType === 'CONSUMPTION' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
                   }`}>
-                    {tx.type === 'IN' ? <ArrowDownLeft className="w-7 h-7" /> :
-                      tx.type === 'OUT' || tx.type === 'CONSUMPTION' ? <ArrowUpRight className="w-7 h-7" /> : <RefreshCcw className="w-6 h-6" />}
+                    {tx.transactionType === 'IN' ? <ArrowDownLeft className="w-7 h-7" /> :
+                      tx.transactionType === 'OUT' || tx.transactionType === 'CONSUMPTION' ? <ArrowUpRight className="w-7 h-7" /> : <RefreshCcw className="w-6 h-6" />}
                   </div>
                   <div>
                     <div className="flex items-center gap-3">
-                      <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{tx.type}</p>
+                      <p className="text-xs font-black text-slate-900 uppercase tracking-widest">{tx.transactionType}</p>
                       <span className="text-[10px] font-bold text-slate-400">{new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
                     </div>
                     <p className="text-sm text-slate-500 font-bold mt-1">{tx.remarks || 'Automated transaction'}</p>
@@ -370,12 +370,12 @@ function LedgerModal({ material, onClose }: any) {
                 </div>
                 <div className="text-right">
                   <p className={`text-2xl font-black tabular-nums tracking-tighter ${
-                    tx.type === 'IN' ? 'text-emerald-600' :
-                    tx.type === 'OUT' || tx.type === 'CONSUMPTION' ? 'text-rose-600' : 'text-blue-600'
+                    tx.transactionType === 'IN' ? 'text-emerald-600' :
+                    tx.transactionType === 'OUT' || tx.transactionType === 'CONSUMPTION' ? 'text-rose-600' : 'text-blue-600'
                   }`}>
-                    {Number(tx.quantityChange) > 0 ? '+' : ''}{parseFloat(tx.quantityChange).toLocaleString()}
+                    {Number(tx.quantity) > 0 ? '+' : ''}{parseFloat(tx.quantity).toLocaleString()}
                   </p>
-                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Balance: {parseFloat(tx.balanceAfter).toLocaleString()}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Balance: {parseFloat(tx.stockBalanceAfter || 0).toLocaleString()}</p>
                 </div>
               </div>
             ))

@@ -1,11 +1,11 @@
-import { ProductLedgerItem } from './ledger-types';
+import { LedgerItem } from './ledger-types';
 import { formatSafeNumber, formatSafeUnits, getTransactionStyles } from './ledger-utils';
 import { ArrowDownLeft, ArrowUpRight, RefreshCw, PenLine, Trash2 } from 'lucide-react';
 
 interface LedgerCardProps {
-  tx: ProductLedgerItem;
+  tx: LedgerItem;
   canManageProducts: boolean;
-  onEdit: (tx: ProductLedgerItem) => void;
+  onEdit: (tx: LedgerItem) => void;
   onDelete: (id: string) => void;
 }
 
@@ -84,60 +84,27 @@ export function LedgerCard({ tx, canManageProducts, onEdit, onDelete }: LedgerCa
         <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inventory After Transaction</h5>
         <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2">
           {/* Stock */}
-          <div
-            className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${
-              tx.impact.stock !== 0 ? 'bg-indigo-50/50 border-indigo-100' : 'bg-white border-slate-100'
-            }`}
-          >
-            <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact.stock !== 0 ? 'text-indigo-600' : 'text-slate-500'}`}>Current Stock</p>
-            <div className="flex items-center gap-1">
-              <p className={`text-xs font-black tabular-nums ${tx.impact.stock !== 0 ? 'text-indigo-900' : 'text-slate-700'}`}>
-                {formatSafeNumber(tx.stockBalanceAfter)}
-              </p>
-              {tx.impact.stock !== 0 && (
-                <span className="text-[9px] font-bold text-indigo-500 bg-indigo-100/50 px-1 rounded">
-                  {tx.impact.stock > 0 ? '↑' : '↓'}
-                </span>
-              )}
-            </div>
+          <div className="px-2.5 py-1.5 rounded-lg border flex items-center gap-2 bg-indigo-50/20 border-indigo-100/50">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-indigo-600/70">Current Stock</p>
+            <p className="text-xs font-black tabular-nums text-indigo-900">
+              {formatSafeNumber(tx.stockBalanceAfter)}
+            </p>
           </div>
 
           {/* Produced */}
-          <div
-            className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${
-              tx.impact.produced !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'
-            }`}
-          >
-            <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact.produced !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>Total Produced</p>
-            <div className="flex items-center gap-1">
-              <p className={`text-xs font-black tabular-nums ${tx.impact.produced !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
-                {formatSafeNumber(tx.producedBalanceAfter)}
-              </p>
-              {tx.impact.produced !== 0 && (
-                <span className="text-[9px] font-bold text-emerald-500 bg-emerald-100/50 px-1 rounded">
-                  {tx.impact.produced > 0 ? '↑' : '↓'}
-                </span>
-              )}
-            </div>
+          <div className="px-2.5 py-1.5 rounded-lg border flex items-center gap-2 bg-emerald-50/20 border-emerald-100/50">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600/70">Total Produced</p>
+            <p className="text-xs font-black tabular-nums text-emerald-900">
+              {formatSafeNumber(tx.producedBalanceAfter)}
+            </p>
           </div>
 
           {/* Dispatched */}
-          <div
-            className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${
-              tx.impact.dispatched !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'
-            }`}
-          >
-            <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact.dispatched !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>Total Dispatched</p>
-            <div className="flex items-center gap-1">
-              <p className={`text-xs font-black tabular-nums ${tx.impact.dispatched !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
-                {formatSafeNumber(tx.dispatchedBalanceAfter)}
-              </p>
-              {tx.impact.dispatched !== 0 && (
-                <span className="text-[9px] font-bold text-amber-500 bg-amber-100/50 px-1 rounded">
-                  {tx.impact.dispatched > 0 ? '↑' : '↓'}
-                </span>
-              )}
-            </div>
+          <div className="px-2.5 py-1.5 rounded-lg border flex items-center gap-2 bg-amber-50/20 border-amber-100/50">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-amber-600/70">Total Dispatched</p>
+            <p className="text-xs font-black tabular-nums text-amber-900">
+              {formatSafeNumber(tx.dispatchedBalanceAfter)}
+            </p>
           </div>
         </div>
       </div>

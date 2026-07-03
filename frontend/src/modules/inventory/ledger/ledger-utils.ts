@@ -1,13 +1,13 @@
-export function formatSafeNumber(value: number): string | JSX.Element {
-  if (!Number.isFinite(value)) {
-    return '[Invalid Number]';
+export function formatSafeNumber(value: number | undefined | null): string | JSX.Element {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return 'N/A';
   }
   return value.toLocaleString();
 }
 
-export function formatSafeUnits(value: number): string | JSX.Element {
-  if (!Number.isFinite(value)) {
-    return '[Invalid Number]';
+export function formatSafeUnits(value: number | undefined | null): string | JSX.Element {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return 'N/A';
   }
   return `${value.toLocaleString()} Units`;
 }

@@ -1,13 +1,13 @@
 import { History, Loader2 } from 'lucide-react';
 import { LedgerCard } from './LedgerCard';
-import { ProductLedgerItem } from './ledger-types';
+import { LedgerItem } from './ledger-types';
 
 interface LedgerHistoryProps {
-  ledger: ProductLedgerItem[];
+  ledger: LedgerItem[];
   isLedgerLoading: boolean;
   currentProduct: any | null;
   canManageProducts: boolean;
-  onEditTransaction: (tx: ProductLedgerItem) => void;
+  onEditTransaction: (tx: LedgerItem) => void;
   onDeleteTransaction: (id: string) => void;
 }
 

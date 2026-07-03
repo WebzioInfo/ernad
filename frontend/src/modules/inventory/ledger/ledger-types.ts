@@ -1,24 +1,17 @@
-export interface ProductLedgerImpact {
-  stock: number;
-  produced: number;
-  dispatched: number;
-}
-
-export interface ProductLedgerItem {
+export interface LedgerItem {
   id: string;
   transactionType: string;
   quantity: number;
-  remarks?: string;
-  batchCode?: string;
-  createdAt: string;
   performedByName: string;
-  impact: ProductLedgerImpact;
-  stockBalanceAfter: number;
-  producedBalanceAfter: number;
-  dispatchedBalanceAfter: number;
+  remarks?: string;
+  createdAt: string;
+  batchCode?: string;
+  stockBalanceAfter?: number;
+  producedBalanceAfter?: number;
+  dispatchedBalanceAfter?: number;
 }
 
-export function normalizeLedgerItem(apiItem: unknown): ProductLedgerItem {
+export function normalizeLedgerItem(apiItem: unknown): LedgerItem {
   const item = (apiItem || {}) as Record<string, unknown>;
 
   const safeNumber = (val: unknown, fieldName: string): number => {
@@ -32,30 +25,29 @@ export function normalizeLedgerItem(apiItem: unknown): ProductLedgerItem {
     return num;
   };
 
+  const safeOptionalNumber = (val: unknown): number | undefined => {
+    if (val === null || val === undefined) return undefined;
+    const num = Number(val);
+    return Number.isFinite(num) ? num : undefined;
+  };
+
   const safeString = (val: unknown): string => {
     if (val === null || val === undefined) return '';
     return String(val);
   };
 
-  const impactObj = (item.impact || {}) as Record<string, unknown>;
-
   return {
     id: safeString(item.id),
-    transactionType: safeString(item.transactionType),
-    quantity: safeNumber(item.quantity, 'quantity'),
-    remarks: item.remarks ? String(item.remarks) : undefined,
-    batchCode: item.batchCode ? String(item.batchCode) : undefined,
+    transactionType: safeString(item.transactionType ?? item.type),
+    quantity: safeNumber(item.quantity ?? item.quantityChange, 'quantity'),
+    remarks: (item.remarks) ? String(item.remarks) : undefined,
+    batchCode: (item.batchCode ?? item.batch) ? String(item.batchCode ?? item.batch) : undefined,
     createdAt: safeString(item.createdAt),
-    performedByName: item.performedByName
-      ? String(item.performedByName)
+    performedByName: (item.performedByName ?? item.userName ?? item.performedBy)
+      ? String(item.performedByName ?? item.userName ?? item.performedBy)
       : (() => { throw new Error('[Ledger Contract] Missing performedByName'); })(),
-    impact: {
-      stock: safeNumber(impactObj.stock, 'impact.stock'),
-      produced: safeNumber(impactObj.produced, 'impact.produced'),
-      dispatched: safeNumber(impactObj.dispatched, 'impact.dispatched'),
-    },
-    stockBalanceAfter: safeNumber(item.stockBalanceAfter, 'stockBalanceAfter'),
-    producedBalanceAfter: safeNumber(item.producedBalanceAfter, 'producedBalanceAfter'),
-    dispatchedBalanceAfter: safeNumber(item.dispatchedBalanceAfter, 'dispatchedBalanceAfter'),
+    stockBalanceAfter: safeOptionalNumber(item.stockBalanceAfter ?? item.balanceAfter),
+    producedBalanceAfter: safeOptionalNumber(item.producedBalanceAfter),
+    dispatchedBalanceAfter: safeOptionalNumber(item.dispatchedBalanceAfter),
   };
 }
