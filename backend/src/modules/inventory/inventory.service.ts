@@ -646,7 +646,7 @@ export class InventoryService {
 
     manualTxs.forEach(t => {
       let impact = { stock: 0, produced: 0, dispatched: 0 };
-      const qty = parseFloat(t.quantityChange as any);
+      const qty = t.quantityChange != null ? parseFloat(t.quantityChange as any) : 0;
       
       if (t.type === 'MANUAL_PRODUCED_ADJUST') {
         impact = { stock: 0, produced: qty, dispatched: 0 };
@@ -693,7 +693,7 @@ export class InventoryService {
     });
 
     dispatches.forEach(d => {
-      const quantity = parseFloat(d.quantity as any);
+      const quantity = d.quantity != null ? parseFloat(d.quantity as any) : 0;
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
         transactionType: 'DISPATCH',
@@ -729,11 +729,11 @@ export class InventoryService {
 
       // Now that the DB migration is running, the values will be guaranteed to be present in DB
       // However, if any somehow slips through, we fallback cleanly without falsifying 0
-      entry.stockBalanceAfter = entry.stockBalanceAfter !== null ? parseFloat(entry.stockBalanceAfter) : runningStock;
-      entry.producedBalanceAfter = entry.producedBalanceAfter !== null ? parseFloat(entry.producedBalanceAfter) : runningProduced;
-      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter !== null ? parseFloat(entry.dispatchedBalanceAfter) : runningDispatched;
+      entry.stockBalanceAfter = entry.stockBalanceAfter != null ? parseFloat(entry.stockBalanceAfter) : runningStock;
+      entry.producedBalanceAfter = entry.producedBalanceAfter != null ? parseFloat(entry.producedBalanceAfter) : runningProduced;
+      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter != null ? parseFloat(entry.dispatchedBalanceAfter) : runningDispatched;
       
-      entry.quantity = parseFloat(entry.quantity);
+      entry.quantity = entry.quantity != null ? parseFloat(entry.quantity) : 0;
     }
 
     // Reverse for descending display and take top 100
