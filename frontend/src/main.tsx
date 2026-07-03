@@ -52,9 +52,9 @@ class GlobalErrorBoundary extends React.Component<{ children: React.ReactNode },
         <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui' }}>
           <h2>Application Error</h2>
           <p>An unexpected error occurred. Please refresh or contact support.</p>
-          {/* <pre style={{ textAlign: 'left', background: '#f8f9fa', padding: '1rem', marginTop: '1rem', overflowX: 'auto', fontSize: '12px' }}>
+          <pre style={{ textAlign: 'left', background: '#f8f9fa', padding: '1rem', marginTop: '1rem', overflowX: 'auto', fontSize: '12px' }}>
             {this.state.error?.toString()}
-          </pre> */}
+          </pre>
           <button
             onClick={() => window.location.reload()}
             style={{ padding: '0.5rem 1rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '1rem' }}

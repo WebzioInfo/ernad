@@ -632,10 +632,11 @@ export class InventoryService {
       ledgerEntries.push({
         id: `sales_${t.id}`,
         transactionType: typeLabel,
-        quantity: Number(quantityChange || 0),
+        quantity: parseFloat(quantityChange as any),
         remarks,
         createdAt: t.salesDate,
-        performedBy: t.userName || 'Manager',
+        performedBy: t.userName || 'Unknown User',
+        performedByName: t.userName || 'Unknown User',
         impact,
         stockBalanceAfter: t.stockBalanceAfter,
         producedBalanceAfter: t.producedBalanceAfter,
@@ -645,7 +646,7 @@ export class InventoryService {
 
     manualTxs.forEach(t => {
       let impact = { stock: 0, produced: 0, dispatched: 0 };
-      const qty = Number(t.quantityChange);
+      const qty = parseFloat(t.quantityChange as any);
       
       if (t.type === 'MANUAL_PRODUCED_ADJUST') {
         impact = { stock: 0, produced: qty, dispatched: 0 };
@@ -658,10 +659,12 @@ export class InventoryService {
       ledgerEntries.push({
         id: t.id,
         transactionType: t.type,
-        quantity: Number(qty || 0),
+        quantity: qty,
+        quantityChange: qty,
         remarks: t.remarks || 'Stock Adjustment',
         createdAt: t.createdAt,
-        performedBy: t.userName || 'Admin',
+        performedBy: t.userName || 'Unknown User',
+        performedByName: t.userName || 'Unknown User',
         impact,
         stockBalanceAfter: t.stockBalanceAfter,
         producedBalanceAfter: t.producedBalanceAfter,
@@ -670,15 +673,18 @@ export class InventoryService {
     });
 
     packingLogs.forEach(l => {
-      const casesProduced = Number(l.casesProduced || 0);
-      if (casesProduced <= 0) return;
+      const casesProduced = parseFloat(l.casesProduced as any);
+      if (isNaN(casesProduced) || casesProduced <= 0) return;
       ledgerEntries.push({
         id: `packing_${l.id}`,
         transactionType: 'PRODUCTION',
         quantity: casesProduced,
+        quantityChange: casesProduced,
         remarks: `Production Output (Batch #${l.batchCode})`,
+        batchCode: l.batchCode,
         createdAt: l.createdAt,
-        performedBy: l.userName || 'Operator',
+        performedBy: l.userName || 'Unknown User',
+        performedByName: l.userName || 'Unknown User',
         impact: { stock: casesProduced, produced: casesProduced, dispatched: 0 },
         stockBalanceAfter: l.stockBalanceAfter,
         producedBalanceAfter: l.producedBalanceAfter,
@@ -687,14 +693,18 @@ export class InventoryService {
     });
 
     dispatches.forEach(d => {
+      const quantity = parseFloat(d.quantity as any);
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
         transactionType: 'DISPATCH',
-        quantity: Number(-(d.quantity || 0)),
+        quantity: -quantity,
+        quantityChange: -quantity,
         remarks: `Dispatched Stock (Batch #${d.batchCode})`,
+        batchCode: d.batchCode,
         createdAt: d.createdAt,
-        performedBy: d.userName || 'Logistics',
-        impact: { stock: -Number(d.quantity || 0), produced: 0, dispatched: Number(d.quantity || 0) },
+        performedBy: d.userName || 'Unknown User',
+        performedByName: d.userName || 'Unknown User',
+        impact: { stock: -quantity, produced: 0, dispatched: quantity },
         stockBalanceAfter: d.stockBalanceAfter,
         producedBalanceAfter: d.producedBalanceAfter,
         dispatchedBalanceAfter: d.dispatchedBalanceAfter,
@@ -709,20 +719,21 @@ export class InventoryService {
     let runningDispatched = 0;
 
     for (const entry of ledgerEntries) {
-      entry.previousStock = Number(runningStock || 0);
-      entry.previousProduced = Number(runningProduced || 0);
-      entry.previousDispatched = Number(runningDispatched || 0);
+      entry.previousStock = parseFloat(runningStock as any);
+      entry.previousProduced = parseFloat(runningProduced as any);
+      entry.previousDispatched = parseFloat(runningDispatched as any);
 
-      runningStock += Number(entry.impact?.stock || 0);
-      runningProduced += Number(entry.impact?.produced || 0);
-      runningDispatched += Number(entry.impact?.dispatched || 0);
+      runningStock += parseFloat(entry.impact?.stock);
+      runningProduced += parseFloat(entry.impact?.produced);
+      runningDispatched += parseFloat(entry.impact?.dispatched);
 
-      // Use stored snapshots if available (future proof), otherwise dynamically calculate
-      entry.stockBalanceAfter = Number(entry.stockBalanceAfter ?? runningStock);
-      entry.producedBalanceAfter = Number(entry.producedBalanceAfter ?? runningProduced);
-      entry.dispatchedBalanceAfter = Number(entry.dispatchedBalanceAfter ?? runningDispatched);
+      // Now that the DB migration is running, the values will be guaranteed to be present in DB
+      // However, if any somehow slips through, we fallback cleanly without falsifying 0
+      entry.stockBalanceAfter = entry.stockBalanceAfter !== null ? parseFloat(entry.stockBalanceAfter) : runningStock;
+      entry.producedBalanceAfter = entry.producedBalanceAfter !== null ? parseFloat(entry.producedBalanceAfter) : runningProduced;
+      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter !== null ? parseFloat(entry.dispatchedBalanceAfter) : runningDispatched;
       
-      entry.quantity = Number(entry.quantity || 0);
+      entry.quantity = parseFloat(entry.quantity);
     }
 
     // Reverse for descending display and take top 100

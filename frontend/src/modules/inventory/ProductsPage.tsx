@@ -453,8 +453,16 @@ export default function ProductsPage() {
                             }`}>{tx.transactionType?.replace(/_/g, ' ')}</span>
                           <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
                         </div>
-                        <p className="text-sm text-slate-700 font-bold mt-1">{tx.remarks}</p>
-                        <p className="text-[10px] text-slate-400 font-semibold mt-1">Performed by {tx.performedBy}</p>
+                        {tx.batchCode && (
+                          <p className="text-sm text-slate-700 font-bold mt-1">Batch: {tx.batchCode}</p>
+                        )}
+                        {tx.remarks && (
+                          <p className="text-xs text-slate-500 font-semibold mt-1">Remarks: {tx.remarks}</p>
+                        )}
+                        <div className="mt-2">
+                          <p className="text-[10px] text-slate-400 font-semibold">Performed by:</p>
+                          <p className="text-sm text-slate-800 font-bold">{tx.performedByName}</p>
+                        </div>
                       </div>
                     </div>
 
@@ -492,11 +500,11 @@ export default function ProductsPage() {
                     <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-2">
                       <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.stock !== 0 ? 'bg-indigo-50/50 border-indigo-100' : 'bg-white border-slate-100'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.stock !== 0 ? 'text-indigo-600' : 'text-slate-500'}`}>
-                          Stock
+                          Current Stock
                         </p>
                         <div className="flex items-center gap-1">
                           <p className={`text-xs font-black tabular-nums ${tx.impact?.stock !== 0 ? 'text-indigo-900' : 'text-slate-700'}`}>
-                            {Number(tx.stockBalanceAfter || 0).toLocaleString()}
+                            {Number(tx.stockBalanceAfter).toLocaleString()}
                           </p>
                           {Number(tx.impact?.stock ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-indigo-500 bg-indigo-100/50 px-1 rounded">
@@ -508,11 +516,11 @@ export default function ProductsPage() {
 
                       <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.produced ?? 0) !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
-                          Produced
+                          Total Produced
                         </p>
                         <div className="flex items-center gap-1">
                           <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.produced ?? 0) !== 0 ? 'text-emerald-900' : 'text-slate-700'}`}>
-                            {Number(tx.producedBalanceAfter || 0).toLocaleString()}
+                            {Number(tx.producedBalanceAfter).toLocaleString()}
                           </p>
                           {Number(tx.impact?.produced ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-emerald-500 bg-emerald-100/50 px-1 rounded">
@@ -524,11 +532,11 @@ export default function ProductsPage() {
 
                       <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
-                          Dispatched
+                          Total Dispatched
                         </p>
                         <div className="flex items-center gap-1">
                           <p className={`text-xs font-black tabular-nums ${Number(tx.impact?.dispatched ?? 0) !== 0 ? 'text-amber-900' : 'text-slate-700'}`}>
-                            {Number(tx.dispatchedBalanceAfter || 0).toLocaleString()}
+                            {Number(tx.dispatchedBalanceAfter).toLocaleString()}
                           </p>
                           {Number(tx.impact?.dispatched ?? 0) !== 0 && (
                             <span className="text-[9px] font-bold text-amber-500 bg-amber-100/50 px-1 rounded">
