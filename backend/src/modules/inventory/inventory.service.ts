@@ -632,7 +632,7 @@ export class InventoryService {
       ledgerEntries.push({
         id: `sales_${t.id}`,
         transactionType: typeLabel,
-        quantity: quantityChange,
+        quantity: Number(quantityChange || 0),
         remarks,
         createdAt: t.salesDate,
         performedBy: t.userName || 'Manager',
@@ -658,7 +658,7 @@ export class InventoryService {
       ledgerEntries.push({
         id: t.id,
         transactionType: t.type,
-        quantity: qty,
+        quantity: Number(qty || 0),
         remarks: t.remarks || 'Stock Adjustment',
         createdAt: t.createdAt,
         performedBy: t.userName || 'Admin',
@@ -690,11 +690,11 @@ export class InventoryService {
       ledgerEntries.push({
         id: `dispatch_${d.id}`,
         transactionType: 'DISPATCH',
-        quantity: -d.quantity,
+        quantity: Number(-(d.quantity || 0)),
         remarks: `Dispatched Stock (Batch #${d.batchCode})`,
         createdAt: d.createdAt,
         performedBy: d.userName || 'Logistics',
-        impact: { stock: -d.quantity, produced: 0, dispatched: d.quantity },
+        impact: { stock: -Number(d.quantity || 0), produced: 0, dispatched: Number(d.quantity || 0) },
         stockBalanceAfter: d.stockBalanceAfter,
         producedBalanceAfter: d.producedBalanceAfter,
         dispatchedBalanceAfter: d.dispatchedBalanceAfter,
@@ -709,18 +709,20 @@ export class InventoryService {
     let runningDispatched = 0;
 
     for (const entry of ledgerEntries) {
-      entry.previousStock = runningStock;
-      entry.previousProduced = runningProduced;
-      entry.previousDispatched = runningDispatched;
+      entry.previousStock = Number(runningStock || 0);
+      entry.previousProduced = Number(runningProduced || 0);
+      entry.previousDispatched = Number(runningDispatched || 0);
 
-      runningStock += entry.impact.stock;
-      runningProduced += entry.impact.produced;
-      runningDispatched += entry.impact.dispatched;
+      runningStock += Number(entry.impact?.stock || 0);
+      runningProduced += Number(entry.impact?.produced || 0);
+      runningDispatched += Number(entry.impact?.dispatched || 0);
 
       // Use stored snapshots if available (future proof), otherwise dynamically calculate
-      entry.stockBalanceAfter = entry.stockBalanceAfter ?? runningStock;
-      entry.producedBalanceAfter = entry.producedBalanceAfter ?? runningProduced;
-      entry.dispatchedBalanceAfter = entry.dispatchedBalanceAfter ?? runningDispatched;
+      entry.stockBalanceAfter = Number(entry.stockBalanceAfter ?? runningStock);
+      entry.producedBalanceAfter = Number(entry.producedBalanceAfter ?? runningProduced);
+      entry.dispatchedBalanceAfter = Number(entry.dispatchedBalanceAfter ?? runningDispatched);
+      
+      entry.quantity = Number(entry.quantity || 0);
     }
 
     // Reverse for descending display and take top 100

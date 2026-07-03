@@ -142,7 +142,7 @@ export default function ProductsPage() {
   };
 
   const filteredStock = useMemo(() => {
-    return productionStock?.filter((p: any) => 
+    return productionStock?.filter((p: any) =>
       (p.productName || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [productionStock, searchQuery]);
@@ -176,12 +176,12 @@ export default function ProductsPage() {
           ))}
         </div>
         <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6">
-           <div className="w-full h-12 bg-slate-100 animate-pulse rounded-xl mb-6" />
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-             {[...Array(8)].map((_, i) => (
-               <div key={i} className="h-64 bg-slate-50 border border-slate-100 rounded-3xl animate-pulse" />
-             ))}
-           </div>
+          <div className="w-full h-12 bg-slate-100 animate-pulse rounded-xl mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="h-64 bg-slate-50 border border-slate-100 rounded-3xl animate-pulse" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -251,7 +251,7 @@ export default function ProductsPage() {
           <div className="space-y-2">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Stock</p>
             <h4 className="text-3xl font-black text-slate-900 tracking-tight tabular-nums">
-              {totalAvailableStock.toLocaleString()}
+              {Number(totalAvailableStock ?? 0).toLocaleString()}
             </h4>
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Ready for dispatch</p>
           </div>
@@ -265,7 +265,7 @@ export default function ProductsPage() {
           <div className="space-y-2">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Produced</p>
             <h4 className="text-3xl font-black text-slate-900 tracking-tight tabular-nums">
-              {totalProducedAllTime.toLocaleString()}
+              {Number(totalProducedAllTime ?? 0).toLocaleString()}
             </h4>
             <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Cumulative output</p>
           </div>
@@ -279,7 +279,7 @@ export default function ProductsPage() {
           <div className="space-y-2">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Dispatched</p>
             <h4 className="text-3xl font-black text-slate-900 tracking-tight tabular-nums">
-              {totalDispatchedAllTime.toLocaleString()}
+              {Number(totalDispatchedAllTime ?? 0).toLocaleString()}
             </h4>
             <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Loaded & Outwarded</p>
           </div>
@@ -329,12 +329,11 @@ export default function ProductsPage() {
                   const isSelected = currentProduct?.productId === stock.productId;
                   const product = productById.get(stock.productId) || { id: stock.productId, name: stock.productName };
                   return (
-                    <tr 
-                      key={stock.id} 
+                    <tr
+                      key={stock.id}
                       onClick={() => setSelectedProduct(stock)}
-                      className={`hover:bg-slate-50/30 transition-colors group cursor-pointer ${
-                        isSelected ? 'bg-[#1A9A91]/5 font-semibold' : ''
-                      }`}
+                      className={`hover:bg-slate-50/30 transition-colors group cursor-pointer ${isSelected ? 'bg-[#1A9A91]/5 font-semibold' : ''
+                        }`}
                     >
                       <td className="px-8 py-6 font-bold text-slate-800 group-hover:text-[#1A9A91] transition-colors flex items-center gap-3">
                         <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-[#1A9A91]/15 text-[#1A9A91]' : 'bg-slate-100 text-slate-400'}`}>
@@ -343,15 +342,14 @@ export default function ProductsPage() {
                         {stock.productName}
                       </td>
                       <td className="px-8 py-6 text-right font-mono font-bold text-slate-650 tabular-nums">
-                        {Number(stock.totalProduced).toLocaleString()}
+                        {Number(stock?.totalProduced ?? 0).toLocaleString()}
                       </td>
                       <td className="px-8 py-6 text-right font-mono font-bold text-slate-650 tabular-nums">
-                        {Number(stock.totalDispatched).toLocaleString()}
+                        {Number(stock?.totalDispatched ?? 0).toLocaleString()}
                       </td>
-                      <td className={`px-8 py-6 text-right font-mono font-black tabular-nums ${
-                        stock.currentStock < 0 ? 'text-rose-600' : 'text-slate-900'
-                      }`}>
-                        {Number(stock.currentStock).toLocaleString()}
+                      <td className={`px-8 py-6 text-right font-mono font-black tabular-nums ${stock.currentStock < 0 ? 'text-rose-600' : 'text-slate-900'
+                        }`}>
+                        {Number(stock?.currentStock ?? 0).toLocaleString()}
                       </td>
                       <td className="px-8 py-6 text-center">
                         {stock.currentStock > 0 ? (
@@ -420,7 +418,7 @@ export default function ProductsPage() {
           </div>
           {currentProduct && (
             <span className="bg-slate-100 border border-slate-200 text-slate-600 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider">
-              {Number(currentProduct.currentStock).toLocaleString()} units left
+              {Number(currentProduct?.currentStock ?? 0).toLocaleString()} units left
             </span>
           )}
         </div>
@@ -443,32 +441,29 @@ export default function ProductsPage() {
                 <div key={tx.id} className="bg-slate-50/40 rounded-2xl p-6 border border-slate-150 group hover:bg-white hover:shadow-md hover:border-slate-250 transition-all duration-300">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                        isAddition ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isAddition ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                         isReduction ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
-                      }`}>
+                        }`}>
                         {isAddition ? <ArrowDownLeft className="w-5 h-5" /> :
-                         isReduction ? <ArrowUpRight className="w-5 h-5" /> : <RefreshCw className="w-4 h-4" />}
+                          isReduction ? <ArrowUpRight className="w-5 h-5" /> : <RefreshCw className="w-4 h-4" />}
                       </div>
                       <div className="pt-1">
                         <div className="flex items-center gap-2">
-                          <span className={`text-[11px] font-black uppercase tracking-wider ${
-                            isAddition ? 'text-emerald-700' : isReduction ? 'text-rose-700' : 'text-blue-700'
-                          }`}>{tx.transactionType?.replace(/_/g, ' ')}</span>
+                          <span className={`text-[11px] font-black uppercase tracking-wider ${isAddition ? 'text-emerald-700' : isReduction ? 'text-rose-700' : 'text-blue-700'
+                            }`}>{tx.transactionType?.replace(/_/g, ' ')}</span>
                           <span className="text-[10px] font-bold text-slate-400">• {new Date(tx.createdAt).toLocaleDateString()} at {new Date(tx.createdAt).toLocaleTimeString()}</span>
                         </div>
                         <p className="text-sm text-slate-700 font-bold mt-1">{tx.remarks}</p>
                         <p className="text-[10px] text-slate-400 font-semibold mt-1">Performed by {tx.performedBy}</p>
                       </div>
                     </div>
-                    
+
                     <div className="text-right">
-                      <p className={`text-xl font-black tabular-nums tracking-tight ${
-                        isAddition ? 'text-emerald-600' : isReduction ? 'text-rose-600' : 'text-blue-600'
-                      }`}>
-                        {tx.quantity > 0 ? '+' : ''}{tx.quantity.toLocaleString()} Units
+                      <p className={`text-xl font-black tabular-nums tracking-tight ${isAddition ? 'text-emerald-600' : isReduction ? 'text-rose-600' : 'text-blue-600'
+                        }`}>
+                        {tx.quantity > 0 ? '+' : ''}{Number(tx.quantity).toLocaleString()} Units
                       </p>
-                      
+
                       {canManageProducts && isManual && (
                         <div className="flex items-center justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
@@ -510,7 +505,7 @@ export default function ProductsPage() {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.produced !== 0 ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.produced !== 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
                           Produced
@@ -526,7 +521,7 @@ export default function ProductsPage() {
                           )}
                         </div>
                       </div>
-                      
+
                       <div className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-2 ${tx.impact?.dispatched !== 0 ? 'bg-amber-50/50 border-amber-100' : 'bg-white border-slate-100'}`}>
                         <p className={`text-[9px] font-bold uppercase tracking-wider ${tx.impact?.dispatched !== 0 ? 'text-amber-600' : 'text-slate-500'}`}>
                           Dispatched
