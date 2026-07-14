@@ -3,6 +3,7 @@ import { LucideIcon } from 'lucide-react';
 export type UserRole = 
   | 'ADMIN' 
   | 'MANAGER' 
+  | 'ACCOUNTANT' 
   | 'OPERATOR';
 
 export interface RouteDefinition {

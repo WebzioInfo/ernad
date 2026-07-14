@@ -84,19 +84,19 @@ export class MasterDataController {
   }
 
   @Post('products')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'ACCOUNTANT')
   async createProduct(@Body() dto: CreateProductDto) {
     return await this.masterDataService.createProduct(dto);
   }
 
   @Patch('products/:id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'ACCOUNTANT')
   async updateProduct(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateProductDto) {
     return await this.masterDataService.updateProduct(req.user, id, dto);
   }
 
   @Delete('products/:id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   async deleteProduct(@Param('id') id: string) {
     return await this.masterDataService.deleteProduct(id);
   }
@@ -120,19 +120,19 @@ export class MasterDataController {
   }
 
   @Post('raw-materials')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'ACCOUNTANT')
   async createRawMaterial(@Body() dto: CreateRawMaterialDto) {
     return await this.masterDataService.createRawMaterial(dto);
   }
 
   @Patch('raw-materials/:id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'ACCOUNTANT')
   async updateRawMaterial(@Param('id') id: string, @Body() dto: UpdateRawMaterialDto) {
     return await this.masterDataService.updateRawMaterial(id, dto);
   }
 
   @Delete('raw-materials/:id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   async deleteRawMaterial(@Param('id') id: string) {
     return await this.masterDataService.deleteRawMaterial(id);
   }

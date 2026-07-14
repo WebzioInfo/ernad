@@ -44,21 +44,23 @@ export class RolesGuard implements CanActivate {
     }
 
     const rawRoles = user.role ? [user.role] : (user.roles || []);
-    const userRoles = rawRoles.map((r: any) => {
+    const normalizedRoles = Array.isArray(rawRoles) ? rawRoles : [rawRoles];
+    const userRoles = normalizedRoles.map((r: any) => {
       const roleStr = String(r).toUpperCase().trim();
       if (roleStr.includes('ADMIN')) return 'ADMIN';
       if (roleStr.includes('MANAGER')) return 'MANAGER';
+      if (roleStr.includes('ACCOUNTANT')) return 'ACCOUNTANT';
       if (roleStr.includes('OPERATOR') || roleStr.includes('USER')) return 'OPERATOR';
       return 'OPERATOR'; // Fallback
     });
-    const userPermissions = user.permissions || [];
+    const userPermissions = Array.isArray(user.permissions) ? user.permissions : [];
 
     this.logger.debug(`[RolesGuard] Path: ${request.method} ${request.url} | User: ${user.username} | Roles: ${JSON.stringify(userRoles)} | Permissions: ${JSON.stringify(userPermissions)} | Required: ${JSON.stringify(requiredPermissions)}`);
 
     // ── Role Check (Strict Exact Match) ──
     if (requiredRoles && requiredRoles.length > 0) {
       const rolePassed = requiredRoles.some(reqRole =>
-        userRoles.includes(reqRole.toUpperCase())
+        userRoles.includes(reqRole.toUpperCase() as 'ADMIN' | 'MANAGER' | 'ACCOUNTANT' | 'OPERATOR')
       );
       if (!rolePassed) {
         this.logger.warn(`[RolesGuard] Role Check Failed: User ${user.username} lacks required roles ${JSON.stringify(requiredRoles)}`);
@@ -68,61 +70,67 @@ export class RolesGuard implements CanActivate {
 
     // ── Permission Check ──
     if (requiredPermissions && requiredPermissions.length > 0) {
-      const permissionPassed = requiredPermissions.every(p => {
-        // [HARDENED] Manager Role implicit permissions for oversight
-        if (userRoles.includes('ADMIN')) {
-          return true;
-        }
+      // Helper to evaluate a single permission against role implicit lists and explicit user permissions
+      const managerPermissions = [
+        'analytics:view',
+        'reports:view',
+        'inventory:view',
+        'inventory:edit',
+        'telemetry:log',
+        'production:start',
+        'production:close',
+        'forensics:view',
+        'forensics:edit',
+        'attendance:view',
+        'settings:view',
+        'settings:manage',
+        'users:view',
+        'notifications:view',
+        'incidents:view',
+        'incidents:create',
+        'incidents:update',
+        'users:manage',
+        'sales:view',
+        'sales:manage'
+      ];
 
-        if (userRoles.includes('MANAGER')) {
-          const managerPermissions = [
-            'analytics:view',
-            'reports:view',
-            'inventory:view',
-            'inventory:edit',
-            'telemetry:log',
-            'production:start',
-            'production:close',
-            'forensics:view',
-            'forensics:edit',
-            'attendance:view',
-            'settings:view',
-            'settings:manage',
-            'users:view',
-            'notifications:view',
-            'incidents:view',
-            'incidents:create',
-            'incidents:update',
-            'users:manage',
-            'sales:view',
-            'sales:manage'
-          ];
-          if (managerPermissions.includes(p)) {
-            return true;
-          }
-        }
+      const accountantPermissions = [
+        'inventory:view',
+        'inventory:edit',
+        'inventory:update',
+        'users:view',
+        'sales:view',
+        'sales:manage',
+        'settings:view',
+        'settings:manage',
+        'notifications:view'
+      ];
 
-        // [HARDENED] Operator Role implicit permissions for operations
-        if (userRoles.includes('OPERATOR')) {
-          const operatorPermissions = [
-            'telemetry:log',
-            'production:start',
-            'production:close',
-            'settings:view',
-            'incidents:view',
-            'incidents:create',
-            'incidents:update'
-          ];
-          if (operatorPermissions.includes(p)) {
-            return true;
-          }
-        }
+      const operatorPermissions = [
+        'telemetry:log',
+        'production:start',
+        'production:close',
+        'settings:view',
+        'incidents:view',
+        'incidents:create',
+        'incidents:update'
+      ];
 
-        return userPermissions.includes(p);
-      });
+      const checkPermission = (p: string): boolean => {
+        if (userRoles.includes('ADMIN')) return true;
+        if (userRoles.includes('MANAGER') && managerPermissions.includes(p)) return true;
+        if (userRoles.includes('ACCOUNTANT') && accountantPermissions.includes(p)) return true;
+        if (userRoles.includes('OPERATOR') && operatorPermissions.includes(p)) return true;
+        return (userPermissions || []).includes(p);
+      };
 
-      if (!permissionPassed) {
-        this.logger.warn(`[RolesGuard] Permission Check Failed: User ${user.username} lacks required permissions ${JSON.stringify(requiredPermissions)}`);
+      const missing: string[] = [];
+      for (const p of requiredPermissions) {
+        if (!checkPermission(p)) missing.push(p);
+      }
+
+      if (missing.length > 0) {
+        this.logger.warn(`[RolesGuard] Permission Check Failed: User ${user.username} lacks required permissions ${JSON.stringify(requiredPermissions)} | Missing: ${JSON.stringify(missing)} | UserRoles: ${JSON.stringify(userRoles)} | UserPermissions: ${JSON.stringify(userPermissions)} | Path: ${request.method} ${request.url}`);
         throw new ForbiddenException('You do not have the specific privileges required for this operation');
       }
     }

@@ -13,7 +13,8 @@ import {
   useCreateSalesTransaction,
   useUpdateSalesTransaction,
   useDeleteSalesTransaction,
-  useCustomers
+  useCustomers,
+  useCreateCustomer,
 } from '../../../hooks/useApi';
 import { useTransactionOverlay } from '../../../components/TransactionOverlay';
 
@@ -23,6 +24,8 @@ export default function SalesAnalyticsPage() {
   const [transactionType, setTransactionType] = useState<'SALES_DISPATCH' | 'RETURN' | 'DAMAGE'>('SALES_DISPATCH');
   const [quantity, setQuantity] = useState<string>('');
   const [salesDate, setSalesDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customerId, setCustomerId] = useState<string>('');
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
   // Dialog states for Admin Edit/Delete
@@ -35,7 +38,12 @@ export default function SalesAnalyticsPage() {
   const [selectedBrandFilter, setSelectedBrandFilter] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
 
-  const { data: transactions, isLoading: isLedgerLoading } = useSalesTransactions();
+  const {
+    data: transactions,
+    isLoading: isLedgerLoading,
+    isError: isLedgerError,
+    error: ledgerError,
+  } = useSalesTransactions();
   const { data: brands, isLoading: isBrandsLoading } = useBrands();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: productionStock } = useProductionStock();
@@ -43,10 +51,12 @@ export default function SalesAnalyticsPage() {
 
   const { user } = useAuthStore();
   const isAdmin = user?.roles?.includes('ADMIN') || user?.role === 'ADMIN';
-  const canEdit = isAdmin || user?.roles?.includes('MANAGER') || user?.role === 'MANAGER';
+  const isAccountant = user?.roles?.includes('ACCOUNTANT') || user?.role === 'ACCOUNTANT';
+  const canManageSales = isAdmin || isAccountant;
 
   const overlay = useTransactionOverlay();
   const createTxMutation = useCreateSalesTransaction();
+  const createCustomerMutation = useCreateCustomer();
 
   if (isLedgerLoading || isBrandsLoading || isProductsLoading || isCustomersLoading) {
     return (
@@ -56,8 +66,17 @@ export default function SalesAnalyticsPage() {
     );
   }
 
+  if (isLedgerError) {
+    return (
+      <div className="h-96 flex flex-col items-center justify-center text-center text-slate-600 px-6">
+        <p className="text-xl font-bold text-slate-900">Unable to load sales ledger</p>
+        <p className="mt-3 text-sm">{(ledgerError as any)?.response?.data?.message || (ledgerError as any)?.message || 'Please try again or contact support.'}</p>
+      </div>
+    );
+  }
+
   // Filtered transactions for the ledger view
-  const filteredTransactions = transactions?.filter((tx: any) => {
+  const filteredTransactions = ((transactions as any[] | undefined) ?? []).filter((tx: any) => {
     const brandName = tx.brandName || '';
     const productName = tx.productName || '';
     const userName = tx.userName || '';
@@ -101,8 +120,8 @@ export default function SalesAnalyticsPage() {
   const handleSave = () => {
     if (overlay.isLocked) return;
 
-    if (!selectedBrandId || !selectedProductId || !transactionType || quantityInt <= 0 || !salesDate) {
-      setErrorMsg('All fields are required and quantity must be greater than zero.');
+    if (!selectedBrandId || !selectedProductId || !transactionType || quantityInt <= 0 || !salesDate || !customerId) {
+      setErrorMsg('All fields are required, including the customer selection.');
       setTimeout(() => setErrorMsg(''), 5000);
       return;
     }
@@ -116,6 +135,7 @@ export default function SalesAnalyticsPage() {
         type: transactionType as any,
         quantity: quantityInt,
         salesDate,
+        customerId,
       },
       {
         onSuccess: async () => {
@@ -124,6 +144,7 @@ export default function SalesAnalyticsPage() {
           setQuantity('');
           setSelectedBrandId('');
           setSelectedProductId('');
+          setCustomerId('');
           setTransactionType('SALES_DISPATCH');
           setSalesDate(format(new Date(), 'yyyy-MM-dd'));
           setErrorMsg('');
@@ -134,6 +155,19 @@ export default function SalesAnalyticsPage() {
         }
       }
     );
+  };
+
+  const handleCustomerCreate = (payload: { name: string; code?: string; email?: string; phone?: string; address?: string }) => {
+    createCustomerMutation.mutate(payload, {
+      onSuccess: (customer: any) => {
+        setCustomerId(customer?.id || '');
+        setIsCustomerModalOpen(false);
+        setErrorMsg('');
+      },
+      onError: (err: any) => {
+        setErrorMsg(err?.response?.data?.message || 'Failed to create customer.');
+      },
+    });
   };
 
   return (
@@ -151,8 +185,10 @@ export default function SalesAnalyticsPage() {
         </p>
       </div>
 
-      {/* Main Entry POS Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {canManageSales ? (
+        <>
+          {/* Main Entry POS Interface */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Entry Sections (Left) */}
         <div className="col-span-1 lg:col-span-8 space-y-6">
           
@@ -244,6 +280,29 @@ export default function SalesAnalyticsPage() {
             </div>
           </div>
 
+          <div className={`bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm transition-opacity duration-300 ${!selectedProductId ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">6. Select Customer</h3>
+              <button
+                type="button"
+                onClick={() => setIsCustomerModalOpen(true)}
+                className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800"
+              >
+                + Add Customer
+              </button>
+            </div>
+            <select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="w-full px-5 py-4 rounded-2xl border border-slate-200 text-base font-black text-slate-800 focus:outline-none focus:border-indigo-500 shadow-sm bg-slate-50 cursor-pointer transition-colors"
+            >
+              <option value="">Select Customer (Required)</option>
+              {customers?.map((customer) => (
+                <option key={customer.id} value={customer.id}>{customer.name} {customer.code ? `(${customer.code})` : ''}</option>
+              ))}
+            </select>
+          </div>
+
         </div>
 
         {/* Section 5 & 6: Live Summary Card & Save (Right) */}
@@ -296,7 +355,7 @@ export default function SalesAnalyticsPage() {
 
             <button
               onClick={handleSave}
-              disabled={createTxMutation.isPending || !selectedBrandId || !selectedProductId || quantityInt <= 0}
+              disabled={createTxMutation.isPending || !selectedBrandId || !selectedProductId || quantityInt <= 0 || !customerId}
               className="w-full mt-8 py-5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2 shadow-xl shadow-indigo-600/20 disabled:shadow-none relative z-10"
             >
               {createTxMutation.isPending ? (
@@ -312,6 +371,14 @@ export default function SalesAnalyticsPage() {
           </div>
         </div>
       </div>
+
+        </>
+      ) : (
+        <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-800">Read-only access</p>
+          <p className="mt-2 text-sm text-slate-600">You can view sales records, but you cannot create or edit transactions.</p>
+        </div>
+      )}
 
       {/* Transaction Ledger Table */}
       <div className="mt-16">
@@ -366,13 +433,13 @@ export default function SalesAnalyticsPage() {
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Quantity</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
                   <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Logged By</th>
-                  {canEdit && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
+                  {canManageSales && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={canEdit ? 8 : 7} className="py-20 text-center text-slate-400 font-bold text-sm">
+                    <td colSpan={canManageSales ? 8 : 7} className="py-20 text-center text-slate-400 font-bold text-sm">
                       No sales transaction logs found.
                     </td>
                   </tr>
@@ -401,13 +468,17 @@ export default function SalesAnalyticsPage() {
                       </td>
                       <td className="py-4 px-6 text-sm font-semibold text-slate-500">
                         {tx.userName}
-                        {tx.customerName && (
+                        {tx.customerName ? (
                           <span className="block text-[10px] text-slate-400 font-bold mt-0.5">
                             To: {tx.customerName}
                           </span>
+                        ) : (
+                          <span className="block text-[10px] text-rose-400 font-bold mt-0.5">
+                            Customer required
+                          </span>
                         )}
                       </td>
-                      {canEdit && (
+                      {canManageSales && (
                         <td className="py-4 px-8 text-sm text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -454,6 +525,14 @@ export default function SalesAnalyticsPage() {
             brands={brands}
             products={products}
             customers={customers}
+          />
+        )}
+
+        {isCustomerModalOpen && (
+          <AddCustomerModal
+            onClose={() => setIsCustomerModalOpen(false)}
+            onSave={handleCustomerCreate}
+            isSaving={createCustomerMutation.isPending}
           />
         )}
 
@@ -654,17 +733,19 @@ function EditSalesEntryModal({ onClose, transaction, brands, products, customers
           </div>
 
           <div>
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Customer / Distributor</label>
-            <select
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
-            >
-              <option value="">Select Customer (Optional)</option>
-              {customers?.map((c) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.code || 'No Code'})</option>
-              ))}
-            </select>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer / Distributor *</label>
+              </div>
+              <select
+                value={customerId}
+                onChange={(e) => setCustomerId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+              >
+                <option value="">Select Customer (Required)</option>
+                {customers?.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.code || 'No Code'})</option>
+                ))}
+              </select>
           </div>
 
           <div>
@@ -722,6 +803,141 @@ function EditSalesEntryModal({ onClose, transaction, brands, products, customers
 interface ConfirmDeleteModalProps {
   onClose: () => void;
   transaction: any;
+}
+
+interface AddCustomerModalProps {
+  onClose: () => void;
+  onSave: (payload: { name: string; code?: string; email?: string; phone?: string; address?: string }) => void;
+  isSaving: boolean;
+}
+
+function AddCustomerModal({ onClose, onSave, isSaving }: AddCustomerModalProps) {
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      setError('Customer name is required.');
+      return;
+    }
+
+    onSave({
+      name: name.trim(),
+      code: code.trim() || undefined,
+      email: email.trim() || undefined,
+      phone: phone.trim() || undefined,
+      address: address.trim() || undefined,
+    });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 15 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.95, y: 15 }}
+        className="bg-white rounded-[2.5rem] p-10 max-w-lg w-full border border-slate-100 shadow-2xl relative flex flex-col max-h-[90vh] overflow-y-auto"
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-50 transition-all"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2">Add Customer</h2>
+        <p className="text-slate-500 font-semibold text-xs mb-6">Create a customer record quickly for sales dispatch tracking.</p>
+
+        {error && (
+          <div className="mb-4 p-4 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-2xl">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Customer Name *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+              placeholder="Customer name"
+            />
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Code</label>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+              placeholder="Optional customer code"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Phone</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+                placeholder="Phone number"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Address</label>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm min-h-[90px]"
+              placeholder="Optional address or delivery details"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              onClick={onClose}
+              className="px-5 py-3 hover:bg-slate-50 text-slate-500 rounded-xl font-bold text-xs uppercase tracking-wider border border-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSaving}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              {isSaving ? 'Saving...' : 'Save Customer'}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }
 
 function ConfirmDeleteModal({ onClose, transaction }: ConfirmDeleteModalProps) {

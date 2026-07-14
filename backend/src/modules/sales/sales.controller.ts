@@ -20,6 +20,14 @@ export class SalesController {
     return await this.salesService.getCustomers();
   }
 
+  @Post('customers')
+  @Roles('ADMIN', 'ACCOUNTANT')
+  @Permissions('sales:manage')
+  @ApiOperation({ summary: 'Create a new customer' })
+  async createCustomer(@Body() dto: any) {
+    return await this.salesService.createCustomer(dto);
+  }
+
   @Get('orders')
   @Permissions('sales:view')
   @ApiOperation({ summary: 'List all sales orders' })
@@ -58,6 +66,7 @@ export class SalesController {
   }
 
   @Post('transactions')
+  @Roles('ADMIN', 'ACCOUNTANT')
   @Permissions('sales:manage')
   @ApiOperation({ summary: 'Create a new sales transaction' })
   async createSalesTransaction(@Body() dto: any, @Req() req: any) {
@@ -65,7 +74,7 @@ export class SalesController {
   }
 
   @Patch('transactions/:id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Update an existing sales transaction' })
   async updateSalesTransaction(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
     return await this.salesService.updateSalesTransaction(id, dto, req.user.id);

@@ -17,7 +17,7 @@ export default function RequireAuth({ children, allowedRoles, requiredPermission
   }
 
   const rawRoles = user.roles || (user.role ? [user.role] : []);
-  const canonicalRoles = ['ADMIN', 'MANAGER', 'OPERATOR'];
+  const canonicalRoles = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'OPERATOR'];
   const hasInvalidRole = rawRoles.length === 0 || rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
 
   if (hasInvalidRole) {

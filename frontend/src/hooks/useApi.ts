@@ -25,6 +25,8 @@ import {
   type TelemetryLogPayload,
   type CreateNotePayload,
   type CreateSalesTransactionPayload,
+  type Customer,
+  type SalesTransaction,
 } from '../services/api-services';
 
 // ─── QUERY KEY REGISTRY ───────────────────────────────────────────────────────
@@ -270,7 +272,21 @@ export function useBrands() {
 }
 
 export function useProducts() {
-  return useQuery({ queryKey: QK.PRODUCTS, queryFn: () => MasterDataService.getProducts() });
+  return useQuery({
+    queryKey: QK.PRODUCTS,
+    queryFn: async () => {
+      try {
+        return await MasterDataService.getProducts();
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useProducts] Failed to fetch products', err);
+        throw err;
+      }
+    },
+    // Provide a small retry window and an empty initial value so components can render deterministically
+    retry: 1,
+    initialData: [],
+  });
 }
 
 export function useShifts() {
@@ -459,10 +475,29 @@ export function useCustomers() {
   });
 }
 
+export function useCreateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<Customer>) => SalesService.createCustomer(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sales-customers'] }),
+  });
+}
+
 export function useSalesTransactions() {
-  return useQuery({
+  return useQuery<SalesTransaction[], Error>({
     queryKey: QK.SALES_TRANSACTIONS,
-    queryFn: () => SalesService.getSalesTransactions(),
+    queryFn: async () => {
+      try {
+        return await SalesService.getSalesTransactions();
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useSalesTransactions] Failed to fetch sales transactions', err);
+        throw err;
+      }
+    },
+    retry: 1,
+    placeholderData: (previousData) => previousData,
+    staleTime: 60000,
   });
 }
 

@@ -23,6 +23,7 @@ export type PermissionSlug = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 export const ROLES = {
   ADMIN: 'ADMIN',
   MANAGER: 'MANAGER',
+  ACCOUNTANT: 'ACCOUNTANT',
   OPERATOR: 'OPERATOR',
 } as const;
 

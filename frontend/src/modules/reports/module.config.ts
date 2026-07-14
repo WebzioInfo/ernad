@@ -18,7 +18,7 @@ export const reportsConfig: ModuleConfig = {
     {
       path: 'sales',
       element: lazy(() => import('./pages/SalesAnalyticsPage')),
-      allowedRoles: ['ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT']
     },
     /* TEMP DISABLED - Future Admin Feature
     // Preserved for future implementation

@@ -18,7 +18,8 @@ export default function RawMaterialsPage() {
   const { user } = useAuthStore();
   const userRoles = (user?.roles || [user?.role]).map((r: any) => String(r).toUpperCase());
   const isAdmin = userRoles.includes('ADMIN');
-  const isManager = userRoles.includes('MANAGER');
+  const isAccountant = userRoles.includes('ACCOUNTANT');
+  const canManageMaterials = isAdmin || isAccountant;
 
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -193,7 +194,7 @@ export default function RawMaterialsPage() {
             <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </button>
 
-          {(isAdmin || isManager) && (
+          {canManageMaterials && (
             <>
               <button
                 onClick={() => {
@@ -228,7 +229,7 @@ export default function RawMaterialsPage() {
                 <th className="px-8 py-5 text-right text-[#1A9A91]">Available Stock</th>
                 <th className="px-8 py-5 text-center">Last Updated</th>
                 <th className="px-8 py-5 text-center">Status</th>
-                {(isAdmin || isManager) && <th className="px-8 py-5 text-right">Actions</th>}
+                {canManageMaterials && <th className="px-8 py-5 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -271,7 +272,7 @@ export default function RawMaterialsPage() {
                         </span>
                       )}
                     </td>
-                    {(isAdmin || isManager) && (
+                    {canManageMaterials && (
                       <td className="px-8 py-6 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -284,7 +285,7 @@ export default function RawMaterialsPage() {
                           >
                             <PenLine className="w-4 h-4" />
                           </button>
-                          {(isAdmin || isManager) && (
+                          {canManageMaterials && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

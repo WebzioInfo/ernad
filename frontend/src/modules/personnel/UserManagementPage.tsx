@@ -38,6 +38,7 @@ export const PRIVILEGED_ROLE_SLUGS = [
 /** Operational roles visible to managers. */
 export const OPERATIONAL_ROLES = [
   { slug: 'MANAGER', label: 'Plant Manager', color: 'amber' },
+  { slug: 'ACCOUNTANT', label: 'Accountant', color: 'slate' },
   { slug: 'OPERATOR', label: 'General Operator', color: 'emerald' },
 ];
 
@@ -67,6 +68,13 @@ const getRoleStyle = (role: string) => {
         color: 'from-amber-500 to-orange-600',
         bg: 'bg-amber-50 text-amber-700 border-amber-100',
         text: 'text-amber-700',
+      };
+    case 'ACCOUNTANT':
+      return {
+        icon: <UserCog className="w-3.5 h-3.5" />,
+        color: 'from-slate-500 to-slate-700',
+        bg: 'bg-slate-100 text-slate-800 border-slate-200',
+        text: 'text-slate-800',
       };
     default:
       return {

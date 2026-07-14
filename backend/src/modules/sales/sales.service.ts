@@ -20,6 +20,31 @@ export class SalesService {
     return await db.select().from(salesOrders).orderBy(desc(salesOrders.orderDate));
   }
 
+  async createCustomer(dto: {
+    name: string;
+    code?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  }) {
+    const { name, code, email, phone, address } = dto;
+    if (!name || String(name).trim().length === 0) {
+      throw new BadRequestException('Customer name is required');
+    }
+
+    const [customer] = await db.insert(customers).values({
+      name: String(name).trim(),
+      code: code ? String(code).trim() : null,
+      email: email ? String(email).trim() : null,
+      phone: phone ? String(phone).trim() : null,
+      address: address ? String(address).trim() : null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    return customer;
+  }
+
   async getOrderById(id: string) {
     const [order] = await db.select().from(salesOrders).where(eq(salesOrders.id, id)).limit(1);
     if (!order) throw new NotFoundException('Sales order not found');
@@ -86,8 +111,8 @@ export class SalesService {
     remarks?: string;
   }, userId: string) {
     const { brandId, productId, type, quantity, salesDate, customerId, unitPrice, remarks } = dto;
-    if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate))) {
-      throw new BadRequestException('Invalid input parameters or salesDate');
+    if (!brandId || !productId || !type || quantity <= 0 || !salesDate || isNaN(Date.parse(salesDate)) || !customerId) {
+      throw new BadRequestException('Customer selection is required and all other fields must be valid');
     }
     if (unitPrice !== undefined && (isNaN(unitPrice) || unitPrice < 0)) {
       throw new BadRequestException('unitPrice must be a non-negative number');
@@ -99,6 +124,10 @@ export class SalesService {
       let runningDispatched = 0;
 
       const existingStock = await tx.select().from(productionStock).where(eq(productionStock.productId, productId)).limit(1);
+      const [customer] = await tx.select().from(customers).where(eq(customers.id, customerId)).limit(1);
+      if (!customer) {
+        throw new BadRequestException('Selected customer does not exist');
+      }
       if (existingStock.length > 0) {
         runningStock = Number(existingStock[0].currentStock);
         runningProduced = Number(existingStock[0].totalProduced);

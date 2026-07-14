@@ -441,11 +441,11 @@ const AdminDashboard = memo(({ filters }: { filters: any }) => {
                 <FileText className="w-5 h-5 text-emerald-400" />
                 <span className="text-xs font-bold text-white group-hover:text-emerald-300">Production Logs</span>
               </Link>
-              <Link to="/admin/inventory/raw-materials" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+              <Link to="/admin/raw-materials" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
                 <Database className="w-5 h-5 text-amber-400" />
                 <span className="text-xs font-bold text-white group-hover:text-amber-300">Raw Materials</span>
               </Link>
-              <Link to="/admin/inventory/products" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
+              <Link to="/admin/products" className="flex flex-col gap-2 p-4 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-colors group">
                 <Package className="w-5 h-5 text-rose-400" />
                 <span className="text-xs font-bold text-white group-hover:text-rose-300">Products</span>
               </Link>

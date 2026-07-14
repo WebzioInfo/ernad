@@ -541,7 +541,8 @@ export const SalesService = {
 
   getCustomers: () =>
     api.get<Customer[]>(ENDPOINTS.SALES.CUSTOMERS).then(r => r.data),
-};
+  createCustomer: (payload: Partial<Customer>) =>
+    api.post<Customer>(ENDPOINTS.SALES.CUSTOMERS, payload).then(r => r.data),};
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
 

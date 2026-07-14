@@ -10,7 +10,7 @@ export default function SmartRedirect() {
 
   // Determine home based on role
   const rawRoles = user.roles || (user.role ? [user.role] : []);
-  const canonicalRoles = ['ADMIN', 'MANAGER', 'OPERATOR'];
+  const canonicalRoles = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'OPERATOR'];
   const hasInvalidRole = rawRoles.length === 0 || rawRoles.some((r: string) => !canonicalRoles.includes(r.toUpperCase().trim()));
 
   if (hasInvalidRole) {
@@ -21,9 +21,14 @@ export default function SmartRedirect() {
   const userRoles = rawRoles.map((r: string) => r.toUpperCase().trim());
   const isOperator = userRoles.includes('OPERATOR');
   const isManager = userRoles.includes('MANAGER');
+  const isAccountant = userRoles.includes('ACCOUNTANT');
   
   if (isManager) {
     return <Navigate to="/manager/overview" replace />;
+  }
+
+  if (isAccountant) {
+    return <Navigate to="/accountant" replace />;
   }
 
   if (isOperator) {

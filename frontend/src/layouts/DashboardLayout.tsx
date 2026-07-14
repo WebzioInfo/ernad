@@ -128,8 +128,9 @@ export default function DashboardLayout() {
     if (isTopLevelWorkflow) return path;
 
     const userRole = String(user?.role || '').toUpperCase();
-    const base = (userRole === 'MANAGER') ? '/manager' : '/admin';
-    return `${base}${path}`;
+    const base = (userRole === 'MANAGER') ? '/manager' : userRole === 'ACCOUNTANT' ? '/accountant' : '/admin';
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalizedPath}`;
   };
 
   return (
@@ -283,7 +284,12 @@ export default function DashboardLayout() {
             </button>
             <div>
               <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                {user?.role === 'MANAGER' ? 'Operations Center' : 'Executive Control'}
+                {user?.role === 'MANAGER'
+                  ? 'Operations Center'
+                  : user?.role === 'ACCOUNTANT'
+                    ? 'Financial Workspace'
+                    : 'Executive Control'
+                }
               </h1>
               <div className="flex items-center gap-3 mt-1">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
