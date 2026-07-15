@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  Users, Save, X, ArrowLeft, Loader2, AlertCircle, Info, Landmark, MapPin, BadgePercent
+  Save, ArrowLeft, Loader2, Info, Landmark, MapPin
 } from 'lucide-react';
 import { useCustomerById, useCreateCustomer, useUpdateCustomer } from '../../hooks/useApi';
 import useAuthStore from '../auth/auth.store';
@@ -152,26 +152,26 @@ export default function AddCustomerPage() {
     const payload = {
       name: name.trim(),
       code: code.trim() || undefined,
-      businessName: businessName.trim() || null,
+      businessName: businessName.trim() || undefined,
       customerType,
-      gstNumber: gstNumber.trim().toUpperCase() || null,
-      panNumber: panNumber.trim().toUpperCase() || null,
+      gstNumber: gstNumber.trim().toUpperCase() || undefined,
+      panNumber: panNumber.trim().toUpperCase() || undefined,
       phone: phone.trim(),
-      alternativePhone: alternativePhone.trim() || null,
-      email: email.trim() || null,
-      address: address.trim() || null,
-      billingAddress: billingAddress.trim() || null,
-      shippingAddress: shippingAddress.trim() || null,
-      state: state.trim() || null,
-      district: district.trim() || null,
-      country: country.trim() || null,
-      pinCode: pinCode.trim() || null,
+      alternativePhone: alternativePhone.trim() || undefined,
+      email: email.trim() || undefined,
+      address: address.trim() || undefined,
+      billingAddress: billingAddress.trim() || undefined,
+      shippingAddress: shippingAddress.trim() || undefined,
+      state: state.trim() || undefined,
+      district: district.trim() || undefined,
+      country: country.trim() || undefined,
+      pinCode: pinCode.trim() || undefined,
       openingBalance: openingBalance.trim(),
       openingBalanceType,
       creditLimit: creditLimit.trim(),
-      paymentTerms: paymentTerms.trim() || null,
+      paymentTerms: paymentTerms.trim() || undefined,
       status,
-      notes: notes.trim() || null,
+      notes: notes.trim() || undefined,
     };
 
     try {

@@ -509,6 +509,7 @@ export interface Customer {
   paymentTerms?: string;
   status?: 'ACTIVE' | 'INACTIVE';
   notes?: string;
+  creditLimit?: string;
 }
 
 export interface CreateSalesTransactionPayload {
