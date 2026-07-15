@@ -43,6 +43,11 @@ export const accountantConfig: ModuleConfig = {
       element: lazy(() => import('./AddCustomerPage')),
       allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
     },
+    {
+      path: 'sales/customers/:customerId',
+      element: lazy(() => import('./CustomerDetailsPage')),
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
+    },
   ],
   sidebarGroups: [
     {

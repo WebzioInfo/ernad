@@ -525,6 +525,69 @@ export function useDeleteCustomer() {
   });
 }
 
+export function useCustomerSummary(id: string, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-summary', id],
+    queryFn: () => SalesService.getCustomerSummary(id),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerLedger(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-ledger', id, params],
+    queryFn: () => SalesService.getCustomerLedger(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerSales(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-sales', id, params],
+    queryFn: () => SalesService.getCustomerSales(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerPayments(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-payments', id, params],
+    queryFn: () => SalesService.getCustomerPayments(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerReturns(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-returns', id, params],
+    queryFn: () => SalesService.getCustomerReturns(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerDamages(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-damages', id, params],
+    queryFn: () => SalesService.getCustomerDamages(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerActivities(id: string, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-activities', id],
+    queryFn: () => SalesService.getCustomerActivities(id),
+    enabled: !!id,
+    ...options
+  });
+}
+
 export function useSalesTransactions() {
   return useQuery<SalesTransaction[], Error>({
     queryKey: QK.SALES_TRANSACTIONS,

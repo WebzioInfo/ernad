@@ -33,7 +33,7 @@ export default function AddCustomerPage() {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [businessName, setBusinessName] = useState('');
-  const [customerType, setCustomerType] = useState<'INDIVIDUAL' | 'BUSINESS'>('BUSINESS');
+  const [customerType, setCustomerType] = useState<'B2B' | 'B2C'>('B2C');
   const [gstNumber, setGstNumber] = useState('');
   const [panNumber, setPanNumber] = useState('');
   const [phone, setPhone] = useState('');
@@ -48,10 +48,7 @@ export default function AddCustomerPage() {
   const [pinCode, setPinCode] = useState('');
   const [openingBalance, setOpeningBalance] = useState('0');
   const [openingBalanceType, setOpeningBalanceType] = useState<'DEBIT' | 'CREDIT'>('DEBIT');
-  const [creditLimit, setCreditLimit] = useState('0');
-  const [paymentTerms, setPaymentTerms] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
-  const [notes, setNotes] = useState('');
 
   // Auxiliary UI States
   const [errors, setErrors] = useState<FormErrors>({});
@@ -65,7 +62,13 @@ export default function AddCustomerPage() {
       setName(existingCustomer.name || '');
       setCode(existingCustomer.code || '');
       setBusinessName(existingCustomer.businessName || '');
-      setCustomerType(existingCustomer.customerType || 'BUSINESS');
+      setCustomerType(
+        (existingCustomer.customerType === 'INDIVIDUAL'
+          ? 'B2C'
+          : existingCustomer.customerType === 'BUSINESS'
+          ? 'B2B'
+          : existingCustomer.customerType) as 'B2B' | 'B2C' || 'B2C'
+      );
       setGstNumber(existingCustomer.gstNumber || '');
       setPanNumber(existingCustomer.panNumber || '');
       setPhone(existingCustomer.phone || '');
@@ -80,10 +83,7 @@ export default function AddCustomerPage() {
       setPinCode(existingCustomer.pinCode || '');
       setOpeningBalance(existingCustomer.openingBalance || '0');
       setOpeningBalanceType(existingCustomer.openingBalanceType || 'DEBIT');
-      setCreditLimit(existingCustomer.creditLimit || '0');
-      setPaymentTerms(existingCustomer.paymentTerms || '');
       setStatus(existingCustomer.status || 'ACTIVE');
-      setNotes(existingCustomer.notes || '');
       setIsDirty(false);
     }
   }, [isEditMode, existingCustomer]);
@@ -120,20 +120,22 @@ export default function AddCustomerPage() {
       newErrors.email = 'Email address format is invalid';
     }
 
-    if (gstNumber.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstNumber.trim().toUpperCase())) {
-      newErrors.gstNumber = 'GST Number must match Indian format (e.g. 22AAAAA1111A1Z1)';
-    }
+    if (customerType === 'B2B') {
+      if (!gstNumber.trim()) {
+        newErrors.gstNumber = 'GST Number is required for B2B';
+      } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstNumber.trim().toUpperCase())) {
+        newErrors.gstNumber = 'GST Number must match Indian format (e.g. 22AAAAA1111A1Z1)';
+      }
 
-    if (panNumber.trim() && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNumber.trim().toUpperCase())) {
-      newErrors.panNumber = 'PAN Number must match Indian format (e.g. ABCDE1234F)';
+      if (!panNumber.trim()) {
+        newErrors.panNumber = 'PAN Number is required for B2B';
+      } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNumber.trim().toUpperCase())) {
+        newErrors.panNumber = 'PAN Number must match Indian format (e.g. ABCDE1234F)';
+      }
     }
 
     if (isNaN(parseFloat(openingBalance))) {
       newErrors.openingBalance = 'Opening balance must be a number';
-    }
-
-    if (isNaN(parseFloat(creditLimit))) {
-      newErrors.creditLimit = 'Credit limit must be a number';
     }
 
     setErrors(newErrors);
@@ -149,13 +151,11 @@ export default function AddCustomerPage() {
     }
 
     setIsSaving(true);
-    const payload = {
+    const payload: any = {
       name: name.trim(),
       code: code.trim() || undefined,
       businessName: businessName.trim() || undefined,
       customerType,
-      gstNumber: gstNumber.trim().toUpperCase() || undefined,
-      panNumber: panNumber.trim().toUpperCase() || undefined,
       phone: phone.trim(),
       alternativePhone: alternativePhone.trim() || undefined,
       email: email.trim() || undefined,
@@ -168,11 +168,13 @@ export default function AddCustomerPage() {
       pinCode: pinCode.trim() || undefined,
       openingBalance: openingBalance.trim(),
       openingBalanceType,
-      creditLimit: creditLimit.trim(),
-      paymentTerms: paymentTerms.trim() || undefined,
       status,
-      notes: notes.trim() || undefined,
     };
+
+    if (customerType === 'B2B') {
+      payload.gstNumber = gstNumber.trim().toUpperCase() || undefined;
+      payload.panNumber = panNumber.trim().toUpperCase() || undefined;
+    }
 
     try {
       if (isEditMode && id) {
@@ -317,31 +319,24 @@ export default function AddCustomerPage() {
               />
             </div>
 
-            {/* Customer Type */}
+            {/* Business Type */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 ml-1">Customer Type</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 text-sm">
-                  <input
-                    type="radio"
-                    name="customerType"
-                    checked={customerType === 'BUSINESS'}
-                    onChange={() => handleFieldChange(setCustomerType, 'BUSINESS')}
-                    className="accent-[#1A9A91] w-4 h-4"
-                  />
-                  Business Entity
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 text-sm">
-                  <input
-                    type="radio"
-                    name="customerType"
-                    checked={customerType === 'INDIVIDUAL'}
-                    onChange={() => handleFieldChange(setCustomerType, 'INDIVIDUAL')}
-                    className="accent-[#1A9A91] w-4 h-4"
-                  />
-                  Individual Account
-                </label>
-              </div>
+              <label className="text-xs font-bold text-slate-700 ml-1">Business Type</label>
+              <select
+                value={customerType}
+                onChange={(e) => {
+                  const val = e.target.value as 'B2B' | 'B2C';
+                  handleFieldChange(setCustomerType, val);
+                  if (val === 'B2C') {
+                    setGstNumber('');
+                    setPanNumber('');
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] focus:bg-white outline-none font-semibold text-sm cursor-pointer"
+              >
+                <option value="B2C">B2C (Business to Consumer)</option>
+                <option value="B2B">B2B (Business to Business)</option>
+              </select>
             </div>
 
             {/* Status */}
@@ -459,30 +454,36 @@ export default function AddCustomerPage() {
 
           <div className="grid gap-6 md:grid-cols-2">
             {/* GST Number */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 ml-1">GST Number</label>
-              <input
-                type="text"
-                value={gstNumber}
-                onChange={(e) => handleFieldChange(setGstNumber, e.target.value)}
-                placeholder="e.g. 32ABCDE1234F1Z5"
-                className={`w-full bg-slate-50 border ${errors.gstNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]'} text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-mono font-bold text-sm`}
-              />
-              {errors.gstNumber && <p className="text-rose-500 text-xs ml-1">{errors.gstNumber}</p>}
-            </div>
+            {customerType === 'B2B' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 ml-1">GST Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={gstNumber}
+                  onChange={(e) => handleFieldChange(setGstNumber, e.target.value)}
+                  placeholder="e.g. 32ABCDE1234F1Z5"
+                  className={`w-full bg-slate-50 border ${errors.gstNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]'} text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-mono font-bold text-sm`}
+                />
+                {errors.gstNumber && <p className="text-rose-500 text-xs ml-1">{errors.gstNumber}</p>}
+              </div>
+            )}
 
             {/* PAN Number */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 ml-1">PAN Number</label>
-              <input
-                type="text"
-                value={panNumber}
-                onChange={(e) => handleFieldChange(setPanNumber, e.target.value)}
-                placeholder="e.g. ABCDE1234F"
-                className={`w-full bg-slate-50 border ${errors.panNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]'} text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-mono font-bold text-sm`}
-              />
-              {errors.panNumber && <p className="text-rose-500 text-xs ml-1">{errors.panNumber}</p>}
-            </div>
+            {customerType === 'B2B' && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 ml-1">PAN Number *</label>
+                <input
+                  type="text"
+                  required
+                  value={panNumber}
+                  onChange={(e) => handleFieldChange(setPanNumber, e.target.value)}
+                  placeholder="e.g. ABCDE1234F"
+                  className={`w-full bg-slate-50 border ${errors.panNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]'} text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-mono font-bold text-sm`}
+                />
+                {errors.panNumber && <p className="text-rose-500 text-xs ml-1">{errors.panNumber}</p>}
+              </div>
+            )}
 
             {/* Opening Balance */}
             <div className="space-y-2">
@@ -509,43 +510,6 @@ export default function AddCustomerPage() {
                 <option value="CREDIT">Credit (Advance Payable)</option>
               </select>
             </div>
-
-            {/* Credit Limit */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 ml-1">Credit Limit (₹)</label>
-              <input
-                type="text"
-                value={creditLimit}
-                onChange={(e) => handleFieldChange(setCreditLimit, e.target.value)}
-                placeholder="0.00"
-                className={`w-full bg-slate-50 border ${errors.creditLimit ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91]'} text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:bg-white outline-none transition-all placeholder:text-slate-400 font-bold text-sm`}
-              />
-              {errors.creditLimit && <p className="text-rose-500 text-xs ml-1">{errors.creditLimit}</p>}
-            </div>
-
-            {/* Payment Terms */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 ml-1">Payment Terms</label>
-              <input
-                type="text"
-                value={paymentTerms}
-                onChange={(e) => handleFieldChange(setPaymentTerms, e.target.value)}
-                placeholder="e.g. Net 30, COD, etc."
-                className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm"
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-2 mt-4">
-            <label className="text-xs font-bold text-slate-700 ml-1">Administrative Notes</label>
-            <textarea
-              rows={3}
-              value={notes}
-              onChange={(e) => handleFieldChange(setNotes, e.target.value)}
-              placeholder="Enter special instructions or internal notations"
-              className="w-full bg-slate-50 border border-slate-200 text-slate-900 px-4 py-3 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/20 focus:border-[#1A9A91] focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm resize-none"
-            />
           </div>
         </section>
 

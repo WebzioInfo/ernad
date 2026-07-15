@@ -725,7 +725,7 @@ export interface Customer {
   createdAt: string;
   updatedAt: string;
   businessName?: string | null;
-  customerType?: 'INDIVIDUAL' | 'BUSINESS' | null;
+  customerType?: 'INDIVIDUAL' | 'BUSINESS' | 'B2B' | 'B2C' | null;
   gstNumber?: string | null;
   panNumber?: string | null;
   alternativePhone?: string | null;

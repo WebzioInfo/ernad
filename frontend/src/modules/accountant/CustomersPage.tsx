@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, Search, Plus, Filter, ArrowUpDown, ChevronLeft, 
-  ChevronRight, Edit2, Trash2, Download, RefreshCw, AlertTriangle
+  ChevronRight, Edit2, Trash2, Download, RefreshCw, AlertTriangle, Eye
 } from 'lucide-react';
 import { useCustomersFiltered, useDeleteCustomer } from '../../hooks/useApi';
 import useAuthStore from '../auth/auth.store';
@@ -349,6 +349,13 @@ export default function CustomersPage() {
                     {/* Edit/Delete Actions */}
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => navigate(`${getBasePath()}/sales/customers/${customer.id}`)}
+                          className="p-2 hover:bg-[#1A9A91]/10 text-slate-500 hover:text-[#1A9A91] rounded-lg transition-colors"
+                          title="View Ledger & Profile"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
                         {canEdit && (
                           <button
                             onClick={() => navigate(`${getBasePath()}/sales/customers/edit/${customer.id}`)}

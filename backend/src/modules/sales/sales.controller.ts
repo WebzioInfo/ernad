@@ -113,4 +113,55 @@ export class SalesController {
   async deleteSalesTransaction(@Param('id') id: string, @Req() req: any) {
     return await this.salesService.deleteSalesTransaction(id, req.user.id);
   }
+
+  // ─── CUSTOMER PROFILE & LEDGER ENDPOINTS ────────────────────────────
+
+  @Get('customers/:id/summary')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer summary metrics' })
+  async getCustomerSummary(@Param('id') id: string) {
+    return await this.salesService.getCustomerSummary(id);
+  }
+
+  @Get('customers/:id/ledger')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer ledger report' })
+  async getCustomerLedger(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.getCustomerLedger(id, req.query);
+  }
+
+  @Get('customers/:id/sales')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer sales history' })
+  async getCustomerSalesHistory(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.getCustomerSalesHistory(id, req.query);
+  }
+
+  @Get('customers/:id/payments')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer payment history' })
+  async getCustomerPaymentHistory(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.getCustomerPaymentHistory(id, req.query);
+  }
+
+  @Get('customers/:id/returns')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer returns history' })
+  async getCustomerReturnsHistory(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.getCustomerReturnsHistory(id, req.query);
+  }
+
+  @Get('customers/:id/damages')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer damages history' })
+  async getCustomerDamagesHistory(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.getCustomerDamagesHistory(id, req.query);
+  }
+
+  @Get('customers/:id/activities')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer activity log' })
+  async getCustomerActivities(@Param('id') id: string) {
+    return await this.salesService.getCustomerActivities(id);
+  }
 }

@@ -494,7 +494,7 @@ export interface Customer {
   phone?: string;
   address?: string;
   businessName?: string;
-  customerType?: 'INDIVIDUAL' | 'BUSINESS';
+  customerType?: 'INDIVIDUAL' | 'BUSINESS' | 'B2B' | 'B2C';
   gstNumber?: string;
   panNumber?: string;
   alternativePhone?: string;
@@ -510,6 +510,79 @@ export interface Customer {
   status?: 'ACTIVE' | 'INACTIVE';
   notes?: string;
   creditLimit?: string;
+}
+
+export interface CustomerSummary {
+  totalSalesCount: number;
+  totalSalesAmount: number;
+  amountReceived: number;
+  outstandingBalance: number;
+  pendingPayments: number;
+  salesReturnsCount: number;
+  salesReturnsAmount: number;
+  damagedReturnsCount: number;
+  damagedReturnsAmount: number;
+  totalProductsPurchased: number;
+  lastPurchaseDate: string | null;
+  lastPaymentDate: string | null;
+  averageOrderValue: number;
+  lifetimeCustomerValue: number;
+}
+
+export interface LedgerEntry {
+  date: string;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  runningBalance: number;
+  status: string;
+  createdBy: string;
+}
+
+export interface SalesHistoryItem {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  totalAmount: string;
+  taxAmount: string;
+  status: string;
+  paymentStatus: string;
+  remarks: string | null;
+  creatorName: string | null;
+  itemCount: number;
+  quantity: number;
+  paid: number;
+  due: number;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  amount: string;
+  paymentDate: string;
+  paymentMethod: string;
+  referenceNumber: string | null;
+  remarks: string | null;
+  orderNumber: string;
+}
+
+export interface ReturnHistoryItem {
+  id: string;
+  type: string;
+  quantity: number;
+  unitPrice: string;
+  salesDate: string;
+  remarks: string | null;
+  productName: string;
+  perfName: string | null;
+  refundAmount: number;
+}
+
+export interface ActivityItem {
+  date: string;
+  user: string;
+  action: string;
+  description: string;
 }
 
 export interface CreateSalesTransactionPayload {
@@ -544,6 +617,9 @@ export interface SalesTransaction {
 }
 
 export const SalesService = {
+  getOrderById: (id: string) =>
+    api.get<any>(ENDPOINTS.SALES.ORDER(id)).then(r => r.data),
+
   getSalesTransactions: () =>
     api.get<SalesTransaction[]>(ENDPOINTS.SALES.TRANSACTIONS).then(r => r.data),
 
@@ -568,6 +644,20 @@ export const SalesService = {
     api.patch<Customer>(ENDPOINTS.SALES.CUSTOMER(id), payload).then(r => r.data),
   deleteCustomer: (id: string) =>
     api.delete<{ success: boolean }>(ENDPOINTS.SALES.CUSTOMER(id)).then(r => r.data),
+  getCustomerSummary: (id: string) =>
+    api.get<CustomerSummary>(ENDPOINTS.SALES.CUSTOMER_SUMMARY(id)).then(r => r.data),
+  getCustomerLedger: (id: string, params?: any) =>
+    api.get<LedgerEntry[]>(ENDPOINTS.SALES.CUSTOMER_LEDGER(id), { params }).then(r => r.data),
+  getCustomerSales: (id: string, params?: any) =>
+    api.get<{ data: SalesHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_SALES(id), { params }).then(r => r.data),
+  getCustomerPayments: (id: string, params?: any) =>
+    api.get<{ data: PaymentHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_PAYMENTS(id), { params }).then(r => r.data),
+  getCustomerReturns: (id: string, params?: any) =>
+    api.get<{ data: ReturnHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_RETURNS(id), { params }).then(r => r.data),
+  getCustomerDamages: (id: string, params?: any) =>
+    api.get<{ data: ReturnHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_DAMAGES(id), { params }).then(r => r.data),
+  getCustomerActivities: (id: string) =>
+    api.get<ActivityItem[]>(ENDPOINTS.SALES.CUSTOMER_ACTIVITIES(id)).then(r => r.data),
 };
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
