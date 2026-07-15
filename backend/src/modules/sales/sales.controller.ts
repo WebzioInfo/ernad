@@ -14,18 +14,45 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Get('customers')
-  @Permissions('sales:view')
-  @ApiOperation({ summary: 'List all customers' })
-  async getCustomers() {
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'List all customers (with search & pagination)' })
+  async getCustomers(@Req() req: any) {
+    const query = req.query;
+    if (query && Object.keys(query).length > 0) {
+      return await this.salesService.getCustomersFiltered(query);
+    }
     return await this.salesService.getCustomers();
   }
 
+  @Get('customers/:id')
+  @Permissions('customers:view')
+  @ApiOperation({ summary: 'Get customer by ID' })
+  async getCustomerById(@Param('id') id: string) {
+    return await this.salesService.getCustomerById(id);
+  }
+
   @Post('customers')
-  @Roles('ADMIN', 'ACCOUNTANT')
-  @Permissions('sales:manage')
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Permissions('customers:create')
   @ApiOperation({ summary: 'Create a new customer' })
-  async createCustomer(@Body() dto: any) {
-    return await this.salesService.createCustomer(dto);
+  async createCustomer(@Body() dto: any, @Req() req: any) {
+    return await this.salesService.createCustomer(dto, req.user?.id || req.user?.sub);
+  }
+
+  @Patch('customers/:id')
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Permissions('customers:edit')
+  @ApiOperation({ summary: 'Update an existing customer' })
+  async updateCustomer(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return await this.salesService.updateCustomer(id, dto, req.user?.id || req.user?.sub);
+  }
+
+  @Delete('customers/:id')
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Permissions('customers:delete')
+  @ApiOperation({ summary: 'Soft delete customer' })
+  async deleteCustomer(@Param('id') id: string, @Req() req: any) {
+    return await this.salesService.deleteCustomer(id, req.user?.id || req.user?.sub);
   }
 
   @Get('orders')

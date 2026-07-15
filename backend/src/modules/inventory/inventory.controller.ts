@@ -114,8 +114,8 @@ export class InventoryController {
   }
 
   @Post('add-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Add raw material or product stock (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Add raw material or product stock (Admin, Manager & Accountant)' })
   async addStock(@Body() body: { materialId?: string; itemId?: string; itemType?: 'RAW' | 'PRODUCT'; quantity: number; remarks?: string }, @Req() req: any) {
     const itemId = body.itemId || body.materialId;
     const itemType = body.itemType || 'RAW';
@@ -138,8 +138,8 @@ export class InventoryController {
   }
 
   @Put('update-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin, Manager & Accountant)' })
   async updateStockTransaction(@Body() body: { transactionId: string; quantity: number; remarks?: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
     return await this.inventoryService.updateStockTransaction({
       transactionId: body.transactionId,
@@ -150,8 +150,8 @@ export class InventoryController {
   }
 
   @Delete('delete-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin, Manager & Accountant)' })
   async deleteStockTransaction(@Body() body: { transactionId: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
     return await this.inventoryService.deleteStockTransaction(body.transactionId);
   }

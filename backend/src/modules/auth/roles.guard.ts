@@ -91,7 +91,12 @@ export class RolesGuard implements CanActivate {
         'incidents:update',
         'users:manage',
         'sales:view',
-        'sales:manage'
+        'sales:manage',
+        'customers:view',
+        'customers:create',
+        'customers:edit',
+        'customers:delete',
+        'customers:export'
       ];
 
       const accountantPermissions = [
@@ -103,7 +108,12 @@ export class RolesGuard implements CanActivate {
         'sales:manage',
         'settings:view',
         'settings:manage',
-        'notifications:view'
+        'notifications:view',
+        'customers:view',
+        'customers:create',
+        'customers:edit',
+        'customers:delete',
+        'customers:export'
       ];
 
       const operatorPermissions = [

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { db } from '../../database/db';
 import { customers, salesOrders, salesOrderItems, salesTransactions, products, productBrands, users, productionStock } from '../../database/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, asc, and, or, ilike, isNull, like, sql, not } from 'drizzle-orm';
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -13,36 +13,351 @@ export class SalesService {
   ) {}
 
   async getCustomers() {
-    return await db.select().from(customers).orderBy(desc(customers.createdAt));
+    return await db.select().from(customers).where(isNull(customers.deletedAt)).orderBy(desc(customers.createdAt));
+  }
+
+  async getCustomersFiltered(query: {
+    search?: string;
+    status?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const conditions = [isNull(customers.deletedAt)];
+
+    if (query.status) {
+      conditions.push(eq(customers.status, query.status.toUpperCase()));
+    }
+    if (query.type) {
+      conditions.push(eq(customers.customerType, query.type.toUpperCase()));
+    }
+
+    if (query.search) {
+      const searchPattern = `%${query.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(customers.name, searchPattern),
+          ilike(customers.code, searchPattern),
+          ilike(customers.businessName, searchPattern),
+          ilike(customers.phone, searchPattern),
+          ilike(customers.gstNumber, searchPattern)
+        )
+      );
+    }
+
+    const whereClause = and(...conditions);
+
+    // Get total count
+    const [countResult] = await db.select({ count: sql`count(*)` }).from(customers).where(whereClause);
+    const total = Number(countResult?.count || 0);
+
+    // Sorting
+    let orderByField = desc(customers.createdAt);
+    if (query.sortBy) {
+      const field = query.sortBy;
+      const order = query.sortOrder === 'asc' ? asc : desc;
+      if (field === 'name') orderByField = order(customers.name);
+      else if (field === 'code') orderByField = order(customers.code);
+      else if (field === 'businessName') orderByField = order(customers.businessName);
+      else if (field === 'createdAt') orderByField = order(customers.createdAt);
+      else if (field === 'creditLimit') orderByField = order(customers.creditLimit);
+      else if (field === 'openingBalance') orderByField = order(customers.openingBalance);
+    }
+
+    const data = await db.select()
+      .from(customers)
+      .where(whereClause)
+      .orderBy(orderByField)
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  async getCustomerById(id: string) {
+    const [customer] = await db.select().from(customers).where(and(eq(customers.id, id), isNull(customers.deletedAt))).limit(1);
+    if (!customer) throw new NotFoundException('Customer not found');
+    return customer;
   }
 
   async getOrders() {
     return await db.select().from(salesOrders).orderBy(desc(salesOrders.orderDate));
   }
 
-  async createCustomer(dto: {
-    name: string;
-    code?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  }) {
-    const { name, code, email, phone, address } = dto;
+  async createCustomer(dto: any, userId?: string) {
+    const {
+      name,
+      code,
+      businessName,
+      customerType,
+      gstNumber,
+      panNumber,
+      phone,
+      alternativePhone,
+      email,
+      address,
+      billingAddress,
+      shippingAddress,
+      state,
+      district,
+      country,
+      pinCode,
+      openingBalance,
+      openingBalanceType,
+      creditLimit,
+      paymentTerms,
+      status,
+      notes,
+      companyId,
+      branchId,
+      tenantId
+    } = dto;
+
     if (!name || String(name).trim().length === 0) {
       throw new BadRequestException('Customer name is required');
     }
+    if (!phone || String(phone).trim().length === 0) {
+      throw new BadRequestException('Phone number is required');
+    }
+
+    const trimmedName = String(name).trim();
+    const trimmedPhone = String(phone).trim();
+    const trimmedGst = gstNumber ? String(gstNumber).trim().toUpperCase() : null;
+
+    // Check duplicate name
+    const [existingName] = await db.select().from(customers)
+      .where(and(eq(customers.name, trimmedName), isNull(customers.deletedAt)))
+      .limit(1);
+    if (existingName) {
+      throw new BadRequestException(`Customer with name "${trimmedName}" already exists`);
+    }
+
+    // Check duplicate phone
+    const [existingPhone] = await db.select().from(customers)
+      .where(and(eq(customers.phone, trimmedPhone), isNull(customers.deletedAt)))
+      .limit(1);
+    if (existingPhone) {
+      throw new BadRequestException(`Customer with phone "${trimmedPhone}" already exists`);
+    }
+
+    // Check duplicate GST
+    if (trimmedGst) {
+      const [existingGst] = await db.select().from(customers)
+        .where(and(eq(customers.gstNumber, trimmedGst), isNull(customers.deletedAt)))
+        .limit(1);
+      if (existingGst) {
+        throw new BadRequestException(`Customer with GST "${trimmedGst}" already exists`);
+      }
+    }
+
+    // Generate code if missing
+    let finalCode = code ? String(code).trim() : null;
+    if (!finalCode) {
+      const lastCust = await db.select({ code: customers.code })
+        .from(customers)
+        .where(like(customers.code, 'CUST-%'))
+        .orderBy(desc(customers.code))
+        .limit(1);
+      
+      if (lastCust.length > 0 && lastCust[0].code) {
+        const lastNumStr = lastCust[0].code.replace('CUST-', '');
+        const lastNum = parseInt(lastNumStr, 10);
+        if (!isNaN(lastNum)) {
+          finalCode = `CUST-${String(lastNum + 1).padStart(4, '0')}`;
+        } else {
+          finalCode = `CUST-0001`;
+        }
+      } else {
+        finalCode = `CUST-0001`;
+      }
+    }
 
     const [customer] = await db.insert(customers).values({
-      name: String(name).trim(),
-      code: code ? String(code).trim() : null,
+      name: trimmedName,
+      code: finalCode,
       email: email ? String(email).trim() : null,
-      phone: phone ? String(phone).trim() : null,
+      phone: trimmedPhone,
       address: address ? String(address).trim() : null,
+      creditLimit: creditLimit !== undefined && creditLimit !== null ? String(creditLimit) : '0',
+      businessName: businessName ? String(businessName).trim() : null,
+      customerType: customerType ? String(customerType).toUpperCase() : 'BUSINESS',
+      gstNumber: trimmedGst,
+      panNumber: panNumber ? String(panNumber).trim().toUpperCase() : null,
+      alternativePhone: alternativePhone ? String(alternativePhone).trim() : null,
+      billingAddress: billingAddress ? String(billingAddress).trim() : null,
+      shippingAddress: shippingAddress ? String(shippingAddress).trim() : null,
+      state: state ? String(state).trim() : null,
+      district: district ? String(district).trim() : null,
+      country: country ? String(country).trim() : null,
+      pinCode: pinCode ? String(pinCode).trim() : null,
+      openingBalance: openingBalance !== undefined && openingBalance !== null ? String(openingBalance) : '0',
+      openingBalanceType: openingBalanceType ? String(openingBalanceType).toUpperCase() : 'DEBIT',
+      paymentTerms: paymentTerms ? String(paymentTerms).trim() : null,
+      status: status ? String(status).toUpperCase() : 'ACTIVE',
+      notes: notes ? String(notes).trim() : null,
+      createdBy: userId,
+      companyId: companyId ? String(companyId) : null,
+      branchId: branchId ? String(branchId) : null,
+      tenantId: tenantId ? String(tenantId) : null,
       createdAt: new Date(),
-      updatedAt: new Date(),
+      updatedAt: new Date()
     }).returning();
 
+    // Log audit action
+    await this.auditService.logAction({
+      userId,
+      action: 'CUSTOMER_CREATED',
+      entityType: 'customers',
+      entityId: customer.id,
+      category: 'SALES',
+      payload: {
+        customer
+      }
+    });
+
     return customer;
+  }
+
+  async updateCustomer(id: string, dto: any, userId: string) {
+    const [existing] = await db.select().from(customers).where(eq(customers.id, id)).limit(1);
+    if (!existing) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    const {
+      name,
+      code,
+      businessName,
+      customerType,
+      gstNumber,
+      panNumber,
+      phone,
+      alternativePhone,
+      email,
+      address,
+      billingAddress,
+      shippingAddress,
+      state,
+      district,
+      country,
+      pinCode,
+      openingBalance,
+      openingBalanceType,
+      creditLimit,
+      paymentTerms,
+      status,
+      notes
+    } = dto;
+
+    if (name !== undefined) {
+      const trimmedName = String(name).trim();
+      if (trimmedName.length === 0) throw new BadRequestException('Customer name is required');
+      const [dup] = await db.select().from(customers)
+        .where(and(eq(customers.name, trimmedName), not(eq(customers.id, id)), isNull(customers.deletedAt)))
+        .limit(1);
+      if (dup) throw new BadRequestException(`Customer with name "${trimmedName}" already exists`);
+    }
+
+    if (phone !== undefined && phone !== null) {
+      const trimmedPhone = String(phone).trim();
+      if (trimmedPhone.length === 0) throw new BadRequestException('Phone number is required');
+      const [dup] = await db.select().from(customers)
+        .where(and(eq(customers.phone, trimmedPhone), not(eq(customers.id, id)), isNull(customers.deletedAt)))
+        .limit(1);
+      if (dup) throw new BadRequestException(`Customer with phone "${trimmedPhone}" already exists`);
+    }
+
+    if (gstNumber !== undefined && gstNumber !== null) {
+      const trimmedGst = String(gstNumber).trim().toUpperCase();
+      if (trimmedGst.length > 0) {
+        const [dup] = await db.select().from(customers)
+          .where(and(eq(customers.gstNumber, trimmedGst), not(eq(customers.id, id)), isNull(customers.deletedAt)))
+          .limit(1);
+        if (dup) throw new BadRequestException(`Customer with GST "${trimmedGst}" already exists`);
+      }
+    }
+
+    const updateObj: any = {
+      updatedAt: new Date(),
+      updatedBy: userId
+    };
+
+    if (name !== undefined) updateObj.name = String(name).trim();
+    if (code !== undefined) updateObj.code = code ? String(code).trim() : null;
+    if (businessName !== undefined) updateObj.businessName = businessName ? String(businessName).trim() : null;
+    if (customerType !== undefined) updateObj.customerType = customerType ? String(customerType).toUpperCase() : 'BUSINESS';
+    if (gstNumber !== undefined) updateObj.gstNumber = gstNumber ? String(gstNumber).trim().toUpperCase() : null;
+    if (panNumber !== undefined) updateObj.panNumber = panNumber ? String(panNumber).trim().toUpperCase() : null;
+    if (phone !== undefined) updateObj.phone = phone ? String(phone).trim() : null;
+    if (alternativePhone !== undefined) updateObj.alternativePhone = alternativePhone ? String(alternativePhone).trim() : null;
+    if (email !== undefined) updateObj.email = email ? String(email).trim() : null;
+    if (address !== undefined) updateObj.address = address ? String(address).trim() : null;
+    if (billingAddress !== undefined) updateObj.billingAddress = billingAddress ? String(billingAddress).trim() : null;
+    if (shippingAddress !== undefined) updateObj.shippingAddress = shippingAddress ? String(shippingAddress).trim() : null;
+    if (state !== undefined) updateObj.state = state ? String(state).trim() : null;
+    if (district !== undefined) updateObj.district = district ? String(district).trim() : null;
+    if (country !== undefined) updateObj.country = country ? String(country).trim() : null;
+    if (pinCode !== undefined) updateObj.pinCode = pinCode ? String(pinCode).trim() : null;
+    if (openingBalance !== undefined) updateObj.openingBalance = openingBalance !== null ? String(openingBalance) : '0';
+    if (openingBalanceType !== undefined) updateObj.openingBalanceType = openingBalanceType ? String(openingBalanceType).toUpperCase() : 'DEBIT';
+    if (creditLimit !== undefined) updateObj.creditLimit = creditLimit !== null ? String(creditLimit) : '0';
+    if (paymentTerms !== undefined) updateObj.paymentTerms = paymentTerms ? String(paymentTerms).trim() : null;
+    if (status !== undefined) updateObj.status = status ? String(status).toUpperCase() : 'ACTIVE';
+    if (notes !== undefined) updateObj.notes = notes ? String(notes).trim() : null;
+
+    const [updated] = await db.update(customers).set(updateObj).where(eq(customers.id, id)).returning();
+
+    // Log audit action
+    await this.auditService.logAction({
+      userId,
+      action: 'CUSTOMER_UPDATED',
+      entityType: 'customers',
+      entityId: id,
+      category: 'SALES',
+      payload: {
+        before: existing,
+        after: updated
+      }
+    });
+
+    return updated;
+  }
+
+  async deleteCustomer(id: string, userId: string) {
+    const [existing] = await db.select().from(customers).where(eq(customers.id, id)).limit(1);
+    if (!existing) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    await db.update(customers)
+      .set({ deletedAt: new Date(), updatedBy: userId })
+      .where(eq(customers.id, id));
+
+    // Log audit action
+    await this.auditService.logAction({
+      userId,
+      action: 'CUSTOMER_DELETED',
+      entityType: 'customers',
+      entityId: id,
+      category: 'SALES',
+      payload: {
+        deletedRecord: existing
+      }
+    });
+
+    return { success: true };
   }
 
   async getOrderById(id: string) {

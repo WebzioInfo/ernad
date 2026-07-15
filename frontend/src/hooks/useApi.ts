@@ -475,11 +475,53 @@ export function useCustomers() {
   });
 }
 
+export function useCustomersFiltered(params: any) {
+  return useQuery({
+    queryKey: ['sales-customers-filtered', params],
+    queryFn: () => SalesService.getCustomersFiltered(params),
+  });
+}
+
+export function useCustomerById(id: string) {
+  return useQuery({
+    queryKey: ['sales-customer', id],
+    queryFn: () => SalesService.getCustomerById(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: Partial<Customer>) => SalesService.createCustomer(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sales-customers'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+    },
+  });
+}
+
+export function useUpdateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<Customer> }) =>
+      SalesService.updateCustomer(id, payload),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+      qc.invalidateQueries({ queryKey: ['sales-customer', variables.id] });
+    },
+  });
+}
+
+export function useDeleteCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => SalesService.deleteCustomer(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+    },
   });
 }
 

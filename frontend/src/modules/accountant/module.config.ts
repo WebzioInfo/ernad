@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Home, Package } from 'lucide-react';
+import { Home, Package, Users } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const accountantConfig: ModuleConfig = {
@@ -27,6 +27,21 @@ export const accountantConfig: ModuleConfig = {
       path: 'raw-materials',
       element: lazy(() => import('../inventory/RawMaterialsPage')),
       allowedRoles: ['ACCOUNTANT'],
+    },
+    {
+      path: 'sales/customers',
+      element: lazy(() => import('./CustomersPage')),
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
+    },
+    {
+      path: 'sales/customers/add',
+      element: lazy(() => import('./AddCustomerPage')),
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
+    },
+    {
+      path: 'sales/customers/edit/:id',
+      element: lazy(() => import('./AddCustomerPage')),
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
     },
   ],
   sidebarGroups: [
@@ -62,6 +77,20 @@ export const accountantConfig: ModuleConfig = {
           icon: Package,
           path: 'raw-materials',
           allowedRoles: ['ACCOUNTANT'],
+        },
+      ],
+    },
+    {
+      id: 'accounting',
+      label: 'Accounting',
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
+      items: [
+        {
+          id: 'customers',
+          label: 'Customers',
+          icon: Users,
+          path: '/sales/customers',
+          allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT'],
         },
       ],
     },

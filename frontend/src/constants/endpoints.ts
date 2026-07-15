@@ -155,6 +155,7 @@ export const ENDPOINTS = {
     TRANSACTIONS: 'sales/transactions',
     TRANSACTION: (id: string) => `sales/transactions/${id}`,
     CUSTOMERS: 'sales/customers',
+    CUSTOMER: (id: string) => `sales/customers/${id}`,
   },
   NOTIFICATIONS: {
     UNREAD: 'notifications/unread',

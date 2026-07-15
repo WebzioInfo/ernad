@@ -493,6 +493,22 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  businessName?: string;
+  customerType?: 'INDIVIDUAL' | 'BUSINESS';
+  gstNumber?: string;
+  panNumber?: string;
+  alternativePhone?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  state?: string;
+  district?: string;
+  country?: string;
+  pinCode?: string;
+  openingBalance?: string;
+  openingBalanceType?: 'DEBIT' | 'CREDIT';
+  paymentTerms?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  notes?: string;
 }
 
 export interface CreateSalesTransactionPayload {
@@ -541,8 +557,17 @@ export const SalesService = {
 
   getCustomers: () =>
     api.get<Customer[]>(ENDPOINTS.SALES.CUSTOMERS).then(r => r.data),
+  getCustomersFiltered: (params?: any) =>
+    api.get<{ data: Customer[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMERS, { params }).then(r => r.data),
+  getCustomerById: (id: string) =>
+    api.get<Customer>(ENDPOINTS.SALES.CUSTOMER(id)).then(r => r.data),
   createCustomer: (payload: Partial<Customer>) =>
-    api.post<Customer>(ENDPOINTS.SALES.CUSTOMERS, payload).then(r => r.data),};
+    api.post<Customer>(ENDPOINTS.SALES.CUSTOMERS, payload).then(r => r.data),
+  updateCustomer: (id: string, payload: Partial<Customer>) =>
+    api.patch<Customer>(ENDPOINTS.SALES.CUSTOMER(id), payload).then(r => r.data),
+  deleteCustomer: (id: string) =>
+    api.delete<{ success: boolean }>(ENDPOINTS.SALES.CUSTOMER(id)).then(r => r.data),
+};
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
 
