@@ -74,7 +74,7 @@ export default function ProductionLogsManager() {
   const [viewingLog, setViewingLog] = useState<any>(null);
 
   const userRoles = [user?.role, ...(user?.roles || [])].map((r: any) => String(r).toUpperCase());
-  const canAct = userRoles.includes('ADMIN') || userRoles.includes('MANAGER');
+  const canAct = userRoles.includes('ADMIN');
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req, Logger, UseInterceptors, Patch, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, Param, Put, Get, UseGuards, Query, Req, Logger, UseInterceptors, Patch, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BatchService } from './services/batch.service';
@@ -33,6 +33,13 @@ export class ProductionController {
     private readonly changeoverService: ChangeoverService,
     private readonly verificationService: VerificationService
   ) {}
+
+  private isManager(req: any): boolean {
+    const roles = [req.user?.role, ...(req.user?.roles || [])]
+      .filter(Boolean)
+      .map((r: any) => String(r).toUpperCase());
+    return roles.includes('MANAGER');
+  }
 
   @Post('batches/start')
   @Permissions('production:start')
@@ -202,6 +209,9 @@ export class ProductionController {
     @Req() req: any,
     @Body() body: { remarks?: string }
   ) {
+    if (this.isManager(req)) {
+      throw new ForbiddenException('Managers cannot modify production logs.');
+    }
     return await this.verificationService.verifyLog(Number(logId), req.user.sub, body.remarks);
   }
 
@@ -213,6 +223,9 @@ export class ProductionController {
     @Req() req: any,
     @Body() body: { reason: string }
   ) {
+    if (this.isManager(req)) {
+      throw new ForbiddenException('Managers cannot modify production logs.');
+    }
     return await this.verificationService.rejectLog(Number(logId), req.user.sub, body.reason);
   }
 
@@ -224,6 +237,9 @@ export class ProductionController {
     @Req() req: any,
     @Body() body: CorrectLogDto
   ) {
+    if (this.isManager(req)) {
+      throw new ForbiddenException('Managers cannot modify production logs.');
+    }
     return await this.verificationService.correctLog(Number(logId), req.user.sub, body.newData, body.reason);
   }
 }
