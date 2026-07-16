@@ -138,18 +138,20 @@ export default function CustomersPage() {
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto font-sans selection:bg-[#1A9A91]/10">
       {/* Title Header Card */}
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-md">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#1A9A91]/10 text-[#1A9A91] rounded-2xl animate-pulse-soft">
-                <Users className="w-5 h-5" />
-              </div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Accounting Module</p>
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#1A9A91]/10 text-[#1A9A91] rounded-2xl animate-pulse-soft">
+              <Users className="w-5 h-5" />
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-2">Customer Directory</h1>
-            <p className="text-sm text-slate-500 max-w-xl">Create, modify, and monitor customer billing accounts, credit limits, and invoicing metrics.</p>
+
+            <div>
+              <h1 className="text-lg font-extrabold text-slate-900 tracking-tight mt-1">
+                Customer Directory
+              </h1>
+            </div>
           </div>
+
           <div className="flex flex-wrap items-center gap-3">
             {canExport && (
               <button
@@ -160,6 +162,7 @@ export default function CustomersPage() {
                 Export CSV
               </button>
             )}
+
             {canCreate && (
               <button
                 onClick={() => navigate(`${getBasePath()}/sales/customers/add`)}
@@ -174,8 +177,8 @@ export default function CustomersPage() {
       </section>
 
       {/* Filters and Controls Card */}
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           {/* Search Inputs */}
           <div className="relative flex-1 max-w-lg">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -242,8 +245,8 @@ export default function CustomersPage() {
       </section>
 
       {/* Main Table Card */}
-      <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto min-h-[300px]">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto min-h-[260px]">
           {isLoading ? (
             <div className="flex flex-col justify-center items-center h-64 gap-3 text-slate-400">
               <RefreshCw className="w-8 h-8 animate-spin text-[#1A9A91]" />
@@ -264,12 +267,12 @@ export default function CustomersPage() {
             <table className="w-full text-left text-sm table-auto">
               <thead>
                 <tr className="text-slate-400 uppercase tracking-widest text-[10px] border-b border-slate-100">
-                  <th className="py-3 px-3 font-semibold">
+                  <th className="py-2 px-2 font-semibold">
                     <button onClick={() => handleSort('code')} className="flex items-center gap-1 hover:text-slate-700">
                       Code <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="py-3 px-3 font-semibold">
+                  <th className="py-2 px-2 font-semibold">
                     <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-slate-700">
                       Name <ArrowUpDown className="w-3 h-3" />
                     </button>
@@ -294,12 +297,12 @@ export default function CustomersPage() {
                 {customersList.map((customer) => (
                   <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group border-b border-slate-100/50">
                     {/* Customer Code */}
-                    <td className="py-3 px-3 font-mono font-bold text-slate-700 text-[11px]">
+                    <td className="py-2 px-2 font-mono font-bold text-slate-700 text-[11px]">
                       {customer.code || '-'}
                     </td>
                     
                     {/* Customer Name */}
-                    <td className="py-3 px-3 font-black text-slate-900 text-sm">
+                    <td className="py-2 px-2 font-black text-slate-900 text-sm">
                       {customer.name}
                     </td>
 
@@ -315,7 +318,7 @@ export default function CustomersPage() {
                     </td>
 
                     {/* Tax IDs (GST/PAN) */}
-                    <td className="py-4 px-4 space-y-1">
+                    <td className="py-2 px-2 space-y-1">
                       {customer.gstNumber ? (
                         <div className="inline-flex items-center px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-[9px] rounded-md tracking-wider">
                           GST: {customer.gstNumber}
@@ -330,12 +333,12 @@ export default function CustomersPage() {
                     </td>
 
                     {/* Credit Limit */}
-                    <td className="py-3 px-3 text-right font-black text-slate-900 text-[11px]">
+                    <td className="py-2 px-2 text-right font-black text-slate-900 text-[11px]">
                       ₹{parseFloat(customer.creditLimit || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
 
                     {/* Status badge */}
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-2 px-2 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wider border ${
                         customer.status === 'ACTIVE'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -386,11 +389,11 @@ export default function CustomersPage() {
         {!isLoading && !isError && customersList.length > 0 && (
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 border-t border-slate-100 mt-6 text-[11px] text-slate-500">
             <div className="flex flex-wrap items-center gap-2">
-              <span>Show</span>
+              <span className="text-[10px] font-semibold">Show</span>
               <select
                 value={limit}
                 onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                className="bg-white border border-slate-200 text-slate-700 px-2 py-1.5 rounded-lg font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30"
+                className="bg-white border border-slate-200 text-slate-700 px-2 py-1.5 rounded-lg font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 text-xs"
               >
                 <option value={5}>5 records</option>
                 <option value={10}>10 records</option>

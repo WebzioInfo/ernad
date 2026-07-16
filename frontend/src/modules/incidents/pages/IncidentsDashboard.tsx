@@ -122,7 +122,8 @@ export default function IncidentsDashboard() {
 
   const factoryQuery = useQuery({
     queryKey: ['factory-live-incidents'],
-    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,  });
+    queryFn: async () => (await api.get(ENDPOINTS.ANALYTICS.FACTORY_LIVE)).data,
+  });
 
   const selectedType = incidentTypes.find((type) => type.id === form.incidentTypeId);
 
@@ -301,8 +302,14 @@ export default function IncidentsDashboard() {
                       </div>
                       <p className="mt-2 break-words text-sm font-bold leading-5 text-slate-700">{incident.title}</p>
                       <p className="mt-1 break-words text-xs leading-5 text-slate-500">
-                        {incident.incidentTypeName} - {incident.lineName || 'Factory'} {incident.stationId ? `- ${incident.stationId}` : ''} - Reported by {incident.reportedByName || 'System'}
+                        {incident.incidentTypeName} - {incident.lineName || 'Factory'} {incident.stationId ? `- ${incident.stationId}` : ''}
                       </p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Reported by <span className="font-semibold text-slate-700">{incident.reportedByName || 'System'}</span> on <span className="font-semibold text-slate-700">{new Date(incident.openedAt).toLocaleString()}</span>
+                      </p>
+                      {incident.description ? (
+                        <p className="mt-3 text-sm leading-6 text-slate-600 whitespace-pre-line">{incident.description}</p>
+                      ) : null}
                     </div>
                     <div className="flex w-full flex-wrap gap-2 xl:w-auto xl:justify-end">
                       {visibleNextStatuses(incident).map(status => (

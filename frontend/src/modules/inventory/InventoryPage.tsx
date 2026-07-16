@@ -29,7 +29,8 @@ export default function InventoryPage() {
 
   const { data: inventory, isLoading } = useQuery({
     queryKey: ['inventory'],
-    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LIST)).data,  });
+    queryFn: async () => (await api.get(ENDPOINTS.INVENTORY.LIST)).data,
+  });
 
   const { data: categoriesData } = useQuery({
     queryKey: ['inventory-categories'],
@@ -141,11 +142,11 @@ export default function InventoryPage() {
           {/* Filters */}
           <div className="bg-white/50 backdrop-blur-md p-8 rounded-[3rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-6 items-center">
             <div className="relative flex-1 group w-full">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
               <input
                 type="text"
                 placeholder="Query materials by SKU or Item Name..."
-                className="w-full bg-white border border-slate-100 rounded-[1.5rem] py-5 pl-16 pr-8 font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm"
+                className="w-full bg-white border border-slate-100 rounded-[1.5rem] py-3 pl-14 pr-6 font-bold text-slate-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 transition-all text-sm"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -155,8 +156,8 @@ export default function InventoryPage() {
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-8 py-5 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat
-                    ? 'bg-slate-900 text-white shadow-xl translate-y-[-2px]'
+                  className={`px-5 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat
+                    ? 'bg-slate-900 text-white shadow-xl translate-y-[-1px]'
                     : 'bg-white text-slate-400 hover:bg-slate-50 border border-slate-100'
                     }`}
                 >
@@ -172,12 +173,12 @@ export default function InventoryPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Material / SKU</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category & Warehouse</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Current Stock</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Min. Required</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Material / SKU</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Category & Warehouse</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Current Stock</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Min. Required</th>
+                    <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -194,8 +195,8 @@ export default function InventoryPage() {
                           key={material.id} 
                           className="hover:bg-slate-50/50 transition-colors group"
                         >
-                          <td className="px-10 py-8">
-                            <div className="flex items-center gap-6">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-5">
                               <div className={`w-14 h-14 rounded-[1.25rem] flex items-center justify-center transition-all group-hover:scale-110 ${isLow ? 'bg-rose-50 text-rose-600 border border-rose-100 shadow-lg' : 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-lg'
                                 }`}>
                                 <Droplet className="w-7 h-7" />
@@ -209,7 +210,7 @@ export default function InventoryPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-10 py-8">
+                          <td className="px-5 py-4">
                             <div className="flex flex-col gap-2">
                               <div className="flex items-center gap-2">
                                 <Tag className="w-3 h-3 text-slate-400" />

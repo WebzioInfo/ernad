@@ -71,12 +71,12 @@ export default function StaffDirectoryPage() {
             <div className="p-1.5 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
               <Users className="w-5 h-5 text-[#1A9A91]" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Staff Directory</h2>
-            <span className="bg-slate-100 text-slate-600 text-xs px-2 py-0.5 rounded-full border border-slate-200 font-semibold">
+            <h2 className="text-lg font-bold text-slate-800 tracking-tight">Staff Directory</h2>
+            <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-0.5 rounded-full border border-slate-200 font-semibold">
               {filteredStaff?.length || 0} Operators
             </span>
           </div>
-          <p className="text-slate-500 text-xs mt-1">Real-time operator registry, station allocation, and biometric verification state.</p>
+          <p className="text-slate-500 text-[11px] mt-1">Real-time operator registry, station allocation, and biometric verification state.</p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -97,7 +97,7 @@ export default function StaffDirectoryPage() {
       </div>
 
       {/* Filters & Search */}
-      <div className="bg-white border border-slate-200 p-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+      <div className="bg-white border border-slate-200 p-2.5 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
         <div className="flex items-center gap-2 text-slate-400 pr-2 border-r border-slate-200">
           <Filter className="w-3.5 h-3.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Refine</span>
@@ -130,10 +130,10 @@ export default function StaffDirectoryPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-3.5 col-span-4">Personnel Profile</th>
-                <th className="px-6 py-3.5 col-span-3">Access Control</th>
-                <th className="px-6 py-3.5 col-span-3">Contact Details</th>
-                <th className="px-6 py-3.5 col-span-2 text-right">System Status</th>
+                <th className="px-4 py-2.5 col-span-4">Personnel Profile</th>
+                <th className="px-4 py-2.5 col-span-3">Access Control</th>
+                <th className="px-4 py-2.5 col-span-3">Contact Details</th>
+                <th className="px-4 py-2.5 col-span-2 text-right">System Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -150,7 +150,7 @@ export default function StaffDirectoryPage() {
               {filteredStaff?.map((person) => (
                 <tr key={person.id} className="hover:bg-slate-50/45 transition-colors group">
                   {/* Personnel Info */}
-                  <td className="px-6 py-3.5">
+                  <td className="px-4 py-2.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg overflow-hidden border border-slate-200 shrink-0 relative group-hover:scale-105 transition-transform duration-300">
                         <img
@@ -173,7 +173,7 @@ export default function StaffDirectoryPage() {
                   </td>
 
                   {/* Access & Role */}
-                  <td className="px-6 py-3.5">
+                  <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className="p-1 bg-slate-100 rounded text-slate-500">
                         <ShieldCheck className="w-3.5 h-3.5" />
