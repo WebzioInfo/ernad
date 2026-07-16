@@ -32,7 +32,7 @@ export class SalesController {
   }
 
   @Post('customers')
-  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Roles('ADMIN', 'ACCOUNTANT')
   @Permissions('customers:create')
   @ApiOperation({ summary: 'Create a new customer' })
   async createCustomer(@Body() dto: any, @Req() req: any) {
@@ -40,7 +40,7 @@ export class SalesController {
   }
 
   @Patch('customers/:id')
-  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Roles('ADMIN', 'ACCOUNTANT')
   @Permissions('customers:edit')
   @ApiOperation({ summary: 'Update an existing customer' })
   async updateCustomer(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
@@ -48,7 +48,7 @@ export class SalesController {
   }
 
   @Delete('customers/:id')
-  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Roles('ADMIN', 'ACCOUNTANT')
   @Permissions('customers:delete')
   @ApiOperation({ summary: 'Soft delete customer' })
   async deleteCustomer(@Param('id') id: string, @Req() req: any) {

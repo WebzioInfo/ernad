@@ -23,6 +23,10 @@ export default function AddCustomerPage() {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const { user } = useAuthStore();
+  const userRoles = (user?.roles || [user?.role]).map((r: any) => String(r).toUpperCase());
+  const isAdmin = userRoles.includes('ADMIN');
+  const isAccountant = userRoles.includes('ACCOUNTANT');
+  const canModify = isAdmin || isAccountant;
 
   // Queries & Mutations
   const { data: existingCustomer, isLoading: isFetching } = useCustomerById(id || '');
@@ -207,6 +211,25 @@ export default function AddCustomerPage() {
       <div className="flex flex-col justify-center items-center h-screen gap-3 text-slate-400">
         <Loader2 className="w-8 h-8 animate-spin text-[#1A9A91]" />
         <span className="font-semibold text-sm">Loading customer record...</span>
+      </div>
+    );
+  }
+
+  if (!canModify) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen gap-4 text-slate-500 px-6 text-center">
+        <Info className="w-12 h-12 text-rose-500" />
+        <h1 className="text-2xl font-bold text-slate-900">Access denied</h1>
+        <p className="max-w-md text-sm text-slate-500">
+          Managers are not permitted to add or edit customer profiles. You can still view customer records from the customer directory.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(`${getBasePath()}/sales/customers`)}
+          className="px-5 py-3 bg-[#1A9A91] hover:bg-[#157C75] text-white rounded-xl font-semibold transition-all"
+        >
+          Back to Customers
+        </button>
       </div>
     );
   }

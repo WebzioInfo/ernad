@@ -62,8 +62,7 @@ export default function CustomerDetailsPage() {
   const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
   const isAdmin = userRoles.includes('ADMIN');
   const isAccountant = userRoles.includes('ACCOUNTANT');
-  const isManager = userRoles.includes('MANAGER');
-  const canEdit = isAdmin || isAccountant || isManager;
+  const canEdit = isAdmin || isAccountant;
 
   const getBasePath = () => {
     const role = String(user?.role || '').toUpperCase();
@@ -195,12 +194,6 @@ export default function CustomerDetailsPage() {
                 Edit Profile
               </button>
             )}
-            <button
-              onClick={() => navigate(`${getBasePath()}/sales/orders/create?customer=${customer.id}`)}
-              className="px-4 py-1.5 bg-[#1A9A91] hover:bg-[#157C75] text-white font-bold rounded-lg shadow-sm transition-all flex items-center gap-1.5 active:scale-95 text-xs"
-            >
-              Create Sale
-            </button>
           </div>
         </div>
       </section>
@@ -212,65 +205,6 @@ export default function CustomerDetailsPage() {
         <p className="text-xs text-slate-400 font-mono mt-1">Code: {customer.code || '-'} | Type: {customer.customerType}</p>
         <p className="text-xs text-slate-400">Statement generated on {new Date().toLocaleDateString('en-IN')}</p>
       </div>
-
-      {/* 2. KPI Summary Grid (Hides on browser printing) */}
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 print:hidden">
-        {/* Total Sales */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 px-4 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-teal-50 text-[#1A9A91] rounded-xl">
-            <ShoppingBag className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Sales</p>
-            <h3 className="text-base font-extrabold text-slate-950 mt-0.5">
-              ₹{isSumLoading ? '...' : parseFloat(String(summary?.totalSalesAmount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </h3>
-            <p className="text-[9px] text-slate-400">{summary?.totalSalesCount || 0} Sales recorded</p>
-          </div>
-        </div>
-
-        {/* Outstanding Balance */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 px-4 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-rose-50 text-rose-500 rounded-xl">
-            <DollarSign className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Outstanding</p>
-            <h3 className="text-base font-extrabold text-rose-600 mt-0.5">
-              ₹{isSumLoading ? '...' : parseFloat(String(summary?.outstandingBalance || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </h3>
-            <p className="text-[9px] text-slate-400">Debit receivable balance</p>
-          </div>
-        </div>
-
-        {/* Returns */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 px-4 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Returns Credit</p>
-            <h3 className="text-base font-extrabold text-indigo-600 mt-0.5">
-              ₹{isSumLoading ? '...' : parseFloat(String(summary?.salesReturnsAmount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </h3>
-            <p className="text-[9px] text-slate-400">{summary?.salesReturnsCount || 0} Returns processed</p>
-          </div>
-        </div>
-
-        {/* Damages */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 px-4 shadow-sm flex items-center gap-3">
-          <div className="p-2 bg-orange-50 text-orange-600 rounded-xl">
-            <Ban className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Damages Loss</p>
-            <h3 className="text-base font-extrabold text-orange-600 mt-0.5">
-              ₹{isSumLoading ? '...' : parseFloat(String(summary?.damagedReturnsAmount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </h3>
-            <p className="text-[9px] text-slate-400">{summary?.damagedReturnsCount || 0} Damaged items</p>
-          </div>
-        </div>
-      </section>
 
       {/* 3. Main Details and Tabs section */}
       <div className="grid gap-4 lg:grid-cols-12">

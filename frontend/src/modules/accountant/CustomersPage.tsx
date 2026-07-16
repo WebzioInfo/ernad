@@ -16,11 +16,10 @@ export default function CustomersPage() {
   const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
   const isAdmin = userRoles.includes('ADMIN');
   const isAccountant = userRoles.includes('ACCOUNTANT');
-  const isManager = userRoles.includes('MANAGER');
   
   // Permissions checking
-  const canCreate = isAdmin || isAccountant || isManager;
-  const canEdit = isAdmin || isAccountant || isManager;
+  const canCreate = isAdmin || isAccountant;
+  const canEdit = isAdmin || isAccountant;
   const canDelete = isAdmin || isAccountant;
   const canExport = isAdmin || isAccountant;
 
@@ -143,30 +142,30 @@ export default function CustomersPage() {
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#1A9A91]/10 text-[#1A9A91] rounded-2xl animate-pulse-soft">
-                <Users className="w-6 h-6" />
+              <div className="p-2 bg-[#1A9A91]/10 text-[#1A9A91] rounded-2xl animate-pulse-soft">
+                <Users className="w-5 h-5" />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Accounting Module</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-400">Accounting Module</p>
             </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mt-2">Customer Directory</h1>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mt-2">Customer Directory</h1>
             <p className="text-sm text-slate-500 max-w-xl">Create, modify, and monitor customer billing accounts, credit limits, and invoicing metrics.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {canExport && (
               <button
                 onClick={handleExportCSV}
-                className="px-4 py-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 shadow-sm transition-all flex items-center gap-2 active:scale-95 text-sm"
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-xl border border-slate-200 shadow-sm transition-all flex items-center gap-1.5 active:scale-95 text-xs"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
                 Export CSV
               </button>
             )}
             {canCreate && (
               <button
                 onClick={() => navigate(`${getBasePath()}/sales/customers/add`)}
-                className="px-5 py-3 bg-[#1A9A91] hover:bg-[#157C75] text-white font-bold rounded-xl shadow-md shadow-[#1A9A91]/20 transition-all flex items-center gap-2 active:scale-95 text-sm uppercase tracking-wider"
+                className="px-4 py-2 bg-[#1A9A91] hover:bg-[#157C75] text-white font-bold rounded-xl shadow-md shadow-[#1A9A91]/20 transition-all flex items-center gap-1.5 active:scale-95 text-xs uppercase tracking-wider"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 Add Customer
               </button>
             )}
@@ -179,30 +178,30 @@ export default function CustomersPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Search Inputs */}
           <div className="relative flex-1 max-w-lg">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              <Search className="w-4 h-4" />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <Search className="w-3.5 h-3.5" />
             </div>
             <input
               type="text"
               placeholder="Search Name, Phone, Code, GST..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/30 focus:border-[#1A9A91] focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm"
+              className="w-full bg-slate-50 border border-slate-200 text-slate-900 pl-10 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/30 focus:border-[#1A9A91] focus:bg-white outline-none transition-all placeholder:text-slate-400 font-medium text-sm"
             />
           </div>
 
           {/* Selector Filters */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200">
-              <Filter className="w-3.5 h-3.5 text-slate-500" />
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filters</span>
+              <Filter className="w-3 h-3 text-slate-500" />
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Filters</span>
             </div>
 
             {/* Customer Type selector */}
             <select
               value={type}
               onChange={(e) => { setType(e.target.value); setPage(1); }}
-              className="bg-white border border-slate-200 text-slate-700 px-3 py-3 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 text-xs"
+              className="bg-white border border-slate-200 text-slate-700 px-2.5 py-2 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 text-xs"
             >
               <option value="">All Types</option>
               <option value="BUSINESS">Business</option>
@@ -213,7 +212,7 @@ export default function CustomersPage() {
             <select
               value={status}
               onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-              className="bg-white border border-slate-200 text-slate-700 px-3 py-3 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 text-xs"
+              className="bg-white border border-slate-200 text-slate-700 px-2.5 py-2 rounded-xl font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 text-xs"
             >
               <option value="">All Status</option>
               <option value="ACTIVE">Active</option>
@@ -224,7 +223,7 @@ export default function CustomersPage() {
             {(search || status || type) && (
               <button
                 onClick={handleResetFilters}
-                className="p-3 text-rose-500 hover:bg-rose-50 rounded-xl transition-all active:scale-95 text-xs font-bold"
+                className="px-3 py-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all active:scale-95 text-[11px] font-bold"
               >
                 Clear
               </button>
@@ -233,10 +232,10 @@ export default function CustomersPage() {
             {/* Refresh Button */}
             <button
               onClick={() => void refetch()}
-              className="p-3 text-slate-500 hover:bg-slate-50 rounded-xl transition-all border border-slate-200 active:scale-95"
+              className="p-2 text-slate-500 hover:bg-slate-50 rounded-xl transition-all border border-slate-200 active:scale-95"
               title="Refresh List"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -264,55 +263,55 @@ export default function CustomersPage() {
           ) : (
             <table className="w-full text-left text-sm table-auto">
               <thead>
-                <tr className="text-slate-400 uppercase tracking-widest text-xs border-b border-slate-100">
-                  <th className="py-4 px-4 font-semibold">
-                    <button onClick={() => handleSort('code')} className="flex items-center gap-1.5 hover:text-slate-700">
-                      Code <ArrowUpDown className="w-3.5 h-3.5" />
+                <tr className="text-slate-400 uppercase tracking-widest text-[10px] border-b border-slate-100">
+                  <th className="py-3 px-3 font-semibold">
+                    <button onClick={() => handleSort('code')} className="flex items-center gap-1 hover:text-slate-700">
+                      Code <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="py-4 px-4 font-semibold">
-                    <button onClick={() => handleSort('name')} className="flex items-center gap-1.5 hover:text-slate-700">
-                      Name <ArrowUpDown className="w-3.5 h-3.5" />
+                  <th className="py-3 px-3 font-semibold">
+                    <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-slate-700">
+                      Name <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="py-4 px-4 font-semibold">
-                    <button onClick={() => handleSort('businessName')} className="flex items-center gap-1.5 hover:text-slate-700">
-                      Business <ArrowUpDown className="w-3.5 h-3.5" />
+                  <th className="py-3 px-3 font-semibold">
+                    <button onClick={() => handleSort('businessName')} className="flex items-center gap-1 hover:text-slate-700">
+                      Business <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="py-4 px-4 font-semibold">Contact</th>
-                  <th className="py-4 px-4 font-semibold">Tax Identification</th>
-                  <th className="py-4 px-4 font-semibold text-right">
-                    <button onClick={() => handleSort('creditLimit')} className="flex items-center gap-1.5 hover:text-slate-700 ml-auto">
-                      Credit Limit <ArrowUpDown className="w-3.5 h-3.5" />
+                  <th className="py-3 px-3 font-semibold">Contact</th>
+                  <th className="py-3 px-3 font-semibold">Tax Identification</th>
+                  <th className="py-3 px-3 font-semibold text-right">
+                    <button onClick={() => handleSort('creditLimit')} className="flex items-center gap-1 hover:text-slate-700 ml-auto">
+                      Credit Limit <ArrowUpDown className="w-3 h-3" />
                     </button>
                   </th>
-                  <th className="py-4 px-4 font-semibold text-center">Status</th>
-                  <th className="py-4 px-4 font-semibold text-right">Actions</th>
+                  <th className="py-3 px-3 font-semibold text-center">Status</th>
+                  <th className="py-3 px-3 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {customersList.map((customer) => (
                   <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors group border-b border-slate-100/50">
                     {/* Customer Code */}
-                    <td className="py-4 px-4 font-mono font-bold text-slate-700 text-xs">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-700 text-[11px]">
                       {customer.code || '-'}
                     </td>
                     
                     {/* Customer Name */}
-                    <td className="py-4 px-4 font-black text-slate-900 text-sm">
+                    <td className="py-3 px-3 font-black text-slate-900 text-sm">
                       {customer.name}
                     </td>
 
                     {/* Business Name */}
-                    <td className="py-4 px-4 text-slate-500 font-medium text-xs">
+                    <td className="py-3 px-3 text-slate-500 font-medium text-[11px]">
                       {customer.businessName || <span className="text-slate-300">N/A</span>}
                     </td>
 
                     {/* Contact Details */}
-                    <td className="py-4 px-4 space-y-0.5">
-                      <p className="text-slate-800 font-bold text-xs">{customer.phone}</p>
-                      {customer.email && <p className="text-slate-400 text-[11px] truncate max-w-[150px]">{customer.email}</p>}
+                    <td className="py-3 px-3 space-y-0.5">
+                      <p className="text-slate-800 font-bold text-[11px]">{customer.phone}</p>
+                      {customer.email && <p className="text-slate-400 text-[10px] truncate max-w-[150px]">{customer.email}</p>}
                     </td>
 
                     {/* Tax IDs (GST/PAN) */}
@@ -327,16 +326,16 @@ export default function CustomersPage() {
                           PAN: {customer.panNumber}
                         </div>
                       ) : null}
-                      {!customer.gstNumber && !customer.panNumber && <span className="text-slate-300 text-xs">N/A</span>}
+                      {!customer.gstNumber && !customer.panNumber && <span className="text-slate-300 text-[11px]">N/A</span>}
                     </td>
 
                     {/* Credit Limit */}
-                    <td className="py-4 px-4 text-right font-black text-slate-900 text-xs">
+                    <td className="py-3 px-3 text-right font-black text-slate-900 text-[11px]">
                       ₹{parseFloat(customer.creditLimit || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
 
                     {/* Status badge */}
-                    <td className="py-4 px-4 text-center">
+                    <td className="py-3 px-3 text-center">
                       <span className={`inline-flex items-center px-2.5 py-1 text-[10px] font-black rounded-full uppercase tracking-wider border ${
                         customer.status === 'ACTIVE'
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -351,27 +350,27 @@ export default function CustomersPage() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => navigate(`${getBasePath()}/sales/customers/${customer.id}`)}
-                          className="p-2 hover:bg-[#1A9A91]/10 text-slate-500 hover:text-[#1A9A91] rounded-lg transition-colors"
+                          className="p-1.5 hover:bg-[#1A9A91]/10 text-slate-500 hover:text-[#1A9A91] rounded-lg transition-colors"
                           title="View Ledger & Profile"
                         >
-                          <Eye className="w-3.5 h-3.5" />
+                          <Eye className="w-3 h-3" />
                         </button>
                         {canEdit && (
                           <button
                             onClick={() => navigate(`${getBasePath()}/sales/customers/edit/${customer.id}`)}
-                            className="p-2 hover:bg-slate-100 text-slate-500 hover:text-slate-950 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-slate-100 text-slate-500 hover:text-slate-950 rounded-lg transition-colors"
                             title="Edit profile"
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            <Edit2 className="w-3 h-3" />
                           </button>
                         )}
                         {canDelete && (
                           <button
                             onClick={() => setCustomerToDelete(customer)}
-                            className="p-2 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
                             title="Delete customer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
@@ -385,8 +384,8 @@ export default function CustomersPage() {
 
         {/* Table Pagination Controller */}
         {!isLoading && !isError && customersList.length > 0 && (
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 border-t border-slate-100 mt-6 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 border-t border-slate-100 mt-6 text-[11px] text-slate-500">
+            <div className="flex flex-wrap items-center gap-2">
               <span>Show</span>
               <select
                 value={limit}
@@ -402,13 +401,13 @@ export default function CustomersPage() {
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center gap-1.5 self-center">
+            <div className="flex items-center gap-1 self-center">
               <button
                 onClick={() => setPage(prev => Math.max(prev - 1, 1))}
                 disabled={page === 1}
                 className="p-2 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
+                <ChevronLeft className="w-3 h-3" />
               </button>
               
               {Array.from({ length: totalPages }).map((_, index) => {
@@ -417,7 +416,7 @@ export default function CustomersPage() {
                   <button
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
-                    className={`px-3 py-1.5 font-bold rounded-lg border transition-all ${
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${
                       page === pageNum
                         ? 'bg-[#1A9A91] border-[#1A9A91] text-white shadow-md shadow-[#1A9A91]/20'
                         : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
@@ -433,7 +432,7 @@ export default function CustomersPage() {
                 disabled={page === totalPages}
                 className="p-2 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
+                <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </div>

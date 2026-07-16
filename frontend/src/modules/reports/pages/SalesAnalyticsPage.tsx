@@ -373,12 +373,7 @@ export default function SalesAnalyticsPage() {
       </div>
 
         </>
-      ) : (
-        <div className="rounded-[2rem] border border-slate-200 bg-slate-50 p-6 shadow-sm">
-          <p className="text-sm font-semibold text-slate-800">Read-only access</p>
-          <p className="mt-2 text-sm text-slate-600">You can view sales records, but you cannot create or edit transactions.</p>
-        </div>
-      )}
+      ) : null}
 
       {/* Transaction Ledger Table */}
       <div className="mt-16">
