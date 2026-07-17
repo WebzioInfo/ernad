@@ -390,8 +390,8 @@ export default function SalesAnalyticsPage() {
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-y-auto p-10 pb-12 md:grid md:grid-cols-[1fr_380px] gap-8 bg-slate-50 scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400/50">
-                  <div className="space-y-8">
-                  <section className="space-y-4 rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
+                  <div className="space-y-6">
+                  <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-black text-slate-900">Sale details</h3>
@@ -402,14 +402,14 @@ export default function SalesAnalyticsPage() {
 
                     <div className="grid gap-4">
                       <div>
-                        <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Brand</label>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Brand</label>
                         <select
                           value={selectedBrandId}
                           onChange={(e) => {
                             setSelectedBrandId(e.target.value);
                             setSelectedProductId('');
                           }}
-                          className={`w-full rounded-3xl border px-4 py-4 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.brand ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.brand ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
                         >
                           <option value="">Select brand</option>
                           {brands?.map((brand) => (
@@ -420,12 +420,12 @@ export default function SalesAnalyticsPage() {
                       </div>
 
                       <div>
-                        <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Product</label>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Product</label>
                         <select
                           value={selectedProductId}
                           onChange={(e) => setSelectedProductId(e.target.value)}
                           disabled={!selectedBrandId}
-                          className={`w-full rounded-3xl border px-4 py-4 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.product ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'} disabled:cursor-not-allowed disabled:bg-slate-100`}
+                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.product ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'} disabled:cursor-not-allowed disabled:bg-slate-100`}
                         >
                           <option value="">Select product</option>
                           {products
@@ -439,32 +439,32 @@ export default function SalesAnalyticsPage() {
                     </div>
                   </section>
 
-                  <section className="space-y-4 rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
+                  <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-black text-slate-900">Transaction details</h3>
                         <p className="text-sm text-slate-500 mt-1">Capture the date, type, and quantity for this sale.</p>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-widest text-slate-500">Mandatory</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Mandatory</span>
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Sales date</label>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Sales date</label>
                         <input
                           type="date"
                           value={salesDate}
                           onChange={(e) => setSalesDate(e.target.value)}
-                          className={`w-full rounded-3xl border px-4 py-4 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.salesDate ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.salesDate ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
                         />
                         {fieldErrors.salesDate ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.salesDate}</p> : null}
                       </div>
                       <div>
-                        <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Transaction type</label>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Transaction type</label>
                         <select
                           value={transactionType}
                           onChange={(e) => setTransactionType(e.target.value as any)}
-                          className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
+                          className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
                         >
                           <option value="SALES_DISPATCH">Sales Dispatch</option>
                           <option value="RETURN">Return</option>
@@ -474,14 +474,14 @@ export default function SalesAnalyticsPage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Quantity (cases)</label>
+                      <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Quantity (cases)</label>
                       <input
                         type="number"
                         min="1"
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         placeholder="0"
-                        className={`w-full rounded-3xl border px-4 py-4 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.quantity ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                        className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.quantity ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
                       />
                       {fieldErrors.quantity ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.quantity}</p> : null}
                     </div>
@@ -519,20 +519,20 @@ export default function SalesAnalyticsPage() {
                     </div>
 
                     <div>
-                      <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Notes</label>
+                      <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Notes</label>
                       <textarea
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         rows={4}
-                        className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
+                        className="w-full min-h-[100px] rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
                         placeholder="Optional notes"
                       />
                     </div>
                   </section>
                 </div>
 
-                <aside className="space-y-6 rounded-[2rem] bg-slate-950 p-6 text-white shadow-xl shadow-slate-900/20 border border-slate-800">
-                  <div className="flex items-center justify-between gap-3 rounded-3xl bg-teal-500/10 px-4 py-4 border border-teal-500/20">
+                <aside className="space-y-5 rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/20 border border-slate-800">
+                  <div className="flex items-center justify-between gap-3 rounded-3xl bg-teal-500/10 px-4 py-3 border border-teal-500/20">
                     <div>
                       <p className="text-xs font-black uppercase tracking-widest text-teal-200">Order summary</p>
                       <p className="mt-2 text-2xl font-black">Review sale details</p>
@@ -542,28 +542,28 @@ export default function SalesAnalyticsPage() {
                     </div>
                   </div>
 
-                  <div className="grid gap-4">
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                  <div className="grid gap-3">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Brand</p>
                       <p className="mt-2 text-base font-black text-white">{currentBrand?.name || 'Not selected'}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Product</p>
                       <p className="mt-2 text-base font-black text-white">{currentProduct?.name || 'Not selected'}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Type</p>
                       <p className="mt-2 text-base font-black text-white">{transactionType === 'RETURN' ? 'Return' : transactionType === 'DAMAGE' ? 'Damage' : 'Sales Dispatch'}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Quantity</p>
                       <p className="mt-2 text-2xl font-black text-white">{quantityInt > 0 ? `${quantityInt} cases` : '0 cases'}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Customer</p>
                       <p className="mt-2 text-base font-black text-white">{customers?.find((customer) => customer.id === customerId)?.name || 'Not selected'}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800">
+                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Date</p>
                       <p className="mt-2 text-base font-black text-white">{salesDate || 'Not selected'}</p>
                     </div>
