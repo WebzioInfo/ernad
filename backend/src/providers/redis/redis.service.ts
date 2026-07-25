@@ -30,7 +30,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         maxRetriesPerRequest: 0,
         connectTimeout: 2000,
         commandTimeout: 1000,
-        enableOfflineQueue: false,
+        family: 0,
         tls: redisUrl.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
         retryStrategy: (times) => {
           if (times > 1) {

@@ -21,8 +21,8 @@ import Redis from 'ioredis';
         const connection = new Redis(url, {
           maxRetriesPerRequest: null,
           enableReadyCheck: false,
-          connectTimeout: 5000,
-          enableOfflineQueue: true, // Set to true to prevent unhandled ioredis crashes with Upstash
+          enableOfflineQueue: true,
+          family: 0,
           tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
           retryStrategy: (times) => Math.min(times * 500, 30000),
         });

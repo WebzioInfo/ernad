@@ -25,8 +25,12 @@ export default function CustomerDetailsPage() {
   const [activeTab, setActiveTab] = useState<'ledger' | 'sales' | 'returns' | 'damages' | 'activity'>('ledger');
 
   // Ledger Filter States
-  const [ledgerStartDate, setLedgerStartDate] = useState('');
-  const [ledgerEndDate, setLedgerEndDate] = useState('');
+  const [ledgerStartDate, setLedgerStartDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [ledgerEndDate, setLedgerEndDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [ledgerType, setLedgerType] = useState('');
 
   // Paginated List Pages
