@@ -32,7 +32,9 @@ import type {
   DailyAttendance,
   MonthlyAttendanceSummary,
   Note,
-  Terminal
+  Terminal,
+  EditHistoryRecord,
+  EditHistoryResponse,
 } from '../types/database.types';
 import { normalizeLedgerItem } from '../modules/inventory/ledger/ledger-types';
 
@@ -708,4 +710,24 @@ export const BackupService = {
       },
     }).then(r => r.data);
   },
+};
+
+export interface EditHistoryQueryParams {
+  startDate?: string;
+  endDate?: string;
+  module?: string;
+  employee?: string;
+  role?: string;
+  field?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const EditHistoryService = {
+  getEditHistory: (params?: EditHistoryQueryParams) =>
+    api.get<EditHistoryResponse>(ENDPOINTS.EDIT_HISTORY, { params }).then(r => r.data),
+
+  getRecordHistory: (module: string, recordId: string) =>
+    api.get<EditHistoryRecord[]>(`${ENDPOINTS.EDIT_HISTORY}/record/${encodeURIComponent(module)}/${encodeURIComponent(recordId)}`).then(r => r.data),
 };

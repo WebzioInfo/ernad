@@ -834,3 +834,35 @@ export interface SalesOrderExpanded extends SalesOrder {
 export interface InventoryStockExpanded extends InventoryStock {
   warehouse?: Pick<WarehouseLocation, 'id' | 'name' | 'type'>;
 }
+
+export interface EditHistoryRecord {
+  id: number;
+  tenantId?: string | null;
+  module: string;
+  tableName: string;
+  recordId: string;
+  fieldName: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+  editedByUserId?: string | null;
+  editedByName?: string | null;
+  editedByRole?: string | null;
+  editedAt: string;
+  reason?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  sessionId?: string | null;
+  createdAt: string;
+}
+
+export interface EditHistoryResponse {
+  items: EditHistoryRecord[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  availableModules: string[];
+  availableRoles: string[];
+}

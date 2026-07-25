@@ -6,6 +6,7 @@ import { productionLines, products, productBrands, productionBatches, rawMateria
 import { ProductionEventsService } from '../../realtime/production.gateway';
 import { sumRawMaterialTransactions } from '../inventory/raw-material-balance.util';
 import { AuditService } from '../audit/audit.service';
+import { EditHistoryService } from '../edit-history/edit-history.service';
 
 @Injectable()
 export class MasterDataService {
@@ -13,7 +14,8 @@ export class MasterDataService {
 
   constructor(
     private readonly eventsService: ProductionEventsService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly editHistoryService: EditHistoryService,
   ) {}
 
   async getLines() {
@@ -93,10 +95,20 @@ export class MasterDataService {
 
   async updateLine(id: string, dto: { name?: string; description?: string; status?: string }) {
     this.linesCache = null;
+    const [oldLine] = await db.select().from(productionLines).where(eq(productionLines.id, id)).limit(1);
     const [line] = await db.update(productionLines)
       .set({ ...dto, updatedAt: new Date() })
       .where(eq(productionLines.id, id))
       .returning();
+
+    void this.editHistoryService.recordEdit({
+      module: 'Machines',
+      tableName: 'production_lines',
+      recordId: id,
+      oldRecord: oldLine,
+      newRecord: line,
+    });
+
     return line;
   }
 
@@ -126,10 +138,20 @@ export class MasterDataService {
   }
 
   async updateBrand(id: string, dto: { name: string }) {
+    const [oldBrand] = await db.select().from(productBrands).where(eq(productBrands.id, id)).limit(1);
     const [brand] = await db.update(productBrands)
       .set({ ...dto })
       .where(eq(productBrands.id, id))
       .returning();
+
+    void this.editHistoryService.recordEdit({
+      module: 'Products',
+      tableName: 'product_brands',
+      recordId: id,
+      oldRecord: oldBrand,
+      newRecord: brand,
+    });
+
     return brand;
   }
 
@@ -148,6 +170,7 @@ export class MasterDataService {
       }
     }
 
+    const [oldProd] = await db.select().from(products).where(eq(products.id, id)).limit(1);
     const result = await db.transaction(async (tx) => {
       let product;
       if (Object.keys(productDto).length > 0) {
@@ -233,6 +256,15 @@ export class MasterDataService {
     if (hasInventoryUpdate) {
       await this.eventsService.emitDataChanged('inventory', { action: 'stock_transaction_created', itemId: id, itemType: 'PRODUCT' });
     }
+    void this.editHistoryService.recordEdit({
+      module: 'Products',
+      tableName: 'products',
+      recordId: id,
+      oldRecord: oldProd,
+      newRecord: result,
+      user,
+    });
+
     return result;
   }
 
@@ -306,11 +338,20 @@ export class MasterDataService {
     const dbPayload: any = { ...updateData, updatedAt: new Date() };
     if (currentStock !== undefined) dbPayload.currentStock = String(currentStock);
 
+    const [oldMat] = await db.select().from(rawMaterials).where(eq(rawMaterials.id, id)).limit(1);
     const [rawMaterial] = await db.update(rawMaterials)
       .set(dbPayload)
       .where(eq(rawMaterials.id, id))
       .returning();
-      
+
+    void this.editHistoryService.recordEdit({
+      module: 'Raw Materials',
+      tableName: 'raw_materials',
+      recordId: id,
+      oldRecord: oldMat,
+      newRecord: rawMaterial,
+    });
+
     await this.eventsService.emitDataChanged('inventory', { action: 'raw_material_updated', id });
     return rawMaterial;
   }

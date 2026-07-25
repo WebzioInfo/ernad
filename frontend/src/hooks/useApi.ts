@@ -20,6 +20,8 @@ import {
   NotificationService,
   SalesService,
   BackupService,
+  EditHistoryService,
+  type EditHistoryQueryParams,
   type StartBatchPayload,
   type CloseBatchPayload,
   type TelemetryLogPayload,
@@ -699,5 +701,24 @@ export function useRestoreBackup() {
     onSuccess: () => {
       qc.invalidateQueries(); // Invalidate all query cache since data is overwritten
     },
+  });
+}
+
+// ── EDIT HISTORY HOOKS ──
+
+export function useEditHistory(params?: EditHistoryQueryParams) {
+  return useQuery({
+    queryKey: ['edit-history', params],
+    queryFn: () => EditHistoryService.getEditHistory(params),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30000,
+  });
+}
+
+export function useRecordEditHistory(module: string, recordId: string) {
+  return useQuery({
+    queryKey: ['edit-history-record', module, recordId],
+    queryFn: () => EditHistoryService.getRecordHistory(module, recordId),
+    enabled: !!module && !!recordId,
   });
 }

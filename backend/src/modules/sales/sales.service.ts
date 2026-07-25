@@ -5,11 +5,14 @@ import { eq, desc, asc, and, or, ilike, isNull, like, sql, not, gte, lte } from 
 import { InventoryService } from '../inventory/inventory.service';
 import { AuditService } from '../audit/audit.service';
 
+import { EditHistoryService } from '../edit-history/edit-history.service';
+
 @Injectable()
 export class SalesService {
   constructor(
     private readonly inventoryService: InventoryService,
     private readonly auditService: AuditService,
+    private readonly editHistoryService: EditHistoryService,
   ) {}
 
   async getCustomers() {
@@ -318,6 +321,16 @@ export class SalesService {
     if (notes !== undefined) updateObj.notes = notes ? String(notes).trim() : null;
 
     const [updated] = await db.update(customers).set(updateObj).where(eq(customers.id, id)).returning();
+
+    // Log edit history
+    void this.editHistoryService.recordEdit({
+      module: 'Customers',
+      tableName: 'customers',
+      recordId: id,
+      oldRecord: existing,
+      newRecord: updated,
+      user: { id: userId },
+    });
 
     // Log audit action
     await this.auditService.logAction({
@@ -673,6 +686,16 @@ export class SalesService {
         })
         .where(eq(salesTransactions.id, id))
         .returning();
+
+      // Log edit history
+      void this.editHistoryService.recordEdit({
+        module: existing.type === 'RETURN' ? 'Returns' : existing.type === 'DAMAGE' ? 'Damage' : 'Sales',
+        tableName: 'sales_transactions',
+        recordId: id,
+        oldRecord: existing,
+        newRecord: updated,
+        user: { id: userId },
+      });
 
       // Recalculate inventory in the background
       setTimeout(() => {

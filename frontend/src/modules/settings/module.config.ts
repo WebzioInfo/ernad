@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, History } from 'lucide-react';
 import { ModuleConfig } from '../../app/registry/types';
 
 export const settingsConfig: ModuleConfig = {
@@ -12,6 +12,11 @@ export const settingsConfig: ModuleConfig = {
       path: 'settings',
       element: lazy(() => import('./SettingsPage')),
       allowedRoles: ['ADMIN', 'MANAGER']
+    },
+    {
+      path: 'edit-history',
+      element: lazy(() => import('../admin/EditHistoryPage')),
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'COMPANY_OWNER', 'OWNER']
     }
   ],
   sidebarGroups: [
@@ -25,6 +30,13 @@ export const settingsConfig: ModuleConfig = {
           icon: Settings,
           path: '/settings',
           allowedRoles: ['ADMIN', 'MANAGER']
+        },
+        {
+          id: 'edit-history',
+          label: 'Edit History',
+          icon: History,
+          path: '/edit-history',
+          allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'COMPANY_OWNER', 'OWNER']
         }
       ]
     }

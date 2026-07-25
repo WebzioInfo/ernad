@@ -183,5 +183,6 @@ export const ENDPOINTS = {
     LIST: 'attendance/all',
     SYNC: 'attendance/sync',
     TODAY: 'biometric/attendance/today',
-  }
+  },
+  EDIT_HISTORY: 'edit-history',
 };

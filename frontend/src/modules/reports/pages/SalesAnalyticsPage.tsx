@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   Package, Search, AlertTriangle, X, Loader2, Check,
-  Boxes, ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw
+  Boxes, ChevronLeft, ChevronRight, Calendar, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import useAuthStore from '../../../modules/auth/auth.store';
 import {
@@ -81,9 +81,12 @@ export default function SalesAnalyticsPage() {
       document.body.style.overflow = '';
     };
   }, [isAnyModalOpen]);
-  // Search & Filters for Ledger (Server-side & Today defaults)
-  const [startDate, setStartDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
-  const [endDate, setEndDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
+  // Search & Filters for Ledger (Server-side & Current Month defaults)
+  const defaultStartDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const defaultEndDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+
+  const [startDate, setStartDate] = useState<string>(() => defaultStartDate);
+  const [endDate, setEndDate] = useState<string>(() => defaultEndDate);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrandFilter, setSelectedBrandFilter] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
@@ -105,7 +108,6 @@ export default function SalesAnalyticsPage() {
     isLoading: isLedgerLoading,
     isError: isLedgerError,
     error: ledgerError,
-    refetch: refetchTransactions,
   } = useSalesTransactionsFiltered(queryParams);
 
   const { data: brands, isLoading: isBrandsLoading } = useBrands();
@@ -392,12 +394,12 @@ export default function SalesAnalyticsPage() {
 
         {/* Action buttons (Clear Filters) */}
         {
-          (searchQuery || selectedBrandFilter || selectedTypeFilter || startDate !== format(new Date(), 'yyyy-MM-dd') || endDate !== format(new Date(), 'yyyy-MM-dd')) && (
-            <div className="flex justify-end pt-2">
+          (searchQuery || selectedBrandFilter || selectedTypeFilter || startDate !== defaultStartDate || endDate !== defaultEndDate) && (
+            <div className="flex justify-end">
               <button
                 onClick={() => {
-                  setStartDate(format(new Date(), 'yyyy-MM-dd'));
-                  setEndDate(format(new Date(), 'yyyy-MM-dd'));
+                  setStartDate(defaultStartDate);
+                  setEndDate(defaultEndDate);
                   setSearchQuery('');
                   setSelectedBrandFilter('');
                   setSelectedTypeFilter('');
