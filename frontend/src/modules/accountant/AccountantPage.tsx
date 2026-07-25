@@ -28,7 +28,9 @@ export default function AccountantPage() {
   const products = Array.isArray(productsQuery.data) ? productsQuery.data : [];
   const rawMaterials = Array.isArray(rawMaterialsQuery.data) ? rawMaterialsQuery.data : [];
   const stockItems = Array.isArray(stockQuery.data) ? stockQuery.data : [];
-  const salesOrders = Array.isArray(salesQuery.data) ? salesQuery.data : [];
+  const salesOrders = salesQuery.data && Array.isArray(salesQuery.data.items)
+    ? salesQuery.data.items
+    : (Array.isArray(salesQuery.data) ? salesQuery.data : []);
 
   const summary = useMemo(() => ({
     products: products.length,

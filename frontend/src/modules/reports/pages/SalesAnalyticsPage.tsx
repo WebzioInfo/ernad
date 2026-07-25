@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
-  Package, Search, AlertTriangle, X, Loader2, Check
+  Package, Search, AlertTriangle, X, Loader2, Check,
+  Boxes, ChevronLeft, ChevronRight, Calendar, Filter, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -9,7 +10,7 @@ import useAuthStore from '../../../modules/auth/auth.store';
 import {
   useBrands,
   useProducts,
-  useSalesTransactions,
+  useSalesTransactionsFiltered,
   useCreateSalesTransaction,
   useUpdateSalesTransaction,
   useDeleteSalesTransaction,
@@ -17,6 +18,38 @@ import {
   useCreateCustomer,
 } from '../../../hooks/useApi';
 import { useTransactionOverlay } from '../../../components/TransactionOverlay';
+
+function AnimatedNumber({ value }: { value: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    let start = displayValue;
+    const end = value;
+    if (start === end) return;
+
+    const duration = 250; // ms
+    const startTime = performance.now();
+
+    let animationFrameId: number;
+
+    const updateNumber = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = progress * (2 - progress); // easeOutQuad
+      const current = Math.round(start + (end - start) * easeProgress);
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(updateNumber);
+      }
+    };
+
+    animationFrameId = requestAnimationFrame(updateNumber);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [value]);
+
+  return <>{displayValue.toLocaleString()}</>;
+}
 
 export default function SalesAnalyticsPage() {
   const [selectedBrandId, setSelectedBrandId] = useState<string>('');
@@ -48,18 +81,33 @@ export default function SalesAnalyticsPage() {
       document.body.style.overflow = '';
     };
   }, [isAnyModalOpen]);
-
-  // Search & Filters for Ledger
+  // Search & Filters for Ledger (Server-side & Today defaults)
+  const [startDate, setStartDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrandFilter, setSelectedBrandFilter] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  const queryParams = {
+    startDate,
+    endDate,
+    brand: selectedBrandFilter,
+    type: selectedTypeFilter,
+    search: searchQuery,
+    page,
+    limit,
+  };
 
   const {
-    data: transactions,
+    data: filteredResponse,
     isLoading: isLedgerLoading,
     isError: isLedgerError,
     error: ledgerError,
-  } = useSalesTransactions();
+    refetch: refetchTransactions,
+  } = useSalesTransactionsFiltered(queryParams);
+
   const { data: brands, isLoading: isBrandsLoading } = useBrands();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
@@ -73,7 +121,13 @@ export default function SalesAnalyticsPage() {
   const createTxMutation = useCreateSalesTransaction();
   const createCustomerMutation = useCreateCustomer();
 
-  if (isLedgerLoading || isBrandsLoading || isProductsLoading || isCustomersLoading) {
+  const filteredTransactions = filteredResponse?.items || [];
+  const pagination = filteredResponse?.pagination || { page: 1, limit: 10, totalItems: 0, totalPages: 1 };
+  const summaryData = filteredResponse?.summary || { totalCases: 0, salesCases: 0, returnCases: 0, damageCases: 0 };
+  const totalPages = pagination.totalPages;
+  const totalCount = pagination.totalItems;
+
+  if (isBrandsLoading || isProductsLoading || isCustomersLoading || (isLedgerLoading && !filteredResponse)) {
     return (
       <div className="h-96 flex items-center justify-center animate-pulse text-slate-400 font-black uppercase tracking-widest text-xs">
         Loading POS Terminal...
@@ -81,7 +135,7 @@ export default function SalesAnalyticsPage() {
     );
   }
 
-  if (isLedgerError) {
+  if (isLedgerError && !filteredResponse) {
     return (
       <div className="h-96 flex flex-col items-center justify-center text-center text-slate-600 px-6">
         <p className="text-xl font-bold text-slate-900">Unable to load sales ledger</p>
@@ -89,23 +143,6 @@ export default function SalesAnalyticsPage() {
       </div>
     );
   }
-
-  // Filtered transactions for the ledger view
-  const filteredTransactions = ((transactions as any[] | undefined) ?? []).filter((tx: any) => {
-    const brandName = tx.brandName || '';
-    const productName = tx.productName || '';
-    const userName = tx.userName || '';
-    const matchesSearch =
-      brandName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      userName.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesBrand = selectedBrandFilter ? tx.brandId === selectedBrandFilter : true;
-    const matchesType = selectedTypeFilter ? tx.type === selectedTypeFilter : true;
-
-    return matchesSearch && matchesBrand && matchesType;
-  }) || [];
-
   const currentProduct = products?.find(p => p.id === selectedProductId);
   const currentBrand = brands?.find(b => b.id === selectedBrandId);
   const quantityInt = parseInt(quantity, 10) || 0;
@@ -203,55 +240,147 @@ export default function SalesAnalyticsPage() {
           {canManageSales && (
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-teal-500 px-6 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-teal-500/20 hover:bg-teal-400 transition"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1A9A91] px-6 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-[#1A9A91]/20 hover:bg-[#157C75] transition active:scale-95"
             >
               + Create Sale
             </button>
           )}
         </div>
-
-        {/* {canManageSales && (
-          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
-            <h2 className="text-lg font-black text-slate-900">Sales workflow</h2>
-            <p className="text-sm text-slate-500 mt-2">
-              Click Create Sale to open a centered modal, enter sale details, and keep your sales list visible below.
-            </p>
-          </div>
-        )} */}
       </div>
 
-      {/* Transaction Ledger Table */}
-      <div className="mt-16">
-        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Recent Dispatches & Returns</h2>
+      {/* KPI Summary Section */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Card 1: Total Cases */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between transition hover:shadow-md">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Cases</p>
+            <p className="text-2xl font-black text-slate-900">
+              <AnimatedNumber value={summaryData.totalCases} /> Cases
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-700">
+            <Boxes className="w-6 h-6" />
+          </div>
+        </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-3">
-            <div className="flex-1 max-w-sm relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* Card 2: Sales Cases */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between transition hover:shadow-md border-l-4 border-l-emerald-500">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Sales Cases</p>
+            <p className="text-2xl font-black text-slate-900">
+              <AnimatedNumber value={summaryData.salesCases} /> Cases
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+            <Package className="w-6 h-6" />
+          </div>
+        </div>
+
+        {/* Card 3: Return Cases */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between transition hover:shadow-md border-l-4 border-l-amber-500">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Return Cases</p>
+            <p className="text-2xl font-black text-slate-900">
+              <AnimatedNumber value={summaryData.returnCases} /> Cases
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-amber-50 border border-amber-100 rounded-2xl flex items-center justify-center text-amber-600">
+            <RefreshCw className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Card 4: Damage Cases */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex items-center justify-between transition hover:shadow-md border-l-4 border-l-rose-500">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Damage Cases</p>
+            <p className="text-2xl font-black text-slate-900">
+              <AnimatedNumber value={summaryData.damageCases} /> Cases
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-rose-50 border border-rose-100 rounded-2xl flex items-center justify-center text-rose-600">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+        </div>
+      </section>
+
+      {/* ERP Analytics Filter Toolbar */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        {/* <div className="flex items-center gap-2 border-b border-slate-100 pb-3 justify-between"> */}
+        <div className="flex items-center gap-2">
+          {isLedgerLoading && (
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#1A9A91]" /> Updating...
+            </span>
+          )}
+
+        </div>
+        {/* </div> */}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Primary Filters: Date Range */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start Date *</label>
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <input
-                type="text"
-                placeholder="Search sales history..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold focus:outline-none focus:border-slate-900 shadow-sm bg-white"
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-11 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91] focus:bg-white outline-none transition-all font-semibold text-sm cursor-pointer"
               />
             </div>
+          </div>
 
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">End Date *</label>
+            <div className="relative">
+              <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-11 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91] focus:bg-white outline-none transition-all font-semibold text-sm cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Search Input */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Search Text</label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search code, product, staff..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 pl-11 pr-3 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91] focus:bg-white outline-none transition-all font-semibold text-sm placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          {/* Brand Selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Brand</label>
             <select
               value={selectedBrandFilter}
-              onChange={(e) => setSelectedBrandFilter(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:border-slate-900 shadow-sm cursor-pointer w-full md:w-auto"
+              onChange={(e) => { setSelectedBrandFilter(e.target.value); setPage(1); }}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91] focus:bg-white outline-none transition-all font-semibold text-sm cursor-pointer"
             >
               <option value="">All Brands</option>
               {brands?.map((b: any) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+          </div>
 
+          {/* Transaction Type Selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Transaction Type</label>
             <select
               value={selectedTypeFilter}
-              onChange={(e) => setSelectedTypeFilter(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:border-slate-900 shadow-sm cursor-pointer w-full md:w-auto"
+              onChange={(e) => { setSelectedTypeFilter(e.target.value); setPage(1); }}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-800 px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-[#1A9A91]/25 focus:border-[#1A9A91] focus:bg-white outline-none transition-all font-semibold text-sm cursor-pointer"
             >
               <option value="">All Types</option>
               <option value="SALES_DISPATCH">Sales Dispatch</option>
@@ -261,97 +390,184 @@ export default function SalesAnalyticsPage() {
           </div>
         </div>
 
+        {/* Action buttons (Clear Filters) */}
+        {
+          (searchQuery || selectedBrandFilter || selectedTypeFilter || startDate !== format(new Date(), 'yyyy-MM-dd') || endDate !== format(new Date(), 'yyyy-MM-dd')) && (
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => {
+                  setStartDate(format(new Date(), 'yyyy-MM-dd'));
+                  setEndDate(format(new Date(), 'yyyy-MM-dd'));
+                  setSearchQuery('');
+                  setSelectedBrandFilter('');
+                  setSelectedTypeFilter('');
+                  setPage(1);
+                }}
+                className="px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all active:scale-95 text-xs font-black uppercase tracking-wider border border-transparent hover:border-rose-100 bg-transparent"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )
+        }
+      </section >
+
+      {/* Transaction Ledger Table */}
+      < div className="mt-8 space-y-4" >
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Recent Dispatches & Returns</h2>
+
         <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest">Sales Date</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Brand</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Product</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Quantity</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
-                  <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Logged By</th>
-                  {canManageSales && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={canManageSales ? 8 : 7} className="py-20 text-center text-slate-400 font-bold text-sm">
-                      No sales transaction logs found.
-                    </td>
+            <motion.div
+              key={`${startDate}-${endDate}-${searchQuery}-${selectedBrandFilter}-${selectedTypeFilter}-${page}`}
+              initial={{ opacity: 0.7 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/50">
+                    <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest">Sales Date</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Brand</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Product</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Type</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Quantity</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
+                    <th className="py-5 px-6 text-xs font-black text-slate-400 uppercase tracking-widest">Logged By</th>
+                    {canManageSales && <th className="py-5 px-8 text-xs font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>}
                   </tr>
-                ) : (
-                  filteredTransactions.map((tx: any) => (
-                    <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-all">
-                      <td className="py-4 px-8 text-sm font-semibold text-slate-700">
-                        {formatSalesDate(tx.salesDate)}
+                </thead>
+                <tbody>
+                  {filteredTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={canManageSales ? 8 : 7} className="py-20 text-center text-slate-400 font-bold text-sm">
+                        No sales records found for the selected date range.
                       </td>
-                      <td className="py-4 px-6 text-sm font-black text-slate-800">{tx.brandName}</td>
-                      <td className="py-4 px-6 text-sm font-semibold text-slate-600">{tx.productName}</td>
-                      <td className="py-4 px-6 text-sm">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          tx.type === 'RETURN'
+                    </tr>
+                  ) : (
+                    filteredTransactions.map((tx: any) => (
+                      <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-all">
+                        <td className="py-4 px-8 text-sm font-semibold text-slate-700">
+                          {formatSalesDate(tx.salesDate)}
+                        </td>
+                        <td className="py-4 px-6 text-sm font-black text-slate-800">{tx.brandName}</td>
+                        <td className="py-4 px-6 text-sm font-semibold text-slate-600">{tx.productName}</td>
+                        <td className="py-4 px-6 text-sm">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${tx.type === 'RETURN'
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/50'
                             : tx.type === 'SALES_DISPATCH'
-                            ? 'bg-rose-50 text-rose-700 border-rose-200/50'
-                            : 'bg-amber-50 text-amber-700 border-amber-200/50'
-                        }`}>
-                          {tx.type === 'RETURN' ? 'Return' : tx.type === 'SALES_DISPATCH' ? 'Dispatch' : 'Damage'}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-sm font-black text-slate-900 text-right">{tx.quantity.toLocaleString()} cases</td>
-                      <td className="py-4 px-6 text-sm font-bold text-slate-700 text-right">
-                        {tx.unitPrice && Number(tx.unitPrice) > 0 ? `₹${(Number(tx.unitPrice) * tx.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
-                      </td>
-                      <td className="py-4 px-6 text-sm font-semibold text-slate-500">
-                        {tx.userName}
-                        {tx.customerName ? (
-                          <span className="block text-[10px] text-slate-400 font-bold mt-0.5">
-                            To: {tx.customerName}
+                              ? 'bg-rose-50 text-rose-700 border-rose-200/50'
+                              : 'bg-amber-50 text-amber-700 border-amber-200/50'
+                            }`}>
+                            {tx.type === 'RETURN' ? 'Return' : tx.type === 'SALES_DISPATCH' ? 'Dispatch' : 'Damage'}
                           </span>
-                        ) : (
-                          <span className="block text-[10px] text-rose-400 font-bold mt-0.5">
-                            Customer optional
-                          </span>
-                        )}
-                      </td>
-                      {canManageSales && (
-                        <td className="py-4 px-8 text-sm text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedTransaction(tx);
-                                setIsEditModalOpen(true);
-                              }}
-                              className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all"
-                            >
-                              Edit
-                            </button>
-                            {isAdmin && (
+                        </td>
+                        <td className="py-4 px-6 text-sm font-black text-slate-900 text-right">{tx.quantity.toLocaleString()} cases</td>
+                        <td className="py-4 px-6 text-sm font-bold text-slate-700 text-right">
+                          {tx.unitPrice && Number(tx.unitPrice) > 0 ? `₹${(Number(tx.unitPrice) * tx.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '—'}
+                        </td>
+                        <td className="py-4 px-6 text-sm font-semibold text-slate-500">
+                          {tx.userName}
+                          {tx.customerName ? (
+                            <span className="block text-[10px] text-slate-400 font-bold mt-0.5">
+                              To: {tx.customerName}
+                            </span>
+                          ) : (
+                            <span className="block text-[10px] text-rose-400 font-bold mt-0.5">
+                              Customer optional
+                            </span>
+                          )}
+                        </td>
+                        {canManageSales && (
+                          <td className="py-4 px-8 text-sm text-center">
+                            <div className="flex items-center justify-center gap-2">
                               <button
                                 onClick={() => {
                                   setSelectedTransaction(tx);
-                                  setIsDeleteModalOpen(true);
+                                  setIsEditModalOpen(true);
                                 }}
-                                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-all"
+                                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all"
                               >
-                                Delete
+                                Edit
                               </button>
-                            )}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => {
+                                    setSelectedTransaction(tx);
+                                    setIsDeleteModalOpen(true);
+                                  }}
+                                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold transition-all"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </motion.div>
           </div>
+
+          {/* Table Pagination Controller */}
+          {!isLedgerLoading && filteredTransactions.length > 0 && (
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between pt-6 border-t border-slate-100 mt-6 text-[11px] text-slate-500 px-8 pb-8">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold">Show</span>
+                <select
+                  value={limit}
+                  onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+                  className="bg-white border border-slate-200 text-slate-700 px-2 py-1.5 rounded-lg font-semibold outline-none focus:ring-2 focus:ring-[#1A9A91]/30 focus:border-[#1A9A91] text-xs"
+                >
+                  <option value={5}>5 records</option>
+                  <option value={10}>10 records</option>
+                  <option value={25}>25 records</option>
+                  <option value={50}>50 records</option>
+                </select>
+                <span>of <strong>{totalCount}</strong> transaction logs</span>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center gap-1 self-center">
+                <button
+                  onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                  disabled={page === 1}
+                  className="p-2 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronLeft className="w-3 h-3" />
+                </button>
+
+                {Array.from({ length: totalPages }).map((_, index) => {
+                  const pageNum = index + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all ${page === pageNum
+                        ? 'bg-[#1A9A91] border-[#1A9A91] text-white shadow-md shadow-[#1A9A91]/20'
+                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                        }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={page === totalPages}
+                  className="p-2 hover:bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                >
+                  <ChevronRight className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      </div >
 
       <AnimatePresence>
         {isCreateModalOpen && (
@@ -391,216 +607,216 @@ export default function SalesAnalyticsPage() {
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex-1 min-h-0 overflow-y-auto p-10 pb-12 md:grid md:grid-cols-[1fr_380px] gap-8 bg-slate-50 scrollbar-thin scrollbar-track-slate-100 scrollbar-thumb-slate-400/50">
                   <div className="space-y-6">
-                  <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-black text-slate-900">Sale details</h3>
-                        <p className="text-sm text-slate-500 mt-1">Select the brand, product, and customer for the sale.</p>
-                      </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-widest text-slate-500">Required</span>
-                    </div>
-
-                    <div className="grid gap-4">
-                      <div>
-                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Brand</label>
-                        <select
-                          value={selectedBrandId}
-                          onChange={(e) => {
-                            setSelectedBrandId(e.target.value);
-                            setSelectedProductId('');
-                          }}
-                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.brand ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
-                        >
-                          <option value="">Select brand</option>
-                          {brands?.map((brand) => (
-                            <option key={brand.id} value={brand.id}>{brand.name}</option>
-                          ))}
-                        </select>
-                        {fieldErrors.brand ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.brand}</p> : null}
+                    <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900">Sale details</h3>
+                          <p className="text-sm text-slate-500 mt-1">Select the brand, product, and customer for the sale.</p>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-widest text-slate-500">Required</span>
                       </div>
 
-                      <div>
-                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Product</label>
-                        <select
-                          value={selectedProductId}
-                          onChange={(e) => setSelectedProductId(e.target.value)}
-                          disabled={!selectedBrandId}
-                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.product ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'} disabled:cursor-not-allowed disabled:bg-slate-100`}
-                        >
-                          <option value="">Select product</option>
-                          {products
-                            ?.filter((product) => product.brandId === selectedBrandId)
-                            .map((product) => (
-                              <option key={product.id} value={product.id}>{product.name}</option>
+                      <div className="grid gap-4">
+                        <div>
+                          <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Brand</label>
+                          <select
+                            value={selectedBrandId}
+                            onChange={(e) => {
+                              setSelectedBrandId(e.target.value);
+                              setSelectedProductId('');
+                            }}
+                            className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.brand ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                          >
+                            <option value="">Select brand</option>
+                            {brands?.map((brand) => (
+                              <option key={brand.id} value={brand.id}>{brand.name}</option>
                             ))}
-                        </select>
-                        {fieldErrors.product ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.product}</p> : null}
-                      </div>
-                    </div>
-                  </section>
+                          </select>
+                          {fieldErrors.brand ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.brand}</p> : null}
+                        </div>
 
-                  <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-black text-slate-900">Transaction details</h3>
-                        <p className="text-sm text-slate-500 mt-1">Capture the date, type, and quantity for this sale.</p>
+                        <div>
+                          <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Product</label>
+                          <select
+                            value={selectedProductId}
+                            onChange={(e) => setSelectedProductId(e.target.value)}
+                            disabled={!selectedBrandId}
+                            className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.product ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'} disabled:cursor-not-allowed disabled:bg-slate-100`}
+                          >
+                            <option value="">Select product</option>
+                            {products
+                              ?.filter((product) => product.brandId === selectedBrandId)
+                              .map((product) => (
+                                <option key={product.id} value={product.id}>{product.name}</option>
+                              ))}
+                          </select>
+                          {fieldErrors.product ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.product}</p> : null}
+                        </div>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Mandatory</span>
-                    </div>
+                    </section>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <section className="space-y-4 rounded-[2rem] bg-white p-5 shadow-sm border border-slate-100">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <h3 className="text-lg font-black text-slate-900">Transaction details</h3>
+                          <p className="text-sm text-slate-500 mt-1">Capture the date, type, and quantity for this sale.</p>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-slate-500">Mandatory</span>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Sales date</label>
+                          <input
+                            type="date"
+                            value={salesDate}
+                            onChange={(e) => setSalesDate(e.target.value)}
+                            className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.salesDate ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                          />
+                          {fieldErrors.salesDate ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.salesDate}</p> : null}
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Transaction type</label>
+                          <select
+                            value={transactionType}
+                            onChange={(e) => setTransactionType(e.target.value as any)}
+                            className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
+                          >
+                            <option value="SALES_DISPATCH">Sales Dispatch</option>
+                            <option value="RETURN">Return</option>
+                            <option value="DAMAGE">Damage</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
-                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Sales date</label>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Quantity (cases)</label>
                         <input
-                          type="date"
-                          value={salesDate}
-                          onChange={(e) => setSalesDate(e.target.value)}
-                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.salesDate ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value)}
+                          placeholder="0"
+                          className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.quantity ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
                         />
-                        {fieldErrors.salesDate ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.salesDate}</p> : null}
+                        {fieldErrors.quantity ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.quantity}</p> : null}
                       </div>
+                    </section>
+
+                    <section className="space-y-4 rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
                       <div>
-                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Transaction type</label>
-                        <select
-                          value={transactionType}
-                          onChange={(e) => setTransactionType(e.target.value as any)}
-                          className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
-                        >
-                          <option value="SALES_DISPATCH">Sales Dispatch</option>
-                          <option value="RETURN">Return</option>
-                          <option value="DAMAGE">Damage</option>
-                        </select>
+                        <h3 className="text-lg font-black text-slate-900">Optional details</h3>
+                        <p className="text-sm text-slate-500 mt-1">Add a customer or notes for better tracking.</p>
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Quantity (cases)</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        placeholder="0"
-                        className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.quantity ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
-                      />
-                      {fieldErrors.quantity ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.quantity}</p> : null}
-                    </div>
-                  </section>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Customer</label>
+                          <select
+                            value={customerId}
+                            onChange={(e) => setCustomerId(e.target.value)}
+                            className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
+                          >
+                            <option value="">No customer</option>
+                            {customers?.map((customer) => (
+                              <option key={customer.id} value={customer.id}>{customer.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => setIsCustomerModalOpen(true)}
+                            className="w-full rounded-3xl border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-200 transition"
+                          >
+                            Add new customer
+                          </button>
+                        </div>
+                      </div>
 
-                  <section className="space-y-4 rounded-[2rem] bg-white p-6 shadow-sm border border-slate-100">
-                    <div>
-                      <h3 className="text-lg font-black text-slate-900">Optional details</h3>
-                      <p className="text-sm text-slate-500 mt-1">Add a customer or notes for better tracking.</p>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-500">Customer</label>
-                        <select
-                          value={customerId}
-                          onChange={(e) => setCustomerId(e.target.value)}
-                          className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
-                        >
-                          <option value="">No customer</option>
-                          {customers?.map((customer) => (
-                            <option key={customer.id} value={customer.id}>{customer.name}</option>
-                          ))}
-                        </select>
+                        <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Notes</label>
+                        <textarea
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          rows={4}
+                          className="w-full min-h-[100px] rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
+                          placeholder="Optional notes"
+                        />
                       </div>
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => setIsCustomerModalOpen(true)}
-                          className="w-full rounded-3xl border border-slate-200 bg-slate-100 px-4 py-4 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-200 transition"
-                        >
-                          Add new customer
-                        </button>
+                    </section>
+                  </div>
+
+                  <aside className="space-y-5 rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/20 border border-slate-800">
+                    <div className="flex items-center justify-between gap-3 rounded-3xl bg-teal-500/10 px-4 py-3 border border-teal-500/20">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-teal-200">Order summary</p>
+                        <p className="mt-2 text-2xl font-black">Review sale details</p>
+                      </div>
+                      <div className="rounded-3xl bg-teal-500/20 p-3 text-teal-200">
+                        <Check className="w-5 h-5" />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-1 block text-[13px] font-black uppercase tracking-widest text-slate-500">Notes</label>
-                      <textarea
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                        rows={4}
-                        className="w-full min-h-[100px] rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none transition focus:border-teal-500"
-                        placeholder="Optional notes"
-                      />
+                    <div className="grid gap-3">
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Brand</p>
+                        <p className="mt-2 text-base font-black text-white">{currentBrand?.name || 'Not selected'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Product</p>
+                        <p className="mt-2 text-base font-black text-white">{currentProduct?.name || 'Not selected'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Type</p>
+                        <p className="mt-2 text-base font-black text-white">{transactionType === 'RETURN' ? 'Return' : transactionType === 'DAMAGE' ? 'Damage' : 'Sales Dispatch'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Quantity</p>
+                        <p className="mt-2 text-2xl font-black text-white">{quantityInt > 0 ? `${quantityInt} cases` : '0 cases'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Customer</p>
+                        <p className="mt-2 text-base font-black text-white">{customers?.find((customer) => customer.id === customerId)?.name || 'Not selected'}</p>
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Date</p>
+                        <p className="mt-2 text-base font-black text-white">{salesDate || 'Not selected'}</p>
+                      </div>
                     </div>
-                  </section>
+
+                    <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800 text-sm text-slate-400">
+                      Sales will be added directly to the ledger after saving. Close the modal at any time to keep your current search and filters intact.
+                    </div>
+                  </aside>
                 </div>
 
-                <aside className="space-y-5 rounded-[2rem] bg-slate-950 p-5 text-white shadow-xl shadow-slate-900/20 border border-slate-800">
-                  <div className="flex items-center justify-between gap-3 rounded-3xl bg-teal-500/10 px-4 py-3 border border-teal-500/20">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-widest text-teal-200">Order summary</p>
-                      <p className="mt-2 text-2xl font-black">Review sale details</p>
+                <div className="border-t border-slate-100 bg-white px-10 py-5">
+                  {createErrorMsg ? (
+                    <div className="mb-4 rounded-3xl bg-rose-50 p-4 text-sm font-bold text-rose-700 border border-rose-100">
+                      {createErrorMsg}
                     </div>
-                    <div className="rounded-3xl bg-teal-500/20 p-3 text-teal-200">
-                      <Check className="w-5 h-5" />
-                    </div>
+                  ) : null}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      onClick={closeCreateModal}
+                      className="rounded-3xl border border-slate-200 bg-white px-6 py-4 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={createTxMutation.isPending || !selectedBrandId || !selectedProductId || quantityInt <= 0 || !salesDate}
+                      className="inline-flex items-center justify-center gap-2 rounded-3xl bg-teal-500 px-6 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-teal-500/20 hover:bg-teal-400 transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                    >
+                      <Check className="w-4 h-4" />
+                      {createTxMutation.isPending ? 'Saving sale...' : 'Save Sale'}
+                    </button>
                   </div>
-
-                  <div className="grid gap-3">
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Brand</p>
-                      <p className="mt-2 text-base font-black text-white">{currentBrand?.name || 'Not selected'}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Product</p>
-                      <p className="mt-2 text-base font-black text-white">{currentProduct?.name || 'Not selected'}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Type</p>
-                      <p className="mt-2 text-base font-black text-white">{transactionType === 'RETURN' ? 'Return' : transactionType === 'DAMAGE' ? 'Damage' : 'Sales Dispatch'}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Quantity</p>
-                      <p className="mt-2 text-2xl font-black text-white">{quantityInt > 0 ? `${quantityInt} cases` : '0 cases'}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Customer</p>
-                      <p className="mt-2 text-base font-black text-white">{customers?.find((customer) => customer.id === customerId)?.name || 'Not selected'}</p>
-                    </div>
-                    <div className="rounded-3xl bg-slate-900/80 p-3 border border-slate-800">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Date</p>
-                      <p className="mt-2 text-base font-black text-white">{salesDate || 'Not selected'}</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-3xl bg-slate-900/80 p-4 border border-slate-800 text-sm text-slate-400">
-                    Sales will be added directly to the ledger after saving. Close the modal at any time to keep your current search and filters intact.
-                  </div>
-                </aside>
-              </div>
-
-              <div className="border-t border-slate-100 bg-white px-10 py-5">
-                {createErrorMsg ? (
-                  <div className="mb-4 rounded-3xl bg-rose-50 p-4 text-sm font-bold text-rose-700 border border-rose-100">
-                    {createErrorMsg}
-                  </div>
-                ) : null}
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    onClick={closeCreateModal}
-                    className="rounded-3xl border border-slate-200 bg-white px-6 py-4 text-sm font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={createTxMutation.isPending || !selectedBrandId || !selectedProductId || quantityInt <= 0 || !salesDate}
-                    className="inline-flex items-center justify-center gap-2 rounded-3xl bg-teal-500 px-6 py-4 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-teal-500/20 hover:bg-teal-400 transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                  >
-                    <Check className="w-4 h-4" />
-                    {createTxMutation.isPending ? 'Saving sale...' : 'Save Sale'}
-                  </button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
         )}
       </AnimatePresence>
 
@@ -637,7 +853,7 @@ export default function SalesAnalyticsPage() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 }
 
@@ -824,19 +1040,19 @@ function EditSalesEntryModal({ onClose, transaction, brands, products, customers
           </div>
 
           <div>
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer / Distributor *</label>
-              </div>
-              <select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
-              >
-                <option value="">Select Customer (Required)</option>
-                {customers?.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.code || 'No Code'})</option>
-                ))}
-              </select>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Customer / Distributor *</label>
+            </div>
+            <select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
+            >
+              <option value="">Select Customer (Required)</option>
+              {customers?.map((c) => (
+                <option key={c.id} value={c.id}>{c.name} ({c.code || 'No Code'})</option>
+              ))}
+            </select>
           </div>
 
           <div>

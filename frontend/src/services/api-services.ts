@@ -620,8 +620,8 @@ export const SalesService = {
   getOrderById: (id: string) =>
     api.get<any>(ENDPOINTS.SALES.ORDER(id)).then(r => r.data),
 
-  getSalesTransactions: () =>
-    api.get<SalesTransaction[]>(ENDPOINTS.SALES.TRANSACTIONS).then(r => r.data),
+  getSalesTransactions: (params?: Record<string, any>) =>
+    api.get<any>(ENDPOINTS.SALES.TRANSACTIONS, { params }).then(r => r.data),
 
   createSalesTransaction: (payload: CreateSalesTransactionPayload) =>
     api.post<SalesTransaction>(ENDPOINTS.SALES.TRANSACTIONS, payload).then(r => r.data),

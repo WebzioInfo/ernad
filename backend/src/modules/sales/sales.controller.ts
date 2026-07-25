@@ -88,8 +88,8 @@ export class SalesController {
   @Get('transactions')
   @Permissions('sales:view')
   @ApiOperation({ summary: 'List all sales transactions' })
-  async getSalesTransactions() {
-    return await this.salesService.getSalesTransactions();
+  async getSalesTransactions(@Req() req: any) {
+    return await this.salesService.getSalesTransactionsFiltered(req.query);
   }
 
   @Post('transactions')

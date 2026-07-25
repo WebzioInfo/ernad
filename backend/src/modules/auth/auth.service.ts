@@ -166,8 +166,7 @@ export class AuthService {
       };
     } catch (err: any) {
       this.logger.error(`[AUTH_CRITICAL_ERROR] Login process terminated abnormally: ${err.message}`, err.stack);
-      if (err instanceof UnauthorizedException) throw err;
-      throw new UnauthorizedException(`Login failed: ${err.message || 'System error'}`);
+      throw err;
     }
   }
 

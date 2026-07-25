@@ -415,6 +415,137 @@ export class SalesService {
     .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt));
   }
 
+  async getSalesTransactionsFiltered(query: {
+    startDate?: string;
+    endDate?: string;
+    brand?: string;
+    type?: string;
+    search?: string;
+    page?: string | number;
+    limit?: string | number;
+  }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    const conditions: any[] = [];
+
+    if (query.startDate) {
+      conditions.push(gte(salesTransactions.salesDate, query.startDate));
+    }
+    if (query.endDate) {
+      conditions.push(lte(salesTransactions.salesDate, query.endDate));
+    }
+    if (query.brand) {
+      conditions.push(eq(salesTransactions.brandId, query.brand));
+    }
+    if (query.type) {
+      conditions.push(eq(salesTransactions.type, query.type as any));
+    }
+    if (query.search) {
+      const searchPattern = `%${query.search.trim()}%`;
+      conditions.push(
+        or(
+          ilike(productBrands.name, searchPattern),
+          ilike(products.name, searchPattern),
+          ilike(users.name, searchPattern),
+          ilike(customers.name, searchPattern),
+          ilike(salesTransactions.remarks, searchPattern)
+        )
+      );
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const items = await db.select({
+      id: salesTransactions.id,
+      brandId: salesTransactions.brandId,
+      brandName: productBrands.name,
+      productId: salesTransactions.productId,
+      productName: products.name,
+      type: salesTransactions.type,
+      quantity: salesTransactions.quantity,
+      performedBy: salesTransactions.performedBy,
+      userName: users.name,
+      salesDate: salesTransactions.salesDate,
+      customerId: salesTransactions.customerId,
+      customerName: customers.name,
+      unitPrice: salesTransactions.unitPrice,
+      remarks: salesTransactions.remarks,
+      updatedBy: salesTransactions.updatedBy,
+      createdAt: salesTransactions.createdAt,
+      updatedAt: salesTransactions.updatedAt,
+    })
+    .from(salesTransactions)
+    .innerJoin(productBrands, eq(salesTransactions.brandId, productBrands.id))
+    .innerJoin(products, eq(salesTransactions.productId, products.id))
+    .innerJoin(users, eq(salesTransactions.performedBy, users.id))
+    .leftJoin(customers, eq(salesTransactions.customerId, customers.id))
+    .where(whereClause)
+    .orderBy(desc(salesTransactions.salesDate), desc(salesTransactions.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+    const totalResult = await db.select({
+      count: sql<number>`count(*)`
+    })
+    .from(salesTransactions)
+    .innerJoin(productBrands, eq(salesTransactions.brandId, productBrands.id))
+    .innerJoin(products, eq(salesTransactions.productId, products.id))
+    .innerJoin(users, eq(salesTransactions.performedBy, users.id))
+    .leftJoin(customers, eq(salesTransactions.customerId, customers.id))
+    .where(whereClause);
+
+    const totalItems = Number(totalResult[0]?.count || 0);
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Dynamic KPI Totals (calculated server-side over full filtered dataset)
+    const summaryResult = await db.select({
+      type: salesTransactions.type,
+      sumQuantity: sql<number>`sum(${salesTransactions.quantity})`
+    })
+    .from(salesTransactions)
+    .innerJoin(productBrands, eq(salesTransactions.brandId, productBrands.id))
+    .innerJoin(products, eq(salesTransactions.productId, products.id))
+    .innerJoin(users, eq(salesTransactions.performedBy, users.id))
+    .leftJoin(customers, eq(salesTransactions.customerId, customers.id))
+    .where(whereClause)
+    .groupBy(salesTransactions.type);
+
+    let totalCases = 0;
+    let salesCases = 0;
+    let returnCases = 0;
+    let damageCases = 0;
+
+    summaryResult.forEach(row => {
+      const qty = Number(row.sumQuantity || 0);
+      totalCases += qty;
+      if (row.type === 'SALES_DISPATCH') {
+        salesCases = qty;
+      } else if (row.type === 'RETURN') {
+        returnCases = qty;
+      } else if (row.type === 'DAMAGE') {
+        damageCases = qty;
+      }
+    });
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages
+      },
+      summary: {
+        totalCases,
+        salesCases,
+        returnCases,
+        damageCases
+      }
+    };
+  }
+
   async createSalesTransaction(dto: {
     brandId: string;
     productId: string;

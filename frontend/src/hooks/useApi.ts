@@ -26,7 +26,6 @@ import {
   type CreateNotePayload,
   type CreateSalesTransactionPayload,
   type Customer,
-  type SalesTransaction,
 } from '../services/api-services';
 
 // ─── QUERY KEY REGISTRY ───────────────────────────────────────────────────────
@@ -589,7 +588,7 @@ export function useCustomerActivities(id: string, options?: any) {
 }
 
 export function useSalesTransactions() {
-  return useQuery<SalesTransaction[], Error>({
+  return useQuery<any, Error>({
     queryKey: QK.SALES_TRANSACTIONS,
     queryFn: async () => {
       try {
@@ -601,8 +600,25 @@ export function useSalesTransactions() {
       }
     },
     retry: 1,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: any) => previousData,
     staleTime: 60000,
+  });
+}
+
+export function useSalesTransactionsFiltered(params?: Record<string, any>) {
+  return useQuery<any, Error>({
+    queryKey: [QK.SALES_TRANSACTIONS, 'filtered', params],
+    queryFn: async () => {
+      try {
+        return await SalesService.getSalesTransactions(params);
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useSalesTransactionsFiltered] Failed to fetch sales transactions', err);
+        throw err;
+      }
+    },
+    placeholderData: (previousData: any) => previousData,
+    staleTime: 5000,
   });
 }
 

@@ -30,7 +30,8 @@ import { InventoryModule } from '../inventory/inventory.module';
     IngestionService, 
     ProcessingService, 
     ProductionReconciliationService,
-    TelemetryProcessor
+    // TelemetryProcessor - Disabled background worker to prevent idle Redis polling/quota exhaustion. 
+    // Ingestion is processed synchronous-inline, so no background telemetry queuing is active.
   ],
   exports: [IngestionService],
 })

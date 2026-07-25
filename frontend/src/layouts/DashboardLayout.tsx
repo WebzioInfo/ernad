@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import useAuthStore from '../modules/auth/auth.store';
 import { moduleRegistry } from '../app/registry/moduleRegistry';
-import { useNavigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
+import { useNavigate, Link, Outlet, useSearchParams } from 'react-router-dom';
 import NotificationBell from '../components/NotificationBell';
 import CommandPalette from '../components/common/CommandPalette';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -133,6 +133,47 @@ export default function DashboardLayout() {
     return `${base}${normalizedPath}`;
   };
 
+  // Helper to normalize route paths for accurate matching
+  const normalizePath = (p: string) => {
+    let cleaned = p.replace(/\/+$/, '');
+    if (!cleaned.startsWith('/')) {
+      cleaned = '/' + cleaned;
+    }
+    return cleaned || '/';
+  };
+
+  // Compute the single active item based on the longest matching route path
+  const activeItemId = useMemo(() => {
+    const userRole = String(user?.role || '').toUpperCase();
+    
+    // Collect all visible items for the current user role
+    const visibleItems = sidebarGroups
+      .filter(g => filterByRole(g.allowedRoles))
+      .flatMap(g => g.items.filter((i: any) => {
+        const roleAllowed = filterByRole(i.allowedRoles);
+        if (userRole === 'MANAGER' && i.isComingSoon) return false;
+        return roleAllowed;
+      }));
+
+    const itemsWithPaths = visibleItems.map((item: any) => ({
+      id: item.id,
+      resolvedPath: normalizePath(getModulePath(item.path))
+    }));
+
+    const currentPath = normalizePath(location.pathname);
+
+    // Find all matching items (exact match or parent subpath match)
+    const matches = itemsWithPaths.filter(({ resolvedPath }) => {
+      return currentPath === resolvedPath || currentPath.startsWith(resolvedPath + '/');
+    });
+
+    if (matches.length === 0) return null;
+
+    // Pick the longest matching resolved path to resolve parent/child highlight conflicts
+    matches.sort((a, b) => b.resolvedPath.length - a.resolvedPath.length);
+    return matches[0].id;
+  }, [sidebarGroups, location.pathname, user?.role]);
+
   return (
     <div className="flex h-screen bg-[#FDFDFD]">
       <CommandPalette />
@@ -185,6 +226,38 @@ export default function DashboardLayout() {
                 <div className="space-y-1">
                   {filteredItems.map((item: any, idx: number) => {
                     const Icon = item.icon;
+                    const isActiveItem = item.id === activeItemId;
+                    const isDisabled = !!item.isComingSoon;
+
+                    if (isDisabled) {
+                      return (
+                        <motion.div
+                          key={item.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                        >
+                          <div
+                            className={cn(
+                              "w-full flex items-center py-3.5 rounded-xl transition-all duration-200 ease-in-out group relative",
+                              isSidebarOpen ? 'px-5' : 'justify-center',
+                              'opacity-40 cursor-not-allowed text-slate-500'
+                            )}
+                          >
+                            <Icon className="w-5 h-5 flex-shrink-0 transition-all duration-200 ease-in-out text-slate-500/60" />
+                            {isSidebarOpen && (
+                              <span className="ml-4 font-bold text-[13px] tracking-tight truncate flex-1 transition-colors duration-200 ease-in-out text-slate-500/60">
+                                {item.label}
+                              </span>
+                            )}
+                            {item.isComingSoon && isSidebarOpen && (
+                              <span className="ml-auto text-[7px] font-black bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md uppercase tracking-tighter border border-white/5">Soon</span>
+                            )}
+                          </div>
+                        </motion.div>
+                      );
+                    }
+
                     return (
                       <motion.div
                         key={item.id}
@@ -192,42 +265,40 @@ export default function DashboardLayout() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: idx * 0.03 }}
                       >
-                        <NavLink
+                        <Link
                           to={getModulePath(item.path)}
-                          className={({ isActive }) => `
-                            w-full flex items-center py-3.5 rounded-2xl transition-all duration-300 group relative
-                            ${isSidebarOpen ? 'px-5' : 'justify-center'}
-                            ${isActive
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
-                              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'}
-                          `}
-                        >
-                          {({ isActive }) => (
-                            <>
-                              <Icon className={cn(
-                                "w-5 h-5 flex-shrink-0 transition-all duration-300",
-                                isActive ? "scale-110" : "group-hover:scale-110 group-hover:text-indigo-400"
-                              )} />
-                              {isSidebarOpen && (
-                                <span className={cn(
-                                  "ml-4 font-bold text-[13px] tracking-tight truncate flex-1",
-                                  isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
-                                )}>
-                                  {item.label}
-                                </span>
-                              )}
-                              {item.isComingSoon && isSidebarOpen && (
-                                <span className="ml-auto text-[7px] font-black bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded-md uppercase tracking-tighter border border-white/5">Soon</span>
-                              )}
-                              {isActive && (
-                                <motion.div
-                                  layoutId="active-indicator"
-                                  className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full shadow-[0_0_10px_white]"
-                                />
-                              )}
-                            </>
+                          aria-current={isActiveItem ? 'page' : undefined}
+                          className={cn(
+                            "w-full flex items-center py-3.5 rounded-xl transition-all duration-200 ease-in-out group relative",
+                            isSidebarOpen ? 'px-5' : 'justify-center',
+                            isActiveItem
+                              ? 'bg-primary text-white shadow-md shadow-primary/20'
+                              : 'text-slate-400 hover:bg-white/5 hover:text-slate-200',
+                            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                           )}
-                        </NavLink>
+                        >
+                          <Icon className={cn(
+                            "w-5 h-5 flex-shrink-0 transition-all duration-200 ease-in-out",
+                            isActiveItem
+                              ? "scale-110 text-white"
+                              : "text-slate-400 group-hover:scale-110 group-hover:text-slate-200"
+                          )} />
+                          {isSidebarOpen && (
+                            <span className={cn(
+                              "ml-4 font-bold text-[13px] tracking-tight truncate flex-1 transition-colors duration-200 ease-in-out",
+                              isActiveItem ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                            )}>
+                              {item.label}
+                            </span>
+                          )}
+                          {isActiveItem && (
+                            <motion.div
+                              layoutId="active-indicator"
+                              className="absolute left-0 w-[3px] h-6 bg-white rounded-r-full shadow-[0_0_10px_white]"
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                            />
+                          )}
+                        </Link>
                       </motion.div>
                     );
                   })}

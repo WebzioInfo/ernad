@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Users, ArrowLeft, Edit2, DollarSign, 
+  Users, ArrowLeft, Edit2, 
   ShoppingBag, Clipboard, History, Layers, 
   Printer, Download, ChevronLeft, ChevronRight,
   TrendingUp, Activity, Ban, X
@@ -42,7 +42,7 @@ export default function CustomerDetailsPage() {
 
   // Queries (Cast as any to bypass generic options type checks)
   const { data: customer, isLoading: isCustLoading } = useCustomerById(id) as any;
-  const { data: summary, isLoading: isSumLoading } = useCustomerSummary(id) as any;
+  useCustomerSummary(id);
   
   const ledgerParams = useMemo(() => {
     const p: any = {};
