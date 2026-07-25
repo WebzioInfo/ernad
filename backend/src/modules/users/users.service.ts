@@ -492,9 +492,10 @@ export class UsersService {
             }
           }
         } else if (dto.role) {
-          this.logger.log(`[TX] Updating legacy role for user ${id}. New role: ${dto.role}`);
+          const roleSlug = String(dto.role).trim().toUpperCase();
+          this.logger.log(`[TX] Updating legacy role for user ${id}. New role: ${roleSlug}`);
           await tx.delete(userRoles).where(eq(userRoles.userId, id));
-          const [roleObj] = await tx.select().from(roles).where(eq(roles.slug, dto.role));
+          const [roleObj] = await tx.select().from(roles).where(ilike(roles.slug, roleSlug));
           if (roleObj) {
             await tx.insert(userRoles).values({ userId: id, roleId: roleObj.id });
           }

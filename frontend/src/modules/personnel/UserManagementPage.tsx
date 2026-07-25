@@ -695,12 +695,10 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
     mutation.mutate(data);
   };
 
-  const toggleRole = (roleSlug: string) => {
+  const selectRole = (roleSlug: string) => {
     setFormData(prev => ({
       ...prev,
-      roles: prev.roles.includes(roleSlug)
-        ? prev.roles.filter(r => r !== roleSlug)
-        : [...prev.roles, roleSlug]
+      roles: [roleSlug.toUpperCase()]
     }));
   };
 
@@ -776,7 +774,7 @@ export function UserFormModal({ user, onClose }: { user?: User, onClose: () => v
                     <button
                       key={role.slug}
                       type="button"
-                      onClick={() => toggleRole(role.slug)}
+                      onClick={() => selectRole(role.slug)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-between ${
                         isSelected
                           ? 'bg-emerald-50 border-[#1A9A91] text-[#1A9A91] shadow-sm'
