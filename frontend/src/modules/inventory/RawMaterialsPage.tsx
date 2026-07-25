@@ -18,7 +18,8 @@ export default function RawMaterialsPage() {
   const { user } = useAuthStore();
   const userRoles = (user?.roles || [user?.role]).map((r: any) => String(r).toUpperCase());
   const isAdmin = userRoles.includes('ADMIN');
-  const isManager = userRoles.includes('MANAGER');
+  const isAccountant = userRoles.includes('ACCOUNTANT');
+  const canManageMaterials = isAdmin || isAccountant;
 
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -172,34 +173,34 @@ export default function RawMaterialsPage() {
             <div className="p-2 bg-[#1A9A91]/10 rounded-xl text-[#1A9A91]">
               <Layers className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
               Raw Material Stock Tracking
             </h2>
-            <span className="bg-slate-100 text-[#1A9A91] text-xs px-2.5 py-1 rounded-full border border-slate-200 font-bold uppercase tracking-widest">
+            <span className="bg-slate-100 text-[#1A9A91] text-[10px] px-2.5 py-1 rounded-full border border-slate-200 font-bold uppercase tracking-widest">
               Live Stock
             </span>
           </div>
-          <p className="text-slate-500 text-xs mt-2">
+          <p className="text-slate-500 text-[11px] mt-2">
             Track and log preforms and caps inventory. Raw materials are automatically consumed as production data is submitted.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleManualSync}
-            className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 flex items-center justify-center shadow-sm transition-all group active:scale-95"
+            className="p-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 flex items-center justify-center shadow-sm transition-all group active:scale-95"
             title="Manual Sync"
           >
             <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </button>
 
-          {(isAdmin || isManager) && (
+          {canManageMaterials && (
             <>
               <button
                 onClick={() => {
                   setIsCreateMaterialModalOpen(true);
                 }}
-                className="bg-white hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-xl font-bold flex items-center gap-2 border border-slate-200 shadow-sm transition-all active:scale-95 text-xs uppercase tracking-wider"
+                className="bg-white hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-slate-200 shadow-sm transition-all active:scale-95 text-xs uppercase tracking-wider"
               >
                 <Plus className="w-4 h-4" />
                 Add Material
@@ -208,7 +209,7 @@ export default function RawMaterialsPage() {
                 onClick={() => {
                   setIsAddModalOpen(true);
                 }}
-                className="bg-[#1A9A91] hover:bg-[#157C75] text-white px-5 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[#1A9A91]/10 transition-all active:scale-95 text-xs uppercase tracking-wider"
+                className="bg-[#1A9A91] hover:bg-[#157C75] text-white px-4 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[#1A9A91]/10 transition-all active:scale-95 text-xs uppercase tracking-wider"
               >
                 <Plus className="w-4 h-4" />
                 Add Stock
@@ -224,11 +225,11 @@ export default function RawMaterialsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="px-8 py-5">Material Name</th>
-                <th className="px-8 py-5 text-right text-[#1A9A91]">Available Stock</th>
-                <th className="px-8 py-5 text-center">Last Updated</th>
-                <th className="px-8 py-5 text-center">Status</th>
-                {(isAdmin || isManager) && <th className="px-8 py-5 text-right">Actions</th>}
+                <th className="px-5 py-4">Material Name</th>
+                <th className="px-5 py-4 text-right text-[#1A9A91]">Available Stock</th>
+                <th className="px-5 py-4 text-center">Last Updated</th>
+                <th className="px-5 py-4 text-center">Status</th>
+                {canManageMaterials && <th className="px-5 py-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -242,7 +243,7 @@ export default function RawMaterialsPage() {
                       isSelected ? 'bg-[#1A9A91]/5 font-semibold' : ''
                     }`}
                   >
-                    <td className="px-8 py-6 font-bold text-slate-800 group-hover:text-[#1A9A91] transition-colors flex items-center gap-3">
+                    <td className="px-5 py-4 font-bold text-slate-800 group-hover:text-[#1A9A91] transition-colors flex items-center gap-3">
                       <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-[#1A9A91]/15 text-[#1A9A91]' : 'bg-slate-100 text-slate-400'}`}>
                         <Layers className="w-4 h-4" />
                       </div>
@@ -253,10 +254,10 @@ export default function RawMaterialsPage() {
                     }`}>
                       {Number(material.currentStock).toLocaleString()} <span className="text-[10px] text-slate-400 font-bold ml-1">{material.unit}</span>
                     </td>
-                    <td className="px-8 py-6 text-center text-xs font-bold text-slate-500">
+                    <td className="px-5 py-4 text-center text-xs font-bold text-slate-500">
                       {new Date(material.updatedAt).toLocaleString()}
                     </td>
-                    <td className="px-8 py-6 text-center">
+                    <td className="px-5 py-4 text-center">
                       {material.currentStock > 0 ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-widest">
                           In Stock
@@ -271,8 +272,8 @@ export default function RawMaterialsPage() {
                         </span>
                       )}
                     </td>
-                    {(isAdmin || isManager) && (
-                      <td className="px-8 py-6 text-right">
+                    {canManageMaterials && (
+                      <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={(e) => {
@@ -284,7 +285,7 @@ export default function RawMaterialsPage() {
                           >
                             <PenLine className="w-4 h-4" />
                           </button>
-                          {(isAdmin || isManager) && (
+                          {canManageMaterials && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -29,7 +29,8 @@ export default function AuditLogsPage() {
 
   const { data: logs, isLoading } = useQuery<AuditLog[]>({
     queryKey: ['audit-logs'],
-    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,    retry: false
+    queryFn: async () => (await api.get(ENDPOINTS.USERS.AUDIT_LOGS)).data,
+    retry: false
   });
 
   const getSeverity = (log: AuditLog) => {
@@ -147,7 +148,7 @@ export default function AuditLogsPage() {
       </div>
 
       {/* Filters Strip */}
-      <div className="bg-white border border-slate-200 p-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+      <div className="bg-white border border-slate-200 p-2.5 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
         <div className="flex items-center gap-2 text-slate-400 pr-2 border-r border-slate-200">
           <Filter className="w-3.5 h-3.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Refine</span>
@@ -186,10 +187,10 @@ export default function AuditLogsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-3.5">Time & Date</th>
-                <th className="px-6 py-3.5">Performed By</th>
-                <th className="px-6 py-3.5">Action Taken</th>
-                <th className="px-6 py-3.5 text-right">Entity Type</th>
+                <th className="px-4 py-2.5">Time & Date</th>
+                <th className="px-4 py-2.5">Performed By</th>
+                <th className="px-4 py-2.5">Action Taken</th>
+                <th className="px-4 py-2.5 text-right">Entity Type</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">

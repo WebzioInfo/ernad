@@ -191,6 +191,39 @@ async function migrate() {
       console.error('Failed to apply Inventory Module tables and seeds:', e.message);
     }
 
+    // Enterprise Edit History Module Table
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "record_edit_history" (
+          "id" bigserial PRIMARY KEY,
+          "tenant_id" uuid,
+          "module" varchar(100) NOT NULL,
+          "table_name" varchar(100) NOT NULL,
+          "record_id" varchar(150) NOT NULL,
+          "field_name" varchar(100) NOT NULL,
+          "old_value" text,
+          "new_value" text,
+          "edited_by_user_id" uuid REFERENCES "users"("id"),
+          "edited_by_name" varchar(255),
+          "edited_by_role" varchar(100),
+          "edited_at" timestamp NOT NULL DEFAULT now(),
+          "reason" text,
+          "ip_address" varchar(100),
+          "user_agent" text,
+          "session_id" varchar(150),
+          "created_at" timestamp NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS "idx_edit_history_module" ON "record_edit_history" ("module");
+        CREATE INDEX IF NOT EXISTS "idx_edit_history_table" ON "record_edit_history" ("table_name");
+        CREATE INDEX IF NOT EXISTS "idx_edit_history_record" ON "record_edit_history" ("record_id");
+        CREATE INDEX IF NOT EXISTS "idx_edit_history_user" ON "record_edit_history" ("edited_by_user_id");
+        CREATE INDEX IF NOT EXISTS "idx_edit_history_date" ON "record_edit_history" ("edited_at");
+      `);
+      console.log('Successfully created record_edit_history table and indexes.');
+    } catch (e: any) {
+      console.error('Failed to create record_edit_history table:', e.message);
+    }
+
     console.log('Migrations applied successfully.');
     process.exit(0);
   } catch (err) {

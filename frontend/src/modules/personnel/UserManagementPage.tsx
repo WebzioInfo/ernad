@@ -38,6 +38,7 @@ export const PRIVILEGED_ROLE_SLUGS = [
 /** Operational roles visible to managers. */
 export const OPERATIONAL_ROLES = [
   { slug: 'MANAGER', label: 'Plant Manager', color: 'amber' },
+  { slug: 'ACCOUNTANT', label: 'Accountant', color: 'slate' },
   { slug: 'OPERATOR', label: 'General Operator', color: 'emerald' },
 ];
 
@@ -67,6 +68,13 @@ const getRoleStyle = (role: string) => {
         color: 'from-amber-500 to-orange-600',
         bg: 'bg-amber-50 text-amber-700 border-amber-100',
         text: 'text-amber-700',
+      };
+    case 'ACCOUNTANT':
+      return {
+        icon: <UserCog className="w-3.5 h-3.5" />,
+        color: 'from-slate-500 to-slate-700',
+        bg: 'bg-slate-100 text-slate-800 border-slate-200',
+        text: 'text-slate-800',
       };
     default:
       return {
@@ -182,14 +190,14 @@ export default function UserManagementPage() {
             <div className="p-1.5 bg-slate-100 rounded-lg text-slate-700 border border-slate-200">
               <UserCog className="w-5 h-5 text-[#1A9A91]" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            <h2 className="text-lg font-bold text-slate-800 tracking-tight">
               User Access & Roles
             </h2>
-            <span className="bg-slate-100 text-slate-655 text-xs px-2 py-0.5 rounded-full border border-slate-200 font-semibold">
+            <span className="bg-slate-100 text-slate-655 text-[10px] px-2 py-0.5 rounded-full border border-slate-200 font-semibold">
               {filteredUsers?.length || 0} Total
             </span>
           </div>
-          <p className="text-slate-500 text-xs mt-1">Configure credentials, platform access privileges, and operator stations.</p>
+          <p className="text-slate-500 text-[11px] mt-1">Configure credentials, platform access privileges, and operator stations.</p>
         </div>
 
         {canAddUser && (
@@ -204,7 +212,7 @@ export default function UserManagementPage() {
       </div>
 
       {/* Advanced Filters Strip */}
-      <div className="bg-white border border-slate-200 p-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+      <div className="bg-white border border-slate-200 p-2.5 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
         <div className="flex items-center gap-2 text-slate-400 pr-2 border-r border-slate-200">
           <Filter className="w-3.5 h-3.5" />
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Filters</span>
@@ -265,12 +273,12 @@ export default function UserManagementPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="px-6 py-3">User</th>
-                <th className="px-6 py-3">Department</th>
-                <th className="px-6 py-3">Access Roles</th>
-                <th className="px-6 py-3">Line Allocation</th>
-                <th className="px-6 py-3">Status</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+                <th className="px-4 py-2.5">User</th>
+                <th className="px-4 py-2.5">Department</th>
+                <th className="px-4 py-2.5">Access Roles</th>
+                <th className="px-4 py-2.5">Line Allocation</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
@@ -284,7 +292,7 @@ export default function UserManagementPage() {
               {filteredUsers?.map((user) => {
                 return (
                   <tr key={user.id} className="hover:bg-slate-50/45 transition-colors group">
-                    <td className="px-6 py-3">
+                    <td className="px-4 py-2.5">
                       <div className="flex items-center gap-3">
                         <div className="relative shrink-0">
                           {user.avatarUrl ? (

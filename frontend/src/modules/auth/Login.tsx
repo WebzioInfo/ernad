@@ -19,11 +19,13 @@ export default function Login() {
 
   // Redirect if already authenticated
   if (isAuthenticated) {
-    const userRoles = user?.roles || (user?.role ? [user.role] : []);
+    const userRoles = (user?.roles || (user?.role ? [user.role] : [])).map((role: string) => role.toUpperCase());
     const isOperator = userRoles.includes('OPERATOR');
     const isManager = userRoles.includes('MANAGER');
-    
+    const isAccountant = userRoles.includes('ACCOUNTANT');
+
     if (isManager) return <Navigate to="/manager/overview" replace />;
+    if (isAccountant) return <Navigate to="/accountant" replace />;
     if (isOperator) return <Navigate to="/line/select" replace />;
     return <Navigate to="/admin/overview" replace />;
   }
@@ -45,10 +47,11 @@ export default function Login() {
       setAuth(res.data.access_token, res.data.user);
       toast.success(`Welcome back, ${res.data.user.name.split(' ')[0]}`);
 
-      const role = res.data.user.role;
-      if (role === 'ADMIN') navigate('/admin');
-      else if (role === 'MANAGER') navigate('/manager');
-      else if (role === 'OPERATOR') navigate('/operator/select');
+      const userRoles = (res.data.user.roles || (res.data.user.role ? [res.data.user.role] : [])).map((role: string) => role.toUpperCase());
+      if (userRoles.includes('ADMIN')) navigate('/admin');
+      else if (userRoles.includes('MANAGER')) navigate('/manager');
+      else if (userRoles.includes('ACCOUNTANT')) navigate('/accountant');
+      else if (userRoles.includes('OPERATOR')) navigate('/operator/select');
       else navigate('/admin'); // Fallback
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Access Denied: Invalid Identity or Credential');

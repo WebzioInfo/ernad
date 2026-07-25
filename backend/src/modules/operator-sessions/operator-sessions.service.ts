@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { db } from '../../database/db';
 import { operatorSessions, productionBatches, users as usersTable, productionLines, machineStates, shiftHandovers, batchTotals, roles, userRoles, permissions, rolePermissions } from '../../database/schema';
-import { eq, and, desc, isNull, or, sql } from 'drizzle-orm';
+import { eq, and, desc, isNull, lt, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { RedisService } from '../../providers/redis/redis.service';
 import { AuditService } from '../audit/audit.service';
@@ -416,7 +416,7 @@ export class OperatorSessionsService {
         eq(operatorSessions.isActive, true),
         or(
           isNull(operatorSessions.lastActivity),
-          sql`${operatorSessions.lastActivity} < ${staleThreshold}`
+          lt(operatorSessions.lastActivity, staleThreshold)
         )
       ));
 

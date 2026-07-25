@@ -21,7 +21,8 @@ export default function ProductsPage() {
   const { user } = useAuthStore();
   const userRoles = (user?.roles || [user?.role]).map(r => String(r).toUpperCase());
   const isAdmin = userRoles.includes('ADMIN') || userRoles.includes('SUPER_ADMIN');
-  const canManageProducts = isAdmin || userRoles.includes('MANAGER');
+  const isAccountant = userRoles.includes('ACCOUNTANT');
+  const canManageProducts = isAdmin || isAccountant;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);

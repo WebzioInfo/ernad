@@ -14,23 +14,28 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get()
-  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Get global inventory levels' })
   async getInventory() {
     return await this.inventoryService.getInventory();
   }
 
   @Get('warehouses')
-  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Get all warehouse locations' })
   async getWarehouses() {
     return await this.inventoryService.getWarehouses();
   }
 
-
+  @Get('stock')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Get all inventory stock items' })
+  async getStock() {
+    return await this.inventoryService.getInventory();
+  }
 
   @Get('stock/category/:category')
-  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Get stock items by category name' })
   async getStockByCategory(@Param('category') category: string) {
     return await this.inventoryService.getStockByCategory(category);
@@ -46,7 +51,7 @@ export class InventoryController {
   }
 
   @Get('packaging/:productId')
-  @Roles('OPERATOR', 'MANAGER', 'ADMIN')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Get packaging configurations for a product' })
   async getPackagingConfigs(@Param('productId', ParseUUIDPipe) productId: string) {
     return await this.inventoryService.getPackagingConfigs(productId);
@@ -79,35 +84,38 @@ export class InventoryController {
   // ─── NEW SIMPLE INVENTORY ENDPOINTS ─────────────────────────────────
 
   @Get('raw-materials')
+  @Roles('OPERATOR', 'MANAGER', 'ADMIN', 'ACCOUNTANT')
+  @Permissions('inventory:view')
   @ApiOperation({ summary: 'Get raw material stocks' })
   async getRawMaterials() {
     return await this.inventoryService.getRawMaterials();
   }
 
   @Get('raw-materials/:id/ledger')
-  @Roles('ADMIN', 'MANAGER')
+  @Permissions('inventory:view')
   @ApiOperation({ summary: 'Get ledger for raw material' })
   async getRawMaterialLedger(@Param('id') id: string) {
     return await this.inventoryService.getRawMaterialLedger(id);
   }
 
   @Get('station-consumption')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @Permissions('inventory:view')
   @ApiOperation({ summary: 'Get raw material consumption by station' })
   async getStationConsumption() {
     return await this.inventoryService.getStationConsumption();
   }
 
   @Get('production-stock')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
   @ApiOperation({ summary: 'Get finished goods production stock' })
   async getProductionStock() {
     return await this.inventoryService.getProductionStock();
   }
 
   @Post('add-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Add raw material or product stock (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Add raw material or product stock (Admin, Manager & Accountant)' })
   async addStock(@Body() body: { materialId?: string; itemId?: string; itemType?: 'RAW' | 'PRODUCT'; quantity: number; remarks?: string }, @Req() req: any) {
     const itemId = body.itemId || body.materialId;
     const itemType = body.itemType || 'RAW';
@@ -123,15 +131,15 @@ export class InventoryController {
   }
 
   @Get('production-stock/:id/ledger')
-  @Roles('ADMIN', 'MANAGER')
+  @Permissions('inventory:view')
   @ApiOperation({ summary: 'Get ledger for a product production stock' })
   async getProductLedger(@Param('id') id: string) {
     return await this.inventoryService.getProductLedger(id);
   }
 
   @Put('update-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Update raw material or product stock transaction (Admin, Manager & Accountant)' })
   async updateStockTransaction(@Body() body: { transactionId: string; quantity: number; remarks?: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
     return await this.inventoryService.updateStockTransaction({
       transactionId: body.transactionId,
@@ -142,8 +150,8 @@ export class InventoryController {
   }
 
   @Delete('delete-stock')
-  @Roles('ADMIN', 'MANAGER')
-  @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin & Manager)' })
+  @Roles('ADMIN', 'MANAGER', 'ACCOUNTANT')
+  @ApiOperation({ summary: 'Delete raw material or product stock transaction (Admin, Manager & Accountant)' })
   async deleteStockTransaction(@Body() body: { transactionId: string; itemType?: 'RAW' | 'PRODUCT' }, @Req() req: any) {
     return await this.inventoryService.deleteStockTransaction(body.transactionId);
   }

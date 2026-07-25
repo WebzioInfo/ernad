@@ -2,7 +2,11 @@ import { LucideIcon } from 'lucide-react';
 
 export type UserRole = 
   | 'ADMIN' 
+  | 'SUPER_ADMIN'
+  | 'COMPANY_OWNER'
+  | 'OWNER'
   | 'MANAGER' 
+  | 'ACCOUNTANT' 
   | 'OPERATOR';
 
 export interface RouteDefinition {

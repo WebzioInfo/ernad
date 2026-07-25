@@ -20,11 +20,14 @@ import {
   NotificationService,
   SalesService,
   BackupService,
+  EditHistoryService,
+  type EditHistoryQueryParams,
   type StartBatchPayload,
   type CloseBatchPayload,
   type TelemetryLogPayload,
   type CreateNotePayload,
   type CreateSalesTransactionPayload,
+  type Customer,
 } from '../services/api-services';
 
 // ─── QUERY KEY REGISTRY ───────────────────────────────────────────────────────
@@ -270,7 +273,21 @@ export function useBrands() {
 }
 
 export function useProducts() {
-  return useQuery({ queryKey: QK.PRODUCTS, queryFn: () => MasterDataService.getProducts() });
+  return useQuery({
+    queryKey: QK.PRODUCTS,
+    queryFn: async () => {
+      try {
+        return await MasterDataService.getProducts();
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useProducts] Failed to fetch products', err);
+        throw err;
+      }
+    },
+    // Provide a small retry window and an empty initial value so components can render deterministically
+    retry: 1,
+    initialData: [],
+  });
 }
 
 export function useShifts() {
@@ -459,10 +476,151 @@ export function useCustomers() {
   });
 }
 
-export function useSalesTransactions() {
+export function useCustomersFiltered(params: any) {
   return useQuery({
+    queryKey: ['sales-customers-filtered', params],
+    queryFn: () => SalesService.getCustomersFiltered(params),
+  });
+}
+
+export function useCustomerById(id: string) {
+  return useQuery({
+    queryKey: ['sales-customer', id],
+    queryFn: () => SalesService.getCustomerById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Partial<Customer>) => SalesService.createCustomer(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+    },
+  });
+}
+
+export function useUpdateCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<Customer> }) =>
+      SalesService.updateCustomer(id, payload),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+      qc.invalidateQueries({ queryKey: ['sales-customer', variables.id] });
+    },
+  });
+}
+
+export function useDeleteCustomer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => SalesService.deleteCustomer(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sales-customers'] });
+      qc.invalidateQueries({ queryKey: ['sales-customers-filtered'] });
+    },
+  });
+}
+
+export function useCustomerSummary(id: string, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-summary', id],
+    queryFn: () => SalesService.getCustomerSummary(id),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerLedger(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-ledger', id, params],
+    queryFn: () => SalesService.getCustomerLedger(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerSales(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-sales', id, params],
+    queryFn: () => SalesService.getCustomerSales(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerPayments(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-payments', id, params],
+    queryFn: () => SalesService.getCustomerPayments(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerReturns(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-returns', id, params],
+    queryFn: () => SalesService.getCustomerReturns(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerDamages(id: string, params?: any, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-damages', id, params],
+    queryFn: () => SalesService.getCustomerDamages(id, params),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useCustomerActivities(id: string, options?: any) {
+  return useQuery({
+    queryKey: ['sales-customer-activities', id],
+    queryFn: () => SalesService.getCustomerActivities(id),
+    enabled: !!id,
+    ...options
+  });
+}
+
+export function useSalesTransactions() {
+  return useQuery<any, Error>({
     queryKey: QK.SALES_TRANSACTIONS,
-    queryFn: () => SalesService.getSalesTransactions(),
+    queryFn: async () => {
+      try {
+        return await SalesService.getSalesTransactions();
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useSalesTransactions] Failed to fetch sales transactions', err);
+        throw err;
+      }
+    },
+    retry: 1,
+    placeholderData: (previousData: any) => previousData,
+    staleTime: 60000,
+  });
+}
+
+export function useSalesTransactionsFiltered(params?: Record<string, any>) {
+  return useQuery<any, Error>({
+    queryKey: [QK.SALES_TRANSACTIONS, 'filtered', params],
+    queryFn: async () => {
+      try {
+        return await SalesService.getSalesTransactions(params);
+      } catch (err: any) {
+        // eslint-disable-next-line no-console
+        console.error('[useSalesTransactionsFiltered] Failed to fetch sales transactions', err);
+        throw err;
+      }
+    },
+    placeholderData: (previousData: any) => previousData,
+    staleTime: 5000,
   });
 }
 
@@ -543,5 +701,24 @@ export function useRestoreBackup() {
     onSuccess: () => {
       qc.invalidateQueries(); // Invalidate all query cache since data is overwritten
     },
+  });
+}
+
+// ── EDIT HISTORY HOOKS ──
+
+export function useEditHistory(params?: EditHistoryQueryParams) {
+  return useQuery({
+    queryKey: ['edit-history', params],
+    queryFn: () => EditHistoryService.getEditHistory(params),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30000,
+  });
+}
+
+export function useRecordEditHistory(module: string, recordId: string) {
+  return useQuery({
+    queryKey: ['edit-history-record', module, recordId],
+    queryFn: () => EditHistoryService.getRecordHistory(module, recordId),
+    enabled: !!module && !!recordId,
   });
 }

@@ -12,6 +12,10 @@ import SmartRedirect from './SmartRedirect';
 // import { Sparkle, Sparkles, Bell, Database, Command, Users } from 'lucide-react';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 
+const SalesAnalyticsPage = lazy(() => import('../modules/reports/pages/SalesAnalyticsPage'));
+const ProductsPage = lazy(() => import('../modules/inventory/ProductsPage'));
+const RawMaterialsPage = lazy(() => import('../modules/inventory/RawMaterialsPage'));
+
 // Optimized Module Loading
 const OperatorPanel = lazy(() => import('../modules/production/OperatorPanel'));
 const LineSelectionPage = lazy(() => import('../modules/production/LineSelectionPage'));
@@ -56,6 +60,17 @@ export function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
+        <Route
+          path="/sales"
+          element={
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<SalesAnalyticsPage />} />
+        </Route>
+
         {/* 1. ADMINISTRATION (Admin) */}
         <Route
           path="/admin"
@@ -66,6 +81,15 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/admin/overview" replace />} />
+          <Route path="sales" element={
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+              <SalesAnalyticsPage />
+            </RequireAuth>
+          } />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="raw-materials" element={<RawMaterialsPage />} />
+          <Route path="inventory/raw-materials" element={<Navigate to="/admin/raw-materials" replace />} />
+          <Route path="inventory/products" element={<Navigate to="/admin/products" replace />} />
           {renderRoutes(dynamicRoutes)}
           
           {/* Static / Compatibility Routes (Coming Soon) */}
@@ -94,23 +118,40 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/manager/overview" replace />} />
+          <Route path="sales" element={
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+              <SalesAnalyticsPage />
+            </RequireAuth>
+          } />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="raw-materials" element={<RawMaterialsPage />} />
+          <Route path="inventory/raw-materials" element={<Navigate to="/manager/raw-materials" replace />} />
+          <Route path="inventory/products" element={<Navigate to="/manager/products" replace />} />
           {renderRoutes(dynamicRoutes)}
-          {/* Static / Compatibility Routes (Coming Soon) */}
-          {/* 
-          <Route path="quality" element={<ComingSoonPage title="Quality Management" description="QC testing modules and digital lab reports are in final validation phase." icon={Bell} />} />
-          <Route path="ai-advices" element={<ComingSoonPage title="AI Integrated Advices" description="Our neural network is currently analyzing your production historical data to provide real-time optimization strategies." icon={Sparkles} />} />
-          <Route path="tally" element={<ComingSoonPage title="Tally ERP Integration" description="Bi-directional synchronization with Tally ERP for automated accounting and voucher generation." icon={Database} />} />
-          <Route path="billing" element={<ComingSoonPage title="Payments & Billing" description="Integrated payment gateway and customer invoicing system for streamlined financial operations." icon={Command} />} />
-          <Route path="distributors" element={<ComingSoonPage title="Distributor Network" description="Centralized management portal for your global distribution network and supply chain partners." icon={Users} />} />
-          */}
-
-          {/* Redirects for disabled/commented-out routes */}
-          <Route path="ai-advices" element={<Navigate to="/manager/overview" replace />} />
-          <Route path="billing" element={<Navigate to="/manager/overview" replace />} />
-          <Route path="distributors" element={<Navigate to="/manager/overview" replace />} />
         </Route>
 
-        {/* 3. OPERATOR PORTAL (Authenticated via Login) */}
+        {/* 3. ACCOUNTANT PORTAL */}
+        <Route
+          path="/accountant"
+          element={
+            <RequireAuth allowedRoles={['ACCOUNTANT']}>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
+          <Route path="sales" element={
+            <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
+              <SalesAnalyticsPage />
+            </RequireAuth>
+          } />
+          <Route path="products" element={<ProductsPage />} />
+          <Route path="raw-materials" element={<RawMaterialsPage />} />
+          <Route path="inventory/raw-materials" element={<Navigate to="/accountant/raw-materials" replace />} />
+          <Route path="inventory/products" element={<Navigate to="/accountant/products" replace />} />
+          {renderRoutes(dynamicRoutes)}
+        </Route>
+
+        {/* 4. OPERATOR PORTAL (Authenticated via Login) */}
         <Route
           path="/operator"
           element={

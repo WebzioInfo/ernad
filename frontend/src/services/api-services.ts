@@ -32,7 +32,9 @@ import type {
   DailyAttendance,
   MonthlyAttendanceSummary,
   Note,
-  Terminal
+  Terminal,
+  EditHistoryRecord,
+  EditHistoryResponse,
 } from '../types/database.types';
 import { normalizeLedgerItem } from '../modules/inventory/ledger/ledger-types';
 
@@ -493,6 +495,96 @@ export interface Customer {
   email?: string;
   phone?: string;
   address?: string;
+  businessName?: string;
+  customerType?: 'INDIVIDUAL' | 'BUSINESS' | 'B2B' | 'B2C';
+  gstNumber?: string;
+  panNumber?: string;
+  alternativePhone?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  state?: string;
+  district?: string;
+  country?: string;
+  pinCode?: string;
+  openingBalance?: string;
+  openingBalanceType?: 'DEBIT' | 'CREDIT';
+  paymentTerms?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  notes?: string;
+  creditLimit?: string;
+}
+
+export interface CustomerSummary {
+  totalSalesCount: number;
+  totalSalesAmount: number;
+  amountReceived: number;
+  outstandingBalance: number;
+  pendingPayments: number;
+  salesReturnsCount: number;
+  salesReturnsAmount: number;
+  damagedReturnsCount: number;
+  damagedReturnsAmount: number;
+  totalProductsPurchased: number;
+  lastPurchaseDate: string | null;
+  lastPaymentDate: string | null;
+  averageOrderValue: number;
+  lifetimeCustomerValue: number;
+}
+
+export interface LedgerEntry {
+  date: string;
+  reference: string;
+  description: string;
+  debit: number;
+  credit: number;
+  runningBalance: number;
+  status: string;
+  createdBy: string;
+}
+
+export interface SalesHistoryItem {
+  id: string;
+  orderNumber: string;
+  orderDate: string;
+  totalAmount: string;
+  taxAmount: string;
+  status: string;
+  paymentStatus: string;
+  remarks: string | null;
+  creatorName: string | null;
+  itemCount: number;
+  quantity: number;
+  paid: number;
+  due: number;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  amount: string;
+  paymentDate: string;
+  paymentMethod: string;
+  referenceNumber: string | null;
+  remarks: string | null;
+  orderNumber: string;
+}
+
+export interface ReturnHistoryItem {
+  id: string;
+  type: string;
+  quantity: number;
+  unitPrice: string;
+  salesDate: string;
+  remarks: string | null;
+  productName: string;
+  perfName: string | null;
+  refundAmount: number;
+}
+
+export interface ActivityItem {
+  date: string;
+  user: string;
+  action: string;
+  description: string;
 }
 
 export interface CreateSalesTransactionPayload {
@@ -527,8 +619,11 @@ export interface SalesTransaction {
 }
 
 export const SalesService = {
-  getSalesTransactions: () =>
-    api.get<SalesTransaction[]>(ENDPOINTS.SALES.TRANSACTIONS).then(r => r.data),
+  getOrderById: (id: string) =>
+    api.get<any>(ENDPOINTS.SALES.ORDER(id)).then(r => r.data),
+
+  getSalesTransactions: (params?: Record<string, any>) =>
+    api.get<any>(ENDPOINTS.SALES.TRANSACTIONS, { params }).then(r => r.data),
 
   createSalesTransaction: (payload: CreateSalesTransactionPayload) =>
     api.post<SalesTransaction>(ENDPOINTS.SALES.TRANSACTIONS, payload).then(r => r.data),
@@ -541,6 +636,30 @@ export const SalesService = {
 
   getCustomers: () =>
     api.get<Customer[]>(ENDPOINTS.SALES.CUSTOMERS).then(r => r.data),
+  getCustomersFiltered: (params?: any) =>
+    api.get<{ data: Customer[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMERS, { params }).then(r => r.data),
+  getCustomerById: (id: string) =>
+    api.get<Customer>(ENDPOINTS.SALES.CUSTOMER(id)).then(r => r.data),
+  createCustomer: (payload: Partial<Customer>) =>
+    api.post<Customer>(ENDPOINTS.SALES.CUSTOMERS, payload).then(r => r.data),
+  updateCustomer: (id: string, payload: Partial<Customer>) =>
+    api.patch<Customer>(ENDPOINTS.SALES.CUSTOMER(id), payload).then(r => r.data),
+  deleteCustomer: (id: string) =>
+    api.delete<{ success: boolean }>(ENDPOINTS.SALES.CUSTOMER(id)).then(r => r.data),
+  getCustomerSummary: (id: string) =>
+    api.get<CustomerSummary>(ENDPOINTS.SALES.CUSTOMER_SUMMARY(id)).then(r => r.data),
+  getCustomerLedger: (id: string, params?: any) =>
+    api.get<LedgerEntry[]>(ENDPOINTS.SALES.CUSTOMER_LEDGER(id), { params }).then(r => r.data),
+  getCustomerSales: (id: string, params?: any) =>
+    api.get<{ data: SalesHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_SALES(id), { params }).then(r => r.data),
+  getCustomerPayments: (id: string, params?: any) =>
+    api.get<{ data: PaymentHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_PAYMENTS(id), { params }).then(r => r.data),
+  getCustomerReturns: (id: string, params?: any) =>
+    api.get<{ data: ReturnHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_RETURNS(id), { params }).then(r => r.data),
+  getCustomerDamages: (id: string, params?: any) =>
+    api.get<{ data: ReturnHistoryItem[]; total: number; page: number; limit: number; totalPages: number }>(ENDPOINTS.SALES.CUSTOMER_DAMAGES(id), { params }).then(r => r.data),
+  getCustomerActivities: (id: string) =>
+    api.get<ActivityItem[]>(ENDPOINTS.SALES.CUSTOMER_ACTIVITIES(id)).then(r => r.data),
 };
 
 // ─── BACKUP & RESTORE ─────────────────────────────────────────────────────────
@@ -591,4 +710,24 @@ export const BackupService = {
       },
     }).then(r => r.data);
   },
+};
+
+export interface EditHistoryQueryParams {
+  startDate?: string;
+  endDate?: string;
+  module?: string;
+  employee?: string;
+  role?: string;
+  field?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export const EditHistoryService = {
+  getEditHistory: (params?: EditHistoryQueryParams) =>
+    api.get<EditHistoryResponse>(ENDPOINTS.EDIT_HISTORY, { params }).then(r => r.data),
+
+  getRecordHistory: (module: string, recordId: string) =>
+    api.get<EditHistoryRecord[]>(`${ENDPOINTS.EDIT_HISTORY}/record/${encodeURIComponent(module)}/${encodeURIComponent(recordId)}`).then(r => r.data),
 };

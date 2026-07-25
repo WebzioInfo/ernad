@@ -11,18 +11,19 @@ export const inventoryConfig: ModuleConfig = {
     {
       path: 'products',
       element: lazy(() => import('./ProductsPage')),
-      allowedRoles: ['ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT']
     },
     {
       path: 'raw-materials',
       element: lazy(() => import('./RawMaterialsPage')),
-      allowedRoles: ['ADMIN', 'MANAGER']
+      allowedRoles: ['ADMIN', 'MANAGER', 'ACCOUNTANT']
     }
   ],
   sidebarGroups: [
     {
       id: 'inventory',
       label: 'Inventory',
+      allowedRoles: ['ADMIN', 'MANAGER'],
       items: [
         {
           id: 'products',

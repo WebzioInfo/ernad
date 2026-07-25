@@ -58,9 +58,8 @@ export class AuthController {
         message: 'Login successful'
       };
     } catch (err: any) {
-      this.logger.error(`[AUTH_CONTROLLER_CRASH] Login lifecycle failed: ${err.message}`);
-      if (err instanceof UnauthorizedException) throw err;
-      throw new UnauthorizedException(err.message || 'Authentication process failed');
+      this.logger.error(`[AUTH_CONTROLLER_CRASH] Login lifecycle failed: ${err.message}`, err.stack);
+      throw err;
     }
   }
 

@@ -724,6 +724,25 @@ export interface Customer {
   creditLimit?: string | null;
   createdAt: string;
   updatedAt: string;
+  businessName?: string | null;
+  customerType?: 'INDIVIDUAL' | 'BUSINESS' | 'B2B' | 'B2C' | null;
+  gstNumber?: string | null;
+  panNumber?: string | null;
+  alternativePhone?: string | null;
+  billingAddress?: string | null;
+  shippingAddress?: string | null;
+  state?: string | null;
+  district?: string | null;
+  country?: string | null;
+  pinCode?: string | null;
+  openingBalance?: string | null;
+  openingBalanceType?: 'DEBIT' | 'CREDIT' | null;
+  paymentTerms?: string | null;
+  status?: 'ACTIVE' | 'INACTIVE' | null;
+  notes?: string | null;
+  deletedAt?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface SalesOrder {
@@ -814,4 +833,36 @@ export interface SalesOrderExpanded extends SalesOrder {
 
 export interface InventoryStockExpanded extends InventoryStock {
   warehouse?: Pick<WarehouseLocation, 'id' | 'name' | 'type'>;
+}
+
+export interface EditHistoryRecord {
+  id: number;
+  tenantId?: string | null;
+  module: string;
+  tableName: string;
+  recordId: string;
+  fieldName: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+  editedByUserId?: string | null;
+  editedByName?: string | null;
+  editedByRole?: string | null;
+  editedAt: string;
+  reason?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  sessionId?: string | null;
+  createdAt: string;
+}
+
+export interface EditHistoryResponse {
+  items: EditHistoryRecord[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+  availableModules: string[];
+  availableRoles: string[];
 }

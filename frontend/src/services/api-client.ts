@@ -62,6 +62,21 @@ export const api = axios.create({
   }
 });
 
+export const showSlowNetworkToast = () => {
+  toast.warning('Slow Network Connection', {
+    id: 'network-latency',
+    description: 'Your request is taking a little longer than usual due to network conditions. Please wait while we continue processing it.',
+    duration: 6000,
+    dismissible: true,
+    style: {
+      backgroundColor: '#FFFBEB',
+      borderColor: '#FCD34D',
+      color: '#92400E',
+    },
+    icon: '⚠️',
+  });
+};
+
 // ── REQUEST INTERCEPTOR (TRACING & AUTH) ──
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().token;
@@ -84,6 +99,15 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers['x-vercel-protection-skip'] = protectionSkip;
   }
 
+  // Latency monitoring: trigger warning toast if request takes > 3.5s
+  const isBackgroundPoll = isBackgroundPollUrl(config.url);
+  if (!isBackgroundPoll) {
+    const latencyTimer = setTimeout(() => {
+      showSlowNetworkToast();
+    }, 3500);
+    (config as any)._latencyTimer = latencyTimer;
+  }
+
   if (import.meta.env.DEV) {
     console.debug(`%c[API_OUT] ${config.method?.toUpperCase()} ${config.url}`, 'color: #1A9A91; font-weight: bold;', { requestId });
   }
@@ -94,13 +118,24 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 // ── RESPONSE INTERCEPTOR (ERROR MAPPING & RETRY) ──
 api.interceptors.response.use(
   (response) => {
+    const config = response.config as any;
+    if (config?._latencyTimer) {
+      clearTimeout(config._latencyTimer);
+    }
+    // Auto-dismiss warning if request completes successfully
+    toast.dismiss('network-latency');
+
     if (response.config.url?.includes('inventory/ledger/product')) {
       console.log("RAW API", response.data);
     }
     return response;
   },
   async (error: AxiosError) => {
-    const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number };
+    const config = error.config as InternalAxiosRequestConfig & { _retryCount?: number; _latencyTimer?: any };
+    if (config?._latencyTimer) {
+      clearTimeout(config._latencyTimer);
+    }
+    toast.dismiss('network-latency');
 
     // 1. Handle Network/CORS/Blocked/Timeout Errors
     if (!error.response) {
@@ -123,10 +158,7 @@ api.interceptors.response.use(
         const isBackgroundPoll = isBackgroundPollUrl(config?.url);
 
         if (!isBackgroundPoll) {
-          toast.error('Network Latency Detected', {
-            id: 'network-latency',
-            description: 'The operation is taking longer than expected. We are still trying in the background.',
-          });
+          showSlowNetworkToast();
         }
       } else if (isNetworkError) {
         // ── OFFLINE-FIRST LOGIC: Queue non-GET requests ──

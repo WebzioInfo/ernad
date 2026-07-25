@@ -114,6 +114,14 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 
+  .recharts-responsive-container,
+  .recharts-wrapper {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
   h1,
   h2,
   h3,

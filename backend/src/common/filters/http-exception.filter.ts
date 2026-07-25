@@ -50,6 +50,28 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (status >= 500) {
       this.logger.error(`[SYSTEM_FAILURE] ${request.method} ${request.url} - ${exception.message}`, exception.stack);
+      
+      let currentCause = exception.cause;
+      let depth = 1;
+      while (currentCause && depth <= 5) {
+        const msg = currentCause.message || String(currentCause);
+        this.logger.error(`[SYSTEM_FAILURE_CAUSE depth=${depth}] ${msg}`);
+        
+        if (currentCause.code || currentCause.severity || currentCause.severity_local || currentCause.detail || currentCause.hint) {
+          const code = currentCause.code || 'N/A';
+          const severity = currentCause.severity_local || currentCause.severity || 'N/A';
+          const detail = currentCause.detail || 'N/A';
+          const hint = currentCause.hint || 'N/A';
+          this.logger.error(`[SYSTEM_FAILURE_CAUSE_METADATA depth=${depth}] code: ${code} | severity: ${severity} | detail: ${detail} | hint: ${hint}`);
+        }
+        
+        if (currentCause.stack) {
+          this.logger.error(`[SYSTEM_FAILURE_CAUSE_STACK depth=${depth}]`, currentCause.stack);
+        }
+        
+        currentCause = currentCause.cause;
+        depth++;
+      }
     } else {
       this.logger.warn(`[CLIENT_FAULT] ${request.method} ${request.url} - ${status} - ${message}`);
     }

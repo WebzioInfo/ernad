@@ -38,7 +38,7 @@ export class UsersService {
     'ADMIN',
   ] as const;
 
-  private static readonly VALID_ROLE_SLUGS = ['ADMIN', 'MANAGER', 'OPERATOR'] as const;
+  private static readonly VALID_ROLE_SLUGS = ['ADMIN', 'MANAGER', 'ACCOUNTANT', 'OPERATOR'] as const;
 
   private async hasUserLinesTable(client: any = db) {
     if (this.userLinesTableExistsCache !== null) {
@@ -332,7 +332,7 @@ export class UsersService {
     const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
     const invalidRole = requestedRoles.find(r => !UsersService.VALID_ROLE_SLUGS.includes(r as any));
     if (invalidRole) {
-      throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, OPERATOR`);
+      throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, ACCOUNTANT, OPERATOR`);
     }
     if (!isAdmin && requestedRoles.some(r => r !== 'OPERATOR')) {
       throw new ForbiddenException('Managers can only create operator staff accounts');
@@ -463,7 +463,7 @@ export class UsersService {
           const requestedRoles = (dto.roles || [dto.role]).filter(Boolean).map((r: string) => r.toUpperCase());
           const invalidRole = requestedRoles.find(r => !UsersService.VALID_ROLE_SLUGS.includes(r as any));
           if (invalidRole) {
-            throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, OPERATOR`);
+            throw new BadRequestException(`Invalid role "${invalidRole}". Allowed roles are ADMIN, MANAGER, ACCOUNTANT, OPERATOR`);
           }
           if (!isAdmin) {
             const hasNonOperatorRole = requestedRoles.some(r => r !== 'OPERATOR');

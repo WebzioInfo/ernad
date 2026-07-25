@@ -11,10 +11,13 @@ import { env } from './env';
  */
 
 const isProduction = process.env.NODE_ENV === 'production';
+const useSSL = env.DATABASE_URL.includes('sslmode=require') || 
+               env.DATABASE_URL.includes('pooler.supabase.com') || 
+               env.DATABASE_URL.includes('supabase.co');
 
 const client = postgres(env.DATABASE_URL, { 
     prepare: false,
-    ssl: isProduction ? { rejectUnauthorized: false } : (process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false),
+    ssl: useSSL ? { rejectUnauthorized: false } : undefined,
     max: isProduction ? 15 : 30, // Optimized for serverless Vercel limits
     idle_timeout: 10,
     connect_timeout: 10,

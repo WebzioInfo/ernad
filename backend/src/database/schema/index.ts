@@ -12,3 +12,4 @@ export * from './incidents';
 export * from './sales';
 
 export * from './procurement';
+export * from './history';

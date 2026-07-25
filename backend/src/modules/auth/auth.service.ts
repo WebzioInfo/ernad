@@ -11,6 +11,7 @@ import { MailService } from '../../providers/mail/mail.service';
 const ROLE_PRECEDENCE = [
   'ADMIN',
   'MANAGER',
+  'ACCOUNTANT',
   'OPERATOR'
 ];
 
@@ -21,6 +22,7 @@ function normalizeRole(roleSlug: string): string {
   if (r === 'PRODUCTION MANAGER') return 'MANAGER';
   if (r.includes('ADMIN')) return 'ADMIN';
   if (r.includes('MANAGER')) return 'MANAGER';
+  if (r.includes('ACCOUNTANT')) return 'ACCOUNTANT';
   
   return 'OPERATOR'; // fallback
 }
@@ -82,14 +84,14 @@ export class AuthService {
       const roleSlugs = Array.from(new Set(userRolesResult.map(r => normalizeRole(r.slug))));
       const sortedRoles = sortRoles(roleSlugs);
       const effectiveRole = sortedRoles[0] || 'OPERATOR';
-      const isManagerOrAdmin = ['ADMIN', 'MANAGER'].includes(effectiveRole);
+      const usesPassword = ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(effectiveRole);
 
       this.logger.debug(`[AUTH_TRACE] 4. Starting credential verification (bcrypt) for role: ${effectiveRole}...`);
       let isMatch = false;
 
       try {
-        if (isManagerOrAdmin) {
-          // Managers/admins MUST authenticate via password
+        if (usesPassword) {
+          // Admins, managers, and accountants authenticate via password
           if (!user.passwordHash) {
             throw new UnauthorizedException('Password access credentials not configured.');
           }
@@ -164,8 +166,7 @@ export class AuthService {
       };
     } catch (err: any) {
       this.logger.error(`[AUTH_CRITICAL_ERROR] Login process terminated abnormally: ${err.message}`, err.stack);
-      if (err instanceof UnauthorizedException) throw err;
-      throw new UnauthorizedException(`Login failed: ${err.message || 'System error'}`);
+      throw err;
     }
   }
 
@@ -323,7 +324,17 @@ export class AuthService {
       const session = await this.sessionService.startSession(operatorId, lineId, station, undefined, true, terminalId);
 
       // 7. Generate Token with Dynamic Roles
-      const payload = {
+      const payload: {
+        sub: string;
+        id: string;
+        username: string;
+        role: string;
+        roles: string[];
+        permissions: string[];
+        name: string;
+        sessionId: string;
+        [key: string]: any;
+      } = {
         sub: user.id,
         id: user.id,
         username: user.username,
@@ -332,7 +343,6 @@ export class AuthService {
         permissions: permissionsSlugs,
         name: user.name,
         sessionId: session.id,
-        deviceId: undefined
       };
 
       const token = await this.jwtService.signAsync(payload);
