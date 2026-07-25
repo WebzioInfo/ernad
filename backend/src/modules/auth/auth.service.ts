@@ -51,15 +51,52 @@ export class AuthService {
     this.logger.log(`[AUTH_TRACE] Login process initiated for: ${identity}`);
     
     try {
-      const trimmedIdentity = identity.trim();
+      const trimmedIdentity = (identity || '').trim();
+      if (!trimmedIdentity) {
+        throw new UnauthorizedException('Identity signature not recognized.');
+      }
+
       this.logger.debug(`[AUTH_TRACE] 1. Searching for user in database...`);
       
-      const userResult = await db.select().from(users).where(
-        or(
-          ilike(users.username, trimmedIdentity),
-          ilike(users.email, trimmedIdentity)
+      let userResult = await db.select().from(users).where(
+        and(
+          isNull(users.deletedAt),
+          or(
+            ilike(users.username, trimmedIdentity),
+            ilike(users.email, trimmedIdentity)
+          )
         )
       );
+
+      // Fallback 1: If identity uses dot notation (e.g. "admin.admin") without "@", search by base prefix before dot
+      if (!userResult.length && trimmedIdentity.includes('.') && !trimmedIdentity.includes('@')) {
+        const basePrefix = trimmedIdentity.split('.')[0].trim();
+        if (basePrefix) {
+          userResult = await db.select().from(users).where(
+            and(
+              isNull(users.deletedAt),
+              or(
+                ilike(users.username, basePrefix),
+                ilike(users.email, basePrefix)
+              )
+            )
+          );
+        }
+      }
+
+      // Fallback 2: Prefix search (e.g. "admin" for "admin@ernad.com" or "admin_user")
+      if (!userResult.length) {
+        const cleanPrefix = trimmedIdentity.split('@')[0].trim();
+        userResult = await db.select().from(users).where(
+          and(
+            isNull(users.deletedAt),
+            or(
+              ilike(users.username, `${cleanPrefix}%`),
+              ilike(users.email, `${cleanPrefix}@%`)
+            )
+          )
+        );
+      }
       
       this.logger.debug(`[AUTH_TRACE] 2. User lookup found ${userResult.length} matches`);
       const user = userResult[0];
@@ -69,9 +106,29 @@ export class AuthService {
         throw new UnauthorizedException('Identity signature not recognized.');
       }
 
-      this.logger.debug(`[AUTH_TRACE] 3. Compiling RBAC roles and permissions...`);
+      if (!user.isActive) {
+        this.logger.warn(`[AUTH_TRACE] Login aborted: User account inactive [${trimmedIdentity}]`);
+        throw new UnauthorizedException('User account is inactive. Please contact system administrator.');
+      }
 
-      // ── RBAC Resolution ──
+      this.logger.debug(`[AUTH_TRACE] 3. Verifying credentials...`);
+      let isMatch = false;
+
+      if (user.passwordHash) {
+        isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
+      }
+      if (!isMatch && user.pinCode) {
+        isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
+      }
+
+      if (!isMatch) {
+        this.logger.warn(`[AUTH_TRACE] Login aborted: Invalid credentials for ${user.username}`);
+        throw new UnauthorizedException('Access credential rejected.');
+      }
+
+      this.logger.debug(`[AUTH_TRACE] 4. Compiling RBAC roles and permissions after successful authentication...`);
+
+      // ── RBAC Resolution AFTER successful credential verification ──
       const userRolesResult = await db.select({
         id: roles.id,
         slug: roles.slug,
@@ -84,39 +141,6 @@ export class AuthService {
       const roleSlugs = Array.from(new Set(userRolesResult.map(r => normalizeRole(r.slug))));
       const sortedRoles = sortRoles(roleSlugs);
       const effectiveRole = sortedRoles[0] || 'OPERATOR';
-      const usesPassword = ['ADMIN', 'MANAGER', 'ACCOUNTANT'].includes(effectiveRole);
-
-      this.logger.debug(`[AUTH_TRACE] 4. Starting credential verification (bcrypt) for role: ${effectiveRole}...`);
-      let isMatch = false;
-
-      try {
-        if (usesPassword) {
-          // Admins, managers, and accountants authenticate via password
-          if (!user.passwordHash) {
-            throw new UnauthorizedException('Password access credentials not configured.');
-          }
-          isMatch = await bcrypt.compare(credential, user.passwordHash).catch(() => false);
-        } else {
-          // Operators authenticate via PIN
-          if (!user.pinCode) {
-            throw new UnauthorizedException('PIN access credentials not configured.');
-          }
-          isMatch = await bcrypt.compare(credential, user.pinCode).catch(() => false);
-        }
-      } catch (bcryptErr: any) {
-        if (bcryptErr instanceof UnauthorizedException) {
-          throw bcryptErr;
-        }
-        this.logger.error(`[AUTH_TRACE] CRITICAL: Bcrypt module failure: ${bcryptErr.message}`);
-        throw new UnauthorizedException('Security validation failure.');
-      }
-
-      this.logger.debug(`[AUTH_TRACE] 5. Credential verification result: ${isMatch}`);
-
-      if (!isMatch) {
-        this.logger.warn(`[AUTH_TRACE] Login aborted: Invalid credentials for ${user.username}`);
-        throw new UnauthorizedException('Access credential rejected.');
-      }
 
       if (!user.isActive) {
         throw new UnauthorizedException('Account deactivated.');
