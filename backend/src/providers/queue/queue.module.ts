@@ -22,7 +22,7 @@ import Redis from 'ioredis';
           maxRetriesPerRequest: null,
           enableReadyCheck: false,
           connectTimeout: 5000,
-          enableOfflineQueue: false,
+          family: 0,
           tls: url.startsWith('rediss://') ? { rejectUnauthorized: false } : undefined,
           retryStrategy: (times) => Math.min(times * 500, 30000),
         });
