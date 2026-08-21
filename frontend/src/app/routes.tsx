@@ -23,6 +23,7 @@ const StationSelectionPage = lazy(() => import('../modules/production/StationSel
 const TerminalDashboard = lazy(() => import('../modules/production/TerminalDashboard'));
 const IncidentsDashboard = lazy(() => import('../modules/incidents/pages/IncidentsDashboard'));
 const DiagnosticsPage = lazy(() => import('./DiagnosticsPage'));
+const KenbyAIPage = lazy(() => import('../modules/ai/KenbyAIPage'));
 
 import { moduleRegistry } from './registry/moduleRegistry';
 import { RouteDefinition } from './registry/types';
@@ -71,6 +72,19 @@ export function AppRoutes() {
           <Route index element={<SalesAnalyticsPage />} />
         </Route>
 
+        {/* 0. OWNER ASSISTANT */}
+        <Route
+          path="/owner"
+          element={
+            <RequireAuth allowedRoles={['ADMIN']}>
+              <DashboardLayout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Navigate to="/owner/ai" replace />} />
+          <Route path="ai" element={<KenbyAIPage />} />
+        </Route>
+
         {/* 1. ADMINISTRATION (Admin) */}
         <Route
           path="/admin"
@@ -81,6 +95,7 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Navigate to="/admin/overview" replace />} />
+          <Route path="ai" element={<KenbyAIPage />} />
           <Route path="sales" element={
             <RequireAuth allowedRoles={['ADMIN', 'MANAGER', 'ACCOUNTANT']}>
               <SalesAnalyticsPage />

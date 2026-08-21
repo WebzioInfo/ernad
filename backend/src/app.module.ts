@@ -34,6 +34,7 @@ import { IncidentsModule } from './modules/incidents/incidents.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { EditHistoryModule } from './modules/edit-history/edit-history.module';
+import { AiModule } from './modules/ai/ai.module';
 
 import { AppController } from './app.controller';
 
@@ -61,6 +62,7 @@ import { AppController } from './app.controller';
     NotesModule,
     IncidentsModule,
     DashboardModule,
+    AiModule,
 
     ReportsModule,
     WastageModule,

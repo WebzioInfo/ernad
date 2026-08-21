@@ -441,3 +441,7 @@
 
 /* Dark mode variants */
 @variant dark (&:where(.dark, .dark *));
+
+.font-ml {
+  font-family: "Noto Sans Malayalam", "Inter", ui-sans-serif, system-ui, sans-serif;
+}

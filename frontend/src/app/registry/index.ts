@@ -9,8 +9,10 @@ import { reportsConfig } from '../../modules/reports/module.config';
 import { accountantConfig } from '../../modules/accountant/module.config';
 import { incidentsConfig } from '../../modules/incidents/module.config';
 import { wastageConfig } from '../../modules/wastage/module.config';
+import { aiConfig } from '../../modules/ai/module.config';
 
 export const registerModules = () => {
+  moduleRegistry.register(aiConfig);
   moduleRegistry.register(analyticsConfig);
   moduleRegistry.register(wastageConfig);
   moduleRegistry.register(personnelConfig);

@@ -269,7 +269,13 @@ export function useLine(lineId: string | undefined) {
 }
 
 export function useBrands() {
-  return useQuery({ queryKey: QK.BRANDS, queryFn: () => MasterDataService.getBrands() });
+  return useQuery({
+    queryKey: QK.BRANDS,
+    queryFn: async () => {
+      const raw = await MasterDataService.getBrands();
+      return Array.isArray(raw) ? raw : (raw as any)?.data || [];
+    },
+  });
 }
 
 export function useProducts() {
@@ -277,16 +283,18 @@ export function useProducts() {
     queryKey: QK.PRODUCTS,
     queryFn: async () => {
       try {
-        return await MasterDataService.getProducts();
+        const raw = await MasterDataService.getProducts();
+        const list = Array.isArray(raw) ? raw : (raw as any)?.data || [];
+        return list.map((item: any) => ({
+          ...item,
+          brandId: item.brandId || item.brand_id || null,
+        }));
       } catch (err: any) {
-        // eslint-disable-next-line no-console
         console.error('[useProducts] Failed to fetch products', err);
         throw err;
       }
     },
-    // Provide a small retry window and an empty initial value so components can render deterministically
     retry: 1,
-    initialData: [],
   });
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Package, Search, AlertTriangle, X, Loader2, Check,
   Boxes, ChevronLeft, ChevronRight, Calendar, RefreshCw
@@ -111,7 +111,12 @@ export default function SalesAnalyticsPage() {
   } = useSalesTransactionsFiltered(queryParams);
 
   const { data: brands, isLoading: isBrandsLoading } = useBrands();
-  const { data: products, isLoading: isProductsLoading } = useProducts();
+  const {
+    data: products = [],
+    isLoading: isProductsLoading,
+    isError: isProductsError,
+    refetch: refetchProducts,
+  } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
 
   const { user } = useAuthStore();
@@ -129,6 +134,28 @@ export default function SalesAnalyticsPage() {
   const totalPages = pagination.totalPages;
   const totalCount = pagination.totalItems;
 
+  const availableProducts = useMemo(() => {
+    if (!products || !Array.isArray(products)) return [];
+    if (!selectedBrandId) return products;
+
+    const brandMatches = products.filter((p: any) => (p.brandId || p.brand_id) === selectedBrandId);
+    if (brandMatches.length > 0) return brandMatches;
+
+    const systemHasBrandAssignments = products.some((p: any) => Boolean(p.brandId || p.brand_id));
+    if (!systemHasBrandAssignments) return products;
+
+    return [];
+  }, [products, selectedBrandId]);
+
+  useEffect(() => {
+    if (selectedProductId) {
+      const stillValid = availableProducts.some((p: any) => p.id === selectedProductId);
+      if (!stillValid) {
+        setSelectedProductId('');
+      }
+    }
+  }, [selectedBrandId, availableProducts]);
+
   if (isBrandsLoading || isProductsLoading || isCustomersLoading || (isLedgerLoading && !filteredResponse)) {
     return (
       <div className="h-96 flex items-center justify-center animate-pulse text-slate-400 font-black uppercase tracking-widest text-xs">
@@ -145,8 +172,8 @@ export default function SalesAnalyticsPage() {
       </div>
     );
   }
-  const currentProduct = products?.find(p => p.id === selectedProductId);
-  const currentBrand = brands?.find(b => b.id === selectedBrandId);
+  const currentProduct = (products || []).find((p: any) => p.id === selectedProductId);
+  const currentBrand = (brands || []).find((b: any) => b.id === selectedBrandId);
   const quantityInt = parseInt(quantity, 10) || 0;
 
   const resetCreateForm = () => {
@@ -630,7 +657,7 @@ export default function SalesAnalyticsPage() {
                             className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.brand ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'}`}
                           >
                             <option value="">Select brand</option>
-                            {brands?.map((brand) => (
+                            {brands?.map((brand: any) => (
                               <option key={brand.id} value={brand.id}>{brand.name}</option>
                             ))}
                           </select>
@@ -642,17 +669,38 @@ export default function SalesAnalyticsPage() {
                           <select
                             value={selectedProductId}
                             onChange={(e) => setSelectedProductId(e.target.value)}
-                            disabled={!selectedBrandId}
+                            disabled={!selectedBrandId || isProductsLoading || (Boolean(selectedBrandId) && availableProducts.length === 0)}
                             className={`w-full rounded-3xl border px-4 py-3 text-sm font-bold text-slate-900 outline-none transition ${fieldErrors.product ? 'border-rose-400 focus:border-rose-400 bg-rose-50' : 'border-slate-200 bg-white focus:border-teal-500'} disabled:cursor-not-allowed disabled:bg-slate-100`}
                           >
-                            <option value="">Select product</option>
-                            {products
-                              ?.filter((product) => product.brandId === selectedBrandId)
-                              .map((product) => (
-                                <option key={product.id} value={product.id}>{product.name}</option>
-                              ))}
+                            {!selectedBrandId ? (
+                              <option value="">Select brand first</option>
+                            ) : isProductsLoading ? (
+                              <option value="">Loading products...</option>
+                            ) : isProductsError ? (
+                              <option value="">Unable to load products</option>
+                            ) : products.length === 0 ? (
+                              <option value="">No products available</option>
+                            ) : availableProducts.length === 0 ? (
+                              <option value="">No products available for this brand</option>
+                            ) : (
+                              <>
+                                <option value="">Select product</option>
+                                {availableProducts.map((product: any) => (
+                                  <option key={product.id} value={product.id}>{product.name}</option>
+                                ))}
+                              </>
+                            )}
                           </select>
                           {fieldErrors.product ? <p className="mt-2 text-sm text-rose-600">{fieldErrors.product}</p> : null}
+                          {isProductsError && (
+                            <button
+                              type="button"
+                              onClick={() => refetchProducts()}
+                              className="mt-1.5 text-xs text-[#1A9A91] underline font-bold"
+                            >
+                              Unable to load products. Try again
+                            </button>
+                          )}
                         </div>
                       </div>
                     </section>
@@ -976,12 +1024,21 @@ function EditSalesEntryModal({ onClose, transaction, brands, products, customers
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-indigo-500 bg-slate-50 shadow-sm"
                 disabled={!brandId}
               >
-                <option value="">Select Product</option>
-                {products
-                  ?.filter((p) => p.brandId === brandId)
-                  .map((prod) => (
-                    <option key={prod.id} value={prod.id}>{prod.name}</option>
-                  ))}
+                {!brandId ? (
+                  <option value="">Select Brand First</option>
+                ) : (
+                  <>
+                    <option value="">Select Product</option>
+                    {(products || [])
+                      .filter((p: any) => {
+                        const pBrandId = p.brandId || p.brand_id;
+                        return !pBrandId || pBrandId === brandId;
+                      })
+                      .map((prod: any) => (
+                        <option key={prod.id} value={prod.id}>{prod.name}</option>
+                      ))}
+                  </>
+                )}
               </select>
             </div>
           </div>
